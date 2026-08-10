@@ -601,7 +601,10 @@ ai_status() {
     published_head="unknown"
   fi
   primary_real="$(ai_realpath "$AI_PRIMARY_ROOT")"
-  live_real="$(ai_realpath "$AI_LIVE_ROOT" 2>/dev/null || true)"
+  live_real=""
+  if [[ -n "$AI_LIVE_ROOT" ]]; then
+    live_real="$(ai_realpath "$AI_LIVE_ROOT" 2>/dev/null || true)"
+  fi
 
   printf 'AI workspace status\n'
   printf '  Primary:   %s\n' "$AI_PRIMARY_ROOT"
