@@ -51,10 +51,11 @@ ai_initialize_context() {
 
   configured_remote="$(git -C "$ROOT_DIR" config --get "branch.${AI_MAIN_BRANCH}.remote" 2>/dev/null || true)"
   if [[ -z "$configured_remote" || "$configured_remote" == "." ]]; then
-    configured_remote="spoiled-milk"
+    configured_remote="origin"
   fi
   AI_REMOTE="${AI_REMOTE:-$configured_remote}"
-  AI_LIVE_ROOT="/tmp/spoiled-milk-live-main"
+  # This source-provider repository has no live deployment worktree.
+  AI_LIVE_ROOT=""
 
   AI_COMMON_GIT_DIR="$(git -C "$ROOT_DIR" rev-parse --git-common-dir)"
   if [[ "$AI_COMMON_GIT_DIR" != /* ]]; then

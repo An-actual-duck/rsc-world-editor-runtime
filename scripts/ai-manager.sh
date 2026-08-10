@@ -13,8 +13,6 @@ Usage:
   ./scripts/ai-manager.sh rescue <ai-N> [-m message] [--local-only] [--allow-sensitive] [--allow-large]
   ./scripts/ai-manager.sh collect-contributor <ai-N> <remote-topic-branch> <exact-commit>
   ./scripts/ai-manager.sh merge <topic-branch>
-  ./scripts/ai-manager.sh release-check
-  ./scripts/ai-manager.sh release <package-player-release options>
 
 Rescue is an explicit preservation action for an abandoned slot. Merge accepts
 only a clean, pushed READY handoff. Contributor collection verifies an exact
@@ -347,14 +345,6 @@ case "$command" in
     ;;
   merge)
     manager_merge "$@"
-    ;;
-  release-check)
-    [[ $# -eq 0 ]] || ai_fail "release-check takes no arguments."
-    manager_release_check
-    ;;
-  release)
-    [[ $# -gt 0 ]] || ai_fail "release requires package-player-release options; run that script with --help for details."
-    manager_release "$@"
     ;;
   *)
     ai_fail "Unknown command '$command'. Run --help for usage."

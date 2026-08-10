@@ -1,4 +1,16 @@
-# Spoiled Milk
+# RSC World Editor Runtime Provider
+
+This repository is the independent adaptive client/server runtime provider for
+[RSC World Editor](https://github.com/An-actual-duck/rsc-world-editor). It is a
+pinned source dependency, not the Spoiled Milk game repository and not a live
+server deployment.
+
+The source began as a purpose-built provider line from the wider game codebase,
+so historical Spoiled Milk content and documentation remain below. New work in
+this repository is limited to functionality required by the standalone World
+Editor runtime. See [the runtime provider workflow](docs/RUNTIME-PROVIDER-WORKFLOW.md).
+
+## Historical source overview
 
 Spoiled Milk is my very changed take on RuneScape Classic.
 
