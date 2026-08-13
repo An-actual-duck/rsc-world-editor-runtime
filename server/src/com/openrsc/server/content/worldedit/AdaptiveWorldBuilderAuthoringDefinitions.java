@@ -21,6 +21,8 @@ import java.util.TreeSet;
 
 /** Exact authoring inventory from the hash-bound project definition catalog. */
 public final class AdaptiveWorldBuilderAuthoringDefinitions {
+	private static final String MANIFEST_TYPE =
+		"world-builder-definition-catalog";
 	private static final long MAX_CATALOG_BYTES = 16L * 1024L * 1024L;
 	private static final int MAX_FAMILY_IDS = 65536;
 
@@ -57,7 +59,7 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 			throw new IOException(
 				"Adaptive authoring definition catalog is invalid JSON", failure);
 		}
-		requireExactSchema(root);
+		requireExactSchema(root, config.WORLD_BUILDER_DEFINITION_ID);
 		Set<Integer> tiles = ids(root, "tiles");
 		Set<Integer> boundaries = ids(root, "boundaries");
 		Set<Integer> scenery = ids(root, "scenery");
@@ -68,10 +70,11 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 		return new Result(boundaries, scenery, npcs, items);
 	}
 
-	private static void requireExactSchema(JSONObject root) throws IOException {
+	private static void requireExactSchema(
+		JSONObject root, String expectedCatalogId) throws IOException {
 		Set<String> expected = new HashSet<String>(Arrays.asList(
-			"schemaVersion", "tiles", "boundaries", "scenery", "npcs",
-			"groundItems"));
+			"schemaVersion", "manifestType", "catalogId", "tiles",
+			"boundaries", "scenery", "npcs", "groundItems"));
 		if (!root.keySet().equals(expected)) {
 			throw new IOException(
 				"Adaptive authoring definition catalog fields differ from schema v1");
@@ -80,6 +83,15 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 		if (!(version instanceof Integer) || ((Integer) version).intValue() != 1) {
 			throw new IOException(
 				"Adaptive authoring definition catalog schemaVersion must be 1");
+		}
+		if (!MANIFEST_TYPE.equals(root.opt("manifestType"))) {
+			throw new IOException(
+				"Adaptive authoring definition catalog manifestType is invalid");
+		}
+		if (expectedCatalogId == null
+			|| !expectedCatalogId.equals(root.opt("catalogId"))) {
+			throw new IOException(
+				"Adaptive authoring definition catalog identity mismatch");
 		}
 	}
 
@@ -111,13 +123,12 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 		int prior = -1;
 		for (int index = 0; index < array.length(); index++) {
 			Object value = array.get(index);
-			if (!(value instanceof Number)) {
+			if (!(value instanceof Integer) && !(value instanceof Long)) {
 				throw new IOException(
 					"Adaptive authoring " + key + " inventory contains a non-integer");
 			}
 			long longValue = ((Number) value).longValue();
-			if (longValue < 0L || longValue > Integer.MAX_VALUE
-				|| ((Number) value).doubleValue() != (double) longValue) {
+			if (longValue < 0L || longValue > Integer.MAX_VALUE) {
 				throw new IOException(
 					"Adaptive authoring " + key + " inventory contains an invalid ID");
 			}

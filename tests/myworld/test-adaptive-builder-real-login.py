@@ -257,16 +257,18 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             # Keep the unrelated Discord native integration out of this bounded
             # process-lifecycle test; the lock file is confined to the fixture.
             (client_root / "Cache/discord_inuse.txt").write_text("1", encoding="ascii")
-            definitions = evidence / "definitions.bin"
+            definitions = evidence / "adaptive-definitions.json"
             assets = evidence / "assets.bin"
-            definitions.write_bytes(canonical_json({
+            definitions.write_text(json.dumps({
                 "schemaVersion": 1,
+                "manifestType": "world-builder-definition-catalog",
+                "catalogId": "integration.neutral.definitions.v1",
                 "tiles": [0, 7],
                 "boundaries": [0, 1],
                 "scenery": [0, 1],
                 "npcs": [0, 1],
                 "groundItems": [10, 11],
-            }))
+            }, indent=2) + "\n", encoding="utf-8")
             assets.write_bytes(b"integration-neutral-asset-evidence-v1\n")
             definition_sha = hashlib.sha256(definitions.read_bytes()).hexdigest()
             asset_sha = hashlib.sha256(assets.read_bytes()).hexdigest()

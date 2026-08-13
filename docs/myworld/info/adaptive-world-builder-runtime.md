@@ -51,13 +51,15 @@ standalone preparer remains responsible for inventorying those files and for
 supplying the actual client asset identity and hash.
 
 The definition catalog is the project authoring authority, not an inventory of
-definitions already referenced by the map. It is strict schema-version-1 JSON
-with exactly `schemaVersion`, `tiles`, `boundaries`, `scenery`, `npcs`, and
-`groundItems`. Each family is a strictly increasing array of non-negative IDs;
-for example:
+definitions already referenced by the map. It is the World Editor's strict
+eight-field schema-version-1 JSON with exactly `schemaVersion`, `manifestType`,
+`catalogId`, `tiles`, `boundaries`, `scenery`, `npcs`, and `groundItems`.
+`manifestType` must be `world-builder-definition-catalog`, and `catalogId` must
+equal the configured definition identity. Each family is a strictly increasing
+array of non-negative integer IDs; for example:
 
 ```json
-{"schemaVersion":1,"tiles":[0,7],"boundaries":[0,1],"scenery":[0,1],"npcs":[0,1],"groundItems":[10,11]}
+{"schemaVersion":1,"manifestType":"world-builder-definition-catalog","catalogId":"creator.catalog.v1","tiles":[0,7],"boundaries":[0,1],"scenery":[0,1],"npcs":[0,1],"groundItems":[10,11]}
 ```
 
 The server verifies that every catalog ID exists in its loaded definitions and

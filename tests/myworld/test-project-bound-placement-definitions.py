@@ -161,6 +161,87 @@ public final class ProjectBoundDefinitionFixture {
             )
             self.assertEqual(0, executed.returncode, executed.stdout + executed.stderr)
 
+    def test_compiled_parser_accepts_real_eight_key_catalog_and_rejects_metadata_drift(self) -> None:
+        self.assertTrue(CORE.is_file(), "build the server before running catalog coverage")
+        fixture = r'''
+import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderAuthoringDefinitions;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import org.json.JSONObject;
+
+public final class AuthoringDefinitionCatalogSchemaFixture {
+    private static final String DOCUMENT =
+        "{\n"
+        + "  \"schemaVersion\": 1,\n"
+        + "  \"manifestType\": \"world-builder-definition-catalog\",\n"
+        + "  \"catalogId\": \"fixture-catalog-v1\",\n"
+        + "  \"tiles\": [0, 7],\n"
+        + "  \"boundaries\": [1, 10],\n"
+        + "  \"scenery\": [0, 104],\n"
+        + "  \"npcs\": [30, 31],\n"
+        + "  \"groundItems\": [10, 20]\n"
+        + "}\n";
+
+    public static void main(String[] args) throws Exception {
+        Method validate = AdaptiveWorldBuilderAuthoringDefinitions.class
+            .getDeclaredMethod("requireExactSchema", JSONObject.class, String.class);
+        validate.setAccessible(true);
+        JSONObject actual = new JSONObject(DOCUMENT);
+        validate.invoke(null, actual, "fixture-catalog-v1");
+
+        reject(validate, changed(actual, "manifestType", "wrong-type"),
+            "fixture-catalog-v1");
+        reject(validate, removed(actual, "manifestType"), "fixture-catalog-v1");
+        reject(validate, changed(actual, "catalogId", "wrong-catalog"),
+            "fixture-catalog-v1");
+        reject(validate, removed(actual, "catalogId"), "fixture-catalog-v1");
+        reject(validate, changed(actual, "extraMetadata", "not-allowed"),
+            "fixture-catalog-v1");
+        reject(validate, actual, "different-configured-catalog");
+    }
+
+    private static JSONObject changed(JSONObject source, String key, Object value) {
+        JSONObject result = new JSONObject(source.toString());
+        result.put(key, value);
+        return result;
+    }
+
+    private static JSONObject removed(JSONObject source, String key) {
+        JSONObject result = new JSONObject(source.toString());
+        result.remove(key);
+        return result;
+    }
+
+    private static void reject(
+            Method validate, JSONObject value, String expectedCatalogId)
+            throws Exception {
+        try {
+            validate.invoke(null, value, expectedCatalogId);
+            throw new AssertionError("invalid catalog metadata was accepted");
+        } catch (InvocationTargetException expected) {
+            if (!(expected.getCause() instanceof IOException)) throw expected;
+        }
+    }
+}
+'''
+        with tempfile.TemporaryDirectory(prefix="authoring-catalog-schema-") as temporary:
+            directory = Path(temporary)
+            source = directory / "AuthoringDefinitionCatalogSchemaFixture.java"
+            source.write_text(fixture, encoding="utf-8")
+            compiled = subprocess.run(
+                ["javac", "-source", "8", "-target", "8", "-cp", str(CORE),
+                 "-d", str(directory), str(source)],
+                cwd=ROOT, capture_output=True, text=True,
+            )
+            self.assertEqual(0, compiled.returncode, compiled.stdout + compiled.stderr)
+            executed = subprocess.run(
+                ["java", "-cp", f"{directory}:{CORE}",
+                 "AuthoringDefinitionCatalogSchemaFixture"],
+                cwd=ROOT, capture_output=True, text=True,
+            )
+            self.assertEqual(0, executed.returncode, executed.stdout + executed.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
