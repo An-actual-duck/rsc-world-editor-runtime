@@ -194,12 +194,18 @@ elevation=0, ground texture=1, ground overlay=8,
 roof=0, horizontal wall=0, vertical wall=0, diagonal wall=0
 ```
 
-The standalone-empty origin is stricter: one global level `0`, one sector
-`0,0`, one empty v3 placement set, no placements, every tile exactly canonical
-void, and initial coordinate `0,0` on level `0`. Adaptive player initialization
-intentionally bypasses ordinary production login recovery, because production
-correctly treats overlay 8 as non-playable while an empty Builder uses it as an
-authoring canvas. The definition catalog must expose overlay 8's one-based tile
+The standalone-empty origin is stricter: one global level `0`, one terrain
+sector covering the configured `0..32767` client-carrier start, one empty v3
+placement set, and no placements. New standalone projects require the exact
+centered 3-by-3 visibility seed emitted by the Editor: all ten raw terrain
+bytes are zero for the nine seed tiles, while the other 2,295 tiles remain
+canonical structural void. The start must therefore be at least one tile from
+every edge of its sole sector. Exact legacy standalone projects at coordinate
+`0,0` retain their original all-void sector for compatibility; no other
+unseeded shape is accepted. Adaptive player initialization intentionally
+bypasses ordinary production login recovery, because production correctly
+treats overlay 8 as non-playable while an empty Builder uses it as an authoring
+canvas. The definition catalog must expose overlay 8's one-based tile
 definition ID 7.
 
 New adaptive placement IDs use only family, signed level, coordinate, and a

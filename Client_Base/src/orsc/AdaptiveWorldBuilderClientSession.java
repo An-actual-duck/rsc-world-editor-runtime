@@ -302,9 +302,9 @@ public final class AdaptiveWorldBuilderClientSession {
 				"Adaptive project origin is unsupported");
 		}
 		if ("standalone-empty".equals(origin)
-			&& (integer(fields, "initialLevel") != 0 || x != 0 || y != 0)) {
+			&& integer(fields, "initialLevel") != 0) {
 			throw new IllegalArgumentException(
-				"Standalone empty client must begin at global layer 0, coordinate 0,0");
+				"Standalone empty client must begin on global layer 0");
 		}
 		int[] levels = parseSignedIntegers(fields.get("levels"), "levels");
 		boolean initialDeclared = false;

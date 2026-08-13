@@ -4,6 +4,7 @@ import com.openrsc.server.ServerConfiguration;
 import com.openrsc.server.io.AdaptiveWorldBuilderPackageGuard;
 import com.openrsc.server.io.NativeLayeredWorldPackage;
 import com.openrsc.server.io.NativeLayeredTerrainSector;
+import com.openrsc.server.io.NativeLayeredTerrainTile;
 import com.openrsc.server.model.world.coordinate.WorldCoordinate;
 import com.openrsc.server.model.world.coordinate.WorldLocation;
 import com.openrsc.server.model.world.coordinate.WorldSpaceId;
@@ -111,11 +112,9 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 					+ CLIENT_VERSION);
 		}
 		if (ORIGIN_EMPTY.equals(config.WORLD_BUILDER_PROJECT_ORIGIN)
-			&& (config.WORLD_BUILDER_INITIAL_LEVEL != 0
-				|| config.WORLD_BUILDER_INITIAL_X != 0
-				|| config.WORLD_BUILDER_INITIAL_Y != 0)) {
+			&& config.WORLD_BUILDER_INITIAL_LEVEL != 0) {
 			throw new IllegalArgumentException(
-				"Standalone empty mode must begin at global layer 0, coordinate 0,0");
+				"Standalone empty mode must begin on global layer 0");
 		}
 	}
 
@@ -171,21 +170,60 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		}
 		NativeLayeredTerrainSector sector = worldPackage.getTerrainSectors()
 			.values().iterator().next();
+		int initialX = config.WORLD_BUILDER_INITIAL_X;
+		int initialY = config.WORLD_BUILDER_INITIAL_Y;
+		int expectedSectorX = Math.floorDiv(
+			initialX, NativeLayeredTerrainSector.SIZE);
+		int expectedSectorY = Math.floorDiv(
+			initialY, NativeLayeredTerrainSector.SIZE);
 		if (!WorldSpaceId.GLOBAL.equals(sector.getIdentity().getWorldSpace())
 			|| sector.getIdentity().getLevel() != 0
-			|| sector.getIdentity().getSectorX() != 0
-			|| sector.getIdentity().getSectorY() != 0) {
+			|| sector.getIdentity().getSectorX() != expectedSectorX
+			|| sector.getIdentity().getSectorY() != expectedSectorY) {
 			throw new IllegalArgumentException(
-				"Standalone empty mode requires global level 0 sector 0,0");
+				"Standalone empty mode requires the sole global level 0 sector "
+					+ "to cover its configured initial coordinate");
+		}
+		boolean legacyOrigin = initialX == 0 && initialY == 0;
+		int initialLocalX = Math.floorMod(
+			initialX, NativeLayeredTerrainSector.SIZE);
+		int initialLocalY = Math.floorMod(
+			initialY, NativeLayeredTerrainSector.SIZE);
+		if (!legacyOrigin
+			&& (initialLocalX < 1
+				|| initialLocalX >= NativeLayeredTerrainSector.SIZE - 1
+				|| initialLocalY < 1
+				|| initialLocalY >= NativeLayeredTerrainSector.SIZE - 1)) {
+			throw new IllegalArgumentException(
+				"Standalone empty visible-floor seed cannot cross its sole terrain sector");
 		}
 		for (int x = 0; x < NativeLayeredTerrainSector.SIZE; x++) {
 			for (int y = 0; y < NativeLayeredTerrainSector.SIZE; y++) {
-				if (!sector.getTile(x, y).isWorldBuilderVoid()) {
+				NativeLayeredTerrainTile tile = sector.getTile(x, y);
+				boolean visibleSeed = !legacyOrigin
+					&& Math.abs(x - initialLocalX) <= 1
+					&& Math.abs(y - initialLocalY) <= 1;
+				if (visibleSeed ? !isRawZeroTile(tile)
+					: !tile.isWorldBuilderVoid()) {
 					throw new IllegalArgumentException(
-						"Standalone empty terrain differs from the canonical void tile");
+						visibleSeed
+							? "Standalone empty visible-floor seed must be an exact "
+								+ "centered 3x3 all-zero raw terrain patch"
+							: "Standalone empty terrain outside the visible-floor seed "
+								+ "differs from the canonical void tile");
 				}
 			}
 		}
+	}
+
+	private static boolean isRawZeroTile(NativeLayeredTerrainTile tile) {
+		return tile.getElevation() == 0
+			&& tile.getTexture() == 0
+			&& tile.getOverlay() == 0
+			&& tile.getRoof() == 0
+			&& tile.getVerticalWall() == 0
+			&& tile.getHorizontalWall() == 0
+			&& tile.getDiagonalWall() == 0;
 	}
 
 	public static Map<String, String> bindingFields(
