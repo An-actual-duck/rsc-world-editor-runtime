@@ -4408,9 +4408,8 @@ public class RegionManager {
 				"Native layered object collision footprint is unavailable for "
 					+ placementId + ": " + footprint.getReason());
 		}
-		List<WorldLocation> collisionTiles =
-			nativeLayeredOwnedCollisionTiles(
-				location, placementId, footprint);
+		requireNativeLayeredCollisionTerrain(
+			location, placementId, footprint);
 		object.setInitialWorldLocation(location);
 		markNativeLayeredPlacement(
 			object, packageId, placementId, kind);
@@ -4422,7 +4421,6 @@ public class RegionManager {
 			direction,
 			object,
 			footprint,
-			collisionTiles,
 			nativeLayeredNpcBlockingSceneryFootprint(
 				object, location, placementId)) == null) {
 			throw new IllegalStateException(
@@ -4433,7 +4431,7 @@ public class RegionManager {
 		layeredSpatialEntityIndex.synchronize(object, null, location);
 	}
 
-	private List<WorldLocation> nativeLayeredOwnedCollisionTiles(
+	private void requireNativeLayeredCollisionTerrain(
 		final WorldLocation origin,
 		final String placementId,
 		final GameTickEventRestorationCollisionFootprintPlanner.Result
@@ -4445,7 +4443,6 @@ public class RegionManager {
 				"Native layered object collision has no package owner for "
 					+ placementId);
 		}
-		List<WorldLocation> owned = new ArrayList<WorldLocation>();
 		for (com.openrsc.server.event.rsc
 				.GameTickEventRestorationTransientRollbackSnapshot
 					.CollisionContribution contribution
@@ -4459,17 +4456,11 @@ public class RegionManager {
 			NativeLayeredWorldPackage collisionOwner =
 				findNativeLayeredWorldPackage(collisionLocation)
 					.orElse(null);
-			if (collisionOwner == null) {
-				continue;
-			}
-			if (collisionOwner != originOwner) {
-				throw new IllegalStateException(
-					"Native layered object collision enters another package for "
-						+ placementId + ": " + collisionLocation);
-			}
-			owned.add(collisionLocation);
+			NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+				originOwner, collisionOwner,
+				"Native layered object collision leaves its package terrain for "
+					+ placementId + ": " + collisionLocation);
 		}
-		return owned;
 	}
 
 	private List<WorldLocation> nativeLayeredNpcBlockingSceneryFootprint(
@@ -4514,7 +4505,7 @@ public class RegionManager {
 						"Native layered NPC-blocking scenery footprint "
 							+ "overflows for " + placementId, overflow);
 				}
-				if (!isWithinLegacyWorldBounds(x, y)) {
+				if (!withinWorld(x, y)) {
 					continue;
 				}
 				WorldLocation tile = new WorldLocation(
@@ -4524,25 +4515,15 @@ public class RegionManager {
 						coordinate.getLevel()));
 				NativeLayeredWorldPackage tileOwner =
 					findNativeLayeredWorldPackage(tile).orElse(null);
-				if (tileOwner == null) {
-					continue;
-				}
-				if (tileOwner != owner) {
-					throw new IllegalStateException(
-						"Native layered NPC-blocking scenery enters another "
-							+ "package for " + placementId
-							+ " at " + tile);
-				}
+				NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+					owner, tileOwner,
+					"Native layered NPC-blocking scenery leaves its "
+						+ "package terrain for " + placementId
+						+ " at " + tile);
 				footprint.add(tile);
 			}
 		}
 		return footprint;
-	}
-
-	private static boolean isWithinLegacyWorldBounds(
-		final int x, final int y) {
-		return x >= 0 && x < Constants.MAX_WIDTH
-			&& y >= 0 && y < Constants.MAX_HEIGHT;
 	}
 
 	public boolean hasNativeLayeredGameObjectIdentity(
@@ -4692,8 +4673,6 @@ public class RegionManager {
 				oldObject, identity.getLocation());
 		}
 		GameObjectCollisionRegistrationState newCollision = null;
-		List<WorldLocation> newCollisionTiles =
-			Collections.<WorldLocation>emptyList();
 		if (newObject != null) {
 			if (newRegisterFootprint == null
 				|| newRegisterFootprint.getOperation()
@@ -4708,18 +4687,17 @@ public class RegionManager {
 				throw new IllegalStateException(
 					"Native layered registration target state is invalid");
 			}
-			newCollisionTiles = nativeLayeredOwnedCollisionTiles(
+			requireNativeLayeredCollisionTerrain(
 				identity.getLocation(), identity.getPlacementId(),
 				newRegisterFootprint);
 			newCollision = GameObjectCollisionRegistrationState.capture(
 				newObject, newRegisterFootprint);
 		}
-		List<WorldLocation> oldCollisionTiles =
-			oldObject == null
-				? Collections.<WorldLocation>emptyList()
-				: nativeLayeredOwnedCollisionTiles(
-					identity.getLocation(), identity.getPlacementId(),
-					oldRollbackRegisterFootprint);
+		if (oldObject != null) {
+			requireNativeLayeredCollisionTerrain(
+				identity.getLocation(), identity.getPlacementId(),
+				oldRollbackRegisterFootprint);
+		}
 
 		List<WorldLocation> oldNpcBlockingScenery =
 			oldObject == null
@@ -4742,7 +4720,6 @@ public class RegionManager {
 					identity.getLocation(), newObject.getType(),
 					newObject.getDirection(), newObject,
 					newRegisterFootprint,
-					newCollisionTiles,
 					newNpcBlockingScenery) == null) {
 				return;
 			}
@@ -4769,7 +4746,6 @@ public class RegionManager {
 					identity.getLocation(), oldObject.getType(),
 					oldObject.getDirection(), oldObject,
 					oldRollbackRegisterFootprint,
-					oldCollisionTiles,
 					oldNpcBlockingScenery);
 				throw failure;
 			}
@@ -4779,7 +4755,6 @@ public class RegionManager {
 					identity.getLocation(), newObject.getType(),
 					newObject.getDirection(), newObject,
 					newRegisterFootprint,
-					newCollisionTiles,
 					newNpcBlockingScenery) == null) {
 				return;
 			}
@@ -4792,7 +4767,6 @@ public class RegionManager {
 					identity.getLocation(), oldObject.getType(),
 					oldObject.getDirection(), oldObject,
 					oldRollbackRegisterFootprint,
-					oldCollisionTiles,
 					oldNpcBlockingScenery);
 				throw failure;
 			}

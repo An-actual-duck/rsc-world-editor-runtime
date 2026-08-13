@@ -206,6 +206,53 @@ public final class RestorationCollisionFootprintFixture {
                 && anchor.getDynamicCollisionMask() == 1
                 && anchor.getDynamicProjectileCount() == 1,
             "edge anchor retains collision and projectile state");
+        Result unregistered = GameTickEventRestorationCollisionFootprintPlanner
+            .planClippedToWorld(
+                Operation.UNREGISTER,
+                ConstructorState.of(8, 0, 0, 0, 1),
+                boundary, false, BOUNDS);
+        check(unregistered.isFootprintAvailable()
+                && unregistered.getContributionTileCount() == 1
+                && unregistered.getContributions().get(0).getX() == 0
+                && unregistered.getContributions().get(0).getY() == 0,
+            "edge removal uses the same clipped in-world footprint");
+        Result minimumCornerScenery =
+            GameTickEventRestorationCollisionFootprintPlanner
+                .planClippedToWorld(
+                    Operation.REGISTER,
+                    ConstructorState.of(8, 0, 0, 0, 0),
+                    Definition.scenery(2, 1, 1, "gate", ALLOWLIST),
+                    false, BOUNDS);
+        CollisionContribution minimumSceneryAnchor =
+            minimumCornerScenery.getContributions().get(0);
+        check(minimumCornerScenery.isFootprintAvailable()
+                && minimumCornerScenery.getContributionTileCount() == 1
+                && minimumSceneryAnchor.getX() == 0
+                && minimumSceneryAnchor.getY() == 0
+                && minimumSceneryAnchor.getDynamicCollisionMask() != 0
+                && minimumSceneryAnchor.getDynamicProjectileCount() == 1,
+            "minimum corner scenery clips its outward reciprocal effects");
+        Result maximumCorner = GameTickEventRestorationCollisionFootprintPlanner
+            .planClippedToWorld(
+                Operation.REGISTER,
+                ConstructorState.of(8, 1007, 4031, 2, 1),
+                boundary, false, BOUNDS);
+        check(maximumCorner.isFootprintAvailable()
+                && maximumCorner.getContributionTileCount() == 1
+                && maximumCorner.getContributions().get(0).getX() == 1007
+                && maximumCorner.getContributions().get(0).getY() == 4031,
+            "maximum world corner clips only its outward projectile effect");
+        Result cornerScenery = GameTickEventRestorationCollisionFootprintPlanner
+            .planClippedToWorld(
+                Operation.REGISTER,
+                ConstructorState.of(8, 1007, 4031, 0, 0),
+                Definition.scenery(1, 2, 2, "chest", ALLOWLIST),
+                false, BOUNDS);
+        check(cornerScenery.isFootprintAvailable()
+                && cornerScenery.getContributionTileCount() == 1
+                && cornerScenery.getContributions().get(0)
+                    .getBlockingSceneryCount() == 1,
+            "maximum corner scenery clips only cells outside global bounds");
         Result outsideAnchor = GameTickEventRestorationCollisionFootprintPlanner
             .planClippedToWorld(
                 Operation.REGISTER,
@@ -213,6 +260,23 @@ public final class RestorationCollisionFootprintFixture {
                 boundary, false, BOUNDS);
         check(outsideAnchor.getReason() == Reason.OUT_OF_WORLD_EFFECT,
             "clipping does not authorize an out-of-world anchor");
+        Result overflow = GameTickEventRestorationCollisionFootprintPlanner
+            .planClippedToWorld(
+                Operation.REGISTER,
+                ConstructorState.of(
+                    8, Integer.MAX_VALUE - 1, 10, 0, 0),
+                Definition.scenery(1, 3, 1, "chest", ALLOWLIST),
+                false, WorldBounds.of(Integer.MAX_VALUE, 100));
+        check(overflow.getReason() == Reason.OUT_OF_WORLD_EFFECT,
+            "clipping does not conceal footprint arithmetic overflow");
+        Result oversized = GameTickEventRestorationCollisionFootprintPlanner
+            .planClippedToWorld(
+                Operation.REGISTER,
+                ConstructorState.of(8, 10, 10, 0, 0),
+                Definition.scenery(1, 65, 64, "statue", ALLOWLIST),
+                false, BOUNDS);
+        check(oversized.getReason() == Reason.CONTRIBUTION_TILE_LIMIT_EXCEEDED,
+            "clipping preserves unsafe-footprint refusal");
     }
 
     private static void keepsEmptyAndPopulatedResultsImmutableAndInert() {

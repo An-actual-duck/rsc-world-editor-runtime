@@ -62,6 +62,11 @@ public final class NativeLayeredPackageCatalogFixture {
             "secondary terrain owner");
         check(!catalog.findPackage(location(450, 600, -1)).isPresent(),
             "legacy location has no native owner");
+        check(NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+                primary, primary, "same owner") == primary,
+            "retained in-world footprint accepts exact package owner");
+        refuseUncoveredFootprint(primary);
+        refuseCrossPackageFootprint(primary, secondary);
         check(catalog.findPackage(secondary.getPackageId())
                 .orElseThrow(() -> new AssertionError("package ID lookup"))
                 == secondary,
@@ -119,6 +124,31 @@ public final class NativeLayeredPackageCatalogFixture {
         } catch (IllegalArgumentException expected) {
             check(expected.getMessage().contains("explicit transition"),
                 "implicit cross refusal reason");
+        }
+    }
+
+    private static void refuseUncoveredFootprint(
+            NativeLayeredWorldPackage primary) {
+        try {
+            NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+                primary, null, "uncovered in-world footprint");
+            throw new AssertionError("Expected uncovered footprint refusal");
+        } catch (IllegalStateException expected) {
+            check(expected.getMessage().equals("uncovered in-world footprint"),
+                "uncovered footprint refusal reason");
+        }
+    }
+
+    private static void refuseCrossPackageFootprint(
+            NativeLayeredWorldPackage primary,
+            NativeLayeredWorldPackage secondary) {
+        try {
+            NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+                primary, secondary, "cross-package footprint");
+            throw new AssertionError("Expected cross-package footprint refusal");
+        } catch (IllegalStateException expected) {
+            check(expected.getMessage().equals("cross-package footprint"),
+                "cross-package footprint refusal reason");
         }
     }
 
