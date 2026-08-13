@@ -15,6 +15,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.handler.codec.CorruptedFrameException;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.AttributeMap;
@@ -23,6 +24,8 @@ import java.util.List;
 
 public final class RSCProtocolDecoder extends ByteToMessageDecoder implements AttributeMap {
 	public static final AttributeKey<ConnectionAttachment> attachment = AttributeKey.valueOf("conn-attachment");
+	private static final int MIN_CUSTOM_LOGIN_LENGTH = 39;
+	private static final int MAX_UNDECIDED_CUSTOM_FRAME_LENGTH = 8192;
 
 	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf buffer, List<Object> out) throws Exception {
@@ -359,15 +362,31 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 	 * and while a recognized frame is awaiting more bytes.
 	 */
 	private boolean decodeUndecidedCustomLoginFrame(
-		ByteBuf buffer, List<Object> out, ConnectionAttachment att) {
+		ByteBuf buffer, List<Object> out, ConnectionAttachment att)
+		throws CorruptedFrameException {
 		if (buffer.readableBytes() < 3) {
 			return false;
 		}
 		int readerIndex = buffer.readerIndex();
 		int length = buffer.getUnsignedShort(readerIndex);
 		int opcode = buffer.getUnsignedByte(readerIndex + 2);
-		if (length < 256 || (opcode != 0 && opcode != 19)) {
+		if (length == 0) {
+			throw new CorruptedFrameException(
+				"Undecided custom-client frame has a zero length");
+		}
+		boolean initialConfigRequest = length == 1 && opcode == 19;
+		boolean loginRequest = opcode == 0 && length >= MIN_CUSTOM_LOGIN_LENGTH;
+		if (opcode == 0 && length < MIN_CUSTOM_LOGIN_LENGTH) {
+			throw new CorruptedFrameException(
+				"Undecided custom-client login frame is too short: " + length);
+		}
+		if (!initialConfigRequest && !loginRequest) {
 			return false;
+		}
+		if (length > MAX_UNDECIDED_CUSTOM_FRAME_LENGTH) {
+			throw new CorruptedFrameException(
+				"Undecided custom-client frame exceeds "
+					+ MAX_UNDECIDED_CUSTOM_FRAME_LENGTH + " bytes: " + length);
 		}
 		if (buffer.readableBytes() < length + 2) {
 			return true;
@@ -379,6 +398,27 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 		att.authenticClient.set((short)-1);
 		addPacketToIncoming(out, att, new Packet(opcode, data));
 		return true;
+	}
+
+	@Override
+	protected void decodeLast(ChannelHandlerContext ctx, ByteBuf buffer,
+		List<Object> out) throws Exception {
+		decode(ctx, buffer, out);
+		ConnectionAttachment att = ctx.channel().attr(attachment).get();
+		if (att == null || att.authenticClient == null
+			|| att.authenticClient.get() != null || buffer.readableBytes() < 3) {
+			return;
+		}
+		int readerIndex = buffer.readerIndex();
+		int length = buffer.getUnsignedShort(readerIndex);
+		int opcode = buffer.getUnsignedByte(readerIndex + 2);
+		if ((length == 1 && opcode == 19)
+			|| (opcode == 0 && length >= MIN_CUSTOM_LOGIN_LENGTH
+				&& length <= MAX_UNDECIDED_CUSTOM_FRAME_LENGTH)) {
+			throw new CorruptedFrameException(
+				"Truncated undecided custom-client frame: expected "
+					+ (length + 2) + " bytes but received " + buffer.readableBytes());
+		}
 	}
 
 	private void addPacketToIncoming(List<Object> out, ConnectionAttachment att, Packet packet) {

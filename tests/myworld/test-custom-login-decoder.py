@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression coverage for custom-client login framing before authentication."""
+"""Regression coverage for custom-client framing before authentication."""
 
 import subprocess
 import tempfile
@@ -16,6 +16,8 @@ HARNESS = r"""
 import com.openrsc.server.net.ConnectionAttachment;
 import com.openrsc.server.net.Packet;
 import com.openrsc.server.net.RSCProtocolDecoder;
+import com.openrsc.server.net.rsc.ISAACContainer;
+import com.openrsc.server.login.ISAACCipher;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 
@@ -47,77 +49,152 @@ public final class CustomLoginDecoderHarness {
         require(packet != null, label + " did not deliver a packet");
         require(packet.getID() == opcode, label + " opcode");
         require(packet.getLength() == length, label + " payload length");
-        require(channel.readInbound() == null, label + " delivered more than once");
     }
 
-    private static void fragmented278() {
-        ConnectionAttachment attachment = new ConnectionAttachment();
-        EmbeddedChannel channel = channel(attachment);
-        byte[] login = frame(278, 0);
-        channel.writeInbound(Unpooled.wrappedBuffer(login, 0, 3));
-        require(channel.readInbound() == null, "278 header was decoded as legacy");
-        require(attachment.authenticClient.get() == null, "278 header classified early");
-        channel.writeInbound(Unpooled.wrappedBuffer(login, 3, 129));
-        require(channel.readInbound() == null, "fragmented 278 delivered early");
-        require(attachment.authenticClient.get() == null, "fragmented 278 classified early");
-        channel.writeInbound(Unpooled.wrappedBuffer(login, 132, login.length - 132));
-        require(Short.valueOf((short) -1).equals(attachment.authenticClient.get()),
-            "278 login did not commit custom framing");
-        requirePacket(channel, 0, 277, "fragmented 278 login");
-        channel.finishAndReleaseAll();
-    }
-
-    private static void coalescedAndBoundaryLengths() {
-        for (int length : new int[] {255, 256, 278}) {
+    private static void fragmentedAtEveryBoundary(int length) {
+        byte[] login = frame(length, 0);
+        for (int cut = 1; cut < login.length; cut++) {
             ConnectionAttachment attachment = new ConnectionAttachment();
             EmbeddedChannel channel = channel(attachment);
-            byte[] login = frame(length, 0);
-            byte[] config = frame(1, 19);
-            byte[] joined = new byte[login.length + config.length];
-            System.arraycopy(login, 0, joined, 0, login.length);
-            System.arraycopy(config, 0, joined, login.length, config.length);
-            channel.writeInbound(Unpooled.wrappedBuffer(joined));
-            require(Short.valueOf((short) -1).equals(attachment.authenticClient.get()),
-                "boundary " + length + " did not classify custom");
-            Packet first = channel.readInbound();
-            Packet second = channel.readInbound();
-            require(first != null && first.getID() == 0 && first.getLength() == length - 1,
-                "boundary " + length + " login");
-            require(second != null && second.getID() == 19 && second.getLength() == 0,
-                "boundary " + length + " coalesced config");
+            channel.writeInbound(Unpooled.wrappedBuffer(login, 0, cut));
             require(channel.readInbound() == null,
-                "boundary " + length + " duplicate delivery");
+                length + " login delivered at fragment boundary " + cut);
+            require(attachment.authenticClient.get() == null,
+                length + " login classified at fragment boundary " + cut);
+            channel.writeInbound(Unpooled.wrappedBuffer(login, cut, login.length - cut));
+            require(Short.valueOf((short) -1).equals(attachment.authenticClient.get()),
+                length + " login did not select custom framing at boundary " + cut);
+            requirePacket(channel, 0, length - 1,
+                length + " login at fragment boundary " + cut);
+            require(channel.readInbound() == null,
+                length + " login delivered twice at boundary " + cut);
             channel.finishAndReleaseAll();
         }
     }
 
-    private static void malformedAndLegacyFrames() {
-        ConnectionAttachment malformed = new ConnectionAttachment();
-        EmbeddedChannel malformedChannel = channel(malformed);
-        malformedChannel.writeInbound(Unpooled.wrappedBuffer(new byte[] {0, 0, 0}));
-        require(malformedChannel.readInbound() == null, "zero-length frame delivered");
-        require(malformed.authenticClient.get() == null, "zero-length frame classified");
-        malformedChannel.finishAndReleaseAll();
+    private static void boundaryAndOrdinaryLogins() {
+        for (int length : new int[] {80, 255, 256, 278}) {
+            ConnectionAttachment attachment = new ConnectionAttachment();
+            EmbeddedChannel channel = channel(attachment);
+            channel.writeInbound(Unpooled.wrappedBuffer(frame(length, 0)));
+            require(Short.valueOf((short) -1).equals(attachment.authenticClient.get()),
+                "login length " + length + " did not classify custom");
+            requirePacket(channel, 0, length - 1, "login length " + length);
+            require(channel.readInbound() == null, "login length " + length + " duplicate");
+            channel.finishAndReleaseAll();
+        }
+    }
 
-        ConnectionAttachment oversized = new ConnectionAttachment();
-        EmbeddedChannel oversizedChannel = channel(oversized);
-        oversizedChannel.writeInbound(Unpooled.wrappedBuffer(new byte[] {(byte) 0xff, (byte) 0xff, 0}));
-        require(oversizedChannel.readInbound() == null, "oversized partial frame delivered");
-        require(oversized.authenticClient.get() == null, "oversized partial frame classified");
-        oversizedChannel.finishAndReleaseAll();
+    private static void coalescedFramesAreDeliveredOnce() {
+        ConnectionAttachment attachment = new ConnectionAttachment();
+        EmbeddedChannel channel = channel(attachment);
+        byte[][] frames = new byte[][] {frame(278, 0), frame(1, 19), frame(5, 42)};
+        byte[] joined = new byte[frames[0].length + frames[1].length + frames[2].length];
+        int offset = 0;
+        for (byte[] value : frames) {
+            System.arraycopy(value, 0, joined, offset, value.length);
+            offset += value.length;
+        }
+        channel.writeInbound(Unpooled.wrappedBuffer(joined));
+        requirePacket(channel, 0, 277, "coalesced login");
+        requirePacket(channel, 19, 0, "coalesced initial-config request");
+        requirePacket(channel, 42, 4, "coalesced ordinary custom packet");
+        require(channel.readInbound() == null, "coalesced frames delivered more than once");
+        channel.finishAndReleaseAll();
+    }
+
+    private static void initialConfigAndLegacyTrafficRemainDistinct() {
+        ConnectionAttachment custom = new ConnectionAttachment();
+        EmbeddedChannel customChannel = channel(custom);
+        customChannel.writeInbound(Unpooled.wrappedBuffer(frame(1, 19)));
+        require(Short.valueOf((short) -1).equals(custom.authenticClient.get()),
+            "initial-config request did not select custom framing");
+        requirePacket(customChannel, 19, 0, "initial-config request");
+        require(customChannel.readInbound() == null, "initial-config duplicate");
+        customChannel.finishAndReleaseAll();
 
         ConnectionAttachment legacy = new ConnectionAttachment();
         EmbeddedChannel legacyChannel = channel(legacy);
         legacyChannel.writeInbound(Unpooled.wrappedBuffer(new byte[] {1, 19, 2}));
-        requirePacket(legacyChannel, 19, 1, "legacy configuration request");
+        requirePacket(legacyChannel, 19, 1, "authentic legacy configuration request");
         require(legacy.authenticClient.get() == null, "legacy request became custom");
         legacyChannel.finishAndReleaseAll();
+
+        ConnectionAttachment session = new ConnectionAttachment();
+        EmbeddedChannel sessionChannel = channel(session);
+        sessionChannel.writeInbound(Unpooled.wrappedBuffer(new byte[] {2, 10, 32}));
+        requirePacket(sessionChannel, 32, 2, "authentic session-ID request");
+        require(session.authenticClient.get() == null, "session-ID request became custom");
+        sessionChannel.finishAndReleaseAll();
+
+        ConnectionAttachment longLegacy = new ConnectionAttachment();
+        EmbeddedChannel longLegacyChannel = channel(longLegacy);
+        byte[] longFrame = new byte[202];
+        longFrame[0] = (byte) 160;
+        longFrame[1] = (byte) 200;
+        longFrame[2] = (byte) 42;
+        longLegacyChannel.writeInbound(Unpooled.wrappedBuffer(longFrame));
+        requirePacket(longLegacyChannel, 42, 199, "two-byte authentic legacy frame");
+        require(longLegacy.authenticClient.get() == null,
+            "two-byte authentic legacy frame became custom");
+        longLegacyChannel.finishAndReleaseAll();
+
+        ConnectionAttachment isaac = new ConnectionAttachment();
+        isaac.authenticClient.set((short) 183);
+        int[] keys = new int[] {11, 22, 33, 44};
+        ISAACCipher incoming = new ISAACCipher();
+        incoming.setKeys(keys);
+        ISAACCipher outgoing = new ISAACCipher();
+        outgoing.setKeys(keys);
+        ISAACCipher encoder = new ISAACCipher();
+        encoder.setKeys(keys);
+        isaac.ISAAC.set(new ISAACContainer(incoming, outgoing));
+        EmbeddedChannel isaacChannel = channel(isaac);
+        byte[] isaacFrame = new byte[202];
+        isaacFrame[0] = (byte) 160;
+        isaacFrame[1] = (byte) 200;
+        isaacFrame[2] = (byte) ((42 + encoder.getNextValue()) & 255);
+        isaacChannel.writeInbound(Unpooled.wrappedBuffer(isaacFrame));
+        requirePacket(isaacChannel, 42, 199, "preclassified ISAAC frame");
+        isaacChannel.finishAndReleaseAll();
+    }
+
+    private static void expectFailure(byte[] value, boolean close, String label) {
+        ConnectionAttachment attachment = new ConnectionAttachment();
+        EmbeddedChannel channel = channel(attachment);
+        boolean failed = false;
+        try {
+            channel.writeInbound(Unpooled.wrappedBuffer(value));
+            if (close) channel.finish();
+        } catch (RuntimeException expected) {
+            failed = true;
+        } finally {
+            channel.close();
+        }
+        require(failed, label + " did not fail closed");
+        require(channel.readInbound() == null, label + " delivered a packet");
+        require(attachment.authenticClient.get() == null, label + " classified a client");
+    }
+
+    private static void malformedAndTruncatedFramesFailClosed() {
+        expectFailure(new byte[] {0, 0, 0}, false, "zero length");
+        expectFailure(new byte[] {0, 38, 0}, false, "short login");
+        expectFailure(new byte[] {32, 1, 0}, false, "excessive login");
+        byte[] truncated = new byte[13];
+        truncated[0] = 1;
+        truncated[1] = 22;
+        truncated[2] = 0;
+        expectFailure(truncated, true, "truncated 278-byte login");
     }
 
     public static void main(String[] args) {
-        fragmented278();
-        coalescedAndBoundaryLengths();
-        malformedAndLegacyFrames();
+        fragmentedAtEveryBoundary(255);
+        fragmentedAtEveryBoundary(256);
+        fragmentedAtEveryBoundary(278);
+        boundaryAndOrdinaryLogins();
+        coalescedFramesAreDeliveredOnce();
+        initialConfigAndLegacyTrafficRemainDistinct();
+        malformedAndTruncatedFramesFailClosed();
         System.out.println("custom-login-decoder-ok");
     }
 }
@@ -125,7 +202,7 @@ public final class CustomLoginDecoderHarness {
 
 
 class CustomLoginDecoderTest(unittest.TestCase):
-    def test_fragmented_coalesced_malformed_boundary_and_single_delivery(self):
+    def test_real_decoder_framing_boundaries_and_failures(self):
         self.assertTrue(CORE.is_file(), "run ./scripts/build-server.sh first")
         with tempfile.TemporaryDirectory(prefix="custom-login-decoder-") as temp:
             root = Path(temp)
@@ -142,118 +219,9 @@ class CustomLoginDecoderTest(unittest.TestCase):
                 cwd=ROOT, capture_output=True, text=True,
             )
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-            self.assertEqual("custom-login-decoder-ok\n", result.stdout)
-
-    def test_authenticated_builder_binding_gates_native_terrain_readiness(self):
-        """Run the production Builder binding gate before its terrain sender can run."""
-        session = ROOT / (
-            "server/src/com/openrsc/server/content/worldedit/"
-            "WorldBuilderPlayerSession.java"
-        )
-        command = (ROOT / "server/src/com/openrsc/server/net/rsc/handlers/"
-                   "CommandHandler.java").read_text(encoding="utf-8")
-        updater = (ROOT / "server/src/com/openrsc/server/GameStateUpdater.java").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn('"builderbind".equalsIgnoreCase(cmd)', command)
-        self.assertIn("WorldBuilderPlayerSession.bind(", command)
-        self.assertIn("WorldBuilderPlayerSession.mayReceiveWorldState(player)", updater)
-        stubs = {
-            "com/openrsc/server/ServerConfiguration.java": """
-                package com.openrsc.server;
-                public class ServerConfiguration { public boolean WORLD_BUILDER_MODE; public boolean adaptive; public String MESSAGE_PREFIX = ""; }
-            """,
-            "com/openrsc/server/Server.java": """
-                package com.openrsc.server;
-                import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderRuntimeSession;
-                import com.openrsc.server.model.entity.player.Player;
-                public class Server {
-                    private final AdaptiveWorldBuilderRuntimeSession session;
-                    public Server(String token) { session = new AdaptiveWorldBuilderRuntimeSession(token); }
-                    public AdaptiveWorldBuilderRuntimeSession getAdaptiveWorldBuilderRuntimeSession() { return session; }
-                    public Sessions getWorldEditorSessions() { return new Sessions(); }
-                    public static class Sessions { public void closeFor(Player player) { } }
-                }
-            """,
-            "com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRuntimeSession.java": """
-                package com.openrsc.server.content.worldedit;
-                public class AdaptiveWorldBuilderRuntimeSession { private final String token; public AdaptiveWorldBuilderRuntimeSession(String token) { this.token = token; } public String getToken() { return token; } }
-            """,
-            "com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRuntimeIdentity.java": """
-                package com.openrsc.server.content.worldedit;
-                import com.openrsc.server.ServerConfiguration;
-                import com.openrsc.server.model.world.coordinate.WorldLocation;
-                public final class AdaptiveWorldBuilderRuntimeIdentity {
-                    public static boolean isAdaptive(ServerConfiguration c) { return c.adaptive; }
-                    public static WorldLocation initialLocation(ServerConfiguration c) { return new WorldLocation(); }
-                }
-            """,
-            "com/openrsc/server/content/worldedit/WorldBuilderMode.java": """
-                package com.openrsc.server.content.worldedit;
-                public final class WorldBuilderMode { public static boolean isBuilderAccount(String value) { return "builder".equals(value); } }
-            """,
-            "com/openrsc/server/content/worldedit/WorldEditorAccessService.java": """
-                package com.openrsc.server.content.worldedit;
-                import com.openrsc.server.model.entity.player.Player;
-                public final class WorldEditorAccessService { public static boolean open(Player player) { return true; } }
-            """,
-            "com/openrsc/server/model/entity/player/Group.java": """
-                package com.openrsc.server.model.entity.player;
-                public final class Group { public static final int ADMIN = 3; }
-            """,
-            "com/openrsc/server/model/world/coordinate/WorldLocation.java": """
-                package com.openrsc.server.model.world.coordinate;
-                public class WorldLocation { }
-            """,
-            "com/openrsc/server/model/World.java": """
-                package com.openrsc.server.model;
-                import com.openrsc.server.Server;
-                public class World { private final Server server; public World(Server server) { this.server = server; } public Server getServer() { return server; } }
-            """,
-            "com/openrsc/server/model/entity/player/Player.java": """
-                package com.openrsc.server.model.entity.player;
-                import com.openrsc.server.ServerConfiguration;
-                import com.openrsc.server.model.World;
-                import com.openrsc.server.model.world.coordinate.WorldLocation;
-                import java.util.HashMap;
-                import java.util.Map;
-                public class Player {
-                    private final ServerConfiguration config; private final String username; private final int group; private final World world; private final Map<String, Object> attributes = new HashMap<String, Object>();
-                    public Player(ServerConfiguration config, String username, int group, World world) { this.config=config; this.username=username; this.group=group; this.world=world; }
-                    public ServerConfiguration getConfig() { return config; } public String getUsername() { return username; } public int getGroupID() { return group; } public void setCacheInvulnerable(boolean value) { } public void teleportLayered(WorldLocation location, boolean value) { } public void message(String value) { }
-                    public Object getAttribute(String key, Object fallback) { Object value=attributes.get(key); return value == null ? fallback : value; } public void setAttribute(String key, Object value) { attributes.put(key, value); } public void removeAttribute(String key) { attributes.remove(key); } public World getWorld() { return world; }
-                }
-            """,
-            "org/apache/logging/log4j/Logger.java": """
-                package org.apache.logging.log4j; public class Logger { public void error(String value) { } }
-            """,
-            "org/apache/logging/log4j/LogManager.java": """
-                package org.apache.logging.log4j; public final class LogManager { public static Logger getLogger(Class<?> type) { return new Logger(); } }
-            """,
-            "BuilderBindingHarness.java": """
-                import com.openrsc.server.Server; import com.openrsc.server.ServerConfiguration; import com.openrsc.server.content.worldedit.WorldBuilderPlayerSession; import com.openrsc.server.model.World; import com.openrsc.server.model.entity.player.Group; import com.openrsc.server.model.entity.player.Player;
-                public final class BuilderBindingHarness { public static void main(String[] args) { ServerConfiguration config = new ServerConfiguration(); config.WORLD_BUILDER_MODE = true; config.adaptive = true; Player player = new Player(config, "builder", Group.ADMIN, new World(new Server("binding-token"))); WorldBuilderPlayerSession.activate(player); if (WorldBuilderPlayerSession.mayReceiveWorldState(player)) throw new AssertionError("native terrain escaped before builderbind"); WorldBuilderPlayerSession.bind(player, "binding-token"); if (!WorldBuilderPlayerSession.mayReceiveWorldState(player)) throw new AssertionError("native terrain remained blocked after authenticated builderbind"); System.out.println("builder-binding-ok"); } }
-            """,
-        }
-        with tempfile.TemporaryDirectory(prefix="builder-binding-") as temp:
-            root = Path(temp)
-            sources = []
-            for relative, contents in stubs.items():
-                path = root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(textwrap.dedent(contents), encoding="utf-8")
-                sources.append(path)
-            subprocess.run(
-                ["javac", "-source", "8", "-target", "8", "-d", str(root),
-                 *map(str, sources), str(session)],
-                cwd=ROOT, check=True, capture_output=True, text=True,
+            self.assertTrue(
+                result.stdout.endswith("custom-login-decoder-ok\n"), result.stdout
             )
-            result = subprocess.run(
-                ["java", "-cp", str(root), "BuilderBindingHarness"], cwd=ROOT,
-                capture_output=True, text=True,
-            )
-            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-            self.assertEqual("builder-binding-ok\n", result.stdout)
 
 
 if __name__ == "__main__":

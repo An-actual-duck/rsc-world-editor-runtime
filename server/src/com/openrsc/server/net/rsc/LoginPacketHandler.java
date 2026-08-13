@@ -4,6 +4,8 @@ import com.openrsc.server.Server;
 import com.openrsc.server.database.struct.PlayerLoginData;
 import com.openrsc.server.database.struct.PlayerRecoveryQuestions;
 import com.openrsc.server.login.*;
+import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderRuntimeIdentity;
+import com.openrsc.server.content.worldedit.WorldBuilderMode;
 import com.openrsc.server.model.Point;
 import com.openrsc.server.model.entity.player.Player;
 import com.openrsc.server.net.*;
@@ -546,10 +548,19 @@ public class LoginPacketHandler {
 						cl.mapHash
 					);
 
+					final boolean deferAdaptiveBuilderSuccess =
+						AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(server.getConfig())
+							&& WorldBuilderMode.isBuilderAccount(username);
+					final AtomicInteger deferredAdaptiveResponse = new AtomicInteger(-1);
 					final LoginRequest request = new LoginRequest(server, channel, username, password, false, clientVersion, opcode == OpcodeIn.RELOGIN, null) {
 						@Override
 						public void loginValidated(int response) {
 							loginResponse = response;
+							if (deferAdaptiveBuilderSuccess
+								&& (response & 0x40) != LoginResponse.LOGIN_UNSUCCESSFUL) {
+								deferredAdaptiveResponse.set(response);
+								return;
+							}
 							Channel channel = getChannel();
 							channel.writeAndFlush(new PacketBuilder().writeByte((byte) response).toPacket());
 							if ((response & 0x40) == LoginResponse.LOGIN_UNSUCCESSFUL) {
@@ -577,6 +588,15 @@ public class LoginPacketHandler {
 
 							server.getPluginHandler().handlePlugin(PlayerLoginTrigger.class, loadedPlayer, new Object[]{loadedPlayer});
 							ActionSender.sendLogin(loadedPlayer);
+						}
+
+						@Override
+						public void sessionReady() {
+							int response = deferredAdaptiveResponse.getAndSet(-1);
+							if (response >= 0) {
+								getChannel().writeAndFlush(
+									new PacketBuilder().writeByte((byte) response).toPacket());
+							}
 						}
 					};
 					server.getLoginExecutor().add(request);

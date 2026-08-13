@@ -65,6 +65,8 @@ public final class WorldBuilderPlayerSession {
 		}
 		player.removeAttribute(BINDING_PENDING_ATTRIBUTE);
 		player.setAttribute(BINDING_COMPLETE_ATTRIBUTE, Boolean.TRUE);
+		LOGGER.info("Adaptive World Builder binding accepted for authenticated player "
+			+ player.getUsername());
 		if (!WorldEditorAccessService.open(player)) {
 			refuse(player, "Adaptive Builder editor authorization failed.");
 		}

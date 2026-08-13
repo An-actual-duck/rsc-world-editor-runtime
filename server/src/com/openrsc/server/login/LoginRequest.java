@@ -128,6 +128,10 @@ public abstract class LoginRequest extends LoginExecutorProcess{
 
 	public abstract void loadingComplete(Player loadedPlayer);
 
+	/** Runs after the player is attached and Builder session activation completes. */
+	public void sessionReady() {
+	}
+
 	protected void processInternal() {
 		ValidatedLogin vl = validateLogin();
 		int loginResponse = vl.responseCode;
@@ -150,6 +154,7 @@ public abstract class LoginRequest extends LoginExecutorProcess{
 					loadedPlayer.desertHeatInit();
 					ActionSender.sendReleasedNameExplanation(loadedPlayer, usernameChangeType);
 					WorldBuilderPlayerSession.activate(loadedPlayer);
+					sessionReady();
 				}
 			});
 
