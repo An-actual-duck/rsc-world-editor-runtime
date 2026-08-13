@@ -160,6 +160,23 @@ public final class CustomLoginDecoderHarness {
         channel.finishAndReleaseAll();
     }
 
+    private static void coalescedUndecidedFrameIsDeliveredOnce(
+        byte[] first, int opcode, String label) {
+        byte[] ordinary = frame(5, 42);
+        byte[] joined = new byte[first.length + ordinary.length];
+        System.arraycopy(first, 0, joined, 0, first.length);
+        System.arraycopy(ordinary, 0, joined, first.length, ordinary.length);
+        ConnectionAttachment attachment = new ConnectionAttachment();
+        EmbeddedChannel channel = channel(attachment);
+        channel.writeInbound(Unpooled.wrappedBuffer(joined));
+        require(Short.valueOf((short) -1).equals(attachment.authenticClient.get()),
+            label + " did not select custom framing");
+        requirePacket(channel, opcode, first.length - 3, label);
+        requirePacket(channel, 42, 4, label + " following packet");
+        require(channel.readInbound() == null, label + " delivered more than once");
+        channel.finishAndReleaseAll();
+    }
+
     private static void initialConfigAndLegacyTrafficRemainDistinct() {
         ConnectionAttachment custom = new ConnectionAttachment();
         EmbeddedChannel customChannel = channel(custom);
@@ -256,10 +273,15 @@ public final class CustomLoginDecoderHarness {
         byte[] malformedLogin = customLoginFrame(80, 0, false);
         malformedLogin[16] = 2;
         expectFailure(malformedLogin, false, "unsupported login encryption");
+		byte[] malformedRelogin = customLoginFrame(80, 19, true);
+		malformedRelogin[16] = 2;
+		expectFailure(malformedRelogin, false, "unsupported relogin encryption");
 
         byte[] malformedRegistration = registrationFrame();
         malformedRegistration[malformedRegistration.length - 1] = 'x';
         expectFailure(malformedRegistration, false, "malformed registration");
+		expectFailure(new byte[] {32, 1, 19}, false, "excessive relogin");
+		expectFailure(new byte[] {32, 1, 2}, false, "excessive registration");
 
         for (byte[] truncated : new byte[][] {
                 customLoginFrame(278, 0, false),
@@ -279,6 +301,10 @@ public final class CustomLoginDecoderHarness {
         fragmentedAtEveryBoundary(registrationFrame(), 2, "registration");
         boundaryAndOrdinaryLogins();
         coalescedFramesAreDeliveredOnce();
+		coalescedUndecidedFrameIsDeliveredOnce(
+			customLoginFrame(80, 19, true), 19, "coalesced undecided relogin");
+		coalescedUndecidedFrameIsDeliveredOnce(
+			registrationFrame(), 2, "coalesced undecided registration");
         initialConfigAndLegacyTrafficRemainDistinct();
         malformedAndTruncatedFramesFailClosed();
         System.out.println("custom-login-decoder-ok");
