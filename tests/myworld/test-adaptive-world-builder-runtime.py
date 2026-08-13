@@ -36,16 +36,42 @@ def canonical_json(value) -> bytes:
     return (json.dumps(value, separators=(",", ":"), ensure_ascii=False) + "\n").encode()
 
 
-def write_package(root: Path, *, empty: bool = False) -> None:
+VOID_TILE = bytes((0, 1, 8, 0, 0, 0, 0, 0, 0, 0))
+VISIBLE_TILE = bytes(10)
+
+
+def terrain_offset(local_x: int, local_y: int) -> int:
+    return (local_x * 48 + local_y) * 10
+
+
+def write_package(
+    root: Path, *, empty: bool = False,
+    empty_start: tuple[int, int] = (0, 0), visible_patch: bool = False,
+) -> None:
     root.mkdir(parents=True)
     levels = [0] if empty else [-3, 0]
     terrain = []
     placements = []
     for level in levels:
         token = f"m{-level}" if level < 0 else f"p{level}"
-        terrain_path = f"terrain/global/l{token}/xp0-yp0.raw"
-        tile = bytes((0, 1, 8, 0, 0, 0, 0, 0, 0, 0))
-        payload = tile * (48 * 48)
+        sector_x = empty_start[0] // 48 if empty else 0
+        sector_y = empty_start[1] // 48 if empty else 0
+        sector_x_token = f"m{-sector_x}" if sector_x < 0 else f"p{sector_x}"
+        sector_y_token = f"m{-sector_y}" if sector_y < 0 else f"p{sector_y}"
+        terrain_path = (
+            f"terrain/global/l{token}/x{sector_x_token}-y{sector_y_token}.raw"
+        )
+        payload = bytearray(VOID_TILE * (48 * 48))
+        if empty and visible_patch:
+            local_x = empty_start[0] % 48
+            local_y = empty_start[1] % 48
+            if local_x < 1 or local_x > 46 or local_y < 1 or local_y > 46:
+                raise ValueError("visible patch cannot cross the fixture sector edge")
+            for x in range(local_x - 1, local_x + 2):
+                for y in range(local_y - 1, local_y + 2):
+                    offset = terrain_offset(x, y)
+                    payload[offset:offset + 10] = VISIBLE_TILE
+        payload = bytes(payload)
         target = root / terrain_path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(payload)
@@ -53,8 +79,8 @@ def write_package(root: Path, *, empty: bool = False) -> None:
             {
                 "worldSpace": "global",
                 "level": level,
-                "sectorX": 0,
-                "sectorY": 0,
+                "sectorX": sector_x,
+                "sectorY": sector_y,
                 "encoding": "raw-layered-sector-v1",
                 "path": terrain_path,
                 "sha256": hashlib.sha256(payload).hexdigest(),
@@ -146,6 +172,17 @@ def write_package(root: Path, *, empty: bool = False) -> None:
         "terrainSectors": terrain,
         "placementSets": placements,
     }
+    (root / "manifest.json").write_bytes(canonical_json(manifest))
+
+
+def mutate_first_terrain(root: Path, mutation) -> None:
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    declaration = manifest["terrainSectors"][0]
+    terrain = root / declaration["path"]
+    payload = bytearray(terrain.read_bytes())
+    mutation(payload, declaration)
+    terrain.write_bytes(payload)
+    declaration["sha256"] = hashlib.sha256(payload).hexdigest()
     (root / "manifest.json").write_bytes(canonical_json(manifest))
 
 
@@ -285,7 +322,7 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             System.out.println("recovered");
             return;
         }
-        if ("empty-origin".equals(mode)) {
+        if ("empty-origin".equals(mode) || "adopted-origin".equals(mode)) {
             NativeLayeredWorldPackage source = NativeLayeredWorldPackage.load(working);
             NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER.validate(
                 NativeLayeredWorldPackageCatalog.of(
@@ -298,7 +335,9 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             config.LAYERED_NATIVE_WORLD_RUNTIME_PROFILE =
                 AdaptiveWorldBuilderRuntimeIdentity.PROFILE_ID;
             config.WORLD_BUILDER_PROJECT_ORIGIN =
-                AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_EMPTY;
+                "empty-origin".equals(mode)
+                    ? AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_EMPTY
+                    : AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_ADOPTED;
             config.WORLD_BUILDER_DEFINITION_ID = "creator.definitions.v1";
             config.WORLD_BUILDER_DEFINITION_SHA256 =
                 "1111111111111111111111111111111111111111111111111111111111111111";
@@ -313,11 +352,13 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
                 inventory.getFingerprint();
             config.WORLD_BUILDER_INITIAL_WORLD_SPACE = "global";
             config.WORLD_BUILDER_INITIAL_LEVEL = 0;
-            config.WORLD_BUILDER_INITIAL_X = 0;
-            config.WORLD_BUILDER_INITIAL_Y = 0;
+            config.WORLD_BUILDER_INITIAL_X = args.length > 2
+                ? Integer.parseInt(args[2]) : 0;
+            config.WORLD_BUILDER_INITIAL_Y = args.length > 3
+                ? Integer.parseInt(args[3]) : 0;
             config.CLIENT_VERSION = AdaptiveWorldBuilderRuntimeIdentity.CLIENT_VERSION;
             AdaptiveWorldBuilderRuntimeIdentity.validateOriginPackage(config, source);
-            System.out.println("accepted-empty");
+            System.out.println("accepted-" + config.WORLD_BUILDER_PROJECT_ORIGIN);
             return;
         }
         if ("composition".equals(mode)) {
@@ -700,20 +741,25 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.compiled.cleanup()
 
-    def run_harness(self, mode: str, working: Path, baseline: Path | None = None):
+    def run_harness(self, mode: str, working: Path, *arguments):
         command = [
             "java", "-cp", self.classpath,
             "AdaptiveWorldBuilderRuntimeHarness", mode, str(working),
         ]
-        if baseline is not None:
-            command.append(str(baseline))
+        command.extend(str(argument) for argument in arguments)
         return subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
 
-    def fixture(self, root: Path, *, empty: bool = False):
+    def fixture(
+        self, root: Path, *, empty: bool = False,
+        empty_start: tuple[int, int] = (0, 0), visible_patch: bool = False,
+    ):
         working = root / "project/working/layered-world/package"
         baseline = root / "project/source/layered-baseline/package"
         target = root / "server-target"
-        write_package(working, empty=empty)
+        write_package(
+            working, empty=empty, empty_start=empty_start,
+            visible_patch=visible_patch,
+        )
         shutil.copytree(working, baseline)
         (target / "server/maps").mkdir(parents=True)
         (target / "server/maps/live.dat").write_bytes(b"target must not change\n")
@@ -778,8 +824,8 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         if empty:
             fields.update({
                 "initialLevel": "0",
-                "initialX": "0",
-                "initialY": "0",
+                "initialX": "120",
+                "initialY": "648",
                 "levels": "0",
                 "packageId": "creator.standalone-empty-world",
                 "packageVersion": "1.0.0",
@@ -899,32 +945,134 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertEqual(outputs[0], outputs[1])
         self.assertEqual(compositions[0], compositions[1])
 
-    def test_canonical_empty_package_is_accepted_without_fixed_world_identity(self):
-        with tempfile.TemporaryDirectory(prefix="adaptive-empty-") as temp:
-            working, baseline, target = self.fixture(Path(temp), empty=True)
-            result = self.run_harness("guard", working)
-            self.assertEqual(0, result.returncode, result.stderr)
-            result = self.run_harness("empty-origin", working)
-            self.assertEqual(0, result.returncode, result.stderr)
-            payload = next((working / "terrain").rglob("*.raw")).read_bytes()
-            self.assertEqual(bytes((0, 1, 8, 0, 0, 0, 0, 0, 0, 0)), payload[:10])
-            self.assertEqual(payload[:10] * (48 * 48), payload)
-            self.assertEqual("creator.empty-world", json.loads(
-                (working / "manifest.json").read_text())["packageId"])
-            for path in working.rglob("*"):
-                if path.is_file():
-                    self.assertNotIn(b"spoiled-milk", path.read_bytes().lower())
+    def test_standalone_empty_accepts_new_bound_seed_and_exact_legacy_origin(self):
+        for name, start, visible in (
+            ("new", (120, 648), True),
+            ("legacy", (0, 0), False),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory(
+                prefix=f"adaptive-empty-{name}-"
+            ) as temp:
+                working, baseline, target = self.fixture(
+                    Path(temp), empty=True, empty_start=start,
+                    visible_patch=visible,
+                )
+                result = self.run_harness("guard", working)
+                self.assertEqual(0, result.returncode, result.stderr)
+                result = self.run_harness(
+                    "empty-origin", working, start[0], start[1]
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                manifest = json.loads((working / "manifest.json").read_text())
+                sector = manifest["terrainSectors"][0]
+                self.assertEqual([start[0] // 48, start[1] // 48], [
+                    sector["sectorX"], sector["sectorY"],
+                ])
+                payload = (working / sector["path"]).read_bytes()
+                if visible:
+                    seed = 0
+                    for x in range(48):
+                        for y in range(48):
+                            tile = payload[
+                                terrain_offset(x, y):terrain_offset(x, y) + 10
+                            ]
+                            if 23 <= x <= 25 and 23 <= y <= 25:
+                                self.assertEqual(VISIBLE_TILE, tile)
+                                seed += 1
+                            else:
+                                self.assertEqual(VOID_TILE, tile)
+                    self.assertEqual(9, seed)
+                else:
+                    self.assertEqual(VOID_TILE * (48 * 48), payload)
+                self.assertEqual("creator.empty-world", manifest["packageId"])
+                for path in working.rglob("*"):
+                    if path.is_file():
+                        self.assertNotIn(b"spoiled-milk", path.read_bytes().lower())
 
-            manifest = json.loads((working / "manifest.json").read_text())
-            terrain = working / manifest["terrainSectors"][0]["path"]
-            invalid = bytes(10) * (48 * 48)
-            terrain.write_bytes(invalid)
-            manifest["terrainSectors"][0]["sha256"] = hashlib.sha256(
-                invalid
-            ).hexdigest()
-            (working / "manifest.json").write_bytes(canonical_json(manifest))
-            refused = self.run_harness("empty-origin", working)
-            self.assertNotEqual(0, refused.returncode)
+    def test_adopted_origin_retains_generic_coordinate_and_package_shape(self):
+        with tempfile.TemporaryDirectory(prefix="adaptive-adopted-origin-") as temp:
+            working, baseline, target = self.fixture(Path(temp))
+            accepted = self.run_harness("adopted-origin", working, 7, 9)
+            self.assertEqual(0, accepted.returncode, accepted.stderr)
+            self.assertIn("accepted-target-layered", accepted.stdout)
+            source = json.loads((working / "manifest.json").read_text())
+            self.assertEqual(2, len(source["levels"]))
+            self.assertEqual(2, len(source["terrainSectors"]))
+            self.assertEqual(2, len(source["placementSets"]))
+            self.assertTrue(source["placementSets"][1]["path"].endswith("lp0.json"))
+
+            uncovered = self.run_harness("adopted-origin", working, 80, 9)
+            self.assertNotEqual(0, uncovered.returncode)
+
+    def test_standalone_empty_bound_seed_rejects_adversarial_shapes(self):
+        start = (120, 648)
+
+        def reset_seed(payload):
+            for x in range(23, 26):
+                for y in range(23, 26):
+                    offset = terrain_offset(x, y)
+                    payload[offset:offset + 10] = VOID_TILE
+
+        mutations = {
+            "shifted-seed": lambda payload, declaration: (
+                reset_seed(payload),
+                [payload.__setitem__(
+                    slice(terrain_offset(x, y), terrain_offset(x, y) + 10),
+                    VISIBLE_TILE,
+                ) for x in range(24, 27) for y in range(23, 26)],
+            ),
+            "wrong-sized-seed": lambda payload, declaration: payload.__setitem__(
+                slice(terrain_offset(23, 23), terrain_offset(23, 23) + 10),
+                VOID_TILE,
+            ),
+            "wrong-color": lambda payload, declaration: payload.__setitem__(
+                terrain_offset(24, 24) + 1, 1
+            ),
+            "wrong-overlay": lambda payload, declaration: payload.__setitem__(
+                terrain_offset(24, 24) + 2, 1
+            ),
+            "wrong-other-field": lambda payload, declaration: payload.__setitem__(
+                terrain_offset(24, 24) + 3, 1
+            ),
+            "extra-non-void": lambda payload, declaration: payload.__setitem__(
+                slice(terrain_offset(22, 24), terrain_offset(22, 24) + 10),
+                VISIBLE_TILE,
+            ),
+            "wrong-sector": lambda payload, declaration: declaration.__setitem__(
+                "sectorX", 3
+            ),
+        }
+        for name, mutation in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory(
+                prefix=f"adaptive-empty-{name}-"
+            ) as temp:
+                working, baseline, target = self.fixture(
+                    Path(temp), empty=True, empty_start=start, visible_patch=True,
+                )
+                mutate_first_terrain(working, mutation)
+                refused = self.run_harness(
+                    "empty-origin", working, start[0], start[1]
+                )
+                self.assertNotEqual(0, refused.returncode)
+
+        for name, configured, package_start in (
+            ("uncovered", (120, 648), (0, 0)),
+            ("out-of-range-x", (32768, 648), (120, 648)),
+            ("out-of-range-y", (120, 32768), (120, 648)),
+            ("sector-edge", (96, 624), (96, 624)),
+            ("near-sector-edge", (97, 624), (97, 624)),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory(
+                prefix=f"adaptive-empty-{name}-"
+            ) as temp:
+                working, baseline, target = self.fixture(
+                    Path(temp), empty=True, empty_start=package_start,
+                    visible_patch=False,
+                )
+                refused = self.run_harness(
+                    "empty-origin", working, configured[0], configured[1]
+                )
+                self.assertNotEqual(0, refused.returncode)
 
     def test_injected_failures_leave_complete_working_baseline_and_target(self):
         for mode in (
@@ -1065,9 +1213,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="adaptive-client-binding-") as temp:
             root = Path(temp)
             binding, definitions, assets, fields = self.client_binding_fixture(root)
-            accepted = self.run_client_binding(
-                binding, definitions, assets, fields
-            )
+            accepted = self.run_client_binding(binding, definitions, assets, fields)
             self.assertEqual(0, accepted.returncode, accepted.stderr)
             self.assertIn(fields["packageId"], accepted.stdout)
 
@@ -1098,16 +1244,12 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             )
 
             definitions.write_bytes(b"mismatched definitions\n")
-            mismatch = self.run_client_binding(
-                binding, definitions, assets, fields
-            )
+            mismatch = self.run_client_binding(binding, definitions, assets, fields)
             self.assertNotEqual(0, mismatch.returncode)
             definitions.write_bytes(b"content-neutral definitions\n")
 
             assets.write_bytes(b"mismatched assets\n")
-            mismatch = self.run_client_binding(
-                binding, definitions, assets, fields
-            )
+            mismatch = self.run_client_binding(binding, definitions, assets, fields)
             self.assertNotEqual(0, mismatch.returncode)
             assets.write_bytes(b"content-neutral assets\n")
 
@@ -1120,9 +1262,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
 
             outside = root / "outside-assets.bin"
             outside.write_bytes(assets.read_bytes())
-            mismatch = self.run_client_binding(
-                binding, definitions, outside, fields
-            )
+            mismatch = self.run_client_binding(binding, definitions, outside, fields)
             self.assertNotEqual(0, mismatch.returncode)
 
             credential = (
@@ -1138,27 +1278,53 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
 
             credential_hardlink = credential.with_name("credential-hardlink")
             os.link(credential, credential_hardlink)
-            mismatch = self.run_client_binding(
-                binding, definitions, assets, fields
-            )
+            mismatch = self.run_client_binding(binding, definitions, assets, fields)
             self.assertNotEqual(0, mismatch.returncode)
             credential_hardlink.unlink()
 
             hardlink = assets.with_name("assets-hardlink.bin")
             os.link(assets, hardlink)
-            mismatch = self.run_client_binding(
-                binding, definitions, assets, fields
-            )
+            mismatch = self.run_client_binding(binding, definitions, assets, fields)
             self.assertNotEqual(0, mismatch.returncode)
             hardlink.unlink()
 
             real_binding = binding.with_name("binding-real.properties")
             binding.rename(real_binding)
             binding.symlink_to(real_binding)
-            mismatch = self.run_client_binding(
-                binding, definitions, assets, fields
-            )
+            mismatch = self.run_client_binding(binding, definitions, assets, fields)
             self.assertNotEqual(0, mismatch.returncode)
+
+    def test_client_accepts_bound_standalone_start_and_rejects_invalid_carrier(self):
+        with tempfile.TemporaryDirectory(prefix="adaptive-client-empty-start-") as temp:
+            root = Path(temp)
+            binding, definitions, assets, fields = self.client_binding_fixture(
+                root, empty=True
+            )
+            accepted = self.run_client_binding(binding, definitions, assets, fields)
+            self.assertEqual(0, accepted.returncode, accepted.stderr)
+            self.assertEqual("120", fields["initialX"])
+            self.assertEqual("648", fields["initialY"])
+
+            for key, value in (
+                ("initialX", "-1"),
+                ("initialX", "32768"),
+                ("initialY", "-1"),
+                ("initialY", "32768"),
+                ("initialLevel", "1"),
+            ):
+                invalid = dict(fields)
+                invalid[key] = value
+                binding.write_text(
+                    "adaptive-world-builder-session-v1\n"
+                    + "".join(
+                        f"{name}={invalid[name]}\n" for name in sorted(invalid)
+                    ),
+                    encoding="ascii",
+                )
+                refused = self.run_client_binding(
+                    binding, definitions, assets, invalid
+                )
+                self.assertNotEqual(0, refused.returncode, (key, value))
 
     def test_strict_startup_skips_legacy_archives_login_world_and_gates_native_readiness(self):
         for empty in (False, True):

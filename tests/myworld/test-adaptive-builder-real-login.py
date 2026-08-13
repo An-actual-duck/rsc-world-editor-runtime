@@ -25,39 +25,28 @@ def canonical_json(value) -> bytes:
 
 
 def write_integration_package(root: Path) -> None:
-    terrain_path = "terrain/global/lp0/xp0-yp0.raw"
+    initial_x = 120
+    initial_y = 648
+    sector_x = initial_x // 48
+    sector_y = initial_y // 48
+    local_x = initial_x % 48
+    local_y = initial_y % 48
+    terrain_path = f"terrain/global/lp0/xp{sector_x}-yp{sector_y}.raw"
     placement_path = "placements/global/lp0.json"
-    terrain = bytes((0, 1, 8, 0, 0, 0, 0, 0, 0, 0)) * (48 * 48)
-    slayer = json.loads(
-        (ROOT / "server/conf/server/defs/extras/MonsterSlayer.json").read_text(
-            encoding="utf-8"
-        )
+    terrain = bytearray(
+        bytes((0, 1, 8, 0, 0, 0, 0, 0, 0, 0)) * (48 * 48)
     )
-    npc_ids = []
-    for family in slayer["families"]:
-        npc_ids.append(family["npcIds"][0])
-    for contact in slayer["contacts"]:
-        npc_ids.append(contact["npcId"])
-    npc_ids = list(dict.fromkeys(npc_ids))
-    npc_placements = []
-    for index, npc_id in enumerate(npc_ids):
-        x = 4 + index % 40
-        y = 4 + index // 40
-        npc_placements.append({
-            "placementId": f"integration.npc.{index:03d}",
-            "npcId": npc_id,
-            "start": {"x": x, "y": y},
-            "roamBounds": {
-                "minimum": {"x": x, "y": y},
-                "maximum": {"x": x, "y": y},
-            },
-        })
+    for x in range(local_x - 1, local_x + 2):
+        for y in range(local_y - 1, local_y + 2):
+            offset = (x * 48 + y) * 10
+            terrain[offset:offset + 10] = bytes(10)
+    terrain = bytes(terrain)
     placements = canonical_json({
         "schemaVersion": 3,
         "encoding": "layered-world-placements-v3",
         "worldSpace": "global",
         "level": 0,
-        "npcs": npc_placements,
+        "npcs": [],
         "groundItems": [],
         "scenery": [],
         "boundaries": [],
@@ -69,7 +58,7 @@ def write_integration_package(root: Path) -> None:
     manifest = {
         "schemaVersion": 1,
         "packageType": "layered-world",
-        "packageId": "integration.neutral.adopted-world",
+        "packageId": "integration.neutral.standalone-empty",
         "packageVersion": "1.0.0",
         "coordinateModel": "signed-layered-v1",
         "storage": {"sectorSize": 48, "presentationChunkSize": 24},
@@ -79,7 +68,8 @@ def write_integration_package(root: Path) -> None:
             "name": "Empty level", "role": "empty-authoring-level",
         }],
         "terrainSectors": [{
-            "worldSpace": "global", "level": 0, "sectorX": 0, "sectorY": 0,
+            "worldSpace": "global", "level": 0,
+            "sectorX": sector_x, "sectorY": sector_y,
             "encoding": "raw-layered-sector-v1", "path": terrain_path,
             "sha256": hashlib.sha256(terrain).hexdigest(),
         }],
@@ -246,6 +236,7 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
                 "want_sync_scene_baseline": "true",
                 "monitor_online": "false",
                 "custom_landscape": "false",
+                "want_myworld": "false",
             }
             for key, value in replacements.items():
                 config = replace_config(config, key, value)
@@ -265,13 +256,13 @@ want_layered_native_terrain_prediction: true
 want_layered_native_terrain_symmetric_residency: true
 want_layered_native_terrain_atomic_activation: true
 layered_native_world_runtime_profile: adaptive-world-builder
-world_builder_project_origin: target-layered
+world_builder_project_origin: standalone-empty
 world_builder_definition_id: integration.neutral.definitions.v1
 world_builder_asset_id: integration.neutral.assets.v1
 world_builder_initial_world_space: global
 world_builder_initial_level: 0
-world_builder_initial_x: 0
-world_builder_initial_y: 0
+world_builder_initial_x: 120
+world_builder_initial_y: 648
 """
             (server_root / "world-builder.conf").write_text(config, encoding="utf-8")
 
@@ -294,7 +285,7 @@ world_builder_initial_y: 0
                 "openrsc.layeredNativeTerrainPackagePath": str(package),
                 "openrsc.layeredNativeTerrainManifestSha256": manifest_sha,
                 "openrsc.layeredNativeTerrainInventorySha256": inventory,
-                "openrsc.worldBuilderProjectOrigin": "target-layered",
+                "openrsc.worldBuilderProjectOrigin": "standalone-empty",
                 "openrsc.worldBuilderDefinitionId": "integration.neutral.definitions.v1",
                 "openrsc.worldBuilderDefinitionSha256": definition_sha,
                 "openrsc.worldBuilderDefinitionEvidencePath": str(definitions),
@@ -304,8 +295,8 @@ world_builder_initial_y: 0
                 "openrsc.worldBuilderSourceBaselineInventorySha256": baseline_inventory,
                 "openrsc.worldBuilderInitialWorldSpace": "global",
                 "openrsc.worldBuilderInitialLevel": "0",
-                "openrsc.worldBuilderInitialX": "0",
-                "openrsc.worldBuilderInitialY": "0",
+                "openrsc.worldBuilderInitialX": "120",
+                "openrsc.worldBuilderInitialY": "648",
             }
             server_command = ["java", "-Xms128m", "-Xmx768m"]
             server_command.extend(f"-D{key}={value}" for key, value in common_server_properties.items())
@@ -374,6 +365,11 @@ world_builder_initial_y: 0
                     server_evidence.count(
                         "Adaptive World Builder binding accepted for authenticated player Builder"
                     ),
+                )
+                self.assertIn(
+                    "location=WorldLocation{worldSpace=global, "
+                    "coordinate=WorldCoordinate{x=120, y=648, level=0}}",
+                    server_evidence,
                 )
                 self.assertIn("nativeTerrain=true initialRegion=true binding=true", runtime_evidence)
                 self.assertIn(
