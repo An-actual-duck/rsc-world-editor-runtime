@@ -24,8 +24,10 @@ import java.util.List;
 
 public final class RSCProtocolDecoder extends ByteToMessageDecoder implements AttributeMap {
 	public static final AttributeKey<ConnectionAttachment> attachment = AttributeKey.valueOf("conn-attachment");
-	private static final int MIN_CUSTOM_LOGIN_LENGTH = 39;
 	private static final int MAX_UNDECIDED_CUSTOM_FRAME_LENGTH = 8192;
+	private static final int MAX_CUSTOM_LOGIN_STRING_LENGTH = 20;
+	private static final int MAX_CUSTOM_EMAIL_LENGTH = 254;
+	private static final int MAX_CUSTOM_CLIENT_VERSION = 1_000_000;
 
 	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf buffer, List<Object> out) throws Exception {
@@ -47,7 +49,7 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 				 * complete; a fragmented login must remain undecided, not become legacy
 				 * traffic part way through its header.
 				 */
-				if (decodeUndecidedCustomLoginFrame(buffer, out, att)) {
+				if (decodeUndecidedCustomFrame(buffer, out, att)) {
 					return;
 				}
 				if (buffer.readableBytes() > 2) {
@@ -357,11 +359,12 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 	}
 
 	/**
-	 * Decodes an initial custom-client login which cannot safely be interpreted
-	 * using legacy one-byte framing.  Returns {@code true} both after delivery
-	 * and while a recognized frame is awaiting more bytes.
+	 * Decodes initial custom-client control, login, relogin, and registration
+	 * frames which cannot safely be interpreted using legacy one-byte framing.
+	 * Returns {@code true} both after delivery and while a structurally possible
+	 * frame is awaiting more bytes.
 	 */
-	private boolean decodeUndecidedCustomLoginFrame(
+	private boolean decodeUndecidedCustomFrame(
 		ByteBuf buffer, List<Object> out, ConnectionAttachment att)
 		throws CorruptedFrameException {
 		if (buffer.readableBytes() < 3) {
@@ -375,12 +378,9 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 				"Undecided custom-client frame has a zero length");
 		}
 		boolean initialConfigRequest = length == 1 && opcode == 19;
-		boolean loginRequest = opcode == 0 && length >= MIN_CUSTOM_LOGIN_LENGTH;
-		if (opcode == 0 && length < MIN_CUSTOM_LOGIN_LENGTH) {
-			throw new CorruptedFrameException(
-				"Undecided custom-client login frame is too short: " + length);
-		}
-		if (!initialConfigRequest && !loginRequest) {
+		boolean loginRequest = opcode == 0 || opcode == 19;
+		boolean registrationRequest = opcode == 2;
+		if (!initialConfigRequest && !loginRequest && !registrationRequest) {
 			return false;
 		}
 		if (length > MAX_UNDECIDED_CUSTOM_FRAME_LENGTH) {
@@ -388,8 +388,28 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 				"Undecided custom-client frame exceeds "
 					+ MAX_UNDECIDED_CUSTOM_FRAME_LENGTH + " bytes: " + length);
 		}
-		if (buffer.readableBytes() < length + 2) {
+		int frameLength = length + 2;
+		int available = buffer.readableBytes();
+		if (!initialConfigRequest && loginRequest && available >= 8
+			&& !hasCustomLoginPrefix(buffer, readerIndex, opcode)) {
+			return false;
+		}
+		if (!initialConfigRequest && registrationRequest && available >= 4
+			&& !hasCustomRegistrationPrefix(buffer, readerIndex, length, available)) {
+			return false;
+		}
+		if (available < frameLength) {
 			return true;
+		}
+		if (!initialConfigRequest) {
+			boolean valid = loginRequest
+				? isStructurallyValidCustomLogin(buffer, readerIndex, length, opcode)
+				: isStructurallyValidCustomRegistration(buffer, readerIndex, length);
+			if (!valid) {
+				throw new CorruptedFrameException(
+					"Malformed undecided custom-client "
+						+ (loginRequest ? "login" : "registration") + " frame");
+			}
 		}
 		buffer.skipBytes(2);
 		opcode = buffer.readUnsignedByte();
@@ -398,6 +418,110 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 		att.authenticClient.set((short)-1);
 		addPacketToIncoming(out, att, new Packet(opcode, data));
 		return true;
+	}
+
+	private boolean hasCustomLoginPrefix(ByteBuf buffer, int frameStart, int opcode) {
+		int reconnecting = buffer.getUnsignedByte(frameStart + 3);
+		int clientVersion = buffer.getInt(frameStart + 4);
+		return (reconnecting == 0 || reconnecting == 1)
+			&& (opcode != 19 || reconnecting == 1)
+			&& clientVersion > 0 && clientVersion <= MAX_CUSTOM_CLIENT_VERSION;
+	}
+
+	private boolean hasCustomRegistrationPrefix(
+		ByteBuf buffer, int frameStart, int length, int available) {
+		int frameEnd = frameStart + Math.min(length + 2, available);
+		int start = frameStart + 3;
+		int limit = Math.min(frameEnd, start + MAX_CUSTOM_LOGIN_STRING_LENGTH + 1);
+		for (int cursor = start; cursor < limit; cursor++) {
+			int value = buffer.getUnsignedByte(cursor);
+			if (value == 10) {
+				return true;
+			}
+			if (value < 32 || value > 126) {
+				return false;
+			}
+		}
+		return frameEnd < start + MAX_CUSTOM_LOGIN_STRING_LENGTH + 1;
+	}
+
+	private boolean isStructurallyValidCustomLogin(
+		ByteBuf buffer, int frameStart, int length, int opcode) {
+		if (length < 18 || !hasCustomLoginPrefix(buffer, frameStart, opcode)) {
+			return false;
+		}
+		int frameEnd = frameStart + length + 2;
+		int clientVersion = buffer.getInt(frameStart + 4);
+		int cursor = findPrintableLineEnd(
+			buffer, frameStart + 8, frameEnd, MAX_CUSTOM_LOGIN_STRING_LENGTH);
+		if (cursor < 0) {
+			return false;
+		}
+		if (clientVersion < 10010 || clientVersion == 10069) {
+			cursor = findPrintableLineEnd(
+				buffer, cursor, frameEnd, MAX_CUSTOM_LOGIN_STRING_LENGTH);
+		} else {
+			if (cursor >= frameEnd) {
+				return false;
+			}
+			int encryptionVersion = buffer.getUnsignedByte(cursor++);
+			if (encryptionVersion == 0) {
+				cursor = findPrintableLineEnd(
+					buffer, cursor, frameEnd, MAX_CUSTOM_LOGIN_STRING_LENGTH);
+			} else if (encryptionVersion == 1) {
+				cursor = skipBoundedBlock(buffer, cursor, frameEnd);
+				if (cursor >= 0) {
+					cursor = skipBoundedBlock(buffer, cursor, frameEnd);
+				}
+			} else {
+				return false;
+			}
+		}
+		return cursor >= 0 && frameEnd - cursor >= 8;
+	}
+
+	private boolean isStructurallyValidCustomRegistration(
+		ByteBuf buffer, int frameStart, int length) {
+		int frameEnd = frameStart + length + 2;
+		int cursor = findPrintableLineEnd(
+			buffer, frameStart + 3, frameEnd, MAX_CUSTOM_LOGIN_STRING_LENGTH);
+		if (cursor < 0) {
+			return false;
+		}
+		cursor = findPrintableLineEnd(
+			buffer, cursor, frameEnd, MAX_CUSTOM_LOGIN_STRING_LENGTH);
+		if (cursor < 0) {
+			return false;
+		}
+		cursor = findPrintableLineEnd(
+			buffer, cursor, frameEnd, MAX_CUSTOM_EMAIL_LENGTH);
+		return cursor == frameEnd;
+	}
+
+	private int findPrintableLineEnd(
+		ByteBuf buffer, int start, int end, int maximumLength) {
+		int limit = Math.min(end, start + maximumLength + 1);
+		for (int cursor = start; cursor < limit; cursor++) {
+			int value = buffer.getUnsignedByte(cursor);
+			if (value == 10) {
+				return cursor + 1;
+			}
+			if (value < 32 || value > 126) {
+				return -1;
+			}
+		}
+		return -1;
+	}
+
+	private int skipBoundedBlock(ByteBuf buffer, int start, int end) {
+		if (end - start < 2) {
+			return -1;
+		}
+		int length = buffer.getUnsignedShort(start);
+		if (length < 1 || length > 1024 || end - start - 2 < length) {
+			return -1;
+		}
+		return start + 2 + length;
 	}
 
 	@Override
@@ -412,9 +536,16 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 		int readerIndex = buffer.readerIndex();
 		int length = buffer.getUnsignedShort(readerIndex);
 		int opcode = buffer.getUnsignedByte(readerIndex + 2);
-		if ((length == 1 && opcode == 19)
-			|| (opcode == 0 && length >= MIN_CUSTOM_LOGIN_LENGTH
-				&& length <= MAX_UNDECIDED_CUSTOM_FRAME_LENGTH)) {
+		int available = buffer.readableBytes();
+		boolean loginCandidate = (opcode == 0 || opcode == 19)
+			&& (available < 8 || hasCustomLoginPrefix(buffer, readerIndex, opcode));
+		boolean registrationCandidate = opcode == 2
+			&& (available < 4
+				|| hasCustomRegistrationPrefix(
+					buffer, readerIndex, length, available));
+		boolean candidate = (length == 1 && opcode == 19)
+			|| loginCandidate || registrationCandidate;
+		if (candidate && length <= MAX_UNDECIDED_CUSTOM_FRAME_LENGTH) {
 			throw new CorruptedFrameException(
 				"Truncated undecided custom-client frame: expected "
 					+ (length + 2) + " bytes but received " + buffer.readableBytes());

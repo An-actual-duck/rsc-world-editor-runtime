@@ -393,8 +393,30 @@ world_builder_initial_y: 0
                 self.assertFalse((client_root / "Cache/video/Authentic_Landscape.orsc").exists())
                 self.assertFalse((client_root / "Cache/video/Custom_Landscape.orsc").exists())
 
+                shutdown_started = time.monotonic()
                 shutdown.write_text("shutdown\n", encoding="ascii")
                 self.assertEqual(0, server.wait(timeout=30), "server clean shutdown")
+                shutdown_elapsed = time.monotonic() - shutdown_started
+                self.assertLess(
+                    shutdown_elapsed, 20,
+                    f"control-channel shutdown took {shutdown_elapsed:.3f}s",
+                )
+                server_output.flush()
+                shutdown_evidence = server_log.read_text(
+                    encoding="utf-8", errors="replace"
+                )
+                self.assertEqual(
+                    1,
+                    shutdown_evidence.count(
+                        "World Builder launcher requested a clean local shutdown"
+                    ),
+                )
+                self.assertIn("Server stop requested", shutdown_evidence)
+                self.assertIn("Server unloaded", shutdown_evidence)
+                self.assertIn("Exiting server process", shutdown_evidence)
+                self.assertNotIn("Server thread termination failed", shutdown_evidence)
+                self.assertFalse(shutdown.exists(), "shutdown request cleanup")
+                self.assertFalse(ready.exists(), "readiness cleanup")
             finally:
                 if client is not None and client.poll() is None:
                     client.terminate()

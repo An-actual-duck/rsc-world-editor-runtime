@@ -948,6 +948,33 @@ public class Server implements Runnable {
 	}
 
 	public void stop() {
+		ScheduledExecutorService gameExecutor;
+		synchronized (running) {
+			if (!isRunning()) {
+				return;
+			}
+			gameExecutor = scheduledExecutor;
+			gameExecutor.shutdown();
+		}
+
+		/*
+		 * Server.run() also synchronizes on running.  Waiting for its executor
+		 * while holding that monitor can deadlock when a scheduled tick has
+		 * already been dispatched and is waiting to enter run().
+		 */
+		try {
+			final boolean terminationResult = gameExecutor.awaitTermination(1, TimeUnit.MINUTES);
+			if (!terminationResult) {
+				LOGGER.error("Server thread termination failed");
+				List<Runnable> skippedTasks = gameExecutor.shutdownNow();
+				LOGGER.error("{} task(s) never commenced execution, forcing shutdown", skippedTasks.size());
+			}
+		} catch (final InterruptedException e) {
+			LOGGER.error("Exception during task shutdown", e);
+			gameExecutor.shutdownNow();
+			Thread.currentThread().interrupt();
+		}
+
 		synchronized (running) {
 			try {
 				if (!isRunning()) {
@@ -956,17 +983,6 @@ public class Server implements Runnable {
 				LOGGER.info("Server stop requested");
 				getWorld().unloadPlayers();
 
-				scheduledExecutor.shutdown();
-				try {
-					final boolean terminationResult = scheduledExecutor.awaitTermination(1, TimeUnit.MINUTES);
-					if (!terminationResult) {
-						LOGGER.error("Server thread termination failed");
-						List<Runnable> skippedTasks = scheduledExecutor.shutdownNow();
-						LOGGER.error("{} task(s) never commenced execution, forcing shutdown", skippedTasks.size());
-					}
-				} catch (final InterruptedException e) {
-					LOGGER.error("Exception during task shutdown", e);
-				}
 				getLoginExecutor().stop();
 				if (getDiscordService() != null) {
 					getDiscordService().stop();
