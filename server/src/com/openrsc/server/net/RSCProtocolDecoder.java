@@ -473,7 +473,7 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 				if (cursor >= 0) {
 					cursor = skipBoundedBlock(buffer, cursor, frameEnd);
 				}
-			} else {
+			} else if (encryptionVersion != 2) {
 				return false;
 			}
 		}
@@ -492,6 +492,9 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 			buffer, cursor, frameEnd, MAX_CUSTOM_LOGIN_STRING_LENGTH);
 		if (cursor < 0) {
 			return false;
+		}
+		if (cursor == frameEnd) {
+			return true;
 		}
 		cursor = findPrintableLineEnd(
 			buffer, cursor, frameEnd, MAX_CUSTOM_EMAIL_LENGTH);

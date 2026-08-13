@@ -65,17 +65,21 @@ public final class CustomLoginDecoderHarness {
         return result;
     }
 
-    private static byte[] registrationFrame() {
+    private static byte[] registrationFrame(boolean withEmail) {
         byte[] username = "Builder             ".getBytes(StandardCharsets.US_ASCII);
         byte[] password = "password            ".getBytes(StandardCharsets.US_ASCII);
         byte[] email = "builder@example.test".getBytes(StandardCharsets.US_ASCII);
-        int length = 1 + username.length + 1 + password.length + 1 + email.length + 1;
+        int length = 1 + username.length + 1 + password.length + 1
+            + (withEmail ? email.length + 1 : 0);
         byte[] result = new byte[length + 2];
         result[0] = (byte) (length >>> 8);
         result[1] = (byte) length;
         result[2] = 2;
         int cursor = 3;
-        for (byte[] field : new byte[][] {username, password, email}) {
+        byte[][] fields = withEmail
+            ? new byte[][] {username, password, email}
+            : new byte[][] {username, password};
+        for (byte[] field : fields) {
             System.arraycopy(field, 0, result, cursor, field.length);
             cursor += field.length;
             result[cursor++] = 10;
@@ -138,7 +142,7 @@ public final class CustomLoginDecoderHarness {
             customLoginFrame(278, 0, false),
             frame(1, 19),
             customLoginFrame(80, 19, true),
-            registrationFrame(),
+            registrationFrame(true),
             frame(5, 42)
         };
         int joinedLength = 0;
@@ -153,7 +157,7 @@ public final class CustomLoginDecoderHarness {
         requirePacket(channel, 0, 277, "coalesced login");
         requirePacket(channel, 19, 0, "coalesced initial-config request");
         requirePacket(channel, 19, 79, "coalesced relogin");
-        requirePacket(channel, 2, registrationFrame().length - 3,
+        requirePacket(channel, 2, registrationFrame(true).length - 3,
             "coalesced registration");
         requirePacket(channel, 42, 4, "coalesced ordinary custom packet");
         require(channel.readInbound() == null, "coalesced frames delivered more than once");
@@ -192,6 +196,10 @@ public final class CustomLoginDecoderHarness {
         byte[] legacyCollision = new byte[] {1, 19, 2, 1, 42};
         legacyChannel.writeInbound(Unpooled.wrappedBuffer(legacyCollision));
         requirePacket(legacyChannel, 19, 1, "authentic legacy configuration request");
+        requirePacket(legacyChannel, 42, 2,
+            "packet following authentic legacy configuration request");
+        require(legacyChannel.readInbound() == null,
+            "legacy registration collision left decoded packets");
         require(legacy.authenticClient.get() == null, "legacy request became custom");
         legacyChannel.finishAndReleaseAll();
 
@@ -216,12 +224,15 @@ public final class CustomLoginDecoderHarness {
 
         ConnectionAttachment loginCollision = new ConnectionAttachment();
         EmbeddedChannel loginCollisionChannel = channel(loginCollision);
-        byte[] coincidentalLogin = new byte[] {1, 22, 0, 7, 0, 0, 0, 0};
+        byte[] coincidentalLogin = new byte[] {8, 22, 0, 7, 1, 2, 3, 4, 5};
         loginCollisionChannel.writeInbound(Unpooled.wrappedBuffer(coincidentalLogin));
-        requirePacket(loginCollisionChannel, 22, 1,
+        requirePacket(loginCollisionChannel, 0, 8,
             "legacy length/opcode collision");
+        require(loginCollisionChannel.readInbound() == null,
+            "legacy login collision left decoded packets");
         require(loginCollision.authenticClient.get() == null,
             "legacy length/opcode collision became custom");
+        loginCollisionChannel.finishAndReleaseAll();
 
         ConnectionAttachment isaac = new ConnectionAttachment();
         isaac.authenticClient.set((short) 183);
@@ -271,40 +282,70 @@ public final class CustomLoginDecoderHarness {
         expectFailure(shortLogin, false, "short login");
         expectFailure(new byte[] {32, 1, 0}, false, "excessive login");
         byte[] malformedLogin = customLoginFrame(80, 0, false);
-        malformedLogin[16] = 2;
+        malformedLogin[16] = 3;
         expectFailure(malformedLogin, false, "unsupported login encryption");
 		byte[] malformedRelogin = customLoginFrame(80, 19, true);
-		malformedRelogin[16] = 2;
+		malformedRelogin[16] = 3;
 		expectFailure(malformedRelogin, false, "unsupported relogin encryption");
 
-        byte[] malformedRegistration = registrationFrame();
+        byte[] malformedRegistration = registrationFrame(true);
         malformedRegistration[malformedRegistration.length - 1] = 'x';
         expectFailure(malformedRegistration, false, "malformed registration");
+		byte[] malformedRegistrationWithoutEmail = registrationFrame(false);
+		malformedRegistrationWithoutEmail[malformedRegistrationWithoutEmail.length - 1] = 'x';
+		expectFailure(malformedRegistrationWithoutEmail, false,
+			"malformed registration without email");
 		expectFailure(new byte[] {32, 1, 19}, false, "excessive relogin");
 		expectFailure(new byte[] {32, 1, 2}, false, "excessive registration");
 
         for (byte[] truncated : new byte[][] {
                 customLoginFrame(278, 0, false),
                 customLoginFrame(80, 19, true),
-                registrationFrame()}) {
+                registrationFrame(true),
+				registrationFrame(false)}) {
             byte[] prefix = new byte[24];
             System.arraycopy(truncated, 0, prefix, 0, prefix.length);
             expectFailure(prefix, true, "truncated opcode " + (truncated[2] & 255));
         }
     }
 
+    private static void loginEncryptionVersionTwoRemainsAccepted() {
+		for (int opcode : new int[] {0, 19}) {
+			byte[] value = customLoginFrame(80, opcode, opcode == 19);
+			value[16] = 2;
+			ConnectionAttachment attachment = new ConnectionAttachment();
+			EmbeddedChannel channel = channel(attachment);
+			channel.writeInbound(Unpooled.wrappedBuffer(value));
+			require(Short.valueOf((short) -1).equals(attachment.authenticClient.get()),
+				"encryption version 2 opcode " + opcode + " did not classify custom");
+			requirePacket(channel, opcode, 79,
+				"encryption version 2 opcode " + opcode);
+			require(channel.readInbound() == null,
+				"encryption version 2 opcode " + opcode + " duplicate");
+			channel.finishAndReleaseAll();
+		}
+	}
+
     public static void main(String[] args) {
         fragmentedAtEveryBoundary(customLoginFrame(255, 0, false), 0, "255 login");
         fragmentedAtEveryBoundary(customLoginFrame(256, 0, false), 0, "256 login");
         fragmentedAtEveryBoundary(customLoginFrame(278, 0, false), 0, "278 login");
         fragmentedAtEveryBoundary(customLoginFrame(80, 19, true), 19, "relogin");
-        fragmentedAtEveryBoundary(registrationFrame(), 2, "registration");
+        fragmentedAtEveryBoundary(
+			registrationFrame(false), 2, "registration without email");
+		fragmentedAtEveryBoundary(
+			registrationFrame(true), 2, "registration with email");
         boundaryAndOrdinaryLogins();
+		loginEncryptionVersionTwoRemainsAccepted();
         coalescedFramesAreDeliveredOnce();
 		coalescedUndecidedFrameIsDeliveredOnce(
 			customLoginFrame(80, 19, true), 19, "coalesced undecided relogin");
 		coalescedUndecidedFrameIsDeliveredOnce(
-			registrationFrame(), 2, "coalesced undecided registration");
+			registrationFrame(false), 2,
+			"coalesced undecided registration without email");
+		coalescedUndecidedFrameIsDeliveredOnce(
+			registrationFrame(true), 2,
+			"coalesced undecided registration with email");
         initialConfigAndLegacyTrafficRemainDistinct();
         malformedAndTruncatedFramesFailClosed();
         System.out.println("custom-login-decoder-ok");
