@@ -156,6 +156,10 @@ def wait_for_text(path: Path, needle: str, process: subprocess.Popen,
             if needle in latest:
                 return latest
         if process.poll() is not None:
+            if path.is_file():
+                latest = path.read_text(encoding="utf-8", errors="replace")
+                if needle in latest:
+                    return latest
             raise AssertionError(
                 f"{label} process exited early with {process.returncode}\n{latest}"
             )
@@ -166,7 +170,6 @@ def wait_for_text(path: Path, needle: str, process: subprocess.Popen,
 @unittest.skipUnless(os.environ.get("DISPLAY"), "real desktop-client integration needs DISPLAY")
 class AdaptiveBuilderRealLoginTest(unittest.TestCase):
     def test_built_client_authenticates_binds_and_reaches_native_readiness(self):
-        manual_test = os.environ.get("OPENRSC_WORLD_BUILDER_MANUAL_TEST") == "1"
         for artifact in (CORE, PLUGINS, CLIENT):
             self.assertTrue(artifact.is_file(), f"build artifact missing: {artifact}")
 
@@ -332,11 +335,8 @@ world_builder_initial_y: 648
                     "openrsc.worldBuilderAssetEvidenceFile": str(assets),
                     "spoiledmilk.clientLog": str(client_runtime_log),
                     "sun.java2d.opengl": "false",
+                    "openrsc.worldBuilderAutomatedPlacementProbe": "place",
                 }
-                if not manual_test:
-                    client_properties[
-                        "openrsc.worldBuilderAutomatedPlacementProbe"
-                    ] = "place"
                 client_command = ["java", "-Xms256m", "-Xmx1024m"]
                 client_command.extend(
                     f"-D{key}={value}" for key, value in client_properties.items()
@@ -347,14 +347,6 @@ world_builder_initial_y: 648
                     client_command, cwd=client_root, stdout=client_output,
                     stderr=subprocess.STDOUT, text=True,
                 )
-                if manual_test:
-                    print(
-                        "MANUAL_WORLD_BUILDER_READY "
-                        f"workspace={project} logs={fixture}",
-                        flush=True,
-                    )
-                    client.wait()
-                    return
                 runtime_evidence = wait_for_text(
                     client_runtime_log,
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_SAVED status=0",

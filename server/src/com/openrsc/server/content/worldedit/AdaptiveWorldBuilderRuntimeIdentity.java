@@ -148,11 +148,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 
 	public static void validateOriginPackage(
 		ServerConfiguration config, NativeLayeredWorldPackage worldPackage) {
-		WorldLocation initial = initialLocation(config);
-		if (worldPackage == null || !worldPackage.findTile(initial).isPresent()) {
-			throw new IllegalArgumentException(
-				"Adaptive initial location has no package terrain");
-		}
+		requireInitialTerrain(config, worldPackage);
 		if (!ORIGIN_EMPTY.equals(config.WORLD_BUILDER_PROJECT_ORIGIN)) {
 			return;
 		}
@@ -213,6 +209,54 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 								+ "differs from the canonical void tile");
 				}
 			}
+		}
+	}
+
+	/**
+	 * Validates the mutable working descendant independently from the immutable
+	 * project origin. Saved authoring may legitimately change the empty origin's
+	 * placement and terrain counts, but it may not replace its package identity
+	 * or discard baseline levels, sectors, or placement sets.
+	 */
+	public static void validateWorkingPackage(
+		ServerConfiguration config,
+		NativeLayeredWorldPackage baseline,
+		NativeLayeredWorldPackage working) {
+		requireInitialTerrain(config, working);
+		if (baseline == null) {
+			throw new IllegalArgumentException(
+				"Adaptive working package requires its immutable source baseline");
+		}
+		if (!baseline.getPackageId().equals(working.getPackageId())
+			|| !baseline.getPackageVersion().equals(working.getPackageVersion())
+			|| !baseline.getWorldSpaceKinds().equals(
+				working.getWorldSpaceKinds())) {
+			throw new IllegalArgumentException(
+				"Adaptive working package changed its source package identity");
+		}
+		for (NativeLayeredWorldPackage.LevelDeclaration level
+			: baseline.getLevelDeclarations()) {
+			if (!working.declaresLevel(
+					level.getWorldSpace(), level.getLevel())) {
+				throw new IllegalArgumentException(
+					"Adaptive working package removed a source level");
+			}
+		}
+		if (!working.getTerrainSectors().keySet().containsAll(
+				baseline.getTerrainSectors().keySet())
+			|| !working.getPlacementSets().keySet().containsAll(
+				baseline.getPlacementSets().keySet())) {
+			throw new IllegalArgumentException(
+				"Adaptive working package removed source-owned content");
+		}
+	}
+
+	private static void requireInitialTerrain(
+		ServerConfiguration config, NativeLayeredWorldPackage worldPackage) {
+		WorldLocation initial = initialLocation(config);
+		if (worldPackage == null || !worldPackage.findTile(initial).isPresent()) {
+			throw new IllegalArgumentException(
+				"Adaptive initial location has no package terrain");
 		}
 	}
 

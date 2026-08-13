@@ -186,6 +186,24 @@ def mutate_first_terrain(root: Path, mutation) -> None:
     (root / "manifest.json").write_bytes(canonical_json(manifest))
 
 
+def add_scenery_placement(root: Path, scenery_id: int, x: int, y: int) -> None:
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    declaration = manifest["placementSets"][0]
+    placement_path = root / declaration["path"]
+    placements = json.loads(placement_path.read_text(encoding="utf-8"))
+    placements["scenery"].append({
+        "placementId": "creator.saved.scenery",
+        "sceneryId": scenery_id,
+        "position": {"x": x, "y": y},
+        "direction": 0,
+    })
+    placement_bytes = canonical_json(placements)
+    placement_path.write_bytes(placement_bytes)
+    declaration["sha256"] = hashlib.sha256(placement_bytes).hexdigest()
+    manifest_path.write_bytes(canonical_json(manifest))
+
+
 HARNESS = r"""
 import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderPackagePublisher;
 import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderRuntimeIdentity;
@@ -322,20 +340,30 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             System.out.println("recovered");
             return;
         }
-        if ("empty-origin".equals(mode) || "adopted-origin".equals(mode)) {
+        if ("empty-origin".equals(mode) || "adopted-origin".equals(mode)
+            || "empty-working".equals(mode)) {
+            boolean workingDescendant = "empty-working".equals(mode);
             NativeLayeredWorldPackage source = NativeLayeredWorldPackage.load(working);
             NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER.validate(
                 NativeLayeredWorldPackageCatalog.of(
                     java.util.Collections.singletonList(source)));
+            NativeLayeredWorldPackage origin = workingDescendant
+                ? NativeLayeredWorldPackage.load(Paths.get(args[2])) : source;
+            NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER.validate(
+                NativeLayeredWorldPackageCatalog.of(
+                    java.util.Collections.singletonList(origin)));
             AdaptiveWorldBuilderPackageGuard.Inventory inventory =
                 AdaptiveWorldBuilderPackageGuard.requireClosedPackage(working);
+            AdaptiveWorldBuilderPackageGuard.Inventory originInventory =
+                AdaptiveWorldBuilderPackageGuard.requireClosedPackage(
+                    workingDescendant ? Paths.get(args[2]) : working);
             ServerConfiguration config = new ServerConfiguration();
             config.WORLD_BUILDER_MODE = true;
             config.WORLD_BUILDER_ADAPTIVE_MODE = true;
             config.LAYERED_NATIVE_WORLD_RUNTIME_PROFILE =
                 AdaptiveWorldBuilderRuntimeIdentity.PROFILE_ID;
             config.WORLD_BUILDER_PROJECT_ORIGIN =
-                "empty-origin".equals(mode)
+                ("empty-origin".equals(mode) || workingDescendant)
                     ? AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_EMPTY
                     : AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_ADOPTED;
             config.WORLD_BUILDER_DEFINITION_ID = "creator.definitions.v1";
@@ -345,19 +373,24 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             config.WORLD_BUILDER_ASSET_SHA256 =
                 "2222222222222222222222222222222222222222222222222222222222222222";
             config.WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256 =
-                inventory.getFingerprint();
+                originInventory.getFingerprint();
             config.LAYERED_NATIVE_TERRAIN_MANIFEST_SHA256 =
                 source.getManifestSha256();
             config.LAYERED_NATIVE_TERRAIN_INVENTORY_SHA256 =
                 inventory.getFingerprint();
             config.WORLD_BUILDER_INITIAL_WORLD_SPACE = "global";
             config.WORLD_BUILDER_INITIAL_LEVEL = 0;
-            config.WORLD_BUILDER_INITIAL_X = args.length > 2
-                ? Integer.parseInt(args[2]) : 0;
-            config.WORLD_BUILDER_INITIAL_Y = args.length > 3
-                ? Integer.parseInt(args[3]) : 0;
+            int coordinateOffset = workingDescendant ? 1 : 0;
+            config.WORLD_BUILDER_INITIAL_X = args.length > 2 + coordinateOffset
+                ? Integer.parseInt(args[2 + coordinateOffset]) : 0;
+            config.WORLD_BUILDER_INITIAL_Y = args.length > 3 + coordinateOffset
+                ? Integer.parseInt(args[3 + coordinateOffset]) : 0;
             config.CLIENT_VERSION = AdaptiveWorldBuilderRuntimeIdentity.CLIENT_VERSION;
-            AdaptiveWorldBuilderRuntimeIdentity.validateOriginPackage(config, source);
+            AdaptiveWorldBuilderRuntimeIdentity.validateOriginPackage(config, origin);
+            if (workingDescendant) {
+                AdaptiveWorldBuilderRuntimeIdentity.validateWorkingPackage(
+                    config, origin, source);
+            }
             System.out.println("accepted-" + config.WORLD_BUILDER_PROJECT_ORIGIN);
             return;
         }
@@ -1003,6 +1036,31 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
 
             uncovered = self.run_harness("adopted-origin", working, 80, 9)
             self.assertNotEqual(0, uncovered.returncode)
+
+    def test_saved_standalone_placements_reopen_as_working_descendant(self):
+        with tempfile.TemporaryDirectory(
+            prefix="adaptive-empty-working-"
+        ) as temp:
+            working, baseline, target = self.fixture(
+                Path(temp), empty=True, empty_start=(120, 648),
+                visible_patch=True,
+            )
+            add_scenery_placement(working, 0, 119, 648)
+            self.assertEqual(0, self.run_harness("guard", working).returncode)
+
+            reopened = self.run_harness(
+                "empty-working", working, baseline, 120, 648
+            )
+            self.assertEqual(0, reopened.returncode, reopened.stderr)
+            self.assertIn("accepted-standalone-empty", reopened.stdout)
+
+            origin_only = self.run_harness(
+                "empty-origin", working, 120, 648
+            )
+            self.assertNotEqual(
+                0, origin_only.returncode,
+                "authored working content must not weaken empty-origin validation",
+            )
 
     def test_standalone_empty_bound_seed_rejects_adversarial_shapes(self):
         start = (120, 648)
