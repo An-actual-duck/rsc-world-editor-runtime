@@ -905,6 +905,8 @@ public final class mudclient implements Runnable {
 	private boolean regionLoadNeedsHardPlayerReset = false;
 	private boolean hasCompletedInitialRegionLoad = false;
 	private boolean adaptiveWorldBuilderReadinessLogged = false;
+	private int automatedBuilderPlacementProbeStage = 0;
+	private long automatedBuilderPlacementProbeDeadline = 0L;
 	private final Map<Long, ResidentObjectChunkCacheEntry> cachedResidentObjectChunks =
 		new HashMap<Long, ResidentObjectChunkCacheEntry>();
 	private final ExecutorService residentObjectBuildExecutor =
@@ -25251,7 +25253,133 @@ public final class mudclient implements Runnable {
 				System.exit(0);
 			}
 		}
+		if (ready) {
+			runAutomatedBuilderPlacementProbe();
+		}
 		return ready;
+	}
+
+	private void runAutomatedBuilderPlacementProbe() {
+		String mode = System.getProperty(
+			"openrsc.worldBuilderAutomatedPlacementProbe", "");
+		if (!"place".equals(mode) && !"verify".equals(mode)) {
+			return;
+		}
+		long now = System.currentTimeMillis();
+		if (automatedBuilderPlacementProbeStage == 0) {
+			if ("place".equals(mode)) {
+				sendCommandString("worldeditormode");
+				automatedBuilderPlacementProbeDeadline = now + 1000L;
+				automatedBuilderPlacementProbeStage = 1;
+			} else {
+				automatedBuilderPlacementProbeDeadline = now + 10000L;
+				automatedBuilderPlacementProbeStage = 6;
+			}
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 1
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("aobject 0 119 648");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 2;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 2
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("cnpc 0 0 120 649");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 3;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 3
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("buildergrounditem 10 1 30 121 648");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 4;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 4
+			&& "place".equals(mode)
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("aobject 0 119 648");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 5;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 5
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			automatedBuilderPlacementProbeDeadline = now + 10000L;
+			automatedBuilderPlacementProbeStage = 6;
+		}
+		if (automatedBuilderPlacementProbeStage != 6) {
+			return;
+		}
+		boolean scenery = false;
+		for (int i = 0; i < getGameObjectInstanceCount(); i++) {
+			scenery |= getGameObjectInstanceID(i) == 0
+				&& getGameObjectInstanceX(i) + getMidRegionBaseX() == 119
+				&& getGameObjectInstanceZ(i) + getMidRegionBaseZ() == 648
+				&& isGameObjectInstanceMaterialized(i);
+		}
+		boolean npc = false;
+		for (int i = 0; i < getNpcCount(); i++) {
+			ORSCharacter value = getNpc(i);
+			if (value != null) {
+				npc |= value.npcId == 0
+					&& value.currentX / tileSize + getMidRegionBaseX() == 120
+					&& value.currentZ / tileSize + getMidRegionBaseZ() == 649;
+			}
+		}
+		boolean item = false;
+		for (int i = 0; i < getGroundItemCount(); i++) {
+			item |= getGroundItemID(i) == 10
+				&& getGroundItemX(i) + getMidRegionBaseX() == 121
+				&& getGroundItemZ(i) + getMidRegionBaseZ() == 648;
+		}
+		if (scenery && npc && item) {
+			String evidence = "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode="
+				+ mode
+				+ " scenery=0@119,648 npc=0@120,649 item=10@121,648";
+			System.out.println(evidence);
+			ClientRuntimeLogger.log(evidence);
+			if ("place".equals(mode)) {
+				sendCommandString("saveworldedits");
+				automatedBuilderPlacementProbeStage = 7;
+			} else {
+				ClientRuntimeLogger.log(
+					"ADAPTIVE_WORLD_BUILDER_PLACEMENTS_REOPENED status=0");
+				closeConnection(true);
+				System.exit(0);
+			}
+		} else if (now >= automatedBuilderPlacementProbeDeadline) {
+			String evidence = "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_MISSING"
+				+ " scenery=" + scenery + " npc=" + npc + " item=" + item;
+			System.out.println(evidence);
+			ClientRuntimeLogger.log(evidence);
+			automatedBuilderPlacementProbeStage = 4;
+			closeConnection(true);
+			System.exit(2);
+		}
+	}
+
+	public void observeAutomatedBuilderPlacementMessage(String message) {
+		String normalized = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
+		if (automatedBuilderPlacementProbeStage >= 1
+			&& (normalized.contains("layered scenery")
+				|| normalized.contains("layered npc")
+				|| normalized.contains("layered ground-item"))) {
+			ClientRuntimeLogger.log(
+				"ADAPTIVE_WORLD_BUILDER_PLACEMENT_RESPONSE " + message);
+		}
+		if (automatedBuilderPlacementProbeStage != 7 || message == null
+			|| !message.contains("Saved the complete isolated working package:")) {
+			return;
+		}
+		ClientRuntimeLogger.log(
+			"ADAPTIVE_WORLD_BUILDER_PLACEMENTS_SAVED status=0");
+		automatedBuilderPlacementProbeStage = 4;
+		closeConnection(true);
+		System.exit(0);
 	}
 
 	public boolean isFullScreenModalUiActive() {

@@ -262,6 +262,7 @@ public class RegionManager {
 		}
 		try {
 			AdaptiveWorldBuilderPackageGuard.Inventory adaptiveInventory = null;
+			NativeLayeredWorldPackage adaptiveBaseline = null;
 			if (profile == NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER) {
 				AdaptiveWorldBuilderRuntimeIdentity.validateEvidenceFiles(
 					world.getServer().getConfig(),
@@ -276,16 +277,22 @@ public class RegionManager {
 				}
 				adaptiveInventory =
 					AdaptiveWorldBuilderPackageGuard.requireClosedPackage(expected);
+				Path baselinePath = world.getServer().getWorldEditStorage()
+					.sourceLayeredBaselinePackage();
 				AdaptiveWorldBuilderPackageGuard.Inventory baseline =
 					AdaptiveWorldBuilderPackageGuard.requireClosedPackage(
-						world.getServer().getWorldEditStorage()
-							.sourceLayeredBaselinePackage());
+						baselinePath);
 				if (!baseline.getFingerprint().equals(
 						world.getServer().getConfig()
 							.WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256)) {
 					throw new IOException(
 						"Immutable adaptive source baseline fingerprint mismatch");
 				}
+				adaptiveBaseline = NativeLayeredWorldPackage.load(baselinePath);
+				profile.validate(NativeLayeredWorldPackageCatalog.of(
+					java.util.Collections.singletonList(adaptiveBaseline)));
+				AdaptiveWorldBuilderRuntimeIdentity.validateOriginPackage(
+					world.getServer().getConfig(), adaptiveBaseline);
 			}
 			NativeLayeredWorldPackageCatalog loaded =
 				NativeLayeredWorldPackageCatalog.loadConfigured(
@@ -318,8 +325,9 @@ public class RegionManager {
 					throw new IllegalStateException(
 						"Adaptive working package inventory SHA-256 mismatch");
 				}
-				AdaptiveWorldBuilderRuntimeIdentity.validateOriginPackage(
-					world.getServer().getConfig(), loaded.getPrimaryPackage());
+				AdaptiveWorldBuilderRuntimeIdentity.validateWorkingPackage(
+					world.getServer().getConfig(), adaptiveBaseline,
+					loaded.getPrimaryPackage());
 			}
 			return loaded;
 		} catch (IOException failure) {

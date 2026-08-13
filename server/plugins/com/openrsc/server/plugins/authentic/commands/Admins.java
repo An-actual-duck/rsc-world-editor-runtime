@@ -2,6 +2,7 @@ package com.openrsc.server.plugins.authentic.commands;
 
 import com.openrsc.server.constants.*;
 import com.openrsc.server.content.LegacyAmuletCompatibility;
+import com.openrsc.server.content.worldedit.WorldBuilderMode;
 import com.openrsc.server.database.GameDatabaseException;
 import com.openrsc.server.database.impl.mysql.queries.logging.ChatLog;
 import com.openrsc.server.database.impl.mysql.queries.logging.StaffLog;
@@ -108,6 +109,11 @@ public final class Admins implements CommandTrigger {
 	}
 
 	public boolean blockCommand(Player player, String command, String[] args) {
+		if (WorldBuilderMode.isBuilderAccount(player.getUsername())
+			&& WorldBuilderMode.isLayeredAuthoringProfile(player.getConfig())
+			&& Development.isWorldBuilderOwnedCommand(command)) {
+			return false;
+		}
 		return player.isAdmin();
 	}
 

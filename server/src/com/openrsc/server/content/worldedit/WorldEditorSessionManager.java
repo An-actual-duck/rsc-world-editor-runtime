@@ -528,6 +528,9 @@ public final class WorldEditorSessionManager {
 
 	public synchronized GameObject placeNativeScenery(
 		Player player, int sceneryId, int x, int y) {
+		requireClientPlacementDefinition(
+			player, "scenery", sceneryId,
+			player.getClientLimitations().maxSceneryId);
 		WorldLocation location = activeNativeSceneryLocation(player, x, y);
 		if (player.getWorld().getRegionManager().findInteractionScenery(
 				Point.location(x, y), player) != null) {
@@ -580,6 +583,9 @@ public final class WorldEditorSessionManager {
 
 	public synchronized Npc placeNativeNpc(
 		Player player, int npcId, int radius, int x, int y) {
+		requireClientPlacementDefinition(
+			player, "NPC", npcId,
+			player.getClientLimitations().maxNpcId);
 		WorldLocation location = activeNativePlacementLocation(player, x, y);
 		if (player.getWorld().getServer().getEntityHandler()
 				.getNpcDef(npcId) == null) {
@@ -641,6 +647,9 @@ public final class WorldEditorSessionManager {
 		int respawnSeconds,
 		int x,
 		int y) {
+		requireClientPlacementDefinition(
+			player, "item", itemId,
+			player.getClientLimitations().maxItemId);
 		WorldLocation location = activeNativePlacementLocation(player, x, y);
 		com.openrsc.server.external.ItemDefinition definition =
 			player.getWorld().getServer().getEntityHandler()
@@ -1545,6 +1554,15 @@ public final class WorldEditorSessionManager {
 		player.getWorld().registerGameObject(object);
 		recordNativeScenery(key,NativeSceneryState.from(object));
 		return object;
+	}
+	private static void requireClientPlacementDefinition(
+		Player player,String family,int id,int inclusiveMaximum){
+		if(id<0||id>inclusiveMaximum){
+			throw new IllegalArgumentException(
+				"The authenticated client cannot display "+family
+					+" definition ID "+id+" (supported range 0.."
+					+inclusiveMaximum+").");
+		}
 	}
 	private WorldLocation activeNativeSceneryLocation(
 		Player player,int x,int y){

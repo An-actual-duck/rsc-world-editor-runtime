@@ -121,10 +121,28 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(mode!=Mode.NAVIGATE){brushX=x;brushY=y;brushLevel=level;}
 		coordinateFocus=0;toolbar.closeUnpinnedAfterWorldAction();updatePresentationBounds();
 	}
-	public void markPotentialEntityEdit(){if(!isEditorOpen())return;pendingEntityActions++;unsavedChanges=true;saveRequested=false;closeArmed=false;}
+	public void markPotentialEntityEdit(){if(!isEditorOpen())return;pendingEntityActions++;saveRequested=false;closeArmed=false;inspectionStatus="Awaiting authoritative World Builder response.";}
 	public void observeGameMessage(String message){
 		if(!isEditorOpen()||message==null)return;
-		if((message.contains("Saved ")&&message.contains(" world edits."))||message.contains("No pending world edits to save.")){
+		mc.observeAutomatedBuilderPlacementMessage(message);
+		boolean accepted=message.contains("Added layered ")
+			||message.contains("Removed layered ")
+			||message.contains("Rotated layered ");
+		boolean refused=message.contains("placement refused:")
+			||message.contains("removal refused:")
+			||message.contains("rotation refused:")
+			||message.contains("Invalid coordinates")
+			||message.contains("Invalid npc")
+			||message.contains("There is already scenery")
+			||message.contains("There is no scenery");
+		if(accepted&&pendingEntityActions>0){
+			pendingEntityActions--;unsavedChanges=true;saveRequested=false;closeArmed=false;inspectionStatus=message;
+		}else if(refused&&pendingEntityActions>0){
+			pendingEntityActions--;inspectionStatus=message;
+		}
+		if((message.contains("Saved ")&&message.contains(" world edits."))
+				||message.contains("Saved the complete isolated working package:")
+				||message.contains("No pending world edits to save.")){
 			unsavedChanges=false;saveRequested=false;pendingEntityActions=0;closeArmed=false;inspectionStatus="World edits saved; no pending changes.";
 		}else if(message.contains("Failed to save world edits:")){saveRequested=false;inspectionStatus=message;}
 	}
@@ -406,7 +424,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void setFocusedText(String value){switch(coordinateFocus){case 1:teleportX=value;break;case 2:teleportY=value;break;case 13:teleportLevel=value;break;case 3:sceneryIdText=value;break;case 4:npcIdText=value;break;case 5:npcRadiusText=value;break;case 14:groundItemIdText=value;break;case 15:groundItemAmountText=value;break;case 16:groundItemRespawnText=value;break;case 6:terrainElevationText=value;break;case 7:terrainFloorColorText=value;break;case 8:terrainFloorTextureText=value;break;case 9:terrainRoofText=value;break;case 10:terrainNorthWallText=value;break;case 11:terrainEastWallText=value;break;default:terrainDiagonalWallText=value;}}
 	private void focusNumber(int focus){coordinateFocus=focus;replaceFocusedText=true;}
 	private void rejectLayeredReviewMutation(String message){inspectionStatus=message;mc.showWorldEditorStatus(message);}
-	private void requestWorldEditSave(){if(isLayeredReview()&&!isLayeredTerrainDraft()){rejectLayeredReviewMutation("Layered package review is read-only; no files were changed.");saveRequested=false;return;}if(terrainStrokeTiles!=null||terrainDragActive||terrainDragReleasePending){inspectionStatus="Wait for the active terrain stroke to finish before saving.";return;}mc.sendCommandString("saveworldedits");saveRequested=true;closeArmed=false;inspectionStatus=isLayeredTerrainDraft()?"Layered draft save requested; it will commit to working/ when this Builder closes.":"World edit save requested; see game messages for verification.";}
+	private void requestWorldEditSave(){if(isLayeredReview()&&!isLayeredTerrainDraft()){rejectLayeredReviewMutation("Layered package review is read-only; no files were changed.");saveRequested=false;return;}if(terrainStrokeTiles!=null||terrainDragActive||terrainDragReleasePending||pendingEntityActions>0){inspectionStatus="Wait for authoritative edit responses before saving.";return;}mc.sendCommandString("saveworldedits");saveRequested=true;closeArmed=false;inspectionStatus=isLayeredTerrainDraft()?"Layered draft save requested; it will commit to working/ when this Builder closes.":"World edit save requested; see game messages for verification.";}
 	private void requestEditorClose(){
 		if(unsavedChanges&&!closeArmed){closeArmed=true;inspectionStatus="Unsaved edits remain. Select Close again to exit without saving.";return;}
 		setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);definitionBrowser.close();send(1,0,0,0,0,0,0);setVisible(false);
