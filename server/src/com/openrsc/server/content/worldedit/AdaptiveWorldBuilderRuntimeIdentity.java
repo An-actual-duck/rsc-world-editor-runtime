@@ -26,6 +26,10 @@ import java.util.regex.Pattern;
 
 /** Stable identities and exact session binding for the opt-in adaptive runtime. */
 public final class AdaptiveWorldBuilderRuntimeIdentity {
+	// Authoring families are capped at 65,536 signed-int IDs. Ten digits plus
+	// one separator per entry is the largest canonical binding representation.
+	private static final int MAX_DEFINITION_ID_LIST_CHARACTERS =
+		65536 * 11 - 1;
 	public static final String PROFILE_ID = "adaptive-world-builder";
 	public static final String CAPABILITY_ID =
 		"adaptive-world-builder-runtime-capability-v1";
@@ -382,11 +386,30 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 
 	private static String checkedIdList(String value) {
 		String checked = value == null ? "" : value;
-		if (!checked.isEmpty() && !checked.matches("[0-9]+(?:,[0-9]+)*")) {
-			throw new IllegalArgumentException(
-				"Adaptive World Builder definition ID inventory is invalid");
+		if (checked.isEmpty()) return checked;
+		if (checked.length() > MAX_DEFINITION_ID_LIST_CHARACTERS) {
+			throw invalidIdList();
+		}
+		boolean needsDigit = true;
+		for (int index = 0; index < checked.length(); index++) {
+			char valueAtIndex = checked.charAt(index);
+			if (valueAtIndex >= '0' && valueAtIndex <= '9') {
+				needsDigit = false;
+			} else if (valueAtIndex == ',' && !needsDigit) {
+				needsDigit = true;
+			} else {
+				throw invalidIdList();
+			}
+		}
+		if (needsDigit) {
+			throw invalidIdList();
 		}
 		return checked;
+	}
+
+	private static IllegalArgumentException invalidIdList() {
+		return new IllegalArgumentException(
+			"Adaptive World Builder definition ID inventory is invalid");
 	}
 
 	private static void requireId(String label, String value) {

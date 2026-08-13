@@ -25320,7 +25320,10 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 8
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			worldEditorInterface.sendAutomatedBoundaryPlacementProbe(123, 648, 3);
+			worldEditorInterface.sendAutomatedBoundaryPlacementProbe(
+				123, 648,
+				Integer.getInteger(
+					"openrsc.worldBuilderAutomatedDisallowedBoundaryId", 2) + 1);
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 9;
 			return;
@@ -25334,7 +25337,9 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 10
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("aobject 2 117 648");
+			sendCommandString("aobject " + Integer.getInteger(
+				"openrsc.worldBuilderAutomatedDisallowedSceneryId", 2)
+				+ " 117 648");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 11;
 			return;
@@ -25348,7 +25353,9 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 12
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("cnpc 2 0 120 651");
+			sendCommandString("cnpc " + Integer.getInteger(
+				"openrsc.worldBuilderAutomatedDisallowedNpcId", 2)
+				+ " 0 120 651");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 13;
 			return;
@@ -25362,7 +25369,9 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 14
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("buildergrounditem 12 1 30 121 650");
+			sendCommandString("buildergrounditem " + Integer.getInteger(
+				"openrsc.worldBuilderAutomatedDisallowedItemId", 12)
+				+ " 1 30 121 650");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 15;
 			return;
