@@ -322,7 +322,7 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             System.out.println("recovered");
             return;
         }
-        if ("empty-origin".equals(mode)) {
+        if ("empty-origin".equals(mode) || "adopted-origin".equals(mode)) {
             NativeLayeredWorldPackage source = NativeLayeredWorldPackage.load(working);
             NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER.validate(
                 NativeLayeredWorldPackageCatalog.of(
@@ -335,7 +335,9 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             config.LAYERED_NATIVE_WORLD_RUNTIME_PROFILE =
                 AdaptiveWorldBuilderRuntimeIdentity.PROFILE_ID;
             config.WORLD_BUILDER_PROJECT_ORIGIN =
-                AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_EMPTY;
+                "empty-origin".equals(mode)
+                    ? AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_EMPTY
+                    : AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_ADOPTED;
             config.WORLD_BUILDER_DEFINITION_ID = "creator.definitions.v1";
             config.WORLD_BUILDER_DEFINITION_SHA256 =
                 "1111111111111111111111111111111111111111111111111111111111111111";
@@ -356,7 +358,7 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
                 ? Integer.parseInt(args[3]) : 0;
             config.CLIENT_VERSION = AdaptiveWorldBuilderRuntimeIdentity.CLIENT_VERSION;
             AdaptiveWorldBuilderRuntimeIdentity.validateOriginPackage(config, source);
-            System.out.println("accepted-empty");
+            System.out.println("accepted-" + config.WORLD_BUILDER_PROJECT_ORIGIN);
             return;
         }
         if ("composition".equals(mode)) {
@@ -986,6 +988,21 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
                 for path in working.rglob("*"):
                     if path.is_file():
                         self.assertNotIn(b"spoiled-milk", path.read_bytes().lower())
+
+    def test_adopted_origin_retains_generic_coordinate_and_package_shape(self):
+        with tempfile.TemporaryDirectory(prefix="adaptive-adopted-origin-") as temp:
+            working, baseline, target = self.fixture(Path(temp))
+            accepted = self.run_harness("adopted-origin", working, 7, 9)
+            self.assertEqual(0, accepted.returncode, accepted.stderr)
+            self.assertIn("accepted-target-layered", accepted.stdout)
+            source = json.loads((working / "manifest.json").read_text())
+            self.assertEqual(2, len(source["levels"]))
+            self.assertEqual(2, len(source["terrainSectors"]))
+            self.assertEqual(2, len(source["placementSets"]))
+            self.assertTrue(source["placementSets"][1]["path"].endswith("lp0.json"))
+
+            uncovered = self.run_harness("adopted-origin", working, 80, 9)
+            self.assertNotEqual(0, uncovered.returncode)
 
     def test_standalone_empty_bound_seed_rejects_adversarial_shapes(self):
         start = (120, 648)
