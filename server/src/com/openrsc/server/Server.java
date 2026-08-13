@@ -128,6 +128,7 @@ public class Server implements Runnable {
 	private EventLoopGroup bossGroupWs;
 
 	private volatile AtomicBoolean running = new AtomicBoolean(false);
+	private final Object lifecycleLock = new Object();
 	private boolean restarting = false;
 	private boolean shuttingDown = false;
 
@@ -700,7 +701,7 @@ public class Server implements Runnable {
 	}
 
 	public void start() {
-		synchronized (running) {
+		synchronized (lifecycleLock) {
 			try {
 				if (isRunning()) {
 					return;
@@ -947,9 +948,10 @@ public class Server implements Runnable {
 		}
 	}
 
+	@SuppressWarnings("PMD.CloseResource") // Field-owned executor is shut down and awaited below.
 	public void stop() {
 		ScheduledExecutorService gameExecutor;
-		synchronized (running) {
+		synchronized (lifecycleLock) {
 			if (!isRunning()) {
 				return;
 			}
@@ -958,7 +960,7 @@ public class Server implements Runnable {
 		}
 
 		/*
-		 * Server.run() also synchronizes on running.  Waiting for its executor
+		 * Server.run() also synchronizes on lifecycleLock. Waiting for its executor
 		 * while holding that monitor can deadlock when a scheduled tick has
 		 * already been dispatched and is waiting to enter run().
 		 */
@@ -975,7 +977,7 @@ public class Server implements Runnable {
 			Thread.currentThread().interrupt();
 		}
 
-		synchronized (running) {
+		synchronized (lifecycleLock) {
 			try {
 				if (!isRunning()) {
 					return;
@@ -1065,7 +1067,7 @@ public class Server implements Runnable {
 	@Override
 	public void run() {
 		LogUtil.populateThreadContext(getConfig());
-		synchronized (running) {
+		synchronized (lifecycleLock) {
 			try {
 				this.timeLate = System.nanoTime() - lastTickTimestamp;
 				if (getTimeLate() >= getConfig().GAME_TICK * 1000000L) {
