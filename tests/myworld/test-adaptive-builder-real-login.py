@@ -18,6 +18,13 @@ ROOT = Path(__file__).resolve().parents[2]
 CORE = ROOT / "server/core.jar"
 PLUGINS = ROOT / "server/plugins.jar"
 CLIENT = ROOT / "Client_Base/Open_RSC_Client.jar"
+PRODUCTION_DEFINITION_COUNTS = {
+    "boundaries": 214,
+    "scenery": 1332,
+    "npcs": 845,
+    "groundItems": 3309,
+    "tiles": 26,
+}
 
 
 def canonical_json(value) -> bytes:
@@ -263,11 +270,10 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
                 "schemaVersion": 1,
                 "manifestType": "world-builder-definition-catalog",
                 "catalogId": "integration.neutral.definitions.v1",
-                "tiles": [0, 7],
-                "boundaries": [0, 1],
-                "scenery": [0, 1],
-                "npcs": [0, 1],
-                "groundItems": [10, 11],
+                **{
+                    family: list(range(count))
+                    for family, count in PRODUCTION_DEFINITION_COUNTS.items()
+                },
             }, indent=2) + "\n", encoding="utf-8")
             assets.write_bytes(b"integration-neutral-asset-evidence-v1\n")
             definition_sha = hashlib.sha256(definitions.read_bytes()).hexdigest()
@@ -382,10 +388,17 @@ world_builder_initial_y: 648
                 }
                 for key, value in expected_required.items():
                     self.assertEqual(value, binding_fields[key])
-                self.assertEqual("0,1", binding_fields["authorableBoundaryIds"])
-                self.assertEqual("0,1", binding_fields["authorableSceneryIds"])
-                self.assertEqual("0,1", binding_fields["authorableNpcIds"])
-                self.assertEqual("10,11", binding_fields["authorableItemIds"])
+                for family, key in (
+                    ("boundaries", "authorableBoundaryIds"),
+                    ("scenery", "authorableSceneryIds"),
+                    ("npcs", "authorableNpcIds"),
+                    ("groundItems", "authorableItemIds"),
+                ):
+                    expected = ",".join(
+                        str(value)
+                        for value in range(PRODUCTION_DEFINITION_COUNTS[family])
+                    )
+                    self.assertEqual(expected, binding_fields[key])
 
                 client_properties = {
                     "openrsc.worldBuilderMode": "true",
@@ -402,6 +415,18 @@ world_builder_initial_y: 648
                     "sun.java2d.opengl": "false",
                     "openrsc.worldBuilderAutomatedPlacementProbe": "place",
                     "openrsc.worldBuilderAutomatedDefinitionProbe": "true",
+                    "openrsc.worldBuilderAutomatedDisallowedBoundaryId": str(
+                        PRODUCTION_DEFINITION_COUNTS["boundaries"]
+                    ),
+                    "openrsc.worldBuilderAutomatedDisallowedSceneryId": str(
+                        PRODUCTION_DEFINITION_COUNTS["scenery"]
+                    ),
+                    "openrsc.worldBuilderAutomatedDisallowedNpcId": str(
+                        PRODUCTION_DEFINITION_COUNTS["npcs"]
+                    ),
+                    "openrsc.worldBuilderAutomatedDisallowedItemId": str(
+                        PRODUCTION_DEFINITION_COUNTS["groundItems"]
+                    ),
                 }
                 client_command = ["java", "-Xms256m", "-Xmx1024m"]
                 client_command.extend(
@@ -455,18 +480,19 @@ world_builder_initial_y: 648
                     "There is already scenery in that spot.",
                     runtime_evidence,
                 )
-                for family, definition_id in (
-                    ("scenery", 2), ("NPC", 2), ("item", 12),
-                ):
-                    self.assertIn(
-                        "The bound project does not permit " + family
-                        + " definition ID " + str(definition_id) + ".",
-                        runtime_evidence,
-                    )
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_DEFINITION_RESPONSE "
-                    "Editor request failed: The bound project does not permit "
-                    "boundary definition ID 2.",
+                    "Editor request failed: East wall "
+                    + str(PRODUCTION_DEFINITION_COUNTS["boundaries"] + 1)
+                    + " is not defined.",
+                    runtime_evidence,
+                )
+                self.assertIn(
+                    "The authenticated client cannot display item definition ID "
+                    + str(PRODUCTION_DEFINITION_COUNTS["groundItems"])
+                    + " (supported range 0.."
+                    + str(PRODUCTION_DEFINITION_COUNTS["groundItems"] - 1)
+                    + ").",
                     runtime_evidence,
                 )
                 for family in ("scenery", "npc", "ground-item"):
@@ -530,7 +556,8 @@ world_builder_initial_y: 648
                     ],
                 )
                 self.assertNotIn(
-                    2, [row["sceneryId"] for row in placement_document["scenery"]]
+                    PRODUCTION_DEFINITION_COUNTS["scenery"],
+                    [row["sceneryId"] for row in placement_document["scenery"]],
                 )
                 self.assertIn(
                     (0, 120, 649, 120, 649, 120, 649),
@@ -550,7 +577,10 @@ world_builder_initial_y: 648
                         for row in placement_document["npcs"]
                     ],
                 )
-                self.assertNotIn(2, [row["npcId"] for row in placement_document["npcs"]])
+                self.assertNotIn(
+                    PRODUCTION_DEFINITION_COUNTS["npcs"],
+                    [row["npcId"] for row in placement_document["npcs"]],
+                )
                 self.assertIn(
                     (10, 1, 30, 121, 648),
                     [
@@ -568,7 +598,8 @@ world_builder_initial_y: 648
                     ],
                 )
                 self.assertNotIn(
-                    12, [row["itemId"] for row in placement_document["groundItems"]]
+                    PRODUCTION_DEFINITION_COUNTS["groundItems"],
+                    [row["itemId"] for row in placement_document["groundItems"]],
                 )
                 terrain_bytes = (
                     package / "terrain/global/lp0/xp2-yp13.raw"
