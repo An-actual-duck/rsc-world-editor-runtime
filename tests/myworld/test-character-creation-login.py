@@ -81,6 +81,8 @@ def main() -> None:
     require(
         mudclient,
         "&& !this.loadingArea\n"
+        "\t\t\t&& !this.layeredSceneActivationPending\n"
+        "\t\t\t&& isAdaptiveWorldStateReadyForEditor()\n"
         "\t\t\t&& !this.isFullScreenModalUiActive();",
         "renderer-v2 world disabled during full-screen modal UI",
     )

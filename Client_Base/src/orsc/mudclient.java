@@ -904,6 +904,7 @@ public final class mudclient implements Runnable {
 	private boolean layeredSceneTerrainStageWaitLogged = false;
 	private boolean regionLoadNeedsHardPlayerReset = false;
 	private boolean hasCompletedInitialRegionLoad = false;
+	private boolean adaptiveWorldBuilderReadinessLogged = false;
 	private final Map<Long, ResidentObjectChunkCacheEntry> cachedResidentObjectChunks =
 		new HashMap<Long, ResidentObjectChunkCacheEntry>();
 	private final ExecutorService residentObjectBuildExecutor =
@@ -25232,9 +25233,25 @@ public final class mudclient implements Runnable {
 	}
 
 	public boolean isAdaptiveWorldStateReadyForEditor() {
-		return WorldBuilderClientProfile.current().isAdaptiveWorldStateReady(
+		boolean ready = WorldBuilderClientProfile.current().isAdaptiveWorldStateReady(
 			this.hasCompletedInitialRegionLoad,
 			this.world != null && this.world.hasNativeLayeredTerrain());
+		if (ready && WorldBuilderClientProfile.current().isStrictAdaptiveTerrain()
+			&& !this.adaptiveWorldBuilderReadinessLogged) {
+			this.adaptiveWorldBuilderReadinessLogged = true;
+			String evidence = "ADAPTIVE_WORLD_BUILDER_READY nativeTerrain=true"
+				+ " initialRegion=true binding=true";
+			System.out.println(evidence);
+			ClientRuntimeLogger.log(evidence);
+			if (Boolean.getBoolean(
+					"openrsc.worldBuilderAutomatedExitOnReady")) {
+				ClientRuntimeLogger.log(
+					"ADAPTIVE_WORLD_BUILDER_AUTOMATED_EXIT status=0");
+				this.closeConnection(true);
+				System.exit(0);
+			}
+		}
+		return ready;
 	}
 
 	public boolean isFullScreenModalUiActive() {
@@ -27409,6 +27426,7 @@ public final class mudclient implements Runnable {
 			return;
 		}
 		WorldBuilderClientProfile profile = WorldBuilderClientProfile.current();
+		this.adaptiveWorldBuilderReadinessLogged = false;
 		profile.resetAdaptiveRuntimeState();
 		profile.requireClientDefinitions();
 		// The initial server-config packet refreshes cached connection properties.

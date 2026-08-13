@@ -88,6 +88,8 @@ export SPOILED_MILK_LAYERED_PACKAGE="$LAYERED_TEST_WORKSPACE/package"
 python3 ./tests/myworld/test-layered-production-promotion.py
 python3 ./tests/myworld/test-world-builder-layered-import.py
 python3 ./tests/myworld/test-adaptive-world-builder-runtime.py
+python3 ./tests/myworld/test-custom-login-decoder.py
+python3 ./tests/myworld/test-adaptive-builder-real-login.py
 python3 ./tests/myworld/test-native-terrain-wire-cache.py
 python3 ./tests/myworld/test-native-terrain-residency.py
 python3 ./tests/myworld/test-fatigue-sleep-removal.py
