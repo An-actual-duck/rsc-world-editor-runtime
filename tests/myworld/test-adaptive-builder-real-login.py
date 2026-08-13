@@ -166,6 +166,7 @@ def wait_for_text(path: Path, needle: str, process: subprocess.Popen,
 @unittest.skipUnless(os.environ.get("DISPLAY"), "real desktop-client integration needs DISPLAY")
 class AdaptiveBuilderRealLoginTest(unittest.TestCase):
     def test_built_client_authenticates_binds_and_reaches_native_readiness(self):
+        manual_test = os.environ.get("OPENRSC_WORLD_BUILDER_MANUAL_TEST") == "1"
         for artifact in (CORE, PLUGINS, CLIENT):
             self.assertTrue(artifact.is_file(), f"build artifact missing: {artifact}")
 
@@ -331,8 +332,11 @@ world_builder_initial_y: 648
                     "openrsc.worldBuilderAssetEvidenceFile": str(assets),
                     "spoiledmilk.clientLog": str(client_runtime_log),
                     "sun.java2d.opengl": "false",
-                    "openrsc.worldBuilderAutomatedExitOnReady": "true",
                 }
+                if not manual_test:
+                    client_properties[
+                        "openrsc.worldBuilderAutomatedPlacementProbe"
+                    ] = "place"
                 client_command = ["java", "-Xms256m", "-Xmx1024m"]
                 client_command.extend(
                     f"-D{key}={value}" for key, value in client_properties.items()
@@ -343,8 +347,17 @@ world_builder_initial_y: 648
                     client_command, cwd=client_root, stdout=client_output,
                     stderr=subprocess.STDOUT, text=True,
                 )
+                if manual_test:
+                    print(
+                        "MANUAL_WORLD_BUILDER_READY "
+                        f"workspace={project} logs={fixture}",
+                        flush=True,
+                    )
+                    client.wait()
+                    return
                 runtime_evidence = wait_for_text(
-                    client_runtime_log, "ADAPTIVE_WORLD_BUILDER_READY",
+                    client_runtime_log,
+                    "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_SAVED status=0",
                     client, 90, "adaptive client readiness",
                 )
                 self.assertEqual(0, client.wait(timeout=20), "desktop client clean shutdown")
@@ -373,6 +386,38 @@ world_builder_initial_y: 648
                 )
                 self.assertIn("nativeTerrain=true initialRegion=true binding=true", runtime_evidence)
                 self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode=place "
+                    "scenery=0@119,648 npc=0@120,649 item=10@121,648",
+                    runtime_evidence,
+                )
+                self.assertIn(
+                    "Layered scenery placement refused: "
+                    "There is already scenery in that spot.",
+                    runtime_evidence,
+                )
+                for family in ("scenery", "npc", "ground-item"):
+                    self.assertEqual(
+                        1,
+                        server_evidence.count(
+                            "WORLD_BUILDER_PLACEMENT_ACCEPTED family=" + family
+                        ),
+                    )
+                self.assertIn(
+                    "WORLD_BUILDER_PLACEMENT_REFUSED family=scenery id=0 "
+                    "x=119 y=648 reason=There is already scenery in that spot.",
+                    server_evidence,
+                )
+                for command in (
+                    "worldeditormode", "aobject", "cnpc",
+                    "buildergrounditem", "saveworldedits",
+                ):
+                    self.assertIn(
+                        "Development.onCommand : [[Player:0:Builder @ (120, 648)], "
+                        + command,
+                        server_evidence,
+                    )
+                self.assertNotIn("Default.onCommand", server_evidence)
+                self.assertIn(
                     "Skipping legacy terrain archives for explicit adaptive World Builder profile",
                     server_evidence,
                 )
@@ -388,6 +433,77 @@ world_builder_initial_y: 648
                 self.assertNotIn("fallback", combined)
                 self.assertFalse((client_root / "Cache/video/Authentic_Landscape.orsc").exists())
                 self.assertFalse((client_root / "Cache/video/Custom_Landscape.orsc").exists())
+
+                placement_document = json.loads(
+                    (package / "placements/global/lp0.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(
+                    [(0, 119, 648, 0)],
+                    [
+                        (row["sceneryId"], row["position"]["x"],
+                         row["position"]["y"], row["direction"])
+                        for row in placement_document["scenery"]
+                    ],
+                )
+                self.assertEqual(
+                    [(0, 120, 649, 120, 649, 120, 649)],
+                    [
+                        (row["npcId"], row["start"]["x"], row["start"]["y"],
+                         row["roamBounds"]["minimum"]["x"],
+                         row["roamBounds"]["minimum"]["y"],
+                         row["roamBounds"]["maximum"]["x"],
+                         row["roamBounds"]["maximum"]["y"])
+                        for row in placement_document["npcs"]
+                    ],
+                )
+                self.assertEqual(
+                    [(10, 1, 30, 121, 648)],
+                    [
+                        (row["itemId"], row["amount"], row["respawnSeconds"],
+                         row["position"]["x"], row["position"]["y"])
+                        for row in placement_document["groundItems"]
+                    ],
+                )
+
+                reopened_runtime_log = fixture / "client-reopened-runtime.log"
+                reopened_client_log = fixture / "client-reopened.log"
+                reopened_properties = dict(client_properties)
+                reopened_properties["openrsc.worldBuilderAutomatedPlacementProbe"] = "verify"
+                reopened_properties["spoiledmilk.clientLog"] = str(
+                    reopened_runtime_log
+                )
+                reopened_command = ["java", "-Xms256m", "-Xmx1024m"]
+                reopened_command.extend(
+                    f"-D{key}={value}"
+                    for key, value in reopened_properties.items()
+                )
+                reopened_command.extend(["-jar", "Open_RSC_Client.jar"])
+                with reopened_client_log.open("w", encoding="utf-8") as reopened_output:
+                    reopened_client = subprocess.Popen(
+                        reopened_command, cwd=client_root, stdout=reopened_output,
+                        stderr=subprocess.STDOUT, text=True,
+                    )
+                    try:
+                        reopened_evidence = wait_for_text(
+                            reopened_runtime_log,
+                            "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_REOPENED status=0",
+                            reopened_client, 90, "reopened adaptive client",
+                        )
+                        self.assertEqual(
+                            0, reopened_client.wait(timeout=20),
+                            "reopened desktop client clean shutdown",
+                        )
+                    finally:
+                        if reopened_client.poll() is None:
+                            reopened_client.terminate()
+                            reopened_client.wait(timeout=10)
+                self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode=verify "
+                    "scenery=0@119,648 npc=0@120,649 item=10@121,648",
+                    reopened_evidence,
+                )
 
                 shutdown_started = time.monotonic()
                 shutdown.write_text("shutdown\n", encoding="ascii")

@@ -42,7 +42,6 @@ public final class PluginHandler implements IPluginHandler {
     private final Server server;
     private final ThreadFactory threadFactory;
     private final Multimap<Class<?>, Object> triggerTypeToInstance = HashMultimap.create();
-    private final Set<Class<?>> triggerTypes = new HashSet<>();
     private final ClassToInstanceMap<Object> pluginInstances = MutableClassToInstanceMap.create();
     private final PluginJarLoader loader = new PluginJarLoader();
     private final Injector injector;
@@ -53,11 +52,6 @@ public final class PluginHandler implements IPluginHandler {
     public PluginHandler(final Server server) {
         this.server = server;
         this.threadFactory = new NamedThreadFactory(server.getName() + " : PluginThread", server.getConfig());
-        try {
-            triggerTypes.addAll(loader.loadTriggers("com.openrsc.server.plugins.triggers"));
-        } catch (Exception ex) {
-            LOGGER.error("Unable to load triggers: ", ex);
-        }
 
         this.injector = Guice.createInjector(binder -> {
             binder.bind(Server.class).toInstance(server);
@@ -93,7 +87,7 @@ public final class PluginHandler implements IPluginHandler {
                             ClassUtils.hierarchy(pluginType, ClassUtils.Interfaces.INCLUDE).spliterator(),
                             true
                     )
-                    .filter(triggerTypes::contains)
+                    .filter(PluginHandler::isPluginTriggerType)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
 
             // If there are no triggers implemented by this, we should do nothing
@@ -122,6 +116,13 @@ public final class PluginHandler implements IPluginHandler {
         LOGGER.info("Loaded {}", box(server.getWorld().getQuests().size()) + " Quests.");
         LOGGER.info("Loaded {}", box(server.getWorld().getMiniGames().size()) + " MiniGames.");
         LOGGER.info("Loaded total of {}", pluginInstances.size() + " plugin handlers.");
+    }
+
+    private static boolean isPluginTriggerType(Class<?> type) {
+        return type != null
+                && type.isInterface()
+                && type.getName().startsWith("com.openrsc.server.plugins.triggers.")
+                && type.getSimpleName().endsWith("Trigger");
     }
 
     public <T> T getPluginInstance(Class<T> type) {

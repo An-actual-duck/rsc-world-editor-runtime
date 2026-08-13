@@ -299,6 +299,16 @@ public final class Development implements CommandTrigger {
 		}
 	}
 
+	static boolean isWorldBuilderOwnedCommand(String command) {
+		String normalized=command==null?"":command.toLowerCase(java.util.Locale.ROOT);
+		return normalized.equals("worldeditormode")
+			||normalized.equals("buildergoto")
+			||normalized.equals("buildergrow")
+			||normalized.equals("worldedits")
+			||normalized.equals("listworldedits")
+			||isLayeredBuilderMutationCommand(normalized);
+	}
+
 	private static boolean isLayeredBuilderMutationCommand(String command) {
 		String normalized=command==null?"":command.toLowerCase(java.util.Locale.ROOT);
 		return normalized.equals("radiusnpc")||normalized.equals("createnpc")
@@ -960,11 +970,15 @@ public final class Development implements CommandTrigger {
 			try{
 				Npc npc=player.getWorld().getServer().getWorldEditorSessions()
 					.placeNativeNpc(player,id,radius,x,y);
+				LOGGER.info("WORLD_BUILDER_PLACEMENT_ACCEPTED family=npc id={} x={} y={} level={} instance={}",
+					id,x,y,npc.getWorldLocation().getCoordinate().getLevel(),npc.getIndex());
 				player.message(messagePrefix+"Added layered NPC: "
 					+npc.getDef().getName()+" at "+npc.getWorldLocation()
 					+" with radius "+radius+" and instance ID "
 					+npc.getIndex()+". Save and close/reopen the Builder to commit.");
 			}catch(Exception failure){
+				LOGGER.warn("WORLD_BUILDER_PLACEMENT_REFUSED family=npc id={} x={} y={} reason={}",
+					id,x,y,failure.getMessage());
 				player.message(messagePrefix+"Layered NPC placement refused: "
 					+failure.getMessage());
 			}
@@ -1038,6 +1052,8 @@ public final class Development implements CommandTrigger {
 			GroundItem item = player.getWorld().getServer()
 				.getWorldEditorSessions().placeNativeGroundItem(
 					player, itemId, amount, respawnSeconds, x, y);
+			LOGGER.info("WORLD_BUILDER_PLACEMENT_ACCEPTED family=ground-item id={} x={} y={} level={} amount={}",
+				itemId,x,y,item.getWorldLocation().getCoordinate().getLevel(),amount);
 			player.message(messagePrefix + "Added layered ground-item spawn: "
 				+ item.getDef().getName() + " x"
 				+ item.getNativeLayeredPlacement().getAmount()
@@ -1048,6 +1064,8 @@ public final class Development implements CommandTrigger {
 			player.message(badSyntaxPrefix + command.toUpperCase()
 				+ " [item_id] [amount] [respawn_seconds] (x) (y)");
 		} catch (Exception failure) {
+			LOGGER.warn("WORLD_BUILDER_PLACEMENT_REFUSED family=ground-item command={} reason={}",
+				command,failure.getMessage());
 			player.message(messagePrefix
 				+ "Layered ground-item placement refused: "
 				+ failure.getMessage());
@@ -1124,7 +1142,15 @@ public final class Development implements CommandTrigger {
 		final GameObject object = player.getViewArea().getGameObject(objectLoc);
 
 		if (object != null && object.getType() != 1) {
-			player.message("There is already scenery in that spot: " + object.getGameObjectDef().getName());
+			if(player.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE){
+				LOGGER.warn("WORLD_BUILDER_PLACEMENT_REFUSED family=scenery id={} x={} y={} reason={}",
+					id,x,y,"There is already scenery in that spot.");
+				player.message(messagePrefix+"Layered scenery placement refused: "
+					+"There is already scenery in that spot.");
+			}else{
+				player.message("There is already scenery in that spot: "
+					+object.getGameObjectDef().getName());
+			}
 			return;
 		}
 
@@ -1137,12 +1163,16 @@ public final class Development implements CommandTrigger {
 				GameObject newObject=player.getWorld().getServer()
 					.getWorldEditorSessions()
 					.placeNativeScenery(player,id,x,y);
+				LOGGER.info("WORLD_BUILDER_PLACEMENT_ACCEPTED family=scenery id={} x={} y={} level={} direction={}",
+					id,x,y,newObject.getWorldLocation().getCoordinate().getLevel(),newObject.getDirection());
 				rememberLastSceneryPlacement(player,id);
 				player.message(messagePrefix+"Added layered scenery: "
 					+newObject.getGameObjectDef().getName()+" with ID "
 					+newObject.getID()+" at "+newObject.getWorldLocation()
 					+". Save and close/reopen the Builder to commit.");
 			}catch(Exception failure){
+				LOGGER.warn("WORLD_BUILDER_PLACEMENT_REFUSED family=scenery id={} x={} y={} reason={}",
+					id,x,y,failure.getMessage());
 				player.message(messagePrefix+"Layered scenery placement refused: "
 					+failure.getMessage());
 			}

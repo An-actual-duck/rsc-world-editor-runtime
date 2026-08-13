@@ -136,9 +136,21 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertIn("placeNativeGroundItem(", sessions)
         self.assertIn("removeNativeGroundItem(", sessions)
         self.assertIn("nativeGroundItemDraftSize()", sessions)
+        self.assertEqual(4, sessions.count("requireClientPlacementDefinition("))
+        self.assertIn("player.getClientLimitations().maxSceneryId", sessions)
+        self.assertIn("player.getClientLimitations().maxNpcId", sessions)
+        self.assertIn("player.getClientLimitations().maxItemId", sessions)
         self.assertIn("placeNativeNpc(player,id,radius,x,y)", commands)
         self.assertIn("removeNativeNpc(player,npc)", commands)
         self.assertIn('sendCommandString("saveworldedits")', ui)
+        potential = re.search(
+            r"public void markPotentialEntityEdit\(\)\{(?P<body>.*?)\}", ui
+        )
+        self.assertIsNotNone(potential)
+        self.assertNotIn("unsavedChanges=true", potential.group("body"))
+        self.assertIn('message.contains("Added layered ")', ui)
+        self.assertIn("pendingEntityActions>0", ui)
+        self.assertIn("Wait for authoritative edit responses before saving.", ui)
         self.assertNotIn("WORLD_EDITOR_UNDO", actions)
         self.assertNotIn("WORLD_EDITOR_REDO", actions)
 
