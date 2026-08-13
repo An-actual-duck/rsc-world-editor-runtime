@@ -356,11 +356,19 @@ world_builder_initial_y: 0
                     client_runtime_log, "ADAPTIVE_WORLD_BUILDER_READY",
                     client, 90, "adaptive client readiness",
                 )
+                self.assertEqual(0, client.wait(timeout=20), "desktop client clean shutdown")
+                client_output.flush()
+                client_evidence = client_log.read_text(
+                    encoding="utf-8", errors="replace"
+                )
                 server_output.flush()
                 server_evidence = server_log.read_text(
                     encoding="utf-8", errors="replace"
                 )
                 self.assertEqual(1, server_evidence.count("Player Loaded: Builder"))
+                self.assertEqual(
+                    1, server_evidence.count("Processed login request for Builder response: 86")
+                )
                 self.assertEqual(
                     1,
                     server_evidence.count(
@@ -368,15 +376,23 @@ world_builder_initial_y: 0
                     ),
                 )
                 self.assertIn("nativeTerrain=true initialRegion=true binding=true", runtime_evidence)
-                combined = (server_evidence + "\n" + runtime_evidence).lower()
+                self.assertIn(
+                    "Skipping legacy terrain archives for explicit adaptive World Builder profile",
+                    server_evidence,
+                )
+                self.assertEqual(1, client_evidence.count("login response:86"))
+                combined = (
+                    server_evidence + "\n" + runtime_evidence + "\n" + client_evidence
+                ).lower()
                 self.assertNotIn("socket timeout", combined)
+                self.assertNotIn("sockettimeoutexception", combined)
                 self.assertNotIn("login retry", combined)
+                self.assertNotIn("lost connection", combined)
                 self.assertNotIn("legacy landscape", combined)
                 self.assertNotIn("fallback", combined)
                 self.assertFalse((client_root / "Cache/video/Authentic_Landscape.orsc").exists())
                 self.assertFalse((client_root / "Cache/video/Custom_Landscape.orsc").exists())
 
-                self.assertEqual(0, client.wait(timeout=20), "desktop client clean shutdown")
                 shutdown.write_text("shutdown\n", encoding="ascii")
                 self.assertEqual(0, server.wait(timeout=30), "server clean shutdown")
             finally:
