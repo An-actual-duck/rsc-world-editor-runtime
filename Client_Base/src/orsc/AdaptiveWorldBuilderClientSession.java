@@ -178,6 +178,17 @@ public final class AdaptiveWorldBuilderClientSession {
 	public String definitionIdentity() { return fields.get("definitionIdentity"); }
 	public String assetIdentity() { return fields.get("assetIdentity"); }
 	public int[] levels() { return levels.clone(); }
+	public boolean hasProjectDefinitionRestrictions() {
+		return !"standalone-empty".equals(fields.get("projectOrigin"));
+	}
+	public int[] definitionIds(String family) {
+		return definitionIdsForFamily(family).clone();
+	}
+
+	public boolean allowsDefinition(String family, int id) {
+		return !hasProjectDefinitionRestrictions() || id >= 0
+			&& Arrays.binarySearch(definitionIdsForFamily(family), id) >= 0;
+	}
 
 	public void requirePackageIdentity(
 		String packageId, String packageVersion, String manifestSha256) {
@@ -257,6 +268,16 @@ public final class AdaptiveWorldBuilderClientSession {
 		for (int id : itemIds) require("item", id, new Lookup() {
 			@Override public Object get(int value) { return EntityHandler.findItem(value, false); }
 		});
+	}
+
+	private int[] definitionIdsForFamily(String family) {
+		if ("tile".equals(family)) return tileIds;
+		if ("boundary".equals(family)) return boundaryIds;
+		if ("scenery".equals(family)) return sceneryIds;
+		if ("npc".equals(family)) return npcIds;
+		if ("item".equals(family)) return itemIds;
+		throw new IllegalArgumentException(
+			"Unknown adaptive definition family: " + family);
 	}
 
 	private static void validateConstants(Map<String, String> fields) {

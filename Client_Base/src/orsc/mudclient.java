@@ -19631,12 +19631,13 @@ public final class mudclient implements Runnable {
 					if(editorNpc!=null){worldEditorInterface.recordWorldClick(midRegionBaseX+editorNpc.currentX/tileSize,midRegionBaseZ+editorNpc.currentZ/tileSize);worldEditorInterface.selectNpc(editorNpc.npcId,worldEditorInterface.getNpcRadius());}
 					worldEditorInterface.inspectNpc(indexOrX,true);break;
 				}
-				case WORLD_EDITOR_PLACE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("aobject "+worldEditorInterface.getSceneryId()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
+				case WORLD_EDITOR_PLACE_SCENERY: { if(!worldEditorInterface.canPlaceSelectedScenery()){worldEditorInterface.showError("Selected scenery is not permitted by this project.");break;}worldEditorInterface.markPotentialEntityEdit();sendCommandString("aobject "+worldEditorInterface.getSceneryId()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
 				case WORLD_EDITOR_ROTATE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("rotateobject "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
 				case WORLD_EDITOR_REMOVE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("robject "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
-				case WORLD_EDITOR_PLACE_NPC: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("cnpc "+worldEditorInterface.getNpcId()+" "+worldEditorInterface.getNpcRadius()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
+				case WORLD_EDITOR_PLACE_NPC: { if(!worldEditorInterface.canPlaceSelectedNpc()){worldEditorInterface.showError("Selected NPC is not permitted by this project.");break;}worldEditorInterface.markPotentialEntityEdit();sendCommandString("cnpc "+worldEditorInterface.getNpcId()+" "+worldEditorInterface.getNpcRadius()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
 				case WORLD_EDITOR_REMOVE_NPC: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("rpc "+indexOrX); break; }
 				case WORLD_EDITOR_PLACE_GROUND_ITEM: {
+					if(!worldEditorInterface.canPlaceSelectedGroundItem()){worldEditorInterface.showError("Selected item is not permitted by this project.");break;}
 					int worldX=indexOrX+midRegionBaseX,worldY=idOrZ+midRegionBaseZ;
 					worldEditorInterface.recordWorldClick(worldX,worldY);
 					worldEditorInterface.markPotentialEntityEdit();
@@ -25279,6 +25280,12 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 1
 			&& now >= automatedBuilderPlacementProbeDeadline) {
+			if (Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")) {
+				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(122, 648, 1);
+				automatedBuilderPlacementProbeDeadline = now + 2500L;
+				automatedBuilderPlacementProbeStage = 8;
+				return;
+			}
 			sendCommandString("aobject 0 119 648");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 2;
@@ -25310,6 +25317,41 @@ public final class mudclient implements Runnable {
 			&& now >= automatedBuilderPlacementProbeDeadline) {
 			automatedBuilderPlacementProbeDeadline = now + 10000L;
 			automatedBuilderPlacementProbeStage = 6;
+		}
+		if (automatedBuilderPlacementProbeStage == 8
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			worldEditorInterface.sendAutomatedBoundaryPlacementProbe(122, 648, 2);
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 9;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 9
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("aobject 1 118 648");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 10;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 10
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("cnpc 1 0 120 650");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 11;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 11
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("buildergrounditem 11 1 30 121 649");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 12;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 12
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("aobject 0 119 648");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 2;
+			return;
 		}
 		if (automatedBuilderPlacementProbeStage != 6) {
 			return;
@@ -25380,6 +25422,13 @@ public final class mudclient implements Runnable {
 		automatedBuilderPlacementProbeStage = 4;
 		closeConnection(true);
 		System.exit(0);
+	}
+
+	public void observeAutomatedBuilderEditorError(String message) {
+		if (Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")) {
+			ClientRuntimeLogger.log(
+				"ADAPTIVE_WORLD_BUILDER_DEFINITION_RESPONSE " + message);
+		}
 	}
 
 	public boolean isFullScreenModalUiActive() {

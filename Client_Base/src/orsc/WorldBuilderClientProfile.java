@@ -344,6 +344,19 @@ public final class WorldBuilderClientProfile {
 		if (isAdaptive()) adaptiveSession.requireClientDefinitions();
 	}
 
+	public boolean hasProjectDefinitionRestrictions() {
+		return isAdaptive() && adaptiveSession.hasProjectDefinitionRestrictions();
+	}
+
+	/** Exact project-bound IDs; meaningful only when restrictions are active. */
+	public int[] definitionIds(String family) {
+		return isAdaptive() ? adaptiveSession.definitionIds(family) : new int[0];
+	}
+
+	public boolean isDefinitionAllowed(String family, int id) {
+		return !isAdaptive() || adaptiveSession.allowsDefinition(family, id);
+	}
+
 	public String layeredPackageId() {
 		return layeredPackageId;
 	}

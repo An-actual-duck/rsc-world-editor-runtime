@@ -46,10 +46,34 @@ def write_integration_package(root: Path) -> None:
         "encoding": "layered-world-placements-v3",
         "worldSpace": "global",
         "level": 0,
-        "npcs": [],
-        "groundItems": [],
-        "scenery": [],
-        "boundaries": [],
+        "npcs": [{
+            "placementId": "integration.seed.npc",
+            "npcId": 0,
+            "start": {"x": 100, "y": 630},
+            "roamBounds": {
+                "minimum": {"x": 100, "y": 630},
+                "maximum": {"x": 100, "y": 630},
+            },
+        }],
+        "groundItems": [{
+            "placementId": "integration.seed.item",
+            "itemId": 10,
+            "position": {"x": 101, "y": 630},
+            "amount": 1,
+            "respawnSeconds": 30,
+        }],
+        "scenery": [{
+            "placementId": "integration.seed.scenery",
+            "sceneryId": 0,
+            "position": {"x": 102, "y": 630},
+            "direction": 0,
+        }],
+        "boundaries": [{
+            "placementId": "integration.seed.boundary",
+            "boundaryId": 0,
+            "position": {"x": 103, "y": 630},
+            "direction": 0,
+        }],
     })
     (root / terrain_path).parent.mkdir(parents=True)
     (root / placement_path).parent.mkdir(parents=True)
@@ -58,14 +82,14 @@ def write_integration_package(root: Path) -> None:
     manifest = {
         "schemaVersion": 1,
         "packageType": "layered-world",
-        "packageId": "integration.neutral.standalone-empty",
+        "packageId": "integration.neutral.target-layered",
         "packageVersion": "1.0.0",
         "coordinateModel": "signed-layered-v1",
         "storage": {"sectorSize": 48, "presentationChunkSize": 24},
         "worldSpaces": [{"id": "global", "kind": "static"}],
         "levels": [{
             "worldSpace": "global", "level": 0,
-            "name": "Empty level", "role": "empty-authoring-level",
+            "name": "Bound project level", "role": "authoring-level",
         }],
         "terrainSectors": [{
             "worldSpace": "global", "level": 0,
@@ -260,7 +284,7 @@ want_layered_native_terrain_prediction: true
 want_layered_native_terrain_symmetric_residency: true
 want_layered_native_terrain_atomic_activation: true
 layered_native_world_runtime_profile: adaptive-world-builder
-world_builder_project_origin: standalone-empty
+world_builder_project_origin: target-layered
 world_builder_definition_id: integration.neutral.definitions.v1
 world_builder_asset_id: integration.neutral.assets.v1
 world_builder_initial_world_space: global
@@ -289,7 +313,7 @@ world_builder_initial_y: 648
                 "openrsc.layeredNativeTerrainPackagePath": str(package),
                 "openrsc.layeredNativeTerrainManifestSha256": manifest_sha,
                 "openrsc.layeredNativeTerrainInventorySha256": inventory,
-                "openrsc.worldBuilderProjectOrigin": "standalone-empty",
+                "openrsc.worldBuilderProjectOrigin": "target-layered",
                 "openrsc.worldBuilderDefinitionId": "integration.neutral.definitions.v1",
                 "openrsc.worldBuilderDefinitionSha256": definition_sha,
                 "openrsc.worldBuilderDefinitionEvidencePath": str(definitions),
@@ -336,6 +360,7 @@ world_builder_initial_y: 648
                     "spoiledmilk.clientLog": str(client_runtime_log),
                     "sun.java2d.opengl": "false",
                     "openrsc.worldBuilderAutomatedPlacementProbe": "place",
+                    "openrsc.worldBuilderAutomatedDefinitionProbe": "true",
                 }
                 client_command = ["java", "-Xms256m", "-Xmx1024m"]
                 client_command.extend(
@@ -387,6 +412,20 @@ world_builder_initial_y: 648
                     "There is already scenery in that spot.",
                     runtime_evidence,
                 )
+                for family, definition_id in (
+                    ("scenery", 1), ("NPC", 1), ("item", 11),
+                ):
+                    self.assertIn(
+                        "The bound project does not permit " + family
+                        + " definition ID " + str(definition_id) + ".",
+                        runtime_evidence,
+                    )
+                self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_DEFINITION_RESPONSE "
+                    "Editor request failed: The bound project does not permit "
+                    "boundary definition ID 1.",
+                    runtime_evidence,
+                )
                 for family in ("scenery", "npc", "ground-item"):
                     self.assertEqual(
                         1,
@@ -431,16 +470,16 @@ world_builder_initial_y: 648
                         encoding="utf-8"
                     )
                 )
-                self.assertEqual(
-                    [(0, 119, 648, 0)],
+                self.assertIn(
+                    (0, 119, 648, 0),
                     [
                         (row["sceneryId"], row["position"]["x"],
                          row["position"]["y"], row["direction"])
                         for row in placement_document["scenery"]
                     ],
                 )
-                self.assertEqual(
-                    [(0, 120, 649, 120, 649, 120, 649)],
+                self.assertIn(
+                    (0, 120, 649, 120, 649, 120, 649),
                     [
                         (row["npcId"], row["start"]["x"], row["start"]["y"],
                          row["roamBounds"]["minimum"]["x"],
@@ -450,14 +489,19 @@ world_builder_initial_y: 648
                         for row in placement_document["npcs"]
                     ],
                 )
-                self.assertEqual(
-                    [(10, 1, 30, 121, 648)],
+                self.assertIn(
+                    (10, 1, 30, 121, 648),
                     [
                         (row["itemId"], row["amount"], row["respawnSeconds"],
                          row["position"]["x"], row["position"]["y"])
                         for row in placement_document["groundItems"]
                     ],
                 )
+                terrain_bytes = (
+                    package / "terrain/global/lp0/xp2-yp13.raw"
+                ).read_bytes()
+                boundary_offset = ((122 % 48) * 48 + (648 % 48)) * 10 + 5
+                self.assertEqual(1, terrain_bytes[boundary_offset])
 
                 reopened_runtime_log = fixture / "client-reopened-runtime.log"
                 reopened_client_log = fixture / "client-reopened.log"

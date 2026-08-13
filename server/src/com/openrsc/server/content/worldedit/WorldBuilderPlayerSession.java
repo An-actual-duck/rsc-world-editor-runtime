@@ -87,6 +87,30 @@ public final class WorldBuilderPlayerSession {
 					BINDING_COMPLETE_ATTRIBUTE, Boolean.FALSE)));
 	}
 
+	/** Enforces the exact definition inventory from the successfully bound session. */
+	public static void requireProjectDefinition(
+		Player player, String family, int id) {
+		if (player == null) {
+			throw new IllegalArgumentException(
+				"Project definition validation requires a player.");
+		}
+		if (!AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(player.getConfig())) {
+			return;
+		}
+		if (!Boolean.TRUE.equals(player.getAttribute(
+				BINDING_COMPLETE_ATTRIBUTE, Boolean.FALSE))) {
+			throw new IllegalStateException(
+				"Adaptive Builder definition validation requires an authenticated binding.");
+		}
+		AdaptiveWorldBuilderRuntimeSession session = player.getWorld()
+			.getServer().getAdaptiveWorldBuilderRuntimeSession();
+		if (session == null) {
+			throw new IllegalStateException(
+				"Adaptive runtime definition binding is unavailable.");
+		}
+		session.requireDefinition(family, id);
+	}
+
 	private static void refuse(Player player, String message) {
 		LOGGER.error(message);
 		if (player != null) {

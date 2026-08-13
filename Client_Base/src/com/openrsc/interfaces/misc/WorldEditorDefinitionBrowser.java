@@ -1,6 +1,7 @@
 package com.openrsc.interfaces.misc;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -28,9 +29,16 @@ final class WorldEditorDefinitionBrowser {
 	private String query = "";
 	private int firstRow;
 	private List<WorldEditorDefinitionCatalog.Entry> results = Collections.emptyList();
+	private int[] allowedIds;
 
 	void open(Family selectedFamily, int selectedId) {
+		open(selectedFamily, selectedId, null);
+	}
+
+	void open(Family selectedFamily, int selectedId, int[] projectAllowedIds) {
 		family = selectedFamily == null ? Family.SCENERY : selectedFamily;
+		allowedIds = projectAllowedIds == null ? null : projectAllowedIds.clone();
+		if (allowedIds != null) Arrays.sort(allowedIds);
 		open = true;
 		query = "";
 		rebuild();
@@ -42,6 +50,7 @@ final class WorldEditorDefinitionBrowser {
 		query = "";
 		firstRow = 0;
 		results = Collections.emptyList();
+		allowedIds = null;
 	}
 
 	boolean isOpen() {
@@ -146,21 +155,26 @@ final class WorldEditorDefinitionBrowser {
 				break;
 		}
 		String normalized = normalized(query);
-		if (normalized.isEmpty()) {
+		if (normalized.isEmpty() && allowedIds == null) {
 			results = source;
 			firstRow = clamp(firstRow, 0, maxFirstRow());
 			return;
 		}
-		String[] tokens = normalized.split(" ");
+		String[] tokens = normalized.isEmpty() ? new String[0] : normalized.split(" ");
 		List<WorldEditorDefinitionCatalog.Entry> filtered =
 			new ArrayList<WorldEditorDefinitionCatalog.Entry>();
 		for (WorldEditorDefinitionCatalog.Entry entry : source) {
-			if (matches(entry, tokens)) {
+			if (isAllowed(entry.id()) && matches(entry, tokens)) {
 				filtered.add(entry);
 			}
 		}
 		results = Collections.unmodifiableList(filtered);
-		firstRow = 0;
+		firstRow = normalized.isEmpty()
+			? clamp(firstRow, 0, maxFirstRow()) : 0;
+	}
+
+	private boolean isAllowed(int id) {
+		return allowedIds == null || Arrays.binarySearch(allowedIds, id) >= 0;
 	}
 
 	private static boolean matches(WorldEditorDefinitionCatalog.Entry entry, String[] tokens) {
