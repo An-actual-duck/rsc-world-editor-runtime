@@ -229,6 +229,8 @@ public final class WorldEditorSessionManager {
 		validateTerrainPaint(
 			fieldMask, elevation, groundTexture, groundOverlay, roofTexture,
 			horizontalWall, verticalWall);
+		requireClientBoundaryPlacementDefinitions(
+			player, fieldMask, horizontalWall, verticalWall, diagonal);
 		int[][] coordinates = WorldEditorTerrainStroke.validateTiles(requestedTiles);
 		ensureNativePaintCoverage(player, coordinates, level);
 		WorldSpaceId worldSpace = player.getLayeredLocation().getWorldSpace();
@@ -500,6 +502,11 @@ public final class WorldEditorSessionManager {
 					"Automatic pairing found conflicting scenery at the "
 						+ "destination coordinates.");
 			}
+		}
+		if (inverse == null) {
+			requireClientPlacementDefinition(
+				player, "scenery", pairing.getInverseSceneryId(),
+				player.getClientLimitations().maxSceneryId);
 		}
 
 		NativeVerticalProvision provision =
@@ -1563,6 +1570,30 @@ public final class WorldEditorSessionManager {
 					+" definition ID "+id+" (supported range 0.."
 					+inclusiveMaximum+").");
 		}
+		WorldBuilderPlayerSession.requireProjectDefinition(
+			player,family.toLowerCase(java.util.Locale.ROOT),id);
+	}
+	private static void requireClientBoundaryPlacementDefinitions(
+		Player player,int fieldMask,int horizontalWall,int verticalWall,
+		int diagonal){
+		if((fieldMask&16)!=0)requireClientBoundaryPlacementDefinition(
+			player,horizontalWall,false);
+		if((fieldMask&32)!=0)requireClientBoundaryPlacementDefinition(
+			player,verticalWall,false);
+		if((fieldMask&64)!=0)requireClientBoundaryPlacementDefinition(
+			player,diagonal,true);
+	}
+	private static void requireClientBoundaryPlacementDefinition(
+		Player player,int raw,boolean diagonal){
+		if(raw==0)return;
+		int id;
+		if(diagonal){
+			if(raw<1||raw>=24000||raw==12000)throw new IllegalArgumentException(
+				"Diagonal wall encoding is invalid.");
+			id=raw>12000?raw-12001:raw-1;
+		}else id=raw-1;
+		requireClientPlacementDefinition(
+			player,"boundary",id,player.getClientLimitations().maxBoundaryId);
 	}
 	private WorldLocation activeNativeSceneryLocation(
 		Player player,int x,int y){

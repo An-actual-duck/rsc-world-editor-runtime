@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
-MAX_CATALOG_BYTES = 1024 * 1024 * 1024
+MAX_CATALOG_BYTES = 16 * 1024 * 1024
 SERVER_BUILD_ID = "core-framework-adaptive-builder-server-v1"
 CLIENT_BUILD_ID = "core-framework-adaptive-builder-client-v1"
 LOADER_ID = "generic-signed-layered-loader-v1"

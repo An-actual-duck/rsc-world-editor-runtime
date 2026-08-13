@@ -6,6 +6,7 @@ import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeTerr
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeTerrainStrokeResult;
 import com.openrsc.server.content.worldedit.WorldEditorTerrainStroke;
 import com.openrsc.server.content.worldedit.WorldBuilderMode;
+import com.openrsc.server.content.worldedit.WorldBuilderPlayerSession;
 import com.openrsc.server.io.NativeLayeredTerrainTile;
 import com.openrsc.server.io.WorldEditorTerrainArchive;
 import com.openrsc.server.io.WorldLoader;
@@ -199,7 +200,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 		if((r.fieldMask&32)!=0)validateWall(p,r.verticalWall,"North wall");
 		if((r.fieldMask&64)!=0){if(r.diagonal!=0&&(r.diagonal<1||r.diagonal>=24000||r.diagonal==12000))throw new IllegalArgumentException("Diagonal wall encoding is invalid.");validateWall(p,diagonalRawWall(r.diagonal),"Diagonal wall");}
 	}
-	private void validateWall(Player p,int raw,String label){if(raw==0)return;try{if(p.getWorld().getServer().getEntityHandler().getDoorDef(raw-1)==null)throw new Exception();}catch(Exception e){throw new IllegalArgumentException(label+" "+raw+" is not defined.");}}
+	private void validateWall(Player p,int raw,String label){if(raw==0)return;try{if(p.getWorld().getServer().getEntityHandler().getDoorDef(raw-1)==null)throw new Exception();}catch(Exception e){throw new IllegalArgumentException(label+" "+raw+" is not defined.");}WorldBuilderPlayerSession.requireProjectDefinition(p,"boundary",raw-1);}
 	private boolean overlayBlocks(Player p,int overlay){
 		int effective=overlay==250?2:overlay;if(effective==0)return false;
 		try{return p.getWorld().getServer().getEntityHandler().getTileDef(effective-1).getObjectType()!=0;}

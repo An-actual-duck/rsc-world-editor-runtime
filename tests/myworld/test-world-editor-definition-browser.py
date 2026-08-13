@@ -89,6 +89,9 @@ public final class WorldEditorDefinitionBrowserFixture {
         browser.open(WorldEditorDefinitionBrowser.Family.BOUNDARY, 8);
         browser.setQuery("gray bricks");
         require(visibleContains(browser, 8), "shared boundary metadata was not searchable");
+		browser.open(WorldEditorDefinitionBrowser.Family.BOUNDARY, 8, new int[]{8});
+		require(browser.resultCount() == 1 && visibleContains(browser, 8),
+			"project-bound boundary results were not exact");
 
 		browser.open(WorldEditorDefinitionBrowser.Family.NPC, 0);
 		require(browser.resultCount() == WorldEditorDefinitionCatalog.npcEntries().size(),
@@ -101,6 +104,9 @@ public final class WorldEditorDefinitionBrowserFixture {
 			"NPC search returned the wrong definition");
 		browser.setQuery("pickpocket citizens");
 		require(browser.resultCount() >= 1, "NPC action metadata was not searchable");
+		browser.open(WorldEditorDefinitionBrowser.Family.NPC, 0, new int[]{0, 2});
+		require(browser.resultCount() == 2 && visibleContains(browser, 0),
+			"project-bound NPC results were not exact");
 
 		browser.open(WorldEditorDefinitionBrowser.Family.ITEM, 10);
 		require(browser.resultCount() == WorldEditorDefinitionCatalog.itemEntries().size(),
@@ -114,6 +120,18 @@ public final class WorldEditorDefinitionBrowserFixture {
 		browser.setQuery("#18");
 		require(browser.resultCount() == 1, "exact item ID search returned extra definitions");
 		require(browser.resultAtVisibleSlot(0).id() == 18, "exact item ID search returned the wrong item");
+		browser.open(WorldEditorDefinitionBrowser.Family.ITEM, 10, new int[]{10, 20});
+		require(browser.resultCount() == 2 && visibleContains(browser, 10),
+			"project-bound item results were not exact");
+		browser.open(WorldEditorDefinitionBrowser.Family.SCENERY, 104, new int[]{104, 223});
+		require(browser.resultCount() == 2 && visibleContains(browser, 104),
+			"project-bound scenery results were not exact");
+		browser.setQuery("#105");
+		require(browser.resultCount() == 0,
+			"search escaped the project-bound scenery inventory");
+		browser.open(WorldEditorDefinitionBrowser.Family.SCENERY, 104, null);
+		require(browser.resultCount() == 1332,
+			"standalone browser behavior was not preserved");
         browser.close();
         require(!browser.isOpen(), "browser did not close");
     }

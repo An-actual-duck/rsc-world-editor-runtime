@@ -507,6 +507,18 @@ public final class AdaptiveWorldBuilderClientBindingHarness {
         session.requireEvidence(Paths.get(args[1]), Paths.get(args[2]));
         session.requireCredential(Paths.get(args[3]));
         session.requirePackageIdentity(args[4], args[5], args[6]);
+        if (!session.allowsDefinition("boundary", 10)
+                || !session.allowsDefinition("scenery", 104)
+                || !session.allowsDefinition("npc", 31)
+                || !session.allowsDefinition("item", 20)) {
+            throw new AssertionError("authorable unused definition was hidden");
+        }
+        if (session.allowsDefinition("boundary", 2)
+                || session.allowsDefinition("scenery", 2)
+                || session.allowsDefinition("npc", 2)
+                || session.allowsDefinition("item", 2)) {
+            throw new AssertionError("out-of-catalog definition was exposed");
+        }
         System.out.println(session.token() + " " + session.packageId());
     }
 }
@@ -820,6 +832,10 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "assetIdentity": "creator.assets.v1",
             "assetSha256": hashlib.sha256(assets.read_bytes()).hexdigest(),
             "authoring": "generic-signed-layered-authoring-v1",
+            "authorableBoundaryIds": "1,10",
+            "authorableItemIds": "10,20",
+            "authorableNpcIds": "30,31",
+            "authorableSceneryIds": "0,104",
             "capability": "adaptive-world-builder-runtime-capability-v1",
             "clientBuild": "core-framework-adaptive-builder-client-v1",
             "clientVersion": "10048",

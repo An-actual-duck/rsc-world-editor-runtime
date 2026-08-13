@@ -24,7 +24,7 @@ def canonical_json(value) -> bytes:
     return (json.dumps(value, separators=(",", ":")) + "\n").encode("utf-8")
 
 
-def write_integration_package(root: Path) -> None:
+def write_integration_package(root: Path, *, seeded: bool = True) -> None:
     initial_x = 120
     initial_y = 648
     sector_x = initial_x // 48
@@ -41,7 +41,7 @@ def write_integration_package(root: Path) -> None:
             offset = (x * 48 + y) * 10
             terrain[offset:offset + 10] = bytes(10)
     terrain = bytes(terrain)
-    placements = canonical_json({
+    placement_document = {
         "schemaVersion": 3,
         "encoding": "layered-world-placements-v3",
         "worldSpace": "global",
@@ -50,7 +50,39 @@ def write_integration_package(root: Path) -> None:
         "groundItems": [],
         "scenery": [],
         "boundaries": [],
-    })
+    }
+    if seeded:
+        placement_document.update({
+            "npcs": [{
+                "placementId": "integration.seed.npc",
+                "npcId": 0,
+                "start": {"x": 100, "y": 630},
+                "roamBounds": {
+                    "minimum": {"x": 100, "y": 630},
+                    "maximum": {"x": 100, "y": 630},
+                },
+            }],
+            "groundItems": [{
+                "placementId": "integration.seed.item",
+                "itemId": 10,
+                "position": {"x": 101, "y": 630},
+                "amount": 1,
+                "respawnSeconds": 30,
+            }],
+            "scenery": [{
+                "placementId": "integration.seed.scenery",
+                "sceneryId": 0,
+                "position": {"x": 102, "y": 630},
+                "direction": 0,
+            }],
+            "boundaries": [{
+                "placementId": "integration.seed.boundary",
+                "boundaryId": 0,
+                "position": {"x": 103, "y": 630},
+                "direction": 0,
+            }],
+        })
+    placements = canonical_json(placement_document)
     (root / terrain_path).parent.mkdir(parents=True)
     (root / placement_path).parent.mkdir(parents=True)
     (root / terrain_path).write_bytes(terrain)
@@ -58,14 +90,17 @@ def write_integration_package(root: Path) -> None:
     manifest = {
         "schemaVersion": 1,
         "packageType": "layered-world",
-        "packageId": "integration.neutral.standalone-empty",
+        "packageId": (
+            "integration.neutral.target-layered"
+            if seeded else "integration.neutral.standalone-empty"
+        ),
         "packageVersion": "1.0.0",
         "coordinateModel": "signed-layered-v1",
         "storage": {"sectorSize": 48, "presentationChunkSize": 24},
         "worldSpaces": [{"id": "global", "kind": "static"}],
         "levels": [{
             "worldSpace": "global", "level": 0,
-            "name": "Empty level", "role": "empty-authoring-level",
+            "name": "Bound project level", "role": "authoring-level",
         }],
         "terrainSectors": [{
             "worldSpace": "global", "level": 0,
@@ -174,6 +209,11 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             self.assertTrue(artifact.is_file(), f"build artifact missing: {artifact}")
 
         with tempfile.TemporaryDirectory(prefix="adaptive-real-login-") as temp:
+            project_origin = os.environ.get(
+                "ADAPTIVE_REAL_LOGIN_PROJECT_ORIGIN", "target-layered"
+            )
+            self.assertIn(project_origin, ("target-layered", "standalone-empty"))
+            seeded = project_origin != "standalone-empty"
             fixture = Path(temp)
             project = fixture / "project"
             working = project / "working"
@@ -183,7 +223,7 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             client_root = working / "runtime/client"
             control = project / "run/world-builder"
             evidence = working / "evidence"
-            write_integration_package(package)
+            write_integration_package(package, seeded=seeded)
             shutil.copytree(package, baseline)
             classes = fixture / "classes"
             classes.mkdir()
@@ -217,9 +257,18 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             # Keep the unrelated Discord native integration out of this bounded
             # process-lifecycle test; the lock file is confined to the fixture.
             (client_root / "Cache/discord_inuse.txt").write_text("1", encoding="ascii")
-            definitions = evidence / "definitions.bin"
+            definitions = evidence / "adaptive-definitions.json"
             assets = evidence / "assets.bin"
-            definitions.write_bytes(b"integration-neutral-definition-evidence-v1\n")
+            definitions.write_text(json.dumps({
+                "schemaVersion": 1,
+                "manifestType": "world-builder-definition-catalog",
+                "catalogId": "integration.neutral.definitions.v1",
+                "tiles": [0, 7],
+                "boundaries": [0, 1],
+                "scenery": [0, 1],
+                "npcs": [0, 1],
+                "groundItems": [10, 11],
+            }, indent=2) + "\n", encoding="utf-8")
             assets.write_bytes(b"integration-neutral-asset-evidence-v1\n")
             definition_sha = hashlib.sha256(definitions.read_bytes()).hexdigest()
             asset_sha = hashlib.sha256(assets.read_bytes()).hexdigest()
@@ -244,7 +293,7 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             }
             for key, value in replacements.items():
                 config = replace_config(config, key, value)
-            config += """
+            config += f"""
 
 # Explicit isolated adaptive Builder integration profile.
 world_builder_mode: true
@@ -260,7 +309,7 @@ want_layered_native_terrain_prediction: true
 want_layered_native_terrain_symmetric_residency: true
 want_layered_native_terrain_atomic_activation: true
 layered_native_world_runtime_profile: adaptive-world-builder
-world_builder_project_origin: standalone-empty
+world_builder_project_origin: {project_origin}
 world_builder_definition_id: integration.neutral.definitions.v1
 world_builder_asset_id: integration.neutral.assets.v1
 world_builder_initial_world_space: global
@@ -289,7 +338,7 @@ world_builder_initial_y: 648
                 "openrsc.layeredNativeTerrainPackagePath": str(package),
                 "openrsc.layeredNativeTerrainManifestSha256": manifest_sha,
                 "openrsc.layeredNativeTerrainInventorySha256": inventory,
-                "openrsc.worldBuilderProjectOrigin": "standalone-empty",
+                "openrsc.worldBuilderProjectOrigin": project_origin,
                 "openrsc.worldBuilderDefinitionId": "integration.neutral.definitions.v1",
                 "openrsc.worldBuilderDefinitionSha256": definition_sha,
                 "openrsc.worldBuilderDefinitionEvidencePath": str(definitions),
@@ -321,6 +370,22 @@ world_builder_initial_y: 648
                 wait_for(credential, server, 5, "generated credential", server_log)
                 wait_for(binding, server, 5, "runtime binding", server_log)
                 self.assertEqual(20, len(credential.read_text(encoding="ascii")))
+                binding_fields = dict(
+                    line.split("=", 1)
+                    for line in binding.read_text(encoding="ascii").splitlines()[1:]
+                )
+                expected_required = {
+                    "requiredBoundaryIds": "0" if seeded else "",
+                    "requiredSceneryIds": "0" if seeded else "",
+                    "requiredNpcIds": "0" if seeded else "",
+                    "requiredItemIds": "10" if seeded else "",
+                }
+                for key, value in expected_required.items():
+                    self.assertEqual(value, binding_fields[key])
+                self.assertEqual("0,1", binding_fields["authorableBoundaryIds"])
+                self.assertEqual("0,1", binding_fields["authorableSceneryIds"])
+                self.assertEqual("0,1", binding_fields["authorableNpcIds"])
+                self.assertEqual("10,11", binding_fields["authorableItemIds"])
 
                 client_properties = {
                     "openrsc.worldBuilderMode": "true",
@@ -336,6 +401,7 @@ world_builder_initial_y: 648
                     "spoiledmilk.clientLog": str(client_runtime_log),
                     "sun.java2d.opengl": "false",
                     "openrsc.worldBuilderAutomatedPlacementProbe": "place",
+                    "openrsc.worldBuilderAutomatedDefinitionProbe": "true",
                 }
                 client_command = ["java", "-Xms256m", "-Xmx1024m"]
                 client_command.extend(
@@ -379,7 +445,9 @@ world_builder_initial_y: 648
                 self.assertIn("nativeTerrain=true initialRegion=true binding=true", runtime_evidence)
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode=place "
-                    "scenery=0@119,648 npc=0@120,649 item=10@121,648",
+                    "scenery=0@119,648,1@118,648 "
+                    "npc=0@120,649,1@120,650 "
+                    "item=10@121,648,11@121,649",
                     runtime_evidence,
                 )
                 self.assertIn(
@@ -387,9 +455,23 @@ world_builder_initial_y: 648
                     "There is already scenery in that spot.",
                     runtime_evidence,
                 )
+                for family, definition_id in (
+                    ("scenery", 2), ("NPC", 2), ("item", 12),
+                ):
+                    self.assertIn(
+                        "The bound project does not permit " + family
+                        + " definition ID " + str(definition_id) + ".",
+                        runtime_evidence,
+                    )
+                self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_DEFINITION_RESPONSE "
+                    "Editor request failed: The bound project does not permit "
+                    "boundary definition ID 2.",
+                    runtime_evidence,
+                )
                 for family in ("scenery", "npc", "ground-item"):
                     self.assertEqual(
-                        1,
+                        2,
                         server_evidence.count(
                             "WORLD_BUILDER_PLACEMENT_ACCEPTED family=" + family
                         ),
@@ -431,16 +513,27 @@ world_builder_initial_y: 648
                         encoding="utf-8"
                     )
                 )
-                self.assertEqual(
-                    [(0, 119, 648, 0)],
+                self.assertIn(
+                    (0, 119, 648, 0),
                     [
                         (row["sceneryId"], row["position"]["x"],
                          row["position"]["y"], row["direction"])
                         for row in placement_document["scenery"]
                     ],
                 )
-                self.assertEqual(
-                    [(0, 120, 649, 120, 649, 120, 649)],
+                self.assertIn(
+                    (1, 118, 648, 0),
+                    [
+                        (row["sceneryId"], row["position"]["x"],
+                         row["position"]["y"], row["direction"])
+                        for row in placement_document["scenery"]
+                    ],
+                )
+                self.assertNotIn(
+                    2, [row["sceneryId"] for row in placement_document["scenery"]]
+                )
+                self.assertIn(
+                    (0, 120, 649, 120, 649, 120, 649),
                     [
                         (row["npcId"], row["start"]["x"], row["start"]["y"],
                          row["roamBounds"]["minimum"]["x"],
@@ -450,14 +543,40 @@ world_builder_initial_y: 648
                         for row in placement_document["npcs"]
                     ],
                 )
-                self.assertEqual(
-                    [(10, 1, 30, 121, 648)],
+                self.assertIn(
+                    (1, 120, 650),
+                    [
+                        (row["npcId"], row["start"]["x"], row["start"]["y"])
+                        for row in placement_document["npcs"]
+                    ],
+                )
+                self.assertNotIn(2, [row["npcId"] for row in placement_document["npcs"]])
+                self.assertIn(
+                    (10, 1, 30, 121, 648),
                     [
                         (row["itemId"], row["amount"], row["respawnSeconds"],
                          row["position"]["x"], row["position"]["y"])
                         for row in placement_document["groundItems"]
                     ],
                 )
+                self.assertIn(
+                    (11, 1, 30, 121, 649),
+                    [
+                        (row["itemId"], row["amount"], row["respawnSeconds"],
+                         row["position"]["x"], row["position"]["y"])
+                        for row in placement_document["groundItems"]
+                    ],
+                )
+                self.assertNotIn(
+                    12, [row["itemId"] for row in placement_document["groundItems"]]
+                )
+                terrain_bytes = (
+                    package / "terrain/global/lp0/xp2-yp13.raw"
+                ).read_bytes()
+                boundary_offset = ((122 % 48) * 48 + (648 % 48)) * 10 + 5
+                refused_boundary_offset = ((123 % 48) * 48 + (648 % 48)) * 10 + 5
+                self.assertEqual(2, terrain_bytes[boundary_offset])
+                self.assertEqual(0, terrain_bytes[refused_boundary_offset])
 
                 reopened_runtime_log = fixture / "client-reopened-runtime.log"
                 reopened_client_log = fixture / "client-reopened.log"
@@ -493,7 +612,9 @@ world_builder_initial_y: 648
                             reopened_client.wait(timeout=10)
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode=verify "
-                    "scenery=0@119,648 npc=0@120,649 item=10@121,648",
+                    "scenery=0@119,648,1@118,648 "
+                    "npc=0@120,649,1@120,650 "
+                    "item=10@121,648,11@121,649",
                     reopened_evidence,
                 )
 

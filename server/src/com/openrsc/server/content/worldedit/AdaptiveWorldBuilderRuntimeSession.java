@@ -78,6 +78,10 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 		AdaptiveWorldBuilderDefinitionInventory.Result definitions =
 			AdaptiveWorldBuilderDefinitionInventory.validate(
 				server.getEntityHandler(), worldPackage);
+		AdaptiveWorldBuilderAuthoringDefinitions.Result authorable =
+			AdaptiveWorldBuilderAuthoringDefinitions.load(
+				server.getConfig(), storage, server.getEntityHandler());
+		authorable.requireComposition(definitions);
 		writeComposition(composition, worldPackage, inventory.getFingerprint());
 		String compositionSha256 = sha256(composition);
 		Map<String, String> fields =
@@ -86,7 +90,9 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 				compositionSha256,
 				definitions.tileIdsCsv(), definitions.boundaryIdsCsv(),
 				definitions.sceneryIdsCsv(), definitions.npcIdsCsv(),
-				definitions.itemIdsCsv());
+				definitions.itemIdsCsv(), authorable.boundaryIdsCsv(),
+				authorable.sceneryIdsCsv(), authorable.npcIdsCsv(),
+				authorable.itemIdsCsv());
 		String canonical =
 			AdaptiveWorldBuilderRuntimeIdentity.canonicalSession(fields);
 		AdaptiveWorldBuilderRuntimeIdentity.validateEvidenceFiles(
@@ -103,6 +109,42 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 	public Path getBindingFile() { return bindingFile; }
 	public Path getCompositionFile() { return compositionFile; }
 	public Map<String, String> getFields() { return fields; }
+	/** Refuses any authoring ID outside the immutable project catalog binding. */
+	public void requireDefinition(String family, int id) {
+		String key;
+		String label;
+		if ("boundary".equals(family)) {
+			key = "authorableBoundaryIds"; label = "boundary";
+		} else if ("scenery".equals(family)) {
+			key = "authorableSceneryIds"; label = "scenery";
+		} else if ("npc".equals(family)) {
+			key = "authorableNpcIds"; label = "NPC";
+		} else if ("item".equals(family)) {
+			key = "authorableItemIds"; label = "item";
+		} else {
+			throw new IllegalArgumentException(
+				"Unknown adaptive definition family: " + family);
+		}
+		if (id < 0 || !canonicalIdListContains(fields.get(key), id)) {
+			throw new IllegalArgumentException(
+				"The bound project does not permit " + label
+					+ " definition ID " + id + ".");
+		}
+	}
+
+	private static boolean canonicalIdListContains(String csv, int requested) {
+		if (csv == null || csv.isEmpty()) return false;
+		String needle = Integer.toString(requested);
+		int start = 0;
+		while (start < csv.length()) {
+			int end = csv.indexOf(',', start);
+			if (end < 0) end = csv.length();
+			if (end - start == needle.length()
+				&& csv.regionMatches(start, needle, 0, needle.length())) return true;
+			start = end + 1;
+		}
+		return false;
+	}
 
 	private static void writeComposition(
 		Path destination, NativeLayeredWorldPackage worldPackage,
