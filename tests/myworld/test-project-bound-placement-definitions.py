@@ -56,17 +56,22 @@ class ProjectBoundPlacementDefinitionsTest(unittest.TestCase):
         boundary_mutation = manager.index("nativeTerrainOverlay.put(key, painted)", boundary_check)
         self.assertLess(boundary_check, boundary_mutation)
 
-    def test_client_filters_only_project_bound_sessions(self) -> None:
+    def test_client_filters_every_adaptive_origin_by_authoring_catalog(self) -> None:
         profile = PROFILE.read_text(encoding="utf-8")
         editor = EDITOR.read_text(encoding="utf-8")
-        self.assertIn("hasProjectDefinitionRestrictions()", profile)
+        self.assertIn("hasAuthoringDefinitionBinding()", profile)
         self.assertIn('projectDefinitionIds("scenery")', editor)
         self.assertIn('projectDefinitionIds("npc")', editor)
         self.assertIn('projectDefinitionIds("item")', editor)
         self.assertIn('acceptWallInput(int raw)', editor)
         self.assertIn('steppedWallValue(', editor)
 
-    def test_compiled_runtime_session_accepts_exact_ids_and_preserves_standalone(self) -> None:
+        session = SESSION.read_text(encoding="utf-8")
+        self.assertIn("AdaptiveWorldBuilderAuthoringDefinitions.load(", session)
+        self.assertIn("authorable.requireComposition(definitions)", session)
+        self.assertNotIn("ORIGIN_EMPTY", session)
+
+    def test_compiled_runtime_session_separates_resident_and_authorable_ids(self) -> None:
         self.assertTrue(CORE.is_file(), "build the server before running binding coverage")
         fixture = r"""
 import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderRuntimeSession;
@@ -78,28 +83,44 @@ import java.util.Map;
 
 public final class ProjectBoundDefinitionFixture {
     public static void main(String[] args) throws Exception {
-        AdaptiveWorldBuilderRuntimeSession bound = session("target-layered");
+        AdaptiveWorldBuilderRuntimeSession bound = session("target-layered", false);
         allow(bound, "boundary", 1); allow(bound, "boundary", 10);
         allow(bound, "scenery", 0); allow(bound, "scenery", 104);
-        allow(bound, "npc", 2); allow(bound, "item", 10);
+        allow(bound, "npc", 2); allow(bound, "npc", 30);
+        allow(bound, "item", 10); allow(bound, "item", 20);
         refuse(bound, "boundary", 0); refuse(bound, "boundary", 11);
         refuse(bound, "scenery", 1); refuse(bound, "npc", 1);
         refuse(bound, "item", 1); refuse(bound, "item", 100);
 
-        AdaptiveWorldBuilderRuntimeSession standalone = session("standalone-empty");
-        allow(standalone, "boundary", 37); allow(standalone, "scenery", 401);
-        allow(standalone, "npc", 77); allow(standalone, "item", 999);
+        AdaptiveWorldBuilderRuntimeSession fullStandalone =
+            session("standalone-empty", false);
+        allow(fullStandalone, "boundary", 10);
+        allow(fullStandalone, "scenery", 104);
+        allow(fullStandalone, "npc", 30);
+        allow(fullStandalone, "item", 20);
+
+        AdaptiveWorldBuilderRuntimeSession narrowStandalone =
+            session("standalone-empty", true);
+        refuse(narrowStandalone, "boundary", 1);
+        refuse(narrowStandalone, "scenery", 0);
+        refuse(narrowStandalone, "npc", 2);
+        refuse(narrowStandalone, "item", 10);
     }
 
-    private static AdaptiveWorldBuilderRuntimeSession session(String origin)
+    private static AdaptiveWorldBuilderRuntimeSession session(
+            String origin, boolean empty)
             throws Exception {
         Map<String, String> fields = new HashMap<String, String>();
-        fields.put("projectOrigin", origin);
+		fields.put("projectOrigin", origin);
         fields.put("requiredBoundaryIds", "1,10");
         fields.put("requiredSceneryIds", "0,104");
         fields.put("requiredNpcIds", "2");
         fields.put("requiredItemIds", "10");
         fields.put("requiredTileIds", "3");
+		fields.put("authorableBoundaryIds", empty ? "" : "1,10");
+		fields.put("authorableSceneryIds", empty ? "" : "0,104");
+		fields.put("authorableNpcIds", empty ? "" : "2,30");
+		fields.put("authorableItemIds", empty ? "" : "10,20");
         Constructor<AdaptiveWorldBuilderRuntimeSession> constructor =
             AdaptiveWorldBuilderRuntimeSession.class.getDeclaredConstructor(
                 String.class, Path.class, Path.class, Map.class);

@@ -279,7 +279,11 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		String requiredBoundaryIds,
 		String requiredSceneryIds,
 		String requiredNpcIds,
-		String requiredItemIds) {
+		String requiredItemIds,
+		String authorableBoundaryIds,
+		String authorableSceneryIds,
+		String authorableNpcIds,
+		String authorableItemIds) {
 		validateConfiguredIdentities(config);
 		if (worldPackage == null || inventory == null) {
 			throw new IllegalArgumentException(
@@ -291,6 +295,10 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		fields.put("assetIdentity", config.WORLD_BUILDER_ASSET_ID);
 		fields.put("assetSha256", config.WORLD_BUILDER_ASSET_SHA256);
 		fields.put("authoring", AUTHORING_ID);
+		fields.put("authorableBoundaryIds", checkedIdList(authorableBoundaryIds));
+		fields.put("authorableItemIds", checkedIdList(authorableItemIds));
+		fields.put("authorableNpcIds", checkedIdList(authorableNpcIds));
+		fields.put("authorableSceneryIds", checkedIdList(authorableSceneryIds));
 		fields.put("capability", CAPABILITY_ID);
 		fields.put("clientBuild", CLIENT_BUILD_ID);
 		fields.put("clientVersion", Integer.toString(CLIENT_VERSION));
@@ -413,7 +421,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		}
 	}
 
-	private static String sha256(Path path) throws IOException {
+	static String sha256(Path path) throws IOException {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
 			byte[] buffer = new byte[64 * 1024];

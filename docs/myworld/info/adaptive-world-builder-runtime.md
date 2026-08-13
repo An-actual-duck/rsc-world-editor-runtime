@@ -40,7 +40,7 @@ than publishing a placeholder hash. Example:
 ```bash
 ./scripts/write-adaptive-world-builder-runtime-evidence.py \
   --side server \
-  --definition-catalog working/runtime/server/evidence/definitions.bin \
+  --definition-catalog working/runtime/server/evidence/definitions.json \
   --definition-catalog-id creator.catalog.v1 \
   > working/runtime/server/evidence/runtime.json
 ```
@@ -49,6 +49,24 @@ Run it again with `--side client` and the client catalog. The resulting server
 and client evidence must match the target capability descriptor exactly. The
 standalone preparer remains responsible for inventorying those files and for
 supplying the actual client asset identity and hash.
+
+The definition catalog is the project authoring authority, not an inventory of
+definitions already referenced by the map. It is strict schema-version-1 JSON
+with exactly `schemaVersion`, `tiles`, `boundaries`, `scenery`, `npcs`, and
+`groundItems`. Each family is a strictly increasing array of non-negative IDs;
+for example:
+
+```json
+{"schemaVersion":1,"tiles":[0,7],"boundaries":[0,1],"scenery":[0,1],"npcs":[0,1],"groundItems":[10,11]}
+```
+
+The server verifies that every catalog ID exists in its loaded definitions and
+that every definition already referenced by the effective map composition is a
+member of the catalog. The authenticated binding carries the four placement
+families as separate `authorable*Ids` fields. Both adopted and standalone
+projects use those fields for new boundary, scenery, NPC, and ground-item
+placements; a valid catalog ID remains authorable even when the map does not
+currently use it.
 
 ## Required project layout
 

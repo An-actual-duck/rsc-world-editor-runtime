@@ -234,7 +234,7 @@ class WorldBuilderRuntimeTest(unittest.TestCase):
                         public int initialY() { return 0; }
                         public int[] levels() { return new int[0]; }
                         public String token() { return ""; }
-                        public boolean hasProjectDefinitionRestrictions() { return false; }
+						public boolean hasAuthoringDefinitionBinding() { return false; }
                         public int[] definitionIds(String family) { return new int[0]; }
                         public boolean allowsDefinition(String family, int id) { return true; }
                         public void requirePackageIdentity(String id, String version, String hash) { }

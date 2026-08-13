@@ -344,11 +344,11 @@ public final class WorldBuilderClientProfile {
 		if (isAdaptive()) adaptiveSession.requireClientDefinitions();
 	}
 
-	public boolean hasProjectDefinitionRestrictions() {
-		return isAdaptive() && adaptiveSession.hasProjectDefinitionRestrictions();
+	public boolean hasAuthoringDefinitionBinding() {
+		return isAdaptive();
 	}
 
-	/** Exact project-bound IDs; meaningful only when restrictions are active. */
+	/** Exact project-bound IDs; meaningful only for the adaptive profile. */
 	public int[] definitionIds(String family) {
 		return isAdaptive() ? adaptiveSession.definitionIds(family) : new int[0];
 	}

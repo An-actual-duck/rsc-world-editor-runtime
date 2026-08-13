@@ -78,6 +78,10 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 		AdaptiveWorldBuilderDefinitionInventory.Result definitions =
 			AdaptiveWorldBuilderDefinitionInventory.validate(
 				server.getEntityHandler(), worldPackage);
+		AdaptiveWorldBuilderAuthoringDefinitions.Result authorable =
+			AdaptiveWorldBuilderAuthoringDefinitions.load(
+				server.getConfig(), storage, server.getEntityHandler());
+		authorable.requireComposition(definitions);
 		writeComposition(composition, worldPackage, inventory.getFingerprint());
 		String compositionSha256 = sha256(composition);
 		Map<String, String> fields =
@@ -86,7 +90,9 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 				compositionSha256,
 				definitions.tileIdsCsv(), definitions.boundaryIdsCsv(),
 				definitions.sceneryIdsCsv(), definitions.npcIdsCsv(),
-				definitions.itemIdsCsv());
+				definitions.itemIdsCsv(), authorable.boundaryIdsCsv(),
+				authorable.sceneryIdsCsv(), authorable.npcIdsCsv(),
+				authorable.itemIdsCsv());
 		String canonical =
 			AdaptiveWorldBuilderRuntimeIdentity.canonicalSession(fields);
 		AdaptiveWorldBuilderRuntimeIdentity.validateEvidenceFiles(
@@ -103,30 +109,22 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 	public Path getBindingFile() { return bindingFile; }
 	public Path getCompositionFile() { return compositionFile; }
 	public Map<String, String> getFields() { return fields; }
-	public boolean hasProjectDefinitionRestrictions() {
-		return !AdaptiveWorldBuilderRuntimeIdentity.ORIGIN_EMPTY.equals(
-			fields.get("projectOrigin"));
-	}
-
 	/** Refuses any authoring ID outside the immutable project catalog binding. */
 	public void requireDefinition(String family, int id) {
 		String key;
 		String label;
 		if ("boundary".equals(family)) {
-			key = "requiredBoundaryIds"; label = "boundary";
+			key = "authorableBoundaryIds"; label = "boundary";
 		} else if ("scenery".equals(family)) {
-			key = "requiredSceneryIds"; label = "scenery";
+			key = "authorableSceneryIds"; label = "scenery";
 		} else if ("npc".equals(family)) {
-			key = "requiredNpcIds"; label = "NPC";
+			key = "authorableNpcIds"; label = "NPC";
 		} else if ("item".equals(family)) {
-			key = "requiredItemIds"; label = "item";
-		} else if ("tile".equals(family)) {
-			key = "requiredTileIds"; label = "tile";
+			key = "authorableItemIds"; label = "item";
 		} else {
 			throw new IllegalArgumentException(
 				"Unknown adaptive definition family: " + family);
 		}
-		if (!hasProjectDefinitionRestrictions()) return;
 		if (id < 0 || !canonicalIdListContains(fields.get(key), id)) {
 			throw new IllegalArgumentException(
 				"The bound project does not permit " + label

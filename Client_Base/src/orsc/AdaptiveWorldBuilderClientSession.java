@@ -57,6 +57,8 @@ public final class AdaptiveWorldBuilderClientSession {
 	private static final Set<String> EXACT_KEYS = Collections.unmodifiableSet(
 		new HashSet<String>(Arrays.asList(
 			"assetContract", "assetIdentity", "assetSha256", "authoring",
+			"authorableBoundaryIds", "authorableItemIds",
+			"authorableNpcIds", "authorableSceneryIds",
 			"capability", "clientBuild", "clientVersion", "coordinateModel",
 			"definitionContract", "definitionIdentity", "definitionSha256",
 			"effectiveComposition", "effectiveCompositionSha256", "initialLevel",
@@ -76,13 +78,20 @@ public final class AdaptiveWorldBuilderClientSession {
 	private final int[] sceneryIds;
 	private final int[] npcIds;
 	private final int[] itemIds;
+	private final int[] authorableBoundaryIds;
+	private final int[] authorableSceneryIds;
+	private final int[] authorableNpcIds;
+	private final int[] authorableItemIds;
 	private final int[] levels;
 
 	private AdaptiveWorldBuilderClientSession(
 		Path bindingFile, Path workspaceRoot,
 		Map<String, String> fields, String token,
 		int[] tileIds, int[] boundaryIds, int[] sceneryIds,
-		int[] npcIds, int[] itemIds, int[] levels) {
+		int[] npcIds, int[] itemIds,
+		int[] authorableBoundaryIds, int[] authorableSceneryIds,
+		int[] authorableNpcIds, int[] authorableItemIds,
+		int[] levels) {
 		this.bindingFile = bindingFile;
 		this.workspaceRoot = workspaceRoot;
 		this.fields = Collections.unmodifiableMap(
@@ -93,6 +102,10 @@ public final class AdaptiveWorldBuilderClientSession {
 		this.sceneryIds = sceneryIds;
 		this.npcIds = npcIds;
 		this.itemIds = itemIds;
+		this.authorableBoundaryIds = authorableBoundaryIds;
+		this.authorableSceneryIds = authorableSceneryIds;
+		this.authorableNpcIds = authorableNpcIds;
+		this.authorableItemIds = authorableItemIds;
 		this.levels = levels;
 	}
 
@@ -155,6 +168,10 @@ public final class AdaptiveWorldBuilderClientSession {
 				parseIds(fields.get("requiredSceneryIds")),
 				parseIds(fields.get("requiredNpcIds")),
 				parseIds(fields.get("requiredItemIds")),
+				parseIds(fields.get("authorableBoundaryIds")),
+				parseIds(fields.get("authorableSceneryIds")),
+				parseIds(fields.get("authorableNpcIds")),
+				parseIds(fields.get("authorableItemIds")),
 				parseSignedIntegers(fields.get("levels"), "levels"));
 		} catch (IllegalArgumentException failure) {
 			throw failure;
@@ -178,15 +195,12 @@ public final class AdaptiveWorldBuilderClientSession {
 	public String definitionIdentity() { return fields.get("definitionIdentity"); }
 	public String assetIdentity() { return fields.get("assetIdentity"); }
 	public int[] levels() { return levels.clone(); }
-	public boolean hasProjectDefinitionRestrictions() {
-		return !"standalone-empty".equals(fields.get("projectOrigin"));
-	}
 	public int[] definitionIds(String family) {
 		return definitionIdsForFamily(family).clone();
 	}
 
 	public boolean allowsDefinition(String family, int id) {
-		return !hasProjectDefinitionRestrictions() || id >= 0
+		return id >= 0
 			&& Arrays.binarySearch(definitionIdsForFamily(family), id) >= 0;
 	}
 
@@ -268,14 +282,26 @@ public final class AdaptiveWorldBuilderClientSession {
 		for (int id : itemIds) require("item", id, new Lookup() {
 			@Override public Object get(int value) { return EntityHandler.findItem(value, false); }
 		});
+		for (int id : authorableBoundaryIds) require("authorable boundary", id, new Lookup() {
+			@Override public Object get(int value) { return EntityHandler.getDoorDef(value); }
+		});
+		for (int id : authorableSceneryIds) require("authorable scenery", id, new Lookup() {
+			@Override public Object get(int value) { return EntityHandler.getObjectDef(value); }
+		});
+		for (int id : authorableNpcIds) require("authorable NPC", id, new Lookup() {
+			@Override public Object get(int value) { return EntityHandler.getNpcDef(value); }
+		});
+		for (int id : authorableItemIds) require("authorable item", id, new Lookup() {
+			@Override public Object get(int value) { return EntityHandler.findItem(value, false); }
+		});
 	}
 
 	private int[] definitionIdsForFamily(String family) {
 		if ("tile".equals(family)) return tileIds;
-		if ("boundary".equals(family)) return boundaryIds;
-		if ("scenery".equals(family)) return sceneryIds;
-		if ("npc".equals(family)) return npcIds;
-		if ("item".equals(family)) return itemIds;
+		if ("boundary".equals(family)) return authorableBoundaryIds;
+		if ("scenery".equals(family)) return authorableSceneryIds;
+		if ("npc".equals(family)) return authorableNpcIds;
+		if ("item".equals(family)) return authorableItemIds;
 		throw new IllegalArgumentException(
 			"Unknown adaptive definition family: " + family);
 	}
@@ -335,6 +361,22 @@ public final class AdaptiveWorldBuilderClientSession {
 		if (!initialDeclared) {
 			throw new IllegalArgumentException(
 				"Adaptive initial level is not declared by the package");
+		}
+		requireSubset(fields, "requiredBoundaryIds", "authorableBoundaryIds");
+		requireSubset(fields, "requiredSceneryIds", "authorableSceneryIds");
+		requireSubset(fields, "requiredNpcIds", "authorableNpcIds");
+		requireSubset(fields, "requiredItemIds", "authorableItemIds");
+	}
+
+	private static void requireSubset(
+		Map<String, String> fields, String requiredKey, String authorableKey) {
+		int[] required = parseIds(fields.get(requiredKey));
+		int[] authorable = parseIds(fields.get(authorableKey));
+		for (int id : required) {
+			if (Arrays.binarySearch(authorable, id) < 0) {
+				throw new IllegalArgumentException(
+					"Adaptive required definition inventory exceeds its authoring catalog");
+			}
 		}
 	}
 

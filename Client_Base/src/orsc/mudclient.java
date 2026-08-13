@@ -25281,7 +25281,7 @@ public final class mudclient implements Runnable {
 		if (automatedBuilderPlacementProbeStage == 1
 			&& now >= automatedBuilderPlacementProbeDeadline) {
 			if (Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")) {
-				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(122, 648, 1);
+				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(122, 648, 2);
 				automatedBuilderPlacementProbeDeadline = now + 2500L;
 				automatedBuilderPlacementProbeStage = 8;
 				return;
@@ -25320,7 +25320,7 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 8
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			worldEditorInterface.sendAutomatedBoundaryPlacementProbe(122, 648, 2);
+			worldEditorInterface.sendAutomatedBoundaryPlacementProbe(123, 648, 3);
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 9;
 			return;
@@ -25334,19 +25334,40 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 10
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("cnpc 1 0 120 650");
+			sendCommandString("aobject 2 117 648");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 11;
 			return;
 		}
 		if (automatedBuilderPlacementProbeStage == 11
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("buildergrounditem 11 1 30 121 649");
+			sendCommandString("cnpc 1 0 120 650");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 12;
 			return;
 		}
 		if (automatedBuilderPlacementProbeStage == 12
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("cnpc 2 0 120 651");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 13;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 13
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("buildergrounditem 11 1 30 121 649");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 14;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 14
+			&& now >= automatedBuilderPlacementProbeDeadline) {
+			sendCommandString("buildergrounditem 12 1 30 121 650");
+			automatedBuilderPlacementProbeDeadline = now + 2500L;
+			automatedBuilderPlacementProbeStage = 15;
+			return;
+		}
+		if (automatedBuilderPlacementProbeStage == 15
 			&& now >= automatedBuilderPlacementProbeDeadline) {
 			sendCommandString("aobject 0 119 648");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
@@ -25357,31 +25378,47 @@ public final class mudclient implements Runnable {
 			return;
 		}
 		boolean scenery = false;
+		boolean authorableScenery = false;
 		for (int i = 0; i < getGameObjectInstanceCount(); i++) {
 			scenery |= getGameObjectInstanceID(i) == 0
 				&& getGameObjectInstanceX(i) + getMidRegionBaseX() == 119
 				&& getGameObjectInstanceZ(i) + getMidRegionBaseZ() == 648
 				&& isGameObjectInstanceMaterialized(i);
+			authorableScenery |= getGameObjectInstanceID(i) == 1
+				&& getGameObjectInstanceX(i) + getMidRegionBaseX() == 118
+				&& getGameObjectInstanceZ(i) + getMidRegionBaseZ() == 648
+				&& isGameObjectInstanceMaterialized(i);
 		}
 		boolean npc = false;
+		boolean authorableNpc = false;
 		for (int i = 0; i < getNpcCount(); i++) {
 			ORSCharacter value = getNpc(i);
 			if (value != null) {
 				npc |= value.npcId == 0
 					&& value.currentX / tileSize + getMidRegionBaseX() == 120
 					&& value.currentZ / tileSize + getMidRegionBaseZ() == 649;
+				authorableNpc |= value.npcId == 1
+					&& value.currentX / tileSize + getMidRegionBaseX() == 120
+					&& value.currentZ / tileSize + getMidRegionBaseZ() == 650;
 			}
 		}
 		boolean item = false;
+		boolean authorableItem = false;
 		for (int i = 0; i < getGroundItemCount(); i++) {
 			item |= getGroundItemID(i) == 10
 				&& getGroundItemX(i) + getMidRegionBaseX() == 121
 				&& getGroundItemZ(i) + getMidRegionBaseZ() == 648;
+			authorableItem |= getGroundItemID(i) == 11
+				&& getGroundItemX(i) + getMidRegionBaseX() == 121
+				&& getGroundItemZ(i) + getMidRegionBaseZ() == 649;
 		}
-		if (scenery && npc && item) {
+		if (scenery && authorableScenery && npc && authorableNpc
+			&& item && authorableItem) {
 			String evidence = "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode="
 				+ mode
-				+ " scenery=0@119,648 npc=0@120,649 item=10@121,648";
+				+ " scenery=0@119,648,1@118,648"
+				+ " npc=0@120,649,1@120,650"
+				+ " item=10@121,648,11@121,649";
 			System.out.println(evidence);
 			ClientRuntimeLogger.log(evidence);
 			if ("place".equals(mode)) {
@@ -25395,7 +25432,10 @@ public final class mudclient implements Runnable {
 			}
 		} else if (now >= automatedBuilderPlacementProbeDeadline) {
 			String evidence = "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_MISSING"
-				+ " scenery=" + scenery + " npc=" + npc + " item=" + item;
+				+ " scenery=" + scenery
+				+ " authorableScenery=" + authorableScenery
+				+ " npc=" + npc + " authorableNpc=" + authorableNpc
+				+ " item=" + item + " authorableItem=" + authorableItem;
 			System.out.println(evidence);
 			ClientRuntimeLogger.log(evidence);
 			automatedBuilderPlacementProbeStage = 4;

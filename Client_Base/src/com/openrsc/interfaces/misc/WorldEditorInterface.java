@@ -309,25 +309,25 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void setTerrainNorthWall(int value){if(!acceptWallInput(value)){terrainNorthWallText=String.valueOf(terrainNorthWall);return;}terrainNorthWall=Math.max(0,Math.min(value,EntityHandler.doorCount()));terrainNorthWallText=String.valueOf(terrainNorthWall);}
 	private void setTerrainDiagonalWall(int value){if(!acceptWallInput(value)){terrainDiagonalWallText=String.valueOf(terrainDiagonalWall);return;}terrainDiagonalWall=Math.max(0,Math.min(value,EntityHandler.doorCount()));terrainDiagonalWallText=String.valueOf(terrainDiagonalWall);}
 	private boolean acceptDefinitionInput(String family,int id,int maximum){
-		if(!WorldBuilderClientProfile.current().hasProjectDefinitionRestrictions())return true;
+		if(!WorldBuilderClientProfile.current().hasAuthoringDefinitionBinding())return true;
 		if(id>=0&&id<=maximum&&definitionAllowed(family,id))return true;
 		rejectDefinitionSelection(family,id);return false;
 	}
 	private boolean acceptWallInput(int raw){
-		if(!WorldBuilderClientProfile.current().hasProjectDefinitionRestrictions())return true;
+		if(!WorldBuilderClientProfile.current().hasAuthoringDefinitionBinding())return true;
 		if(raw==0)return true;
 		if(raw>0&&raw<=EntityHandler.doorCount()&&definitionAllowed("boundary",raw-1))return true;
 		rejectDefinitionSelection("boundary",raw<=0?raw:raw-1);return false;
 	}
 	private boolean definitionAllowed(String family,int id){return WorldBuilderClientProfile.current().isDefinitionAllowed(family,id);}
-	private int[] projectDefinitionIds(String family){return WorldBuilderClientProfile.current().hasProjectDefinitionRestrictions()?WorldBuilderClientProfile.current().definitionIds(family):null;}
+	private int[] projectDefinitionIds(String family){return WorldBuilderClientProfile.current().hasAuthoringDefinitionBinding()?WorldBuilderClientProfile.current().definitionIds(family):null;}
 	private void rejectDefinitionSelection(String family,int id){
 		inspectionStatus="Project-bound "+family+" definition ID "+id+" is unavailable.";
 		inspectionDetails=new String[]{"Choose an ID exposed by this project's definition browser."};
 		mc.showWorldEditorStatus(inspectionStatus);
 	}
 	private void normalizeProjectBoundSelections(){
-		if(!WorldBuilderClientProfile.current().hasProjectDefinitionRestrictions())return;
+		if(!WorldBuilderClientProfile.current().hasAuthoringDefinitionBinding())return;
 		sceneryId=normalizedProjectId("scenery",sceneryId);sceneryIdText=sceneryId<0?"-":String.valueOf(sceneryId);
 		npcId=normalizedProjectId("npc",npcId);npcIdText=npcId<0?"-":String.valueOf(npcId);
 		groundItemId=normalizedProjectId("item",groundItemId);groundItemIdText=groundItemId<0?"-":String.valueOf(groundItemId);
@@ -340,7 +340,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		return ids[Math.max(0,Math.min(ids.length-1,index+(amount<0?-1:1)))];
 	}
 	private int steppedWallValue(int current,int amount){
-		if(!WorldBuilderClientProfile.current().hasProjectDefinitionRestrictions())return current+amount;
+		if(!WorldBuilderClientProfile.current().hasAuthoringDefinitionBinding())return current+amount;
 		int[] ids=projectDefinitionIds("boundary");if(ids.length==0)return 0;
 		if(current==0)return amount<0?0:ids[0]+1;
 		int id=current-1,index=java.util.Arrays.binarySearch(ids,id);if(index<0)index=amount<0?ids.length: -1;
