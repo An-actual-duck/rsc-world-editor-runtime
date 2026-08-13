@@ -67,6 +67,7 @@ public final class RestorationCollisionFootprintFixture {
         boundaryPreservesLegacyCollisionAndProjectileAxes();
         specialObjectPreservesRegisterUnregisterAsymmetry();
         refusesUnavailableMismatchedAndOutOfWorldEffects();
+        clipsOnlyEffectsBeyondTheWorldEdge();
         keepsEmptyAndPopulatedResultsImmutableAndInert();
     }
 
@@ -186,6 +187,32 @@ public final class RestorationCollisionFootprintFixture {
                 Definition.scenery(1, 1, 1, "chest", ALLOWLIST), true).getReason()
                     == Reason.FORCE_FULL_BLOCK_REQUIRES_REGISTER_OPERATION,
             "force-full-block cannot be invented for unregister");
+    }
+
+    private static void clipsOnlyEffectsBeyondTheWorldEdge() {
+        Definition boundary = Definition.boundary(
+            1, "gate", ALLOWLIST);
+        Result clipped = GameTickEventRestorationCollisionFootprintPlanner
+            .planClippedToWorld(
+                Operation.REGISTER,
+                ConstructorState.of(8, 0, 0, 0, 1),
+                boundary, false, BOUNDS);
+        check(clipped.isFootprintAvailable()
+                && clipped.getContributionTileCount() == 1
+                && clipped.getRequiredRegionCount() == 1,
+            "edge anchor keeps only its in-world collision contribution");
+        CollisionContribution anchor = clipped.getContributions().get(0);
+        check(anchor.getX() == 0 && anchor.getY() == 0
+                && anchor.getDynamicCollisionMask() == 1
+                && anchor.getDynamicProjectileCount() == 1,
+            "edge anchor retains collision and projectile state");
+        Result outsideAnchor = GameTickEventRestorationCollisionFootprintPlanner
+            .planClippedToWorld(
+                Operation.REGISTER,
+                ConstructorState.of(8, 1008, 10, 0, 1),
+                boundary, false, BOUNDS);
+        check(outsideAnchor.getReason() == Reason.OUT_OF_WORLD_EFFECT,
+            "clipping does not authorize an out-of-world anchor");
     }
 
     private static void keepsEmptyAndPopulatedResultsImmutableAndInert() {

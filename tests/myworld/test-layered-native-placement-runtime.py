@@ -230,6 +230,36 @@ public final class NativeLayeredPlacementRegistryFixture {
             fenceProjectile);
         check(fenceProjectile.getDynamicProjectileCount() == 1,
             "allowlisted boundary projectile footprint composed");
+
+        NativeLayeredGameObjectRegistry<Object> edgeObjects =
+            new NativeLayeredGameObjectRegistry<Object>();
+        long edgeGeneration = edgeObjects.getGeneration();
+        Object edgeFence = new Object();
+        check(edgeObjects.register(
+                edgeGeneration, "edge-fence", fenceLocation,
+                1, 0, edgeFence, fence,
+                java.util.Collections.singleton(fenceLocation),
+                java.util.Collections.<WorldLocation>emptyList())
+                == edgeFence,
+            "register package-edge boundary with owned collision tiles");
+        TileValue edgeNorth = emptyTile();
+        edgeObjects.applyCollision(fenceLocation, edgeNorth);
+        check((edgeNorth.traversalMask & CollisionFlag.WALL_NORTH) != 0,
+            "package-edge boundary keeps its owned collision");
+        TileValue absentSouth = emptyTile();
+        edgeObjects.applyCollision(
+            new WorldLocation(
+                WorldSpaceId.GLOBAL, new WorldCoordinate(448, 603, -2)),
+            absentSouth);
+        check((absentSouth.traversalMask & CollisionFlag.WALL_SOUTH) == 0,
+            "package-edge boundary omits off-package reciprocal collision");
+        check(edgeObjects.getCollisionTileCount() == 1,
+            "package-edge registry retains only owned collision tiles");
+        check(edgeObjects.unregister(
+                edgeGeneration, "edge-fence", edgeFence) == edgeFence
+                && edgeObjects.getCollisionTileCount() == 0,
+            "package-edge removal clears the clipped collision footprint");
+
         check(objects.size() == 2 && objects.countType(0) == 1
                 && objects.countType(1) == 1,
             "typed package object counts");

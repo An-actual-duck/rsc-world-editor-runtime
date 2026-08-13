@@ -87,6 +87,11 @@ def write_integration_package(root: Path, *, seeded: bool = True) -> None:
                 "boundaryId": 0,
                 "position": {"x": 103, "y": 630},
                 "direction": 0,
+            }, {
+                "placementId": "integration.seed.edge-boundary",
+                "boundaryId": 0,
+                "position": {"x": 96, "y": 624},
+                "direction": 0,
             }],
         })
     placements = canonical_json(placement_document)
@@ -219,7 +224,10 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             project_origin = os.environ.get(
                 "ADAPTIVE_REAL_LOGIN_PROJECT_ORIGIN", "target-layered"
             )
-            self.assertIn(project_origin, ("target-layered", "standalone-empty"))
+            self.assertIn(
+                project_origin,
+                ("target-packed", "target-layered", "standalone-empty"),
+            )
             seeded = project_origin != "standalone-empty"
             fixture = Path(temp)
             project = fixture / "project"
@@ -521,6 +529,11 @@ world_builder_initial_y: 648
                     "Skipping legacy terrain archives for explicit adaptive World Builder profile",
                     server_evidence,
                 )
+                if seeded:
+                    self.assertIn(
+                        "with 1 NPC, 1 ground-item, 1 scenery, and 2 boundary placements",
+                        server_evidence,
+                    )
                 self.assertEqual(1, client_evidence.count("login response:86"))
                 combined = (
                     server_evidence + "\n" + runtime_evidence + "\n" + client_evidence
@@ -608,6 +621,15 @@ world_builder_initial_y: 648
                 refused_boundary_offset = ((123 % 48) * 48 + (648 % 48)) * 10 + 5
                 self.assertEqual(2, terrain_bytes[boundary_offset])
                 self.assertEqual(0, terrain_bytes[refused_boundary_offset])
+                if seeded:
+                    self.assertIn(
+                        (0, 96, 624, 0),
+                        [
+                            (row["boundaryId"], row["position"]["x"],
+                             row["position"]["y"], row["direction"])
+                            for row in placement_document["boundaries"]
+                        ],
+                    )
 
                 reopened_runtime_log = fixture / "client-reopened-runtime.log"
                 reopened_client_log = fixture / "client-reopened.log"

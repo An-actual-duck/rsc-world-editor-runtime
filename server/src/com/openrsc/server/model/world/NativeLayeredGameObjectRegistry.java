@@ -51,9 +51,31 @@ public final class NativeLayeredGameObjectRegistry<T> {
 		final GameTickEventRestorationCollisionFootprintPlanner.Result
 			footprint,
 		final Collection<WorldLocation> npcBlockingSceneryTiles) {
+		return register(
+			expectedGeneration, placementId, location, type, direction,
+			instance, footprint, collisionLocations(location, footprint),
+			npcBlockingSceneryTiles);
+	}
+
+	/**
+	 * Registers an object while composing only the caller-authorized subset of
+	 * its planned collision tiles. The subset must belong to the immutable
+	 * planner footprint and is retained for exact removal or replacement.
+	 */
+	public T register(
+		final long expectedGeneration,
+		final String placementId,
+		final WorldLocation location,
+		final int type,
+		final int direction,
+		final T instance,
+		final GameTickEventRestorationCollisionFootprintPlanner.Result
+			footprint,
+		final Collection<WorldLocation> collisionTiles,
+		final Collection<WorldLocation> npcBlockingSceneryTiles) {
 		Entry<T> proposed = entry(
 			placementId, location, type, direction, instance, footprint,
-			npcBlockingSceneryTiles);
+			collisionTiles, npcBlockingSceneryTiles);
 		synchronized (lock) {
 			if (expectedGeneration != generation) {
 				return null;
@@ -91,9 +113,29 @@ public final class NativeLayeredGameObjectRegistry<T> {
 		final GameTickEventRestorationCollisionFootprintPlanner.Result
 			footprint,
 		final Collection<WorldLocation> npcBlockingSceneryTiles) {
+		return replace(
+			expectedGeneration, placementId, expectedInstance, location,
+			type, direction, replacement, footprint,
+			collisionLocations(location, footprint),
+			npcBlockingSceneryTiles);
+	}
+
+	/** Replaces an object using the same bounded collision subset contract. */
+	public T replace(
+		final long expectedGeneration,
+		final String placementId,
+		final T expectedInstance,
+		final WorldLocation location,
+		final int type,
+		final int direction,
+		final T replacement,
+		final GameTickEventRestorationCollisionFootprintPlanner.Result
+			footprint,
+		final Collection<WorldLocation> collisionTiles,
+		final Collection<WorldLocation> npcBlockingSceneryTiles) {
 		Entry<T> proposed = entry(
 			placementId, location, type, direction, replacement, footprint,
-			npcBlockingSceneryTiles);
+			collisionTiles, npcBlockingSceneryTiles);
 		T checkedExpected = Objects.requireNonNull(
 			expectedInstance, "expectedInstance");
 		synchronized (lock) {
@@ -253,6 +295,7 @@ public final class NativeLayeredGameObjectRegistry<T> {
 		final T instance,
 		final GameTickEventRestorationCollisionFootprintPlanner.Result
 			footprint,
+		final Collection<WorldLocation> collisionTiles,
 		final Collection<WorldLocation> npcBlockingSceneryTiles) {
 		String checkedId = Objects.requireNonNull(
 			placementId, "placementId");
@@ -269,6 +312,20 @@ public final class NativeLayeredGameObjectRegistry<T> {
 			|| checkedFootprint.isLegacySaturatingUnregister()) {
 			throw new IllegalArgumentException(
 				"Native layered object registration is invalid");
+		}
+		Set<WorldLocation> footprintCollisionTiles =
+			collisionLocations(checkedLocation, checkedFootprint);
+		Set<WorldLocation> checkedCollisionTiles =
+			new LinkedHashSet<WorldLocation>();
+		for (WorldLocation tile : Objects.requireNonNull(
+				collisionTiles, "collisionTiles")) {
+			WorldLocation checkedTile = Objects.requireNonNull(
+				tile, "collisionTile");
+			if (!footprintCollisionTiles.contains(checkedTile)) {
+				throw new IllegalArgumentException(
+					"Native layered collision tile is outside its footprint");
+			}
+			checkedCollisionTiles.add(checkedTile);
 		}
 		Set<WorldLocation> checkedNpcBlockingSceneryTiles =
 			new LinkedHashSet<WorldLocation>();
@@ -289,6 +346,7 @@ public final class NativeLayeredGameObjectRegistry<T> {
 		return new Entry<T>(
 			checkedId, checkedLocation, type, direction,
 			checkedInstance, checkedFootprint,
+			checkedCollisionTiles,
 			checkedNpcBlockingSceneryTiles);
 	}
 
@@ -297,12 +355,10 @@ public final class NativeLayeredGameObjectRegistry<T> {
 		final Entry<T> added) {
 		Set<WorldLocation> touched = new LinkedHashSet<WorldLocation>();
 		if (removed != null) {
-			collectCollisionLocations(
-				removed.location, removed.footprint, touched);
+			touched.addAll(removed.collisionTiles);
 		}
 		if (added != null) {
-			collectCollisionLocations(
-				added.location, added.footprint, touched);
+			touched.addAll(added.collisionTiles);
 		}
 		Map<WorldLocation, CollisionAggregate> staged =
 			new HashMap<WorldLocation, CollisionAggregate>();
@@ -314,36 +370,40 @@ public final class NativeLayeredGameObjectRegistry<T> {
 					? new CollisionAggregate() : aggregate.copy());
 		}
 		if (removed != null) {
-			mutateCollision(
-				removed.location, removed.footprint, staged, false);
+			mutateCollision(removed, staged, false);
 		}
 		if (added != null) {
-			mutateCollision(
-				added.location, added.footprint, staged, true);
+			mutateCollision(added, staged, true);
 		}
 		return staged;
 	}
 
-	private static void collectCollisionLocations(
+	private static Set<WorldLocation> collisionLocations(
 		final WorldLocation origin,
 		final GameTickEventRestorationCollisionFootprintPlanner.Result
-			footprint,
-		final Set<WorldLocation> locations) {
+			footprint) {
+		WorldLocation checkedOrigin = Objects.requireNonNull(origin, "origin");
+		GameTickEventRestorationCollisionFootprintPlanner.Result
+			checkedFootprint = Objects.requireNonNull(footprint, "footprint");
+		Set<WorldLocation> locations = new LinkedHashSet<WorldLocation>();
 		for (CollisionContribution contribution
-			: footprint.getContributions()) {
-			locations.add(collisionLocation(origin, contribution));
+			: checkedFootprint.getContributions()) {
+			locations.add(collisionLocation(checkedOrigin, contribution));
 		}
+		return locations;
 	}
 
-	private static void mutateCollision(
-		final WorldLocation origin,
-		final GameTickEventRestorationCollisionFootprintPlanner.Result
-			footprint,
+	private static <T> void mutateCollision(
+		final Entry<T> entry,
 		final Map<WorldLocation, CollisionAggregate> staged,
 		final boolean add) {
 		for (CollisionContribution contribution
-			: footprint.getContributions()) {
-			WorldLocation location = collisionLocation(origin, contribution);
+			: entry.footprint.getContributions()) {
+			WorldLocation location = collisionLocation(
+				entry.location, contribution);
+			if (!entry.collisionTiles.contains(location)) {
+				continue;
+			}
 			CollisionAggregate aggregate = staged.get(location);
 			if (aggregate == null) {
 				throw new IllegalStateException(
@@ -449,6 +509,7 @@ public final class NativeLayeredGameObjectRegistry<T> {
 		private final Slot slot;
 		private final GameTickEventRestorationCollisionFootprintPlanner.Result
 			footprint;
+		private final Set<WorldLocation> collisionTiles;
 		private final Set<WorldLocation> npcBlockingSceneryTiles;
 
 		private Entry(
@@ -459,6 +520,7 @@ public final class NativeLayeredGameObjectRegistry<T> {
 			final T instance,
 			final GameTickEventRestorationCollisionFootprintPlanner.Result
 				footprint,
+			final Set<WorldLocation> collisionTiles,
 			final Set<WorldLocation> npcBlockingSceneryTiles) {
 			this.placementId = placementId;
 			this.location = location;
@@ -466,6 +528,8 @@ public final class NativeLayeredGameObjectRegistry<T> {
 			this.instance = instance;
 			this.slot = new Slot(location, type, direction);
 			this.footprint = footprint;
+			this.collisionTiles = Collections.unmodifiableSet(
+				new LinkedHashSet<WorldLocation>(collisionTiles));
 			this.npcBlockingSceneryTiles = Collections.unmodifiableSet(
 				new LinkedHashSet<WorldLocation>(
 					npcBlockingSceneryTiles));
