@@ -67,30 +67,37 @@ def write_integration_package(root: Path, *, project_origin: str) -> None:
             "npcs": [{
                 "placementId": "integration.seed.npc",
                 "npcId": 0,
-                "start": {"x": 100, "y": 630},
+                "start": {"x": 130, "y": 630},
                 "roamBounds": {
-                    "minimum": {"x": 100, "y": 630},
-                    "maximum": {"x": 100, "y": 630},
+                    "minimum": {"x": 130, "y": 630},
+                    "maximum": {"x": 130, "y": 630},
                 },
             }],
             "groundItems": [{
                 "placementId": "integration.seed.item",
                 "itemId": 10,
-                "position": {"x": 101, "y": 630},
+                "position": {"x": 131, "y": 630},
                 "amount": 1,
                 "respawnSeconds": 30,
             }],
             "scenery": [{
                 "placementId": "integration.seed.scenery",
                 "sceneryId": 0,
-                "position": {"x": 102, "y": 630},
+                "position": {"x": 132, "y": 630},
                 "direction": 0,
             }],
             "boundaries": [{
                 "placementId": "integration.seed.boundary",
                 "boundaryId": 0,
-                "position": {"x": 103, "y": 630},
+                "position": {"x": 133, "y": 630},
                 "direction": 0,
+            }, {
+                # Reproduce an appended lower-coordinate placement in an
+                # already nonempty adopted package.
+                "placementId": "zz.integration.lower.boundary",
+                "boundaryId": 1,
+                "position": {"x": 125, "y": 630},
+                "direction": 2,
             }],
         })
     placements = canonical_json(placement_document)
@@ -768,7 +775,7 @@ world_builder_initial_y: 648
                     }
                 else:
                     expected_required = {
-                        "requiredBoundaryIds": "0" if seeded else "",
+                        "requiredBoundaryIds": "0,1" if seeded else "",
                         "requiredSceneryIds": "0" if seeded else "",
                         "requiredNpcIds": "0" if seeded else "",
                         "requiredItemIds": "10" if seeded else "",
@@ -943,7 +950,7 @@ world_builder_initial_y: 648
                     )
                 elif seeded:
                     self.assertIn(
-                        "with 1 NPC, 1 ground-item, 1 scenery, and 1 boundary placements",
+                        "with 1 NPC, 1 ground-item, 1 scenery, and 2 boundary placements",
                         server_evidence,
                     )
                 self.assertEqual(1, client_evidence.count("login response:86"))
@@ -1033,6 +1040,43 @@ world_builder_initial_y: 648
                 refused_boundary_offset = ((123 % 48) * 48 + (648 % 48)) * 10 + 5
                 self.assertEqual(2, terrain_bytes[boundary_offset])
                 self.assertEqual(0, terrain_bytes[refused_boundary_offset])
+                if project_origin == "target-layered":
+                    self.assertEqual(
+                        [(125, 630, 2, 1), (133, 630, 0, 0)],
+                        [
+                            (row["position"]["x"], row["position"]["y"],
+                             row["direction"], row["boundaryId"])
+                            for row in placement_document["boundaries"]
+                        ],
+                        "lower-coordinate boundary addition was not canonical",
+                    )
+                    self.assertEqual(
+                        [(118, 648, 1), (119, 648, 0), (132, 630, 0)],
+                        [
+                            (row["position"]["x"], row["position"]["y"],
+                             row["sceneryId"])
+                            for row in placement_document["scenery"]
+                        ],
+                        "lower-coordinate scenery additions were not canonical",
+                    )
+                    self.assertEqual(
+                        [(120, 649, 0), (120, 650, 1), (130, 630, 0)],
+                        [
+                            (row["start"]["x"], row["start"]["y"],
+                             row["npcId"])
+                            for row in placement_document["npcs"]
+                        ],
+                        "lower-coordinate NPC additions were not canonical",
+                    )
+                    self.assertEqual(
+                        [(121, 648, 10), (121, 649, 11), (131, 630, 10)],
+                        [
+                            (row["position"]["x"], row["position"]["y"],
+                             row["itemId"])
+                            for row in placement_document["groundItems"]
+                        ],
+                        "lower-coordinate item additions were not canonical",
+                    )
                 if project_origin == "target-packed":
                     self.assertIn(
                         (10, 0, 0, 0),

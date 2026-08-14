@@ -870,24 +870,35 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 	private static final Comparator<Boundary> BOUNDARY_ORDER =
 		new Comparator<Boundary>() {
 			@Override public int compare(Boundary left, Boundary right) {
-				return left.placementId.compareTo(right.placementId);
+				int value = compareLocation(left.location, right.location);
+				if (value == 0) {
+					value = Integer.compare(left.direction, right.direction);
+				}
+				return value == 0
+					? left.placementId.compareTo(right.placementId) : value;
 			}
 		};
 	private static final Comparator<Scenery> SCENERY_ORDER =
 		new Comparator<Scenery>() {
 			@Override public int compare(Scenery left, Scenery right) {
-				return left.placementId.compareTo(right.placementId);
+				int value = compareLocation(left.location, right.location);
+				return value == 0
+					? left.placementId.compareTo(right.placementId) : value;
 			}
 		};
 	private static final Comparator<Npc> NPC_ORDER = new Comparator<Npc>() {
 		@Override public int compare(Npc left, Npc right) {
-			return left.placementId.compareTo(right.placementId);
+			int value = compareLocation(left.start, right.start);
+			return value == 0
+				? left.placementId.compareTo(right.placementId) : value;
 		}
 	};
 	private static final Comparator<GroundItem> GROUND_ITEM_ORDER =
 		new Comparator<GroundItem>() {
 			@Override public int compare(GroundItem left, GroundItem right) {
-				return left.placementId.compareTo(right.placementId);
+				int value = compareLocation(left.location, right.location);
+				return value == 0
+					? left.placementId.compareTo(right.placementId) : value;
 			}
 		};
 	private static final Comparator<LevelKey> LEVEL_KEY_ORDER =
@@ -905,6 +916,28 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 		if (value == 0) value = Integer.compare(left.getLevel(), right.getLevel());
 		if (value == 0) value = Integer.compare(left.getSectorX(), right.getSectorX());
 		if (value == 0) value = Integer.compare(left.getSectorY(), right.getSectorY());
+		return value;
+	}
+
+	private static int compareLocation(
+		WorldLocation left, WorldLocation right) {
+		int value = left.getWorldSpace().getValue().compareTo(
+			right.getWorldSpace().getValue());
+		if (value == 0) {
+			value = Integer.compare(
+				left.getCoordinate().getLevel(),
+				right.getCoordinate().getLevel());
+		}
+		if (value == 0) {
+			value = Integer.compare(
+				left.getCoordinate().getX(),
+				right.getCoordinate().getX());
+		}
+		if (value == 0) {
+			value = Integer.compare(
+				left.getCoordinate().getY(),
+				right.getCoordinate().getY());
+		}
 		return value;
 	}
 

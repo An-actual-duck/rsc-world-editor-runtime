@@ -242,7 +242,7 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
     }
 
     private static AdaptiveWorldBuilderPackagePublisher.Draft draft(
-        NativeLayeredWorldPackage source) {
+        NativeLayeredWorldPackage source, String mode) {
         List<AdaptiveWorldBuilderPackagePublisher.Level> levels = new ArrayList<>();
         for (NativeLayeredWorldPackage.LevelDeclaration level : source.getLevelDeclarations()) {
             levels.add(new AdaptiveWorldBuilderPackagePublisher.Level(
@@ -284,6 +284,39 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
                 items.add(new AdaptiveWorldBuilderPackagePublisher.GroundItem(
                     item.getPlacementId(), item.getItemId(), item.getLocation(),
                     item.getAmount(), item.getRespawnSeconds()));
+            }
+        }
+        if (mode.startsWith("canonical-")) {
+            boundaries.add(new AdaptiveWorldBuilderPackagePublisher.Boundary(
+                "zz.lower.boundary.direction-2", 6,
+                com.openrsc.server.model.world.coordinate.WorldLocation.global(
+                    new com.openrsc.server.model.world.coordinate.WorldCoordinate(
+                        2, 2, 0)), 2));
+            boundaries.add(new AdaptiveWorldBuilderPackagePublisher.Boundary(
+                "zz.lower.boundary.direction-0", 7,
+                com.openrsc.server.model.world.coordinate.WorldLocation.global(
+                    new com.openrsc.server.model.world.coordinate.WorldCoordinate(
+                        2, 2, 0)), 0));
+            scenery.add(new AdaptiveWorldBuilderPackagePublisher.Scenery(
+                "zz.lower.scenery", 8,
+                com.openrsc.server.model.world.coordinate.WorldLocation.global(
+                    new com.openrsc.server.model.world.coordinate.WorldCoordinate(
+                        3, 3, 0)), 4));
+            npcs.add(new AdaptiveWorldBuilderPackagePublisher.Npc(
+                "zz.lower.npc", 9,
+                com.openrsc.server.model.world.coordinate.WorldLocation.global(
+                    new com.openrsc.server.model.world.coordinate.WorldCoordinate(
+                        4, 4, 0)), 4, 4, 4, 4));
+            items.add(new AdaptiveWorldBuilderPackagePublisher.GroundItem(
+                "zz.lower.ground-item", 10,
+                com.openrsc.server.model.world.coordinate.WorldLocation.global(
+                    new com.openrsc.server.model.world.coordinate.WorldCoordinate(
+                        5, 5, 0)), 1, 30));
+            if ("canonical-reversed".equals(mode)) {
+                java.util.Collections.reverse(boundaries);
+                java.util.Collections.reverse(scenery);
+                java.util.Collections.reverse(npcs);
+                java.util.Collections.reverse(items);
             }
         }
         return new AdaptiveWorldBuilderPackagePublisher.Draft(
@@ -482,7 +515,8 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
         }
         AdaptiveWorldBuilderPackagePublisher.SaveResult result =
             AdaptiveWorldBuilderPackagePublisher.publish(
-                working, baseline, workingHash, baselineHash, draft(source),
+                working, baseline, workingHash, baselineHash,
+                draft(source, mode),
                 new AdaptiveWorldBuilderPackagePublisher.PackageVerifier() {
                     @Override public void verify(NativeLayeredWorldPackage value) {}
                 }, observer);
@@ -993,6 +1027,74 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
                 compositions.append(composition.read_bytes())
         self.assertEqual(outputs[0], outputs[1])
         self.assertEqual(compositions[0], compositions[1])
+
+    def test_publish_canonical_sorts_lower_coordinate_additions_in_every_family(self):
+        published = []
+        for mode in ("canonical-forward", "canonical-reversed"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory(
+                prefix=f"adaptive-{mode}-"
+            ) as temp:
+                working, baseline, _ = self.fixture(Path(temp))
+                result = self.run_harness(mode, working, baseline)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(
+                    ["3", "2", "2", "2"],
+                    result.stdout.strip().split()[2:],
+                )
+                placement = json.loads(
+                    (working / "placements/global/lp0.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(
+                    [
+                        (2, 2, 0, "zz.lower.boundary.direction-0"),
+                        (2, 2, 2, "zz.lower.boundary.direction-2"),
+                        (14, 14, 1, "creator.fixture.boundary"),
+                    ],
+                    [
+                        (
+                            row["position"]["x"], row["position"]["y"],
+                            row["direction"], row["placementId"],
+                        )
+                        for row in placement["boundaries"]
+                    ],
+                )
+                self.assertEqual(
+                    [(3, 3, "zz.lower.scenery"),
+                     (12, 12, "creator.fixture.scenery")],
+                    [
+                        (row["position"]["x"], row["position"]["y"],
+                         row["placementId"])
+                        for row in placement["scenery"]
+                    ],
+                )
+                self.assertEqual(
+                    [(4, 4, "zz.lower.npc"),
+                     (8, 8, "creator.fixture.npc")],
+                    [
+                        (row["start"]["x"], row["start"]["y"],
+                         row["placementId"])
+                        for row in placement["npcs"]
+                    ],
+                )
+                self.assertEqual(
+                    [(5, 5, "zz.lower.ground-item"),
+                     (10, 10, "creator.fixture.ground-item")],
+                    [
+                        (row["position"]["x"], row["position"]["y"],
+                         row["placementId"])
+                        for row in placement["groundItems"]
+                    ],
+                )
+                published.append({
+                    path.relative_to(working).as_posix(): path.read_bytes()
+                    for path in working.rglob("*") if path.is_file()
+                })
+        self.assertEqual(
+            published[0], published[1],
+            "canonical output must not depend on input iteration order",
+        )
 
     def test_standalone_empty_accepts_new_bound_seed_and_exact_legacy_origin(self):
         for name, start, visible in (
