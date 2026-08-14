@@ -444,6 +444,7 @@ ai_generate_workspace_guide() {
     printf -- '- Phase: `%s`\n' "$phase"
     printf -- '- Branch: `%s`\n' "$branch"
     printf -- '- Checkpoint: `%s`\n\n' "$head"
+    printf 'This worker belongs only to the independent RSC World Editor Runtime repository. Never inspect or operate Spoiled Milk/Core-Framework managers, workers, branches, deployments, or live state. The World Editor product manager coordinates work through this runtime manager and may consume only an exact tested commit published on runtime main.\n\n'
     if [[ "$phase" == IDLE ]]; then
       printf 'This slot is idle. Do not edit files while HEAD is detached. From the manager checkout, assign a focused topic branch first:\n\n'
       printf '```bash\n./scripts/ai-workspace.sh start %s TYPE/short-task-name\n```\n' "$slot"
