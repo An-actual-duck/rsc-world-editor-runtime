@@ -39,9 +39,16 @@ public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implement
 		// Sending this random data seems to crash other clients, so if we want to be simultaneously compatible,
 		// we must wait for more modern clients (and ancient clients) to send us data first & cancel out
 		ctx.channel().attr(attachment).get().isLongSessionId.set(false);
-		ctx.channel().attr(attachment).get().canSendSessionId.set(true);
-		Thread t = new Thread(new RSCSessionIdSender(ctx, server.getConfig().SESSION_ID_SENDER_TIMER));
-		t.start();
+		boolean scheduleLegacySessionId = RSCSessionIdSender.shouldSchedule(
+			server.getConfig().WORLD_BUILDER_MODE,
+			server.getConfig().WORLD_BUILDER_ADAPTIVE_MODE);
+		ctx.channel().attr(attachment).get().canSendSessionId.set(
+			scheduleLegacySessionId);
+		if (scheduleLegacySessionId) {
+			Thread t = new Thread(new RSCSessionIdSender(
+				ctx, server.getConfig().SESSION_ID_SENDER_TIMER));
+			t.start();
+		}
 		ctx.fireChannelActive();
 	}
 

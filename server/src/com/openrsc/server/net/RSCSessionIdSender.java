@@ -19,6 +19,18 @@ public class RSCSessionIdSender implements Runnable {
 		this.timer = timer;
 	}
 
+	/**
+	 * Isolated adaptive World Builder accepts only its bound custom client.
+	 * That client opens a configuration connection before authentication, so
+	 * unsolicited legacy-session bytes can corrupt its first response when a
+	 * cold launch delays the request beyond the compatibility timer.
+	 */
+	public static boolean shouldSchedule(
+		final boolean worldBuilderMode,
+		final boolean adaptiveWorldBuilderMode) {
+		return !worldBuilderMode || !adaptiveWorldBuilderMode;
+	}
+
 	@Override
 	public void run() {
 		try {

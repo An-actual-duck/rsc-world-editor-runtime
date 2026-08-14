@@ -66,8 +66,12 @@ public class ScriptRunner {
         this.connection = connection;
         this.autoCommit = autoCommit;
         this.stopOnError = stopOnError;
-        File logFile = new File("create_db.log");
-        File errorLogFile = new File("create_db_error.log");
+        File logDirectory = new File("logs");
+        if (!logDirectory.isDirectory() && !logDirectory.mkdirs()) {
+            System.err.println("Unable to create the database log directory");
+        }
+        File logFile = new File(logDirectory, "create_db.log");
+        File errorLogFile = new File(logDirectory, "create_db_error.log");
         try {
             if (logFile.exists()) {
                 logWriter = new PrintWriter(new FileWriter(logFile, true));
