@@ -445,7 +445,8 @@ def wait_for(path: Path, process: subprocess.Popen, timeout: float, label: str,
 
 
 def wait_for_text(path: Path, needle: str, process: subprocess.Popen,
-                  timeout: float, label: str) -> str:
+                  timeout: float, label: str,
+                  diagnostic: Path | None = None) -> str:
     deadline = time.monotonic() + timeout
     latest = ""
     while time.monotonic() < deadline:
@@ -458,11 +459,121 @@ def wait_for_text(path: Path, needle: str, process: subprocess.Popen,
                 latest = path.read_text(encoding="utf-8", errors="replace")
                 if needle in latest:
                     return latest
+            details = ""
+            if diagnostic is not None and diagnostic.is_file():
+                details = "\n" + diagnostic.read_text(
+                    encoding="utf-8", errors="replace"
+                )
             raise AssertionError(
-                f"{label} process exited early with {process.returncode}\n{latest}"
+                f"{label} process exited early with {process.returncode}"
+                f"\n{latest}{details}"
             )
         time.sleep(0.2)
-    raise AssertionError(f"timed out waiting for {label} marker {needle!r}\n{latest}")
+    details = ""
+    if diagnostic is not None and diagnostic.is_file():
+        details = "\n" + diagnostic.read_text(
+            encoding="utf-8", errors="replace"
+        )
+    raise AssertionError(
+        f"timed out waiting for {label} marker {needle!r}\n{latest}{details}"
+    )
+
+
+def wait_for_occurrences(path: Path, needle: str, count: int,
+                         process: subprocess.Popen, timeout: float,
+                         label: str) -> str:
+    deadline = time.monotonic() + timeout
+    latest = ""
+    while time.monotonic() < deadline:
+        if path.is_file():
+            latest = path.read_text(encoding="utf-8", errors="replace")
+            if latest.count(needle) >= count:
+                return latest
+        if process.poll() is not None:
+            raise AssertionError(
+                f"{label} server exited early with {process.returncode}\n{latest}"
+            )
+        time.sleep(0.1)
+    raise AssertionError(
+        f"timed out waiting for {label} marker {needle!r} count {count}\n"
+        + latest
+    )
+
+
+def recv_exact(connection: socket.socket, length: int) -> bytes:
+    result = bytearray()
+    while len(result) < length:
+        value = connection.recv(length - len(result))
+        if not value:
+            raise AssertionError("config connection closed before its response frame")
+        result.extend(value)
+    return bytes(result)
+
+
+def prove_delayed_adaptive_config_request(port: int) -> None:
+    """Delay beyond the 640 ms legacy timer, then require a clean config frame."""
+    with socket.create_connection(("127.0.0.1", port), timeout=5) as connection:
+        connection.settimeout(0.25)
+        time.sleep(0.9)
+        try:
+            unsolicited = connection.recv(8)
+        except socket.timeout:
+            unsolicited = None
+        if unsolicited is not None:
+            raise AssertionError(
+                "adaptive config connection received unsolicited bytes: "
+                + unsolicited.hex()
+            )
+        connection.sendall(bytes((0, 1, 19)))
+        connection.settimeout(5)
+        header = recv_exact(connection, 3)
+        frame_length = int.from_bytes(header[:2], byteorder="big")
+        if frame_length < 3 or header[2] != 19:
+            raise AssertionError("corrupt adaptive config frame: " + header.hex())
+
+
+def run_readiness_only_client(
+    client_root: Path,
+    base_properties: dict,
+    runtime_log: Path,
+    process_log: Path,
+    label: str,
+) -> tuple[str, str]:
+    properties = dict(base_properties)
+    properties.pop("openrsc.worldBuilderAutomatedPlacementProbe", None)
+    properties.pop("openrsc.worldBuilderAutomatedDefinitionProbe", None)
+    properties["openrsc.worldBuilderAutomatedExitOnReady"] = "true"
+    properties["spoiledmilk.clientLog"] = str(runtime_log)
+    command = ["java", "-Xms256m", "-Xmx1024m"]
+    command.extend(f"-D{key}={value}" for key, value in properties.items())
+    command.extend(["-jar", "Open_RSC_Client.jar"])
+    with process_log.open("w", encoding="utf-8") as output:
+        process = subprocess.Popen(
+            command, cwd=client_root, stdout=output,
+            stderr=subprocess.STDOUT, text=True,
+        )
+        try:
+            runtime_evidence = wait_for_text(
+                runtime_log,
+                "ADAPTIVE_WORLD_BUILDER_AUTOMATED_EXIT status=0",
+                process, 90, label, process_log,
+            )
+            if process.wait(timeout=20) != 0:
+                raise AssertionError(label + " did not shut down cleanly")
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=10)
+    process_evidence = process_log.read_text(
+        encoding="utf-8", errors="replace"
+    )
+    if "Fetching server configs from" not in process_evidence:
+        raise AssertionError(label + " did not enter normal config startup")
+    if "Got server configs!" not in process_evidence:
+        raise AssertionError(label + " did not receive server configs")
+    if "login response:86" not in process_evidence:
+        raise AssertionError(label + " did not authenticate Builder")
+    return runtime_evidence, process_evidence
 
 
 @unittest.skipUnless(os.environ.get("DISPLAY"), "real desktop-client integration needs DISPLAY")
@@ -585,6 +696,12 @@ world_builder_initial_x: 120
 world_builder_initial_y: 648
 """
             (server_root / "world-builder.conf").write_text(config, encoding="utf-8")
+            runtime_root_before_start = {
+                entry.name for entry in server_root.iterdir()
+            }
+            approved_runtime_root_additions = {
+                "client.pem", "server.pem", "ipbans.txt", "logs",
+            }
 
             credential = server_root / "inc/sqlite/world-builder.credential"
             binding = control / "runtime-binding.properties"
@@ -636,6 +753,7 @@ world_builder_initial_y: 648
                 wait_for(ready, server, 45, "server readiness", server_log)
                 wait_for(credential, server, 5, "generated credential", server_log)
                 wait_for(binding, server, 5, "runtime binding", server_log)
+                prove_delayed_adaptive_config_request(port)
                 self.assertEqual(20, len(credential.read_text(encoding="ascii")))
                 binding_fields = dict(
                     line.split("=", 1)
@@ -702,6 +820,30 @@ world_builder_initial_y: 648
                     f"-D{key}={value}" for key, value in client_properties.items()
                 )
                 client_command.extend(["-jar", "Open_RSC_Client.jar"])
+
+                cold_runtime_evidence, cold_client_evidence = (
+                    run_readiness_only_client(
+                        client_root,
+                        client_properties,
+                        fixture / "client-cold-runtime.log",
+                        fixture / "client-cold.log",
+                        "cold manual-startup adaptive client",
+                    )
+                )
+                self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_READY nativeTerrain=true "
+                    "initialRegion=true binding=true",
+                    cold_runtime_evidence,
+                )
+                self.assertNotIn(
+                    "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_", cold_runtime_evidence
+                )
+                self.assertNotIn("socket timeout", cold_client_evidence.lower())
+                wait_for_occurrences(
+                    server_log, "Unregistered Builder from player list.", 1,
+                    server, 10, "cold client unregister",
+                )
+
                 client_output = client_log.open("w", encoding="utf-8")
                 client = subprocess.Popen(
                     client_command, cwd=client_root, stdout=client_output,
@@ -710,9 +852,13 @@ world_builder_initial_y: 648
                 runtime_evidence = wait_for_text(
                     client_runtime_log,
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_SAVED status=0",
-                    client, 90, "adaptive client readiness",
+                    client, 90, "adaptive client readiness", client_log,
                 )
                 self.assertEqual(0, client.wait(timeout=20), "desktop client clean shutdown")
+                wait_for_occurrences(
+                    server_log, "Unregistered Builder from player list.", 2,
+                    server, 10, "placement client unregister",
+                )
                 client_output.flush()
                 client_evidence = client_log.read_text(
                     encoding="utf-8", errors="replace"
@@ -721,12 +867,12 @@ world_builder_initial_y: 648
                 server_evidence = server_log.read_text(
                     encoding="utf-8", errors="replace"
                 )
-                self.assertEqual(1, server_evidence.count("Player Loaded: Builder"))
+                self.assertEqual(2, server_evidence.count("Player Loaded: Builder"))
                 self.assertEqual(
-                    1, server_evidence.count("Processed login request for Builder response: 86")
+                    2, server_evidence.count("Processed login request for Builder response: 86")
                 )
                 self.assertEqual(
-                    1,
+                    2,
                     server_evidence.count(
                         "Adaptive World Builder binding accepted for authenticated player Builder"
                     ),
@@ -944,6 +1090,7 @@ world_builder_initial_y: 648
                             reopened_runtime_log,
                             "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_REOPENED status=0",
                             reopened_client, 90, "reopened adaptive client",
+                            reopened_client_log,
                         )
                         self.assertEqual(
                             0, reopened_client.wait(timeout=20),
@@ -985,6 +1132,107 @@ world_builder_initial_y: 648
                 self.assertNotIn("Server thread termination failed", shutdown_evidence)
                 self.assertFalse(shutdown.exists(), "shutdown request cleanup")
                 self.assertFalse(ready.exists(), "readiness cleanup")
+                self.assertNotIn(
+                    "Set int session id for", shutdown_evidence,
+                    "adaptive connections must never receive unsolicited legacy IDs",
+                )
+                runtime_root_after_first = {
+                    entry.name for entry in server_root.iterdir()
+                }
+                unexpected_root_entries = (
+                    runtime_root_after_first
+                    - runtime_root_before_start
+                    - approved_runtime_root_additions
+                )
+                self.assertEqual(set(), unexpected_root_entries)
+                self.assertFalse((server_root / "create_db.log").exists())
+                self.assertFalse((server_root / "create_db_error.log").exists())
+                self.assertTrue((server_root / "logs/create_db.log").is_file())
+                self.assertTrue(
+                    (server_root / "logs/create_db_error.log").is_file()
+                )
+
+                # Reopen the exact same project-local runtime. This exercises
+                # patch logging and config/login framing without rebuilding or
+                # replacing any workspace content between launches.
+                if client_output is not None:
+                    client_output.close()
+                    client_output = None
+                server_output.close()
+                reopened_server_properties = dict(common_server_properties)
+                reopened_server_properties[
+                    "openrsc.layeredNativeTerrainManifestSha256"
+                ] = hashlib.sha256(
+                    (package / "manifest.json").read_bytes()
+                ).hexdigest()
+                reopened_server_properties[
+                    "openrsc.layeredNativeTerrainInventorySha256"
+                ] = inventory_fingerprint(package, classes)
+                reopened_server_command = [
+                    "java", "-Xms128m", "-Xmx768m",
+                ]
+                reopened_server_command.extend(
+                    f"-D{key}={value}"
+                    for key, value in reopened_server_properties.items()
+                )
+                reopened_server_command.extend([
+                    "-cp", os.pathsep.join(("lib/*", "core.jar", "plugins.jar")),
+                    "com.openrsc.server.Server", "world-builder.conf",
+                ])
+                second_server_log = fixture / "server-reopened.log"
+                server_output = second_server_log.open("w", encoding="utf-8")
+                server = subprocess.Popen(
+                    reopened_server_command, cwd=server_root, stdout=server_output,
+                    stderr=subprocess.STDOUT, text=True,
+                )
+                wait_for(
+                    ready, server, 45, "reopened server readiness",
+                    second_server_log,
+                )
+                second_runtime_evidence, second_client_evidence = (
+                    run_readiness_only_client(
+                        client_root,
+                        client_properties,
+                        fixture / "client-second-runtime.log",
+                        fixture / "client-second.log",
+                        "second-launch manual-startup adaptive client",
+                    )
+                )
+                self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_READY nativeTerrain=true "
+                    "initialRegion=true binding=true",
+                    second_runtime_evidence,
+                )
+                self.assertNotIn(
+                    "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_", second_runtime_evidence
+                )
+                self.assertNotIn("socket timeout", second_client_evidence.lower())
+                shutdown.write_text("shutdown\n", encoding="ascii")
+                self.assertEqual(
+                    0, server.wait(timeout=30),
+                    "reopened server clean shutdown",
+                )
+                server_output.flush()
+                second_server_evidence = second_server_log.read_text(
+                    encoding="utf-8", errors="replace"
+                )
+                self.assertIn("Sending initial configs to:", second_server_evidence)
+                self.assertIn(
+                    "Adaptive World Builder binding accepted for authenticated "
+                    "player Builder",
+                    second_server_evidence,
+                )
+                self.assertNotIn("Set int session id for", second_server_evidence)
+                self.assertIn("Server unloaded", second_server_evidence)
+                self.assertFalse(shutdown.exists(), "second shutdown request cleanup")
+                self.assertFalse(ready.exists(), "second readiness cleanup")
+                self.assertEqual(
+                    runtime_root_after_first,
+                    {entry.name for entry in server_root.iterdir()},
+                    "second launch created an unbound runtime-root entry",
+                )
+                self.assertFalse((server_root / "create_db.log").exists())
+                self.assertFalse((server_root / "create_db_error.log").exists())
             finally:
                 if client is not None and client.poll() is None:
                     client.terminate()
