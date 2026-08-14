@@ -4401,20 +4401,15 @@ public class RegionManager {
 				direction,
 				type.getId()));
 		GameTickEventRestorationCollisionFootprintPlanner.Result footprint =
-			world.projectGameObjectCollisionFootprint(
+			world.projectNativeLayeredGameObjectCollisionFootprint(
 				object, Operation.REGISTER, false);
 		if (!footprint.isFootprintAvailable()) {
 			throw new IllegalStateException(
 				"Native layered object collision footprint is unavailable for "
 					+ placementId + ": " + footprint.getReason());
 		}
-		for (com.openrsc.server.event.rsc
-				.GameTickEventRestorationTransientRollbackSnapshot
-				.CollisionContribution contribution
-					: footprint.getContributions()) {
-			requireNativeLayeredCollisionTerrain(
-				location, placementId, contribution);
-		}
+		requireNativeLayeredCollisionTerrain(
+			location, placementId, footprint);
 		object.setInitialWorldLocation(location);
 		markNativeLayeredPlacement(
 			object, packageId, placementId, kind);
@@ -4439,24 +4434,30 @@ public class RegionManager {
 	private void requireNativeLayeredCollisionTerrain(
 		final WorldLocation origin,
 		final String placementId,
-		final com.openrsc.server.event.rsc
-			.GameTickEventRestorationTransientRollbackSnapshot
-			.CollisionContribution contribution) {
-		WorldLocation collisionLocation = new WorldLocation(
-			origin.getWorldSpace(),
-			new WorldCoordinate(
-				contribution.getX(),
-				contribution.getY(),
-				origin.getCoordinate().getLevel()));
-		NativeLayeredWorldPackage collisionOwner =
-			findNativeLayeredWorldPackage(collisionLocation)
-				.orElse(null);
+		final GameTickEventRestorationCollisionFootprintPlanner.Result
+			footprint) {
 		NativeLayeredWorldPackage originOwner =
 			findNativeLayeredWorldPackage(origin).orElse(null);
-		if (collisionOwner == null
-			|| originOwner == null
-			|| collisionOwner != originOwner) {
+		if (originOwner == null) {
 			throw new IllegalStateException(
+				"Native layered object collision has no package owner for "
+					+ placementId);
+		}
+		for (com.openrsc.server.event.rsc
+				.GameTickEventRestorationTransientRollbackSnapshot
+					.CollisionContribution contribution
+						: footprint.getContributions()) {
+			WorldLocation collisionLocation = new WorldLocation(
+				origin.getWorldSpace(),
+				new WorldCoordinate(
+					contribution.getX(),
+					contribution.getY(),
+					origin.getCoordinate().getLevel()));
+			NativeLayeredWorldPackage collisionOwner =
+				findNativeLayeredWorldPackage(collisionLocation)
+					.orElse(null);
+			NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+				originOwner, collisionOwner,
 				"Native layered object collision leaves its package terrain for "
 					+ placementId + ": " + collisionLocation);
 		}
@@ -4494,18 +4495,31 @@ public class RegionManager {
 		WorldCoordinate coordinate = checkedOrigin.getCoordinate();
 		for (int offsetX = 0; offsetX < width; offsetX++) {
 			for (int offsetY = 0; offsetY < height; offsetY++) {
+				int x;
+				int y;
+				try {
+					x = Math.addExact(coordinate.getX(), offsetX);
+					y = Math.addExact(coordinate.getY(), offsetY);
+				} catch (ArithmeticException overflow) {
+					throw new IllegalStateException(
+						"Native layered NPC-blocking scenery footprint "
+							+ "overflows for " + placementId, overflow);
+				}
+				if (!withinWorld(x, y)) {
+					continue;
+				}
 				WorldLocation tile = new WorldLocation(
 					checkedOrigin.getWorldSpace(),
 					new WorldCoordinate(
-						Math.addExact(coordinate.getX(), offsetX),
-						Math.addExact(coordinate.getY(), offsetY),
+						x, y,
 						coordinate.getLevel()));
-				if (findNativeLayeredWorldPackage(tile).orElse(null) != owner) {
-					throw new IllegalStateException(
-						"Native layered NPC-blocking scenery leaves its "
-							+ "package terrain for " + placementId
-							+ " at " + tile);
-				}
+				NativeLayeredWorldPackage tileOwner =
+					findNativeLayeredWorldPackage(tile).orElse(null);
+				NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+					owner, tileOwner,
+					"Native layered NPC-blocking scenery leaves its "
+						+ "package terrain for " + placementId
+						+ " at " + tile);
 				footprint.add(tile);
 			}
 		}
@@ -4673,17 +4687,16 @@ public class RegionManager {
 				throw new IllegalStateException(
 					"Native layered registration target state is invalid");
 			}
-			for (com.openrsc.server.event.rsc
-					.GameTickEventRestorationTransientRollbackSnapshot
-					.CollisionContribution contribution
-						: newRegisterFootprint.getContributions()) {
-				requireNativeLayeredCollisionTerrain(
-					identity.getLocation(),
-					identity.getPlacementId(),
-					contribution);
-			}
+			requireNativeLayeredCollisionTerrain(
+				identity.getLocation(), identity.getPlacementId(),
+				newRegisterFootprint);
 			newCollision = GameObjectCollisionRegistrationState.capture(
 				newObject, newRegisterFootprint);
+		}
+		if (oldObject != null) {
+			requireNativeLayeredCollisionTerrain(
+				identity.getLocation(), identity.getPlacementId(),
+				oldRollbackRegisterFootprint);
 		}
 
 		List<WorldLocation> oldNpcBlockingScenery =

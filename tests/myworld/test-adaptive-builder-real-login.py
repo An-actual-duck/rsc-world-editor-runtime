@@ -31,7 +31,11 @@ def canonical_json(value) -> bytes:
     return (json.dumps(value, separators=(",", ":")) + "\n").encode("utf-8")
 
 
-def write_integration_package(root: Path, *, seeded: bool = True) -> None:
+def write_integration_package(root: Path, *, project_origin: str) -> None:
+    if project_origin == "target-packed":
+        write_packed_conversion_package(root)
+        return
+    seeded = project_origin == "target-layered"
     initial_x = 120
     initial_y = 648
     sector_x = initial_x // 48
@@ -124,6 +128,152 @@ def write_integration_package(root: Path, *, seeded: bool = True) -> None:
     (root / "manifest.json").write_bytes(canonical_json(manifest))
 
 
+def write_packed_conversion_package(root: Path) -> None:
+    """Mirror the converted-package shape that exposed the global-edge bug."""
+    placement_documents = {
+        -1: {
+            "boundaries": [],
+            "groundItems": [],
+            "npcs": [],
+            "scenery": [{
+                "direction": 6,
+                "placementId": (
+                    "p-8f23c848e0b8b2c2076423ca7cd7696d5b2d2042a41345e5853562cf7203bafa"
+                ),
+                "position": {"x": 1, "y": 943},
+                "sceneryId": 21,
+            }],
+        },
+        0: {
+            "boundaries": [{
+                "boundaryId": 10,
+                "direction": 0,
+                "placementId": (
+                    "p-80318ad49fd89f23e802d00a5c7f6586e3aa1677ad8bbda8e847621da041cb1b"
+                ),
+                "position": {"x": 0, "y": 0},
+            }, {
+                "boundaryId": 11,
+                "direction": 2,
+                "placementId": (
+                    "p-e1c30d9445e8e664a898554b52b4154f2c2ddeabe1cdf585fefe19f0ad983f57"
+                ),
+                "position": {"x": 9, "y": 9},
+            }],
+            "groundItems": [],
+            "npcs": [],
+            "scenery": [],
+        },
+        1: {
+            "boundaries": [],
+            "groundItems": [],
+            "npcs": [{
+                "npcId": 30,
+                "placementId": (
+                    "p-5268479e269a7fb07c5f4467dbf7fcb7d7083a6e64d842bddacb714d243ebed3"
+                ),
+                "roamBounds": {
+                    "maximum": {"x": 5, "y": 5},
+                    "minimum": {"x": 1, "y": 1},
+                },
+                "start": {"x": 3, "y": 3},
+            }],
+            "scenery": [],
+        },
+        2: {
+            "boundaries": [],
+            "groundItems": [{
+                "amount": 3,
+                "itemId": 41,
+                "placementId": (
+                    "p-d46b5254441e49f93c7842a3aa3927f4033abdd252f0cf380400ff132d30dae0"
+                ),
+                "position": {"x": 32767, "y": 0},
+                "respawnSeconds": 90,
+            }],
+            "npcs": [],
+            "scenery": [],
+        },
+    }
+    placement_sets = []
+    for level, families in placement_documents.items():
+        level_name = f"lm{-level}" if level < 0 else f"lp{level}"
+        path = f"placements/global/{level_name}.json"
+        document = {
+            "schemaVersion": 3,
+            "encoding": "layered-world-placements-v3",
+            "worldSpace": "global",
+            "level": level,
+            **families,
+        }
+        payload = canonical_json(document)
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        (root / path).write_bytes(payload)
+        placement_sets.append({
+            "id": f"global-{level_name}",
+            "worldSpace": "global",
+            "level": level,
+            "encoding": "layered-world-placements-v3",
+            "path": path,
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        })
+
+    terrain_specs = [
+        (-1, 0, 0),
+        (-1, 0, 19),
+        (0, 0, 0),
+        (0, 2, 13),  # Dedicated visible authoring area for the built client probe.
+        (1, 0, 0),
+        (2, 682, 0),
+    ]
+    terrain_sectors = []
+    for level, sector_x, sector_y in terrain_specs:
+        terrain = bytearray(
+            bytes((0, 1, 8, 0, 0, 0, 0, 0, 0, 0)) * (48 * 48)
+        )
+        if level == 0 and sector_x == 2 and sector_y == 13:
+            for x in range(23, 26):
+                for y in range(23, 26):
+                    offset = (x * 48 + y) * 10
+                    terrain[offset:offset + 10] = bytes(10)
+        terrain = bytes(terrain)
+        level_name = f"lm{-level}" if level < 0 else f"lp{level}"
+        path = f"terrain/global/{level_name}/xp{sector_x}-yp{sector_y}.raw"
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        (root / path).write_bytes(terrain)
+        terrain_sectors.append({
+            "worldSpace": "global",
+            "level": level,
+            "sectorX": sector_x,
+            "sectorY": sector_y,
+            "encoding": "raw-layered-sector-v1",
+            "path": path,
+            "sha256": hashlib.sha256(terrain).hexdigest(),
+        })
+
+    manifest = {
+        "schemaVersion": 1,
+        "packageType": "layered-world",
+        "packageId": (
+            "world-builder.converted."
+            "43cd84e2795c28bf3a570aa5b523763c6e70fc099e724143dfb3e517fc2f332e"
+        ),
+        "packageVersion": "1.0.0",
+        "coordinateModel": "signed-layered-v1",
+        "storage": {"sectorSize": 48, "presentationChunkSize": 24},
+        "worldSpaces": [{"id": "global", "kind": "static"}],
+        "levels": [{
+            "worldSpace": "global",
+            "level": level,
+            "name": f"Level {level}",
+            "role": f"level-{'m' + str(-level) if level < 0 else 'p' + str(level)}",
+        } for level in (-1, 0, 1, 2)],
+        "terrainSectors": terrain_sectors,
+        "placementSets": placement_sets,
+    }
+    (root / "manifest.json").write_bytes(canonical_json(manifest))
+
+
 def inventory_fingerprint(package: Path, classes: Path) -> str:
     source = classes / "PackageFingerprint.java"
     source.write_text(
@@ -153,6 +303,112 @@ public final class PackageFingerprint {
     if not re.fullmatch(r"[0-9a-f]{64}", value):
         raise AssertionError("invalid package fingerprint: " + value)
     return value
+
+
+def verify_packed_edge_ownership_contract(package: Path, classes: Path) -> None:
+    source = classes / "PackedEdgeOwnership.java"
+    source.write_text(
+        r"""
+import com.openrsc.server.constants.Constants;
+import com.openrsc.server.event.rsc.GameTickEventRestorationCollisionFootprintPlanner;
+import com.openrsc.server.event.rsc.GameTickEventRestorationCollisionFootprintPlanner.ConstructorState;
+import com.openrsc.server.event.rsc.GameTickEventRestorationCollisionFootprintPlanner.Definition;
+import com.openrsc.server.event.rsc.GameTickEventRestorationCollisionFootprintPlanner.Operation;
+import com.openrsc.server.event.rsc.GameTickEventRestorationCollisionFootprintPlanner.Result;
+import com.openrsc.server.event.rsc.GameTickEventRestorationCollisionFootprintPlanner.WorldBounds;
+import com.openrsc.server.event.rsc.GameTickEventRestorationTransientRollbackSnapshot.CollisionContribution;
+import com.openrsc.server.io.NativeLayeredWorldPackage;
+import com.openrsc.server.io.NativeLayeredWorldPackageCatalog;
+import com.openrsc.server.model.world.NativeLayeredGameObjectRegistry;
+import com.openrsc.server.model.world.coordinate.WorldCoordinate;
+import com.openrsc.server.model.world.coordinate.WorldLocation;
+import com.openrsc.server.model.world.coordinate.WorldSpaceId;
+import java.nio.file.Paths;
+import java.util.Collections;
+
+public final class PackedEdgeOwnership {
+  public static void main(String[] args) throws Exception {
+    NativeLayeredWorldPackage worldPackage =
+      NativeLayeredWorldPackage.load(Paths.get(args[0]));
+    NativeLayeredWorldPackageCatalog catalog =
+      NativeLayeredWorldPackageCatalog.of(Collections.singleton(worldPackage));
+    Definition boundary = Definition.boundary(1, "Boundary", new String[0]);
+    WorldBounds bounds = WorldBounds.of(Constants.MAX_WIDTH, Constants.MAX_HEIGHT);
+
+    Result globalEdge = GameTickEventRestorationCollisionFootprintPlanner
+      .planClippedToWorld(
+        Operation.REGISTER, ConstructorState.of(10, 0, 0, 0, 1),
+        boundary, false, bounds);
+    check(globalEdge.isFootprintAvailable()
+        && globalEdge.getContributionTileCount() == 1,
+      "global edge clips only the out-of-world reciprocal effect");
+    WorldLocation edgeAnchor = location(0, 0);
+    requireOwned(catalog, worldPackage, globalEdge);
+
+    NativeLayeredGameObjectRegistry<Object> registry =
+      new NativeLayeredGameObjectRegistry<Object>();
+    Object placed = new Object();
+    long generation = registry.getGeneration();
+    check(registry.register(
+        generation, "packed-edge", edgeAnchor, 1, 0, placed,
+        globalEdge, Collections.<WorldLocation>emptyList()) == placed,
+      "global-edge collision registers");
+    check(registry.getCollisionTileCount() == 1,
+      "global-edge collision retains one in-world tile");
+    check(registry.unregister(generation, "packed-edge", placed) == placed
+        && registry.getCollisionTileCount() == 0,
+      "global-edge removal clears the exact clipped footprint");
+
+    Result packageEdge = GameTickEventRestorationCollisionFootprintPlanner
+      .planClippedToWorld(
+        Operation.REGISTER, ConstructorState.of(10, 96, 624, 0, 1),
+        boundary, false, bounds);
+    check(packageEdge.isFootprintAvailable()
+        && packageEdge.getContributionTileCount() == 2,
+      "ordinary in-world package edge is not planner-clipped");
+    try {
+      requireOwned(catalog, worldPackage, packageEdge);
+      throw new AssertionError("Expected uncovered package-edge refusal");
+    } catch (IllegalStateException expected) {
+      check(expected.getMessage().contains("uncovered package-edge"),
+        "uncovered package-edge refusal reason");
+    }
+  }
+
+  private static void requireOwned(
+      NativeLayeredWorldPackageCatalog catalog,
+      NativeLayeredWorldPackage anchorOwner,
+      Result footprint) {
+    for (CollisionContribution contribution : footprint.getContributions()) {
+      WorldLocation tile = location(contribution.getX(), contribution.getY());
+      NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+        anchorOwner, catalog.findPackage(tile).orElse(null),
+        "uncovered package-edge at " + tile);
+    }
+  }
+
+  private static WorldLocation location(int x, int y) {
+    return new WorldLocation(
+      WorldSpaceId.GLOBAL, new WorldCoordinate(x, y, 0));
+  }
+
+  private static void check(boolean condition, String label) {
+    if (!condition) { throw new AssertionError(label); }
+  }
+}
+""".strip() + "\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["javac", "-source", "8", "-target", "8", "-cp", str(CORE),
+         "-d", str(classes), str(source)],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    )
+    subprocess.run(
+        ["java", "-cp", os.pathsep.join((str(CORE), str(classes))),
+         "PackedEdgeOwnership", str(package)],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    )
 
 
 def replace_config(text: str, key: str, value: str) -> str:
@@ -219,7 +475,10 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             project_origin = os.environ.get(
                 "ADAPTIVE_REAL_LOGIN_PROJECT_ORIGIN", "target-layered"
             )
-            self.assertIn(project_origin, ("target-layered", "standalone-empty"))
+            self.assertIn(
+                project_origin,
+                ("target-packed", "target-layered", "standalone-empty"),
+            )
             seeded = project_origin != "standalone-empty"
             fixture = Path(temp)
             project = fixture / "project"
@@ -230,11 +489,13 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             client_root = working / "runtime/client"
             control = project / "run/world-builder"
             evidence = working / "evidence"
-            write_integration_package(package, seeded=seeded)
+            write_integration_package(package, project_origin=project_origin)
             shutil.copytree(package, baseline)
             classes = fixture / "classes"
             classes.mkdir()
             inventory = inventory_fingerprint(package, classes)
+            if project_origin == "target-packed":
+                verify_packed_edge_ownership_contract(package, classes)
             manifest_sha = hashlib.sha256((package / "manifest.json").read_bytes()).hexdigest()
 
             server_root.mkdir(parents=True)
@@ -380,12 +641,20 @@ world_builder_initial_y: 648
                     line.split("=", 1)
                     for line in binding.read_text(encoding="ascii").splitlines()[1:]
                 )
-                expected_required = {
-                    "requiredBoundaryIds": "0" if seeded else "",
-                    "requiredSceneryIds": "0" if seeded else "",
-                    "requiredNpcIds": "0" if seeded else "",
-                    "requiredItemIds": "10" if seeded else "",
-                }
+                if project_origin == "target-packed":
+                    expected_required = {
+                        "requiredBoundaryIds": "10,11",
+                        "requiredSceneryIds": "21",
+                        "requiredNpcIds": "30",
+                        "requiredItemIds": "41",
+                    }
+                else:
+                    expected_required = {
+                        "requiredBoundaryIds": "0" if seeded else "",
+                        "requiredSceneryIds": "0" if seeded else "",
+                        "requiredNpcIds": "0" if seeded else "",
+                        "requiredItemIds": "10" if seeded else "",
+                    }
                 for key, value in expected_required.items():
                     self.assertEqual(value, binding_fields[key])
                 for family, key in (
@@ -521,6 +790,16 @@ world_builder_initial_y: 648
                     "Skipping legacy terrain archives for explicit adaptive World Builder profile",
                     server_evidence,
                 )
+                if project_origin == "target-packed":
+                    self.assertIn(
+                        "with 1 NPC, 1 ground-item, 1 scenery, and 2 boundary placements",
+                        server_evidence,
+                    )
+                elif seeded:
+                    self.assertIn(
+                        "with 1 NPC, 1 ground-item, 1 scenery, and 1 boundary placements",
+                        server_evidence,
+                    )
                 self.assertEqual(1, client_evidence.count("login response:86"))
                 combined = (
                     server_evidence + "\n" + runtime_evidence + "\n" + client_evidence
@@ -608,6 +887,39 @@ world_builder_initial_y: 648
                 refused_boundary_offset = ((123 % 48) * 48 + (648 % 48)) * 10 + 5
                 self.assertEqual(2, terrain_bytes[boundary_offset])
                 self.assertEqual(0, terrain_bytes[refused_boundary_offset])
+                if project_origin == "target-packed":
+                    self.assertIn(
+                        (10, 0, 0, 0),
+                        [
+                            (row["boundaryId"], row["position"]["x"],
+                             row["position"]["y"], row["direction"])
+                            for row in placement_document["boundaries"]
+                        ],
+                    )
+                    self.assertEqual(
+                        [21],
+                        [row["sceneryId"] for row in json.loads(
+                            (package / "placements/global/lm1.json").read_text(
+                                encoding="utf-8"
+                            )
+                        )["scenery"]],
+                    )
+                    self.assertEqual(
+                        [30],
+                        [row["npcId"] for row in json.loads(
+                            (package / "placements/global/lp1.json").read_text(
+                                encoding="utf-8"
+                            )
+                        )["npcs"]],
+                    )
+                    self.assertEqual(
+                        [41],
+                        [row["itemId"] for row in json.loads(
+                            (package / "placements/global/lp2.json").read_text(
+                                encoding="utf-8"
+                            )
+                        )["groundItems"]],
+                    )
 
                 reopened_runtime_log = fixture / "client-reopened-runtime.log"
                 reopened_client_log = fixture / "client-reopened.log"

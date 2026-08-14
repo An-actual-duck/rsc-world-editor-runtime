@@ -34,6 +34,35 @@ public final class GameTickEventRestorationCollisionFootprintPlanner {
 		final Definition definition,
 		final boolean forceFullBlock,
 		final WorldBounds worldBounds) {
+		return plan(
+			operation, constructor, definition, forceFullBlock,
+			worldBounds, false);
+	}
+
+	/**
+	 * Plans the in-world portion of an in-range anchored footprint.
+	 * Arithmetic overflow, an out-of-range anchor, and every ordinary planner
+	 * refusal remain fatal; only individual effects beyond the world edge are
+	 * omitted.
+	 */
+	public static Result planClippedToWorld(
+		final Operation operation,
+		final ConstructorState constructor,
+		final Definition definition,
+		final boolean forceFullBlock,
+		final WorldBounds worldBounds) {
+		return plan(
+			operation, constructor, definition, forceFullBlock,
+			worldBounds, true);
+	}
+
+	private static Result plan(
+		final Operation operation,
+		final ConstructorState constructor,
+		final Definition definition,
+		final boolean forceFullBlock,
+		final WorldBounds worldBounds,
+		final boolean clipOutOfWorldEffects) {
 		Operation checkedOperation = Objects.requireNonNull(operation, "operation");
 		ConstructorState checkedConstructor = Objects.requireNonNull(
 			constructor, "constructor");
@@ -45,7 +74,8 @@ public final class GameTickEventRestorationCollisionFootprintPlanner {
 				Reason.FORCE_FULL_BLOCK_REQUIRES_REGISTER_OPERATION);
 		}
 
-		Accumulator accumulator = new Accumulator(checkedBounds);
+		Accumulator accumulator = new Accumulator(
+			checkedBounds, clipOutOfWorldEffects);
 		if (!accumulator.requireInWorld(
 				checkedConstructor.getX(), checkedConstructor.getY())) {
 			return Result.refused(
@@ -498,12 +528,16 @@ public final class GameTickEventRestorationCollisionFootprintPlanner {
 			};
 
 		private final WorldBounds bounds;
+		private final boolean clipOutOfWorldEffects;
 		private final Map<TileCoordinate, MutableContribution> contributions =
 			new HashMap<TileCoordinate, MutableContribution>();
 		private Reason refusalReason;
 
-		private Accumulator(final WorldBounds bounds) {
+		private Accumulator(
+			final WorldBounds bounds,
+			final boolean clipOutOfWorldEffects) {
 			this.bounds = bounds;
+			this.clipOutOfWorldEffects = clipOutOfWorldEffects;
 		}
 
 		private boolean requireInWorld(final int x, final int y) {
@@ -536,7 +570,8 @@ public final class GameTickEventRestorationCollisionFootprintPlanner {
 			final int dynamicCollisionMask,
 			final int dynamicProjectileCount) {
 			if (!bounds.contains(x, y)) {
-				return refuse(Reason.OUT_OF_WORLD_EFFECT);
+				return clipOutOfWorldEffects
+					|| refuse(Reason.OUT_OF_WORLD_EFFECT);
 			}
 			TileCoordinate coordinate = new TileCoordinate(x, y);
 			MutableContribution contribution = contributions.get(coordinate);

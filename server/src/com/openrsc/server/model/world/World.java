@@ -700,6 +700,16 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 		final GameObject object,
 		final Operation operation,
 		final boolean forceFullBlock) {
+		return planGameObjectCollision(
+			object, operation, forceFullBlock, false);
+	}
+
+	private GameTickEventRestorationCollisionFootprintPlanner.Result
+		planGameObjectCollision(
+		final GameObject object,
+		final Operation operation,
+		final boolean forceFullBlock,
+		final boolean clipOutOfWorldEffects) {
 		Point currentLocation = object.getLocation();
 		int objectX = currentLocation == null
 			? object.getLoc().getX() : currentLocation.getX();
@@ -721,7 +731,16 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 					Constants.objectsProjectileClipAllowed);
 			}
 		}
-		return GameTickEventRestorationCollisionFootprintPlanner.plan(
+		return clipOutOfWorldEffects
+			? GameTickEventRestorationCollisionFootprintPlanner
+				.planClippedToWorld(
+					operation,
+					ConstructorState.of(
+						object.getID(), objectX, objectY,
+						object.getDirection(), object.getType()),
+					definition, forceFullBlock,
+					WorldBounds.of(Constants.MAX_WIDTH, Constants.MAX_HEIGHT))
+			: GameTickEventRestorationCollisionFootprintPlanner.plan(
 				operation,
 				ConstructorState.of(
 					object.getID(), objectX, objectY,
@@ -742,25 +761,35 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 		return planGameObjectCollision(object, operation, forceFullBlock);
 	}
 
+	/** In-world collision projection for package-owned edge placements only. */
+	public GameTickEventRestorationCollisionFootprintPlanner.Result
+		projectNativeLayeredGameObjectCollisionFootprint(
+		final GameObject object,
+		final Operation operation,
+		final boolean forceFullBlock) {
+		return planGameObjectCollision(
+			object, operation, forceFullBlock, true);
+	}
+
 	private void applyGameObjectTransaction(
 		final GameObject oldObject,
 		final GameObject newObject,
 		final boolean forceFullBlock) {
-		GameTickEventRestorationCollisionFootprintPlanner.Result
-			oldUnregister = oldObject == null ? null
-				: planGameObjectCollision(
-					oldObject, Operation.UNREGISTER, false);
-		GameTickEventRestorationCollisionFootprintPlanner.Result
-			oldRollbackRegister = oldObject == null ? null
-				: planGameObjectCollision(
-					oldObject, Operation.REGISTER, false);
-		GameTickEventRestorationCollisionFootprintPlanner.Result newRegister =
-			newObject == null ? null : planGameObjectCollision(
-				newObject, Operation.REGISTER, forceFullBlock);
 		final boolean nativeLayered = (oldObject != null
 				&& getRegionManager().isNativeLayeredGameObject(oldObject))
 			|| (newObject != null
 				&& getRegionManager().isNativeLayeredGameObject(newObject));
+		GameTickEventRestorationCollisionFootprintPlanner.Result
+			oldUnregister = oldObject == null ? null
+				: planGameObjectCollision(
+					oldObject, Operation.UNREGISTER, false, nativeLayered);
+		GameTickEventRestorationCollisionFootprintPlanner.Result
+			oldRollbackRegister = oldObject == null ? null
+				: planGameObjectCollision(
+					oldObject, Operation.REGISTER, false, nativeLayered);
+		GameTickEventRestorationCollisionFootprintPlanner.Result newRegister =
+			newObject == null ? null : planGameObjectCollision(
+				newObject, Operation.REGISTER, forceFullBlock, nativeLayered);
 		if (nativeLayered) {
 			getRegionManager().applyNativeLayeredGameObjectTransaction(
 				oldObject, oldUnregister, oldRollbackRegister,

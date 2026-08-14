@@ -140,6 +140,22 @@ public final class NativeLayeredWorldPackageCatalog {
 	}
 
 	/**
+	 * Enforces exact package identity for a retained in-world footprint tile.
+	 * A missing owner is distinct from a contribution outside global world
+	 * bounds: callers must reject it rather than treating it as clipped.
+	 */
+	public static NativeLayeredWorldPackage requireExactTerrainOwner(
+		final NativeLayeredWorldPackage anchorOwner,
+		final NativeLayeredWorldPackage footprintOwner,
+		final String refusalMessage) {
+		if (anchorOwner == null || footprintOwner != anchorOwner) {
+			throw new IllegalStateException(
+				Objects.requireNonNull(refusalMessage, "refusalMessage"));
+		}
+		return footprintOwner;
+	}
+
+	/**
 	 * Resolves and validates a complete destination before the caller mutates
 	 * Player, cache, interest, or protocol state.
 	 */
