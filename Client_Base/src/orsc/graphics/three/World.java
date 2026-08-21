@@ -5741,7 +5741,7 @@ public final class World {
 		synchronized(worldEditorTerrainPatchLock){Map<Integer,TerrainPatch> stored=worldEditorTerrainPatches.get(sectorFilename(plane,sectionX,sectionY));if(stored==null||stored.isEmpty())return;snapshot=new HashMap<Integer,TerrainPatch>(stored);}
 		for(TerrainPatch patch:snapshot.values()){
 			com.openrsc.client.model.Tile tile=sector.getTile(patch.localX,patch.localZ);
-			tile.groundElevation=(byte)patch.elevation;tile.groundTexture=(byte)patch.groundTexture;tile.groundOverlay=(byte)patch.groundOverlay;
+				tile.groundElevation=patch.elevation;tile.groundTexture=(byte)patch.groundTexture;tile.groundOverlay=(byte)patch.groundOverlay;
 			tile.roofTexture=(byte)patch.roofTexture;tile.horizontalWall=(byte)patch.horizontalWall;tile.verticalWall=(byte)patch.verticalWall;tile.diagonalWalls=patch.diagonal;tile.editorPaintedOverlay=patch.editorPaintedOverlay;
 		}
 	}

@@ -295,13 +295,17 @@ public final class NativeLayeredTerrainPacketDecoder {
 					}
 					int expandedTileBytes = Math.multiplyExact(
 						Math.multiplyExact(chunkSize, chunkSize),
-						NativeLayeredTerrainChunk.TILE_WIRE_BYTES);
+						NativeLayeredTerrainChunk.wireBytesForEncoding(sourceEncoding));
 					boolean visualPayload =
 						NativeLayeredTerrainChunk.VISUAL_ENCODING.equals(
-							sourceEncoding);
+							sourceEncoding)
+						|| NativeLayeredTerrainChunk.VISUAL_ENCODING_V2.equals(sourceEncoding);
 					boolean structuralPayload =
 						NativeLayeredTerrainChunk.STRUCTURAL_ENCODING.equals(
-							sourceEncoding);
+							sourceEncoding)
+						|| NativeLayeredTerrainChunk.STRUCTURAL_ENCODING_V2.equals(sourceEncoding);
+					int visualTileBytes = NativeLayeredTerrainChunk
+						.VISUAL_ENCODING_V2.equals(sourceEncoding) ? 4 : 3;
 					int expectedTileBytes = structuralPayload
 						? Math.multiplyExact(
 							Math.multiplyExact(chunkSize, chunkSize),
@@ -309,7 +313,7 @@ public final class NativeLayeredTerrainPacketDecoder {
 						: visualPayload
 						? Math.multiplyExact(
 							Math.multiplyExact(chunkSize, chunkSize),
-							3)
+							visualTileBytes)
 						: expandedTileBytes;
 					NativeLayeredTerrainChunk chunk;
 					if (payloadPresent) {
@@ -339,7 +343,7 @@ public final class NativeLayeredTerrainPacketDecoder {
 									"Visual terrain payload requires protocol v9");
 							}
 							tileBytes = expandVisualTerrain(
-								tileBytes, expandedTileBytes);
+								tileBytes, expandedTileBytes, visualTileBytes);
 						} else if (structuralPayload) {
 							if (protocolVersion
 									!= NativeLayeredTerrainSnapshot
@@ -523,12 +527,15 @@ public final class NativeLayeredTerrainPacketDecoder {
 	}
 
 	private static byte[] expandVisualTerrain(
-		byte[] visualBytes, int expandedLength) {
+		byte[] visualBytes, int expandedLength, int visualTileBytes) {
 		if (visualBytes == null
-			|| visualBytes.length % 3 != 0
+			|| (visualTileBytes != 3 && visualTileBytes != 4)
+			|| visualBytes.length % visualTileBytes != 0
 			|| expandedLength
-				!= visualBytes.length / 3
-					* NativeLayeredTerrainChunk.TILE_WIRE_BYTES) {
+				!= visualBytes.length / visualTileBytes
+					* (visualTileBytes == 4
+						? NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES
+						: NativeLayeredTerrainChunk.LEGACY_TILE_WIRE_BYTES)) {
 			throw new IllegalArgumentException(
 				"Visual native terrain has an invalid tile image");
 		}
@@ -536,10 +543,11 @@ public final class NativeLayeredTerrainPacketDecoder {
 		int source = 0;
 		int target = 0;
 		while (source < visualBytes.length) {
-			expanded[target] = visualBytes[source++];
-			expanded[target + 1] = visualBytes[source++];
-			expanded[target + 2] = visualBytes[source++];
-			target += NativeLayeredTerrainChunk.TILE_WIRE_BYTES;
+			System.arraycopy(visualBytes, source, expanded, target, visualTileBytes);
+			source += visualTileBytes;
+			target += visualTileBytes == 4
+				? NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES
+				: NativeLayeredTerrainChunk.LEGACY_TILE_WIRE_BYTES;
 		}
 		return expanded;
 	}
@@ -549,8 +557,7 @@ public final class NativeLayeredTerrainPacketDecoder {
 		if (structuralBytes == null
 			|| structuralBytes.length % 7 != 0
 			|| expandedLength
-				!= structuralBytes.length / 7
-					* NativeLayeredTerrainChunk.TILE_WIRE_BYTES) {
+				!= structuralBytes.length / 7 * (expandedLength / (structuralBytes.length / 7))) {
 			throw new IllegalArgumentException(
 				"Structural native terrain has an invalid tile image");
 		}
@@ -562,10 +569,10 @@ public final class NativeLayeredTerrainPacketDecoder {
 				structuralBytes,
 				source,
 				expanded,
-				target + 3,
+				target + (expandedLength / (structuralBytes.length / 7) == 11 ? 4 : 3),
 				7);
 			source += 7;
-			target += NativeLayeredTerrainChunk.TILE_WIRE_BYTES;
+			target += expandedLength / (structuralBytes.length / 7);
 		}
 		return expanded;
 	}

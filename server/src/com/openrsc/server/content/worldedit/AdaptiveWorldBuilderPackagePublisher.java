@@ -686,7 +686,7 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 				value.append(",\"level\":").append(sector.identity.getLevel())
 					.append(",\"sectorX\":").append(sector.identity.getSectorX())
 					.append(",\"sectorY\":").append(sector.identity.getSectorY())
-					.append(",\"encoding\":\"raw-layered-sector-v1\",\"path\":");
+					.append(",\"encoding\":\"raw-layered-sector-v2-u16\",\"path\":");
 				json(value, file.path); value.append(",\"sha256\":");
 				json(value, file.sha256); value.append('}');
 			}
@@ -750,7 +750,8 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 
 		public Sector(WorldMapSectorId identity, byte[] bytes) {
 			if (identity == null || bytes == null
-				|| bytes.length != NativeLayeredTerrainSector.TILE_COUNT * 10) {
+				|| bytes.length != NativeLayeredTerrainSector.TILE_COUNT
+					* com.openrsc.server.io.NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES) {
 				throw new IllegalArgumentException(
 					"Adaptive terrain sector must contain exact raw tile bytes");
 			}

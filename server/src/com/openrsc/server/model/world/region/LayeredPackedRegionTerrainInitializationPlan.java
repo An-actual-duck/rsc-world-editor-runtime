@@ -226,7 +226,7 @@ public final class LayeredPackedRegionTerrainInitializationPlan {
 		private final byte horizontalWallValue;
 		private final byte overlay;
 		private final byte verticalWallValue;
-		private final byte elevation;
+		private final int elevation;
 		private final boolean staticProjectileBlocked;
 		private final boolean terrainBlocked;
 		private final int terrainCollisionMask;
@@ -242,7 +242,7 @@ public final class LayeredPackedRegionTerrainInitializationPlan {
 			final byte horizontalWallValue,
 			final byte overlay,
 			final byte verticalWallValue,
-			final byte elevation,
+			final int elevation,
 			final boolean originalProjectileAllowed,
 			final boolean terrainBlocked,
 			final int blockingSceneryCount,
@@ -335,7 +335,6 @@ public final class LayeredPackedRegionTerrainInitializationPlan {
 		public byte getHorizontalWallValue() { return horizontalWallValue; }
 		public byte getOverlay() { return overlay; }
 		public byte getVerticalWallValue() { return verticalWallValue; }
-		public byte getElevation() { return elevation; }
 		public boolean isStaticProjectileBlocked() {
 			return staticProjectileBlocked;
 		}

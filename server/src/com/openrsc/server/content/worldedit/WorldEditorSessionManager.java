@@ -4,6 +4,7 @@ import com.openrsc.server.model.entity.player.Player;
 import com.openrsc.server.external.GameObjectLoc;
 import com.openrsc.server.external.NPCLoc;
 import com.openrsc.server.io.NativeLayeredTerrainSector;
+import com.openrsc.server.io.NativeLayeredTerrainChunk;
 import com.openrsc.server.io.NativeLayeredTerrainTile;
 import com.openrsc.server.io.NativeLayeredGroundItemPlacement;
 import com.openrsc.server.io.NativeLayeredBoundaryPlacement;
@@ -225,6 +226,16 @@ public final class WorldEditorSessionManager {
 		int horizontalWall,
 		int verticalWall,
 		int diagonal) {
+		return paintNativeTerrainStroke(player, requestedTiles, level, fieldMask,
+			elevation, groundTexture, groundOverlay, roofTexture, horizontalWall,
+			verticalWall, diagonal, 0, 1);
+	}
+
+	public synchronized NativeTerrainStrokeResult paintNativeTerrainStroke(
+		Player player, int[][] requestedTiles, int level, int fieldMask,
+		int elevation, int groundTexture, int groundOverlay, int roofTexture,
+		int horizontalWall, int verticalWall, int diagonal,
+		int elevationOperation, int elevationStep) {
 		requireNativeTerrainAuthoring(player, level);
 		validateTerrainPaint(
 			fieldMask, elevation, groundTexture, groundOverlay, roofTexture,
@@ -251,8 +262,22 @@ public final class WorldEditorSessionManager {
 			NativeTileKey key = new NativeTileKey(location);
 			NativeLayeredTerrainTile current = nativeTerrainOverlay.get(key);
 			if (current == null) current = base;
+			int targetElevation = elevation;
+			if ((fieldMask & 1) != 0 && elevationOperation != 0) {
+				if (elevationOperation < 1 || elevationOperation > 2
+					|| elevationStep < 1 || elevationStep > 65535) {
+					throw new IllegalArgumentException("Elevation operation capability v2 is invalid.");
+				}
+				long candidate = (long)current.getElevation()
+					+ (elevationOperation == 1 ? elevationStep : -elevationStep);
+				if (candidate < 0L || candidate > 65535L) {
+					throw new IllegalArgumentException(
+						"Elevation stroke refused atomically: relative operation exceeds 0..65535.");
+				}
+				targetElevation = (int)candidate;
+			}
 			NativeLayeredTerrainTile painted = paintNativeTile(
-				current, fieldMask, elevation, groundTexture, groundOverlay,
+				current, fieldMask, targetElevation, groundTexture, groundOverlay,
 				roofTexture, horizontalWall, verticalWall, diagonal);
 			boolean existed = nativeTerrainOverlay.containsKey(key);
 			boolean remains = !painted.equals(base);
@@ -291,7 +316,7 @@ public final class WorldEditorSessionManager {
 
 	public synchronized byte[] copyNativeTerrainSectorWireBytes(
 		NativeLayeredTerrainSector source) {
-		byte[] bytes = source.copyWireBytes();
+		byte[] bytes = copyWideNativeTerrainSector(source);
 		WorldMapSectorId identity = source.getIdentity();
 		for (Map.Entry<NativeTileKey,NativeLayeredTerrainTile> entry
 			: nativeTerrainOverlay.entrySet()) {
@@ -306,7 +331,8 @@ public final class WorldEditorSessionManager {
 			}
 			int localX = Math.floorMod(key.x, NativeLayeredTerrainSector.SIZE);
 			int localY = Math.floorMod(key.y, NativeLayeredTerrainSector.SIZE);
-			int offset = (localX * NativeLayeredTerrainSector.SIZE + localY) * 10;
+			int offset = (localX * NativeLayeredTerrainSector.SIZE + localY)
+				* NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES;
 			writeNativeTile(bytes, offset, entry.getValue());
 		}
 		return bytes;
@@ -1848,12 +1874,18 @@ public final class WorldEditorSessionManager {
 		else nativeTerrainDirty.add(key);
 	}
 	private static void writeNativeTile(byte[] bytes,int offset,NativeLayeredTerrainTile tile){
-		bytes[offset]=(byte)tile.getElevation();bytes[offset+1]=(byte)tile.getTexture();
-		bytes[offset+2]=(byte)tile.getOverlay();bytes[offset+3]=(byte)tile.getRoof();
-		bytes[offset+4]=(byte)tile.getVerticalWall();bytes[offset+5]=(byte)tile.getHorizontalWall();
-		int diagonal=tile.getDiagonalWall();bytes[offset+6]=(byte)(diagonal>>>24);
-		bytes[offset+7]=(byte)(diagonal>>>16);bytes[offset+8]=(byte)(diagonal>>>8);
-		bytes[offset+9]=(byte)diagonal;
+		bytes[offset]=(byte)(tile.getElevation()>>>8);bytes[offset+1]=(byte)tile.getElevation();
+		bytes[offset+2]=(byte)tile.getTexture();bytes[offset+3]=(byte)tile.getOverlay();bytes[offset+4]=(byte)tile.getRoof();
+		bytes[offset+5]=(byte)tile.getVerticalWall();bytes[offset+6]=(byte)tile.getHorizontalWall();
+		int diagonal=tile.getDiagonalWall();bytes[offset+7]=(byte)(diagonal>>>24);
+		bytes[offset+8]=(byte)(diagonal>>>16);bytes[offset+9]=(byte)(diagonal>>>8);
+		bytes[offset+10]=(byte)diagonal;
+	}
+	private static byte[] copyWideNativeTerrainSector(NativeLayeredTerrainSector source){
+		byte[] bytes=new byte[NativeLayeredTerrainSector.TILE_COUNT*NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES];
+		int offset=0;for(int x=0;x<NativeLayeredTerrainSector.SIZE;x++)for(int y=0;y<NativeLayeredTerrainSector.SIZE;y++){
+			writeNativeTile(bytes,offset,source.getTile(x,y));offset+=NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES;
+		}return bytes;
 	}
 	private static String sha256(byte[] bytes){
 		try{
@@ -1865,8 +1897,8 @@ public final class WorldEditorSessionManager {
 	}
 	private static void validateTerrainPaint(int fieldMask,int elevation,int groundTexture,int groundOverlay,int roofTexture,int horizontalWall,int verticalWall){
 		if(fieldMask<=0||(fieldMask&~127)!=0)throw new IllegalArgumentException("Select at least one supported terrain field.");
-		if(!rawByte(elevation)||!rawByte(groundTexture)||!rawByte(groundOverlay)||!rawByte(roofTexture)
-			||!rawByte(horizontalWall)||!rawByte(verticalWall))throw new IllegalArgumentException("Terrain byte values must be from 0 to 255.");
+		if(!unsignedShort(elevation)||!rawByte(groundTexture)||!rawByte(groundOverlay)||!rawByte(roofTexture)
+			||!rawByte(horizontalWall)||!rawByte(verticalWall))throw new IllegalArgumentException("Elevation must be 0..65535; other terrain byte values must be 0..255.");
 	}
 	private WorldEditorTerrainArchive.Snapshot inspectArchivedTerrain(Player player, int x, int y, int plane) throws IOException {
 		if (terrainArchive == null) {
@@ -1881,6 +1913,7 @@ public final class WorldEditorSessionManager {
 	}
 	private static String terrainKey(int x,int y,int plane){return plane+":"+x+":"+y;}
 	private static boolean rawByte(int value){return value>=0&&value<=255;}
+	private static boolean unsignedShort(int value){return value>=0&&value<=65535;}
 
 	private static final class Session { final long id, ownerHash; int nextSequence=1; Session(long i,long o){id=i;ownerHash=o;} }
 	private static final class NativeTileKey {
