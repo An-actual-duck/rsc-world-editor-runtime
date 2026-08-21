@@ -1036,8 +1036,8 @@ world_builder_initial_y: 648
                 terrain_bytes = (
                     package / "terrain/global/lp0/xp2-yp13.raw"
                 ).read_bytes()
-                boundary_offset = ((122 % 48) * 48 + (648 % 48)) * 10 + 5
-                refused_boundary_offset = ((123 % 48) * 48 + (648 % 48)) * 10 + 5
+                boundary_offset = ((122 % 48) * 48 + (648 % 48)) * 11 + 6
+                refused_boundary_offset = ((123 % 48) * 48 + (648 % 48)) * 11 + 6
                 self.assertEqual(2, terrain_bytes[boundary_offset])
                 self.assertEqual(0, terrain_bytes[refused_boundary_offset])
                 if project_origin == "target-layered":

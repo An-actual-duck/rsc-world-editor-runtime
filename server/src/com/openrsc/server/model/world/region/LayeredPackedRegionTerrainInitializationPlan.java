@@ -335,6 +335,7 @@ public final class LayeredPackedRegionTerrainInitializationPlan {
 		public byte getHorizontalWallValue() { return horizontalWallValue; }
 		public byte getOverlay() { return overlay; }
 		public byte getVerticalWallValue() { return verticalWallValue; }
+		public int getElevation() { return elevation; }
 		public boolean isStaticProjectileBlocked() {
 			return staticProjectileBlocked;
 		}

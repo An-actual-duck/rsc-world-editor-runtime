@@ -554,12 +554,18 @@ public final class NativeLayeredTerrainPacketDecoder {
 
 	private static byte[] expandStructuralTerrain(
 		byte[] structuralBytes, int expandedLength) {
-		if (structuralBytes == null
-			|| structuralBytes.length % 7 != 0
-			|| expandedLength
-				!= structuralBytes.length / 7 * (expandedLength / (structuralBytes.length / 7))) {
+		if (structuralBytes == null || structuralBytes.length == 0
+			|| structuralBytes.length % 7 != 0) {
 			throw new IllegalArgumentException(
 				"Structural native terrain has an invalid tile image");
+		}
+		int tileCount = structuralBytes.length / 7;
+		int fullTileBytes = expandedLength / tileCount;
+		if ((fullTileBytes != NativeLayeredTerrainChunk.LEGACY_TILE_WIRE_BYTES
+				&& fullTileBytes != NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES)
+			|| expandedLength != tileCount * fullTileBytes) {
+			throw new IllegalArgumentException(
+				"Structural native terrain has an invalid expanded width");
 		}
 		byte[] expanded = new byte[expandedLength];
 		int source = 0;
@@ -569,10 +575,10 @@ public final class NativeLayeredTerrainPacketDecoder {
 				structuralBytes,
 				source,
 				expanded,
-				target + (expandedLength / (structuralBytes.length / 7) == 11 ? 4 : 3),
+				target + (fullTileBytes == 11 ? 4 : 3),
 				7);
 			source += 7;
-			target += expandedLength / (structuralBytes.length / 7);
+			target += fullTileBytes;
 		}
 		return expanded;
 	}

@@ -617,13 +617,13 @@ public final class AdaptiveWorldBuilderClientStartupHarness {
                         * NativeLayeredTerrainChunk.TILE_WIRE_BYTES];
                 for (int offset = 0; offset < tiles.length;
                         offset += NativeLayeredTerrainChunk.TILE_WIRE_BYTES) {
-                    tiles[offset + 1] = 1;
-                    tiles[offset + 2] = 8;
+                    tiles[offset + 2] = 1;
+                    tiles[offset + 3] = 8;
                 }
                 chunks[index++] = NativeLayeredTerrainChunk.available(
                     NativeLayeredTerrainSnapshot.SECTOR_SIZE,
                     chunkX, chunkY, chunkX, chunkY,
-                    NativeLayeredTerrainChunk.RAW_ENCODING, repeated('4'), tiles);
+                    NativeLayeredTerrainChunk.RAW_ENCODING_V2, repeated('4'), tiles);
             }
         }
         return new NativeLayeredTerrainSnapshot(
@@ -865,13 +865,13 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "assetContract": "world-builder-client-asset-binding-v1",
             "assetIdentity": "creator.assets.v1",
             "assetSha256": hashlib.sha256(assets.read_bytes()).hexdigest(),
-            "authoring": "generic-signed-layered-authoring-v1",
+            "authoring": "generic-signed-layered-authoring-v2-u16-elevation",
             "authorableBoundaryIds": "1,10",
             "authorableItemIds": "10,20",
             "authorableNpcIds": "30,31",
             "authorableSceneryIds": "0,104",
-            "capability": "adaptive-world-builder-runtime-capability-v1",
-            "clientBuild": "core-framework-adaptive-builder-client-v1",
+            "capability": "adaptive-world-builder-runtime-capability-v2",
+            "clientBuild": "core-framework-adaptive-builder-client-v2",
             "clientVersion": "10048",
             "coordinateModel": "signed-layered-v1",
             "definitionContract": "world-builder-definition-catalog-binding-v1",
@@ -885,7 +885,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "initialWorldSpace": "global",
             "initialX": "7",
             "initialY": "9",
-            "loader": "generic-signed-layered-loader-v1",
+            "loader": "generic-signed-layered-loader-v2-u16-elevation",
             "levels": "-3,0",
             "manifestSha256": "1" * 64,
             "packageId": "creator.arbitrary-adopted-world",
@@ -895,13 +895,13 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "placementEncoding": "layered-world-placements-v3",
             "profile": "adaptive-world-builder",
             "projectOrigin": "target-layered",
-            "protocol": "world-builder-native-layered-protocol-v1",
+            "protocol": "world-builder-native-layered-protocol-v2-u16-elevation",
             "requiredBoundaryIds": "",
             "requiredItemIds": "",
             "requiredNpcIds": "",
             "requiredSceneryIds": "",
             "requiredTileIds": "",
-            "serverBuild": "core-framework-adaptive-builder-server-v1",
+            "serverBuild": "core-framework-adaptive-builder-server-v2",
             "sourceBaselineInventorySha256": "3" * 64,
         }
         if empty:
@@ -1611,17 +1611,17 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertEqual(outputs[0], outputs[1])
         evidence = json.loads(outputs[0])
         self.assertEqual("world-builder-runtime-evidence", evidence["manifestType"])
-        self.assertEqual("core-framework-adaptive-builder-server-v1", evidence["buildId"])
-        self.assertEqual("generic-signed-layered-loader-v1", evidence["loaderId"])
-        self.assertEqual("world-builder-native-layered-protocol-v1", evidence["protocolId"])
-        self.assertEqual([1, 3], evidence["encodingVersions"])
+        self.assertEqual("core-framework-adaptive-builder-server-v2", evidence["buildId"])
+        self.assertEqual("generic-signed-layered-loader-v2-u16-elevation", evidence["loaderId"])
+        self.assertEqual("world-builder-native-layered-protocol-v2-u16-elevation", evidence["protocolId"])
+        self.assertEqual([1, 2, 3], evidence["encodingVersions"])
         self.assertEqual(
             ["boundary", "ground-item", "npc", "scenery"],
             evidence["authoring"]["placementFamilies"],
         )
 
         capability = json.loads((
-            ROOT / "server/conf/world-builder/adaptive-runtime-capability-v1.json"
+            ROOT / "server/conf/world-builder/adaptive-runtime-capability-v2.json"
         ).read_text())
         server_identity = (
             ROOT / "server/src/com/openrsc/server/content/worldedit/"

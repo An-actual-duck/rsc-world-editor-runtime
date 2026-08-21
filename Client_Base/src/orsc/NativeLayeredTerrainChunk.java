@@ -166,14 +166,13 @@ public final class NativeLayeredTerrainChunk {
 		int visualBytes = wide ? 4 : 3;
 		int fullBytes = wide ? WIDE_TILE_WIRE_BYTES : LEGACY_TILE_WIRE_BYTES;
 		byte[] merged = new byte[visual.size * visual.size * fullBytes];
-		for (int source = 0, target = 0; target < merged.length;
-			source += visualBytes, target += fullBytes) {
-			System.arraycopy(visual.tileBytes, source, merged, target, visualBytes);
+		for (int offset = 0; offset < merged.length; offset += fullBytes) {
+			System.arraycopy(visual.tileBytes, offset, merged, offset, visualBytes);
 			System.arraycopy(
 				structural.tileBytes,
-				(source / visualBytes) * 7,
+				offset + visualBytes,
 				merged,
-				target + visualBytes,
+				offset + visualBytes,
 				7);
 		}
 		return available(

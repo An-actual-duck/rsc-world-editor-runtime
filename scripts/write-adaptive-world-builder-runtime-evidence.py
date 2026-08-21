@@ -12,10 +12,10 @@ from pathlib import Path
 
 IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
 MAX_CATALOG_BYTES = 16 * 1024 * 1024
-SERVER_BUILD_ID = "core-framework-adaptive-builder-server-v1"
-CLIENT_BUILD_ID = "core-framework-adaptive-builder-client-v1"
-LOADER_ID = "generic-signed-layered-loader-v1"
-PROTOCOL_ID = "world-builder-native-layered-protocol-v1"
+SERVER_BUILD_ID = "core-framework-adaptive-builder-server-v2"
+CLIENT_BUILD_ID = "core-framework-adaptive-builder-client-v2"
+LOADER_ID = "generic-signed-layered-loader-v2-u16-elevation"
+PROTOCOL_ID = "world-builder-native-layered-protocol-v2-u16-elevation"
 
 
 def safe_catalog(requested: str) -> Path:
@@ -73,7 +73,7 @@ def main() -> int:
         "definitionCatalogSha256": catalog_sha256,
         "mapFormatId": "signed-layered-v1",
         "packageSchemaId": "layered-world-package-v1",
-        "encodingVersions": [1, 3],
+        "encodingVersions": [1, 2, 3],
         "authoring": {
             "editExistingLevels": True,
             "createLevels": True,

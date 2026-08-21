@@ -73,7 +73,7 @@ public final class NativeLayeredTerrainSector {
 		return new NativeLayeredTerrainSector(
 			identity,
 			tiles,
-			NativeLayeredWorldPackage.RAW_ENCODING_V2,
+			NativeLayeredWorldPackage.RAW_ENCODING,
 			"world-builder-live-void",
 			sha256(tiles));
 	}
@@ -82,7 +82,6 @@ public final class NativeLayeredTerrainSector {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
 			for (NativeLayeredTerrainTile tile : tiles) {
-				digest.update((byte)(tile.getElevation() >>> 8));
 				digest.update((byte)tile.getElevation());
 				digest.update((byte)tile.getTexture());
 				digest.update((byte)tile.getOverlay());

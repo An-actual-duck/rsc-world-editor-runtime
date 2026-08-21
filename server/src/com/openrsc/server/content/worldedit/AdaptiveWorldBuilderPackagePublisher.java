@@ -749,14 +749,27 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 		public final byte[] bytes;
 
 		public Sector(WorldMapSectorId identity, byte[] bytes) {
-			if (identity == null || bytes == null
-				|| bytes.length != NativeLayeredTerrainSector.TILE_COUNT
-					* com.openrsc.server.io.NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES) {
+			if (identity == null || bytes == null || (bytes.length
+				!= NativeLayeredTerrainSector.TILE_COUNT
+					* com.openrsc.server.io.NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES
+				&& bytes.length != NativeLayeredTerrainSector.TILE_COUNT
+					* com.openrsc.server.io.NativeLayeredTerrainChunk.LEGACY_TILE_WIRE_BYTES)) {
 				throw new IllegalArgumentException(
 					"Adaptive terrain sector must contain exact raw tile bytes");
 			}
 			this.identity = identity;
-			this.bytes = bytes.clone();
+			if (bytes.length == NativeLayeredTerrainSector.TILE_COUNT
+					* com.openrsc.server.io.NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES) {
+				this.bytes = bytes.clone();
+			} else {
+				this.bytes = new byte[NativeLayeredTerrainSector.TILE_COUNT
+					* com.openrsc.server.io.NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES];
+				for (int source = 0, target = 0; source < bytes.length;
+					source += 10, target += 11) {
+					this.bytes[target] = 0;
+					System.arraycopy(bytes, source, this.bytes, target + 1, 10);
+				}
+			}
 		}
 	}
 

@@ -76,10 +76,12 @@ public final class NativeLayeredTerrainChunk {
 	 * all 32 diagonal-wall bits in network byte order.
 	 */
 	public byte[] copyWireBytes() {
-		byte[] result = new byte[tiles.length * WIDE_TILE_WIRE_BYTES];
+		boolean wide = NativeLayeredWorldPackage.isWideTerrainEncoding(sourceEncoding);
+		int tileBytes = copyWireBytesPerTile(wide);
+		byte[] result = new byte[tiles.length * tileBytes];
 		int offset = 0;
 		for (NativeLayeredTerrainTile tile : tiles) {
-			result[offset++] = (byte) (tile.getElevation() >>> 8);
+			if (wide) result[offset++] = (byte) (tile.getElevation() >>> 8);
 			result[offset++] = (byte) tile.getElevation();
 			result[offset++] = (byte) tile.getTexture();
 			result[offset++] = (byte) tile.getOverlay();

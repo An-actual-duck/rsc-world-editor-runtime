@@ -32,23 +32,23 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		65536 * 11 - 1;
 	public static final String PROFILE_ID = "adaptive-world-builder";
 	public static final String CAPABILITY_ID =
-		"adaptive-world-builder-runtime-capability-v1";
+		"adaptive-world-builder-runtime-capability-v2";
 	public static final String SESSION_SCHEMA =
 		"adaptive-world-builder-session-v1";
 	public static final String SERVER_BUILD_ID =
-		"core-framework-adaptive-builder-server-v1";
+		"core-framework-adaptive-builder-server-v2";
 	public static final String CLIENT_BUILD_ID =
-		"core-framework-adaptive-builder-client-v1";
+		"core-framework-adaptive-builder-client-v2";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v1";
+		"generic-signed-layered-loader-v2-u16-elevation";
 	public static final String AUTHORING_ID =
-		"generic-signed-layered-authoring-v1";
+		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
 		"world-builder-definition-catalog-binding-v1";
 	public static final String ASSET_CONTRACT_ID =
 		"world-builder-client-asset-binding-v1";
 	public static final String PROTOCOL_ID =
-		"world-builder-native-layered-protocol-v1";
+		"world-builder-native-layered-protocol-v2-u16-elevation";
 	public static final String EFFECTIVE_COMPOSITION_ID =
 		"world-builder-effective-static-composition-v1";
 	public static final String PLAYER_LOCATION_ORIGIN =
