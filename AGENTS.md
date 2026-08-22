@@ -7,12 +7,25 @@ its workers as part of an assigned World Builder objective. The repositories
 remain independent: this is not Spoiled Milk, does not own a public game
 server, and must never inspect or modify `/home/justin/Core-Framework`.
 
-Before changing anything, identify the checkout role and run:
+Before changing anything, identify the session role and run its matching
+preflight. A manager or maintainer-owned runtime worker runs:
 
 ```bash
 git status --short --branch
 ./scripts/ai-workspace.sh status
 ```
+
+External AI contributors must not run the maintainer workspace scripts. From
+their own Windows clone they run:
+
+```powershell
+git status --short --branch
+py -3 scripts/contributor-workspace.py status
+```
+
+Their beginner-safe checkpoint, rescue, and exact-commit handoff workflow is
+documented in
+[`docs/workspaces/external-contributor.md`](docs/workspaces/external-contributor.md).
 
 ## Roles and default staffing
 

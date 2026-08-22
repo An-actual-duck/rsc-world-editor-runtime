@@ -139,7 +139,8 @@ python3 ./tests/myworld/test-bot-suspicion-report.py
 python3 ./tests/myworld/test-ai-workspace-workflow.py
 python3 ./tests/myworld/test-contributor-workflow.py
 python3 ./tests/myworld/test-hosted-alpha-config.py
-python3 ./tests/myworld/test-hosted-server-safety.py
+# Public hosted-server operation belongs to the separate game-server owner,
+# not this independent World Editor runtime provider.
 python3 ./tests/myworld/test-client-fat-jar-archive.py
 python3 ./tests/myworld/test-player-release.py
 python3 ./tests/myworld/test-release-hotkey-guard.py

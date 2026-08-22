@@ -248,11 +248,50 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         for field in range(6, 13):
             self.assertIn(f"return {field}", ui)
 
+    def test_primary_tools_and_context_actions_have_separate_columns(self):
+        ui = UI.read_text()
+        self.assertIn("DOCK_WIDTH=70,DOCK_HEIGHT=306", ui)
+
+        primary = re.search(r"private Mode dockModeAt\(.*?\{(?P<body>.*?)\}", ui, re.S)
+        self.assertIsNotNone(primary)
+        expected_order = [
+            "dockHit(x,y,0,1))return Mode.NAVIGATE",
+            "dockHit(x,y,0,2))return Mode.INSPECT",
+            "dockHit(x,y,0,3))return Mode.SCENERY",
+            "dockHit(x,y,0,4))return Mode.NPC",
+            "dockHit(x,y,0,5))return Mode.ITEMS",
+        ]
+        offsets = [primary.group("body").index(entry) for entry in expected_order]
+        self.assertEqual(sorted(offsets), offsets)
+
+        context = re.search(r"private int contextActionAtDock\(.*?\{(?P<body>.*?)\n\t\}", ui, re.S)
+        self.assertIsNotNone(context)
+        self.assertIn("mode==Mode.SCENERY", context.group("body"))
+        self.assertIn("mode==Mode.NPC||mode==Mode.ITEMS", context.group("body"))
+        self.assertIn("if(mode!=Mode.TERRAIN)return -1", ui)
+        self.assertIn("renderDockContextActions(x,y)", ui)
+        self.assertIn('MODE_SCENERY,"R"', ui)
+        self.assertIn('return "Scenery: "+(action==0?"Add":action==1?"Rotate":"Remove")', ui)
+
+        compact_scenery = re.search(r"private void renderCompactScenery\(.*?\{(?P<body>.*?)\n\t\}", ui, re.S)
+        compact_npc = re.search(r"private void renderCompactNpc\(.*?\{(?P<body>.*?)\n\t\}", ui, re.S)
+        compact_items = re.search(r"private void renderCompactGroundItems\(.*?\{(?P<body>.*?)\n\t\}", ui, re.S)
+        for method in (compact_scenery, compact_npc, compact_items):
+            self.assertIsNotNone(method)
+            self.assertNotIn('"Place"', method.group("body"))
+            self.assertNotIn('"Remove"', method.group("body"))
+        self.assertNotIn('"Rotate"', compact_scenery.group("body"))
+
+        self.assertIn("dockHit(rx,ry,0,6)", ui)
+        self.assertIn("dockHit(rx,ry,0,7)", ui)
+        self.assertIn("dockHit(rx,ry,0,8)", ui)
+        self.assertIn("dockHit(rx,ry,0,9)", ui)
+
     def test_dirty_save_and_build_profile_restoration_guards_are_visible(self):
         ui = UI.read_text()
         client = (CLIENT / "orsc/mudclient.java").read_text()
         self.assertIn("unsavedChanges||saveRequested", ui)
-        self.assertIn("Wait for the active terrain stroke to finish before saving.", ui)
+        self.assertIn("Wait for authoritative edit responses before saving.", ui)
         self.assertIn("Unsaved edits remain. Select Close again", ui)
         self.assertIn("observeGameMessage", ui)
         self.assertIn("worldEditorBuildSnapshotValid=true", client)

@@ -82,7 +82,11 @@ def main():
 
     require(client, 'addSkill("Harvest");', "Skills tab must display Harvest")
     forbid(client, 'addSkill("Harvesting");', "Skills tab must not display Harvesting")
-    require(packets, '"Enchanting", "Harvest", "Summoning"', "Skill update names must use Harvest")
+    require(
+        packets,
+        'mc.getSkillNamesLong()[skill]',
+        "Skill updates must use the canonical client skill names, including Harvest",
+    )
     require(guide, 'equalsIgnoreCase("Harvest")', "Harvest skill-guide routing must match the new label")
 
     print("PASS: repeating action progress, interruption, and Harvest label validated")

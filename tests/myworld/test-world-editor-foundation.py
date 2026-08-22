@@ -259,7 +259,7 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertIn("editor.type == 8", generator)
         self.assertIn("count<1||count>64", client_handler)
         self.assertIn("acceptTerrainStroke", client_handler)
-        self.assertIn("putByte(6)", ui)
+        self.assertIn("putByte(wide?7:6)", ui)
         self.assertIn('ack "+ackMs+"ms, rebuild "', ui)
         self.assertIn("updateTerrainDrag", ui)
         self.assertIn("terrainDragSeen.add(key)", ui)

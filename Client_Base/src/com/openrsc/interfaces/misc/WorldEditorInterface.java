@@ -16,7 +16,7 @@ import java.util.Map;
 public final class WorldEditorInterface extends NCustomComponent {
 	private static final int TERRAIN_BATCH_LIMIT=64,TERRAIN_DRAG_LIMIT=4096;
 	private static final int MAX_GROUND_ITEM_AMOUNT=99999;
-	private static final int DOCK_WIDTH=70,DOCK_HEIGHT=276,FLYOUT_WIDTH=180,FLYOUT_GAP=4;
+	private static final int DOCK_WIDTH=70,DOCK_HEIGHT=306,FLYOUT_WIDTH=180,FLYOUT_GAP=4;
 	private static final int BROWSER_WIDTH=390,BROWSER_HEIGHT=330,BROWSER_GAP=4;
 	private static final int BROWSER_CARD_WIDTH=178,BROWSER_CARD_HEIGHT=42,BROWSER_CARD_STEP_Y=45,BROWSER_GRID_Y=100;
 	private static final int DOCK_LEFT=6,DOCK_RIGHT=36,DOCK_TOP=4,DOCK_STEP=30;
@@ -523,11 +523,12 @@ public final class WorldEditorInterface extends NCustomComponent {
 			if(dockHit(rx,ry,0,0)){if(click==1){coordinateFocus=0;definitionBrowser.close();toolbar.toggleCollapsed();updatePresentationBounds();}return true;}
 			if(toolbar.isCollapsed())return true;
 			Mode selected=dockModeAt(rx,ry);if(selected!=null){if(click==1)selectMode(selected);return true;}
+			int action=contextActionAtDock(rx,ry);if(action>=0){if(click==1)selectContextAction(action);return true;}
 			int field=terrainFieldAtDock(rx,ry);if(field>=0){if(click==2)toggleTerrainField(field);else openTerrainTool(field);return true;}
-			if(dockHit(rx,ry,0,4)){if(click==2)toggleBrushSize();else toggleBrushFlyout();return true;}
-			if(dockHit(rx,ry,0,5)){if(click==1)setTerrainBuildMode(!terrainBuildMode);return true;}
-			if(dockHit(rx,ry,0,6)){if(click==1)requestWorldEditSave();return true;}
-			if(dockHit(rx,ry,0,7)){if(click==1)requestEditorClose();return true;}
+			if(dockHit(rx,ry,0,6)){if(click==2)toggleBrushSize();else toggleBrushFlyout();return true;}
+			if(dockHit(rx,ry,0,7)){if(click==1)setTerrainBuildMode(!terrainBuildMode);return true;}
+			if(dockHit(rx,ry,0,8)){if(click==1)requestWorldEditSave();return true;}
+			if(dockHit(rx,ry,0,9)){if(click==1)requestEditorClose();return true;}
 			return true;
 		}
 		if(!toolbar.isFlyoutOpen()||rx<DOCK_WIDTH+FLYOUT_GAP)return false;
@@ -548,8 +549,19 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private static boolean hitRow(int y,int start){return y>=start&&y<start+28;}
 	private static boolean dockHit(int x,int y,int column,int row){int startX=column==0?DOCK_LEFT:DOCK_RIGHT;return x>=startX&&x<startX+28&&hitRow(y,DOCK_TOP+row*DOCK_STEP);}
-	private Mode dockModeAt(int x,int y){if(dockHit(x,y,0,1))return Mode.NAVIGATE;if(dockHit(x,y,0,2))return Mode.INSPECT;if(dockHit(x,y,0,3))return Mode.ITEMS;if(dockHit(x,y,1,0))return Mode.SCENERY;if(dockHit(x,y,1,1))return Mode.NPC;return null;}
-	private int terrainFieldAtDock(int x,int y){if(dockHit(x,y,1,2))return 6;if(dockHit(x,y,1,3))return 7;if(dockHit(x,y,1,4))return 8;if(dockHit(x,y,1,5))return 9;if(dockHit(x,y,1,6))return 10;if(dockHit(x,y,1,7))return 11;if(dockHit(x,y,1,8))return 12;return -1;}
+	private Mode dockModeAt(int x,int y){if(dockHit(x,y,0,1))return Mode.NAVIGATE;if(dockHit(x,y,0,2))return Mode.INSPECT;if(dockHit(x,y,0,3))return Mode.SCENERY;if(dockHit(x,y,0,4))return Mode.NPC;if(dockHit(x,y,0,5))return Mode.ITEMS;return null;}
+	private int contextActionAtDock(int x,int y){
+		if(mode==Mode.SCENERY){if(dockHit(x,y,1,0))return 0;if(dockHit(x,y,1,1))return 1;if(dockHit(x,y,1,2))return 2;}
+		else if(mode==Mode.NPC||mode==Mode.ITEMS){if(dockHit(x,y,1,0))return 0;if(dockHit(x,y,1,1))return 1;}
+		return -1;
+	}
+	private void selectContextAction(int action){
+		if(mode==Mode.SCENERY)sceneryTool=action==0?SceneryTool.PLACE:action==1?SceneryTool.ROTATE:SceneryTool.REMOVE;
+		else if(mode==Mode.NPC)npcTool=action==0?NpcTool.PLACE:NpcTool.REMOVE;
+		else if(mode==Mode.ITEMS)groundItemTool=action==0?GroundItemTool.PLACE:GroundItemTool.REMOVE;
+		closeArmed=false;
+	}
+	private int terrainFieldAtDock(int x,int y){if(mode!=Mode.TERRAIN)return -1;if(dockHit(x,y,1,0))return 6;if(dockHit(x,y,1,1))return 7;if(dockHit(x,y,1,2))return 8;if(dockHit(x,y,1,3))return 9;if(dockHit(x,y,1,4))return 10;if(dockHit(x,y,1,5))return 11;if(dockHit(x,y,1,6))return 12;return -1;}
 	private void openTerrainTool(int field){
 		if(isLayeredReview()&&!isLayeredTerrainDraft()){selectMode(Mode.TERRAIN);return;}
 		definitionBrowser.close();mode=Mode.TERRAIN;terrainActiveField=field;if(field>0)terrainStructureTab=field>=9;coordinateFocus=0;replaceFocusedText=false;closeArmed=false;
@@ -586,21 +598,18 @@ public final class WorldEditorInterface extends NCustomComponent {
 		case 11:setTerrainEastWall(steppedWallValue(terrainEastWall,amount));break;case 12:setTerrainDiagonalWall(steppedWallValue(terrainDiagonalWall,amount));break;default:break;}}
 	private void handleCompactSceneryMouse(int x,int y){
 		if(y>=68&&y<92){if(x>=8&&x<38)setSceneryId(steppedProjectId("scenery",sceneryId,-1));else if(x>=42&&x<130)focusNumber(3);else if(x>=134&&x<164)setSceneryId(steppedProjectId("scenery",sceneryId,1));return;}
-		if(y>=108&&y<132){if(x<60)sceneryTool=SceneryTool.PLACE;else if(x<116)sceneryTool=SceneryTool.ROTATE;else sceneryTool=SceneryTool.REMOVE;return;}
-		if(y>=140&&y<164)openSceneryBrowser();
+		if(y>=108&&y<132)openSceneryBrowser();
 	}
 	private void handleCompactNpcMouse(int x,int y){
 		if(y>=56&&y<80){if(x>=8&&x<38)setNpcId(steppedProjectId("npc",npcId,-1));else if(x>=42&&x<130)focusNumber(4);else if(x>=134&&x<164)setNpcId(steppedProjectId("npc",npcId,1));return;}
 		if(y>=100&&y<124){if(x>=8&&x<38)setNpcRadius(npcRadius-1);else if(x>=42&&x<130)focusNumber(5);else if(x>=134&&x<164)setNpcRadius(npcRadius+1);return;}
-		if(y>=138&&y<162){npcTool=x<88?NpcTool.PLACE:NpcTool.REMOVE;return;}
-		if(y>=168&&y<192)openNpcBrowser();
+		if(y>=138&&y<162)openNpcBrowser();
 	}
 	private void handleCompactGroundItemMouse(int x,int y){
 		if(y>=50&&y<74){if(x>=8&&x<38)setGroundItemId(steppedProjectId("item",groundItemId,-1));else if(x>=42&&x<130)focusNumber(14);else if(x>=134&&x<164)setGroundItemId(steppedProjectId("item",groundItemId,1));return;}
 		if(y>=80&&y<104){openGroundItemBrowser();return;}
 		if(y>=108&&y<132){if(x>=68&&x<92)setGroundItemAmount(groundItemAmount-1);else if(x>=96&&x<144)focusNumber(15);else if(x>=148&&x<172)setGroundItemAmount(groundItemAmount+1);return;}
 		if(y>=136&&y<160){if(x>=68&&x<92)setGroundItemRespawnSeconds(groundItemRespawnSeconds-1);else if(x>=96&&x<144)focusNumber(16);else if(x>=148&&x<172)setGroundItemRespawnSeconds(groundItemRespawnSeconds+1);return;}
-		if(y>=166&&y<190)groundItemTool=x<88?GroundItemTool.PLACE:GroundItemTool.REMOVE;
 	}
 	private boolean handleDefinitionBrowserMouse(int x,int y,int click){
 		if(click==0)return true;if(click!=1)return true;
@@ -693,28 +702,47 @@ public final class WorldEditorInterface extends NCustomComponent {
 		int dockWidth=toolbar.isCollapsed()?40:DOCK_WIDTH;graphics().drawBoxAlpha(x,y,dockWidth,toolbar.isCollapsed()?38:DOCK_HEIGHT,0x24190c,235);graphics().drawBoxBorder(x,dockWidth,y,toolbar.isCollapsed()?38:DOCK_HEIGHT,0);
 		drawIconButton(toolbar.isCollapsed()?WorldEditorIconRegistry.Key.TOOLBAR_EXPAND:WorldEditorIconRegistry.Key.TOOLBAR_COLLAPSE,x+DOCK_LEFT,y+DOCK_TOP,toolbar.isCollapsed(),false,false,false);
 		if(toolbar.isCollapsed()){renderCompactTooltip(x,y);return;}
-		drawModeIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,x+DOCK_RIGHT,y+dockRowY(0),Mode.SCENERY);
 		drawModeIcon(WorldEditorIconRegistry.Key.MODE_NAVIGATE,x+DOCK_LEFT,y+dockRowY(1),Mode.NAVIGATE);
-		drawModeIcon(WorldEditorIconRegistry.Key.MODE_NPC,x+DOCK_RIGHT,y+dockRowY(1),Mode.NPC);
 		drawModeIcon(WorldEditorIconRegistry.Key.MODE_INSPECT,x+DOCK_LEFT,y+dockRowY(2),Mode.INSPECT);
-		drawModeIcon(WorldEditorIconRegistry.Key.MODE_ITEMS,x+DOCK_LEFT,y+dockRowY(3),Mode.ITEMS);
-		drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_ELEVATION,x+DOCK_RIGHT,y+dockRowY(2),6,paintElevation);
-		drawIconButton(terrainBrushSize==1?WorldEditorIconRegistry.Key.TOOL_BRUSH_1X1:WorldEditorIconRegistry.Key.TOOL_BRUSH_3X3,x+DOCK_LEFT,y+dockRowY(4),mode==Mode.TERRAIN,mode==Mode.TERRAIN&&terrainActiveField==0&&toolbar.isFlyoutOpen(),false,false);
-		drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_FLOOR_COLOR,x+DOCK_RIGHT,y+dockRowY(3),7,paintFloorColor);
-		drawIconButton(WorldEditorIconRegistry.Key.PROFILE_BUILD,x+DOCK_LEFT,y+dockRowY(5),terrainBuildMode,false,false,false);
-		drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_FLOOR_TEXTURE,x+DOCK_RIGHT,y+dockRowY(4),8,paintFloorTexture);
-		drawIconButton(WorldEditorIconRegistry.Key.ACTION_SAVE,x+DOCK_LEFT,y+dockRowY(6),false,false,false,unsavedChanges||saveRequested);
-		drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_ROOF,x+DOCK_RIGHT,y+dockRowY(5),9,paintRoof);
-		drawIconButton(WorldEditorIconRegistry.Key.ACTION_CLOSE,x+DOCK_LEFT,y+dockRowY(7),false,false,closeArmed,false);
-		drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_WALL_NORTH,x+DOCK_RIGHT,y+dockRowY(6),10,paintNorthWall);
-		drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_WALL_EAST,x+DOCK_RIGHT,y+dockRowY(7),11,paintEastWall);
-		drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_WALL_DIAGONAL,x+DOCK_RIGHT,y+dockRowY(8),12,paintDiagonalWall);
+		drawModeIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,x+DOCK_LEFT,y+dockRowY(3),Mode.SCENERY);
+		drawModeIcon(WorldEditorIconRegistry.Key.MODE_NPC,x+DOCK_LEFT,y+dockRowY(4),Mode.NPC);
+		drawModeIcon(WorldEditorIconRegistry.Key.MODE_ITEMS,x+DOCK_LEFT,y+dockRowY(5),Mode.ITEMS);
+		drawIconButton(terrainBrushSize==1?WorldEditorIconRegistry.Key.TOOL_BRUSH_1X1:WorldEditorIconRegistry.Key.TOOL_BRUSH_3X3,x+DOCK_LEFT,y+dockRowY(6),mode==Mode.TERRAIN,mode==Mode.TERRAIN&&terrainActiveField==0&&toolbar.isFlyoutOpen(),false,false);
+		drawIconButton(WorldEditorIconRegistry.Key.PROFILE_BUILD,x+DOCK_LEFT,y+dockRowY(7),terrainBuildMode,false,false,false);
+		drawIconButton(WorldEditorIconRegistry.Key.ACTION_SAVE,x+DOCK_LEFT,y+dockRowY(8),false,false,false,unsavedChanges||saveRequested);
+		drawIconButton(WorldEditorIconRegistry.Key.ACTION_CLOSE,x+DOCK_LEFT,y+dockRowY(9),false,false,closeArmed,false);
+		renderDockContextActions(x,y);
 		if(toolbar.isFlyoutOpen())renderCompactFlyout(x+DOCK_WIDTH+FLYOUT_GAP,y);
 		renderCompactTooltip(x,y);
 	}
 	private static int dockRowY(int row){return DOCK_TOP+row*DOCK_STEP;}
 	private void drawModeIcon(WorldEditorIconRegistry.Key key,int x,int y,Mode iconMode){boolean selected=mode==iconMode;drawIconButton(key,x,y,selected,selected&&toolbar.isFlyoutOpen(),false,false);}
 	private void drawTerrainIcon(WorldEditorIconRegistry.Key key,int x,int y,int field,boolean enabled){drawIconButton(key,x,y,enabled,mode==Mode.TERRAIN&&terrainActiveField==field&&toolbar.isFlyoutOpen(),terrainFieldInvalid(field),false);}
+	private void renderDockContextActions(int x,int y){
+		if(mode==Mode.TERRAIN){
+			drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_ELEVATION,x+DOCK_RIGHT,y+dockRowY(0),6,paintElevation);
+			drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_FLOOR_COLOR,x+DOCK_RIGHT,y+dockRowY(1),7,paintFloorColor);
+			drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_FLOOR_TEXTURE,x+DOCK_RIGHT,y+dockRowY(2),8,paintFloorTexture);
+			drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_ROOF,x+DOCK_RIGHT,y+dockRowY(3),9,paintRoof);
+			drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_WALL_NORTH,x+DOCK_RIGHT,y+dockRowY(4),10,paintNorthWall);
+			drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_WALL_EAST,x+DOCK_RIGHT,y+dockRowY(5),11,paintEastWall);
+			drawTerrainIcon(WorldEditorIconRegistry.Key.FIELD_WALL_DIAGONAL,x+DOCK_RIGHT,y+dockRowY(6),12,paintDiagonalWall);
+		}else if(mode==Mode.SCENERY){
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"+",x+DOCK_RIGHT,y+dockRowY(0),sceneryTool==SceneryTool.PLACE);
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"R",x+DOCK_RIGHT,y+dockRowY(1),sceneryTool==SceneryTool.ROTATE);
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"-",x+DOCK_RIGHT,y+dockRowY(2),sceneryTool==SceneryTool.REMOVE);
+		}else if(mode==Mode.NPC){
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_NPC,"+",x+DOCK_RIGHT,y+dockRowY(0),npcTool==NpcTool.PLACE);
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_NPC,"-",x+DOCK_RIGHT,y+dockRowY(1),npcTool==NpcTool.REMOVE);
+		}else if(mode==Mode.ITEMS){
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_ITEMS,"+",x+DOCK_RIGHT,y+dockRowY(0),groundItemTool==GroundItemTool.PLACE);
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_ITEMS,"-",x+DOCK_RIGHT,y+dockRowY(1),groundItemTool==GroundItemTool.REMOVE);
+		}
+	}
+	private void drawContextActionIcon(WorldEditorIconRegistry.Key key,String action,int x,int y,boolean selected){
+		drawIconButton(key,x,y,selected,false,false,false);graphics().drawBoxAlpha(x+16,y+15,10,10,0x111111,240);
+		int width=graphics().stringWidth(1,action);graphics().drawString(action,x+21-width/2,y+24,selected?0xffff00:0xffffff,1);
+	}
 	private void drawIconButton(WorldEditorIconRegistry.Key key,int x,int y,boolean selected,boolean viewed,boolean warning,boolean badge){
 		int background=warning?0x7a281f:viewed?0x526f24:selected?0x365b82:0x333333;
 		graphics().drawBoxAlpha(x,y,28,28,background,235);graphics().drawBoxBorder(x,28,y,28,viewed?0xb6e36a:selected?0x66b3ff:warning?0xff981f:0x080808);
@@ -762,21 +790,18 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void renderCompactScenery(int x,int y){
 		graphics().drawString(compactLine(sceneryName(),28),x+8,y+49,0xffff00,1);button(x+8,y+68,30,"-");textField(x+42,y+68,88,sceneryIdText,coordinateFocus==3);button(x+134,y+68,30,"+");
-		toolButton(x+8,y+108,50,"Place",sceneryTool==SceneryTool.PLACE);toolButton(x+62,y+108,50,"Rotate",sceneryTool==SceneryTool.ROTATE);toolButton(x+116,y+108,52,"Remove",sceneryTool==SceneryTool.REMOVE);
-		button(x+8,y+140,164,"Browse scenery...");
+		button(x+8,y+108,164,"Browse scenery...");
 	}
 	private void renderCompactNpc(int x,int y){
 		graphics().drawString(compactLine(npcName(),28),x+8,y+47,0xffff00,1);button(x+8,y+56,30,"-");textField(x+42,y+56,88,npcIdText,coordinateFocus==4);button(x+134,y+56,30,"+");
 		graphics().drawString("Roam radius",x+8,y+95,0xffff00,1);button(x+8,y+100,30,"-");textField(x+42,y+100,88,npcRadiusText,coordinateFocus==5);button(x+134,y+100,30,"+");
-		toolButton(x+8,y+138,76,"Place",npcTool==NpcTool.PLACE);toolButton(x+92,y+138,76,"Remove",npcTool==NpcTool.REMOVE);
-		button(x+8,y+168,164,"Browse NPCs...");
+		button(x+8,y+138,164,"Browse NPCs...");
 	}
 	private void renderCompactGroundItems(int x,int y){
 		graphics().drawString(compactLine(groundItemName(),28),x+8,y+43,0xffff00,1);button(x+8,y+50,30,"-");textField(x+42,y+50,88,groundItemIdText,coordinateFocus==14);button(x+134,y+50,30,"+");
 		button(x+8,y+80,164,"Browse items...");
 		graphics().drawString("Amount",x+8,y+125,0xffff00,1);button(x+68,y+108,24,"-");textField(x+96,y+108,48,groundItemAmountText,coordinateFocus==15);button(x+148,y+108,24,"+");
 		graphics().drawString("Respawn",x+8,y+153,0xffff00,1);button(x+68,y+136,24,"-");textField(x+96,y+136,48,groundItemRespawnText,coordinateFocus==16);button(x+148,y+136,24,"+");
-		toolButton(x+8,y+166,76,"Place",groundItemTool==GroundItemTool.PLACE);toolButton(x+92,y+166,76,"Remove",groundItemTool==GroundItemTool.REMOVE);
 	}
 	private void renderCompactStatus(int x,int y){
 		int px=mc.getEditorPlayerWorldX(),py=mc.getEditorPlayerWorldY(),level=mc.getEditorPlayerWorldLevel(),queued=terrainDragPending.size()+(terrainStrokeTiles==null?0:terrainStrokeTiles.length)+pendingEntityActions;
@@ -792,9 +817,15 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private String toolbarTooltipAt(int x,int y){
 		if(x<0||x>=DOCK_WIDTH||y<0)return "";if(dockHit(x,y,0,0))return "Collapse/expand dock";Mode selected=dockModeAt(x,y);if(selected!=null)return selected.name()+" mode | Left: select or toggle flyout";
+		int action=contextActionAtDock(x,y);if(action>=0)return contextActionTooltip(action);
 		int field=terrainFieldAtDock(x,y);if(field>=0)return activeTerrainLabel(field)+": "+terrainText(field)+" | "+(terrainEnabled(field)?"paint ON":"paint OFF")+" | Left: edit | Right: toggle";
-		if(dockHit(x,y,0,4))return "Brush "+terrainBrushSize+"x"+terrainBrushSize+" | Left: edit | Right: toggle size";if(dockHit(x,y,0,5))return "Build view: "+(terrainBuildMode?"ON":"OFF")+" | faceted terrain grid";
-		if(dockHit(x,y,0,6))return "Save | "+(unsavedChanges?"unsaved changes":"clean")+(saveRequested?" | requested":"");if(dockHit(x,y,0,7))return closeArmed?"Close without saving: confirm":"Close editor";return "";
+		if(dockHit(x,y,0,6))return "Brush "+terrainBrushSize+"x"+terrainBrushSize+" | Left: edit | Right: toggle size";if(dockHit(x,y,0,7))return "Build view: "+(terrainBuildMode?"ON":"OFF")+" | faceted terrain grid";
+		if(dockHit(x,y,0,8))return "Save | "+(unsavedChanges?"unsaved changes":"clean")+(saveRequested?" | requested":"");if(dockHit(x,y,0,9))return closeArmed?"Close without saving: confirm":"Close editor";return "";
+	}
+	private String contextActionTooltip(int action){
+		if(mode==Mode.SCENERY)return "Scenery: "+(action==0?"Add":action==1?"Rotate":"Remove");
+		if(mode==Mode.NPC)return "NPCs: "+(action==0?"Add":"Remove");
+		return "Items: "+(action==0?"Add":"Remove");
 	}
 	private boolean activeTerrainEnabled(){return terrainEnabled(terrainActiveField);}
 	private boolean terrainEnabled(int field){switch(field){case 6:return paintElevation;case 7:return paintFloorColor;case 8:return paintFloorTexture;case 9:return paintRoof;case 10:return paintNorthWall;case 11:return paintEastWall;case 12:return paintDiagonalWall;default:return false;}}
