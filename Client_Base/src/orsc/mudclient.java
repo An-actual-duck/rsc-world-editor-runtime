@@ -23838,7 +23838,7 @@ public final class mudclient implements Runnable {
 	private boolean updateWorldEditorTerrainDrag(){
 		if(worldEditorInterface==null||!worldEditorInterface.isEditorOpen()||!isAdaptiveWorldStateReadyForEditor())return false;int worldX=-1,worldY=-1;
 		boolean picking=controlPressed&&currentMouseButtonDown==1&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
-		if(picking&&scene!=null&&world!=null&&localPlayer!=null){int[] local=scene.projectScreenToGroundTile(mouseX,mouseY,tileSize,getClickTeleportGroundPlaneY());
+		if(picking&&scene!=null&&world!=null&&localPlayer!=null){int[] local=projectScreenToCurrentTerrainTile();
 			if(local!=null&&local[0]>=0&&local[0]<World.LOCAL_TILE_COUNT&&local[1]>=0&&local[1]<World.LOCAL_TILE_COUNT){worldX=midRegionBaseX+local[0];worldY=midRegionBaseZ+local[1];}}
 		return worldEditorInterface.updateTerrainDrag(controlPressed,currentMouseButtonDown==1,worldX,worldY);
 	}
@@ -23892,13 +23892,6 @@ public final class mudclient implements Runnable {
 		} else {
 			this.showMessage(false, null, "Usage: ::clickteleport [on/off]", MessageType.GAME, 0, null);
 		}
-	}
-
-	private int getClickTeleportGroundPlaneY() {
-		if (this.localPlayer == null || this.world == null) {
-			return 0;
-		}
-		return -this.world.getElevation(this.localPlayer.currentX, this.localPlayer.currentZ);
 	}
 
 	private void sendBlinkToTile(int tileX, int tileZ) {

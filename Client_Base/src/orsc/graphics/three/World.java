@@ -1851,6 +1851,20 @@ public final class World {
 		int localTileZ,
 		NativeLayeredTerrainSnapshot active,
 		NativeLayeredTerrainSnapshot visual) {
+		/*
+		 * Loaded gameplay sectors include acknowledged editor patches and are the
+		 * surface rendered by the active terrain product. Scenery placement and
+		 * mouse picking must sample those same live values. Immutable snapshots
+		 * remain authoritative for the presentation halo outside this window.
+		 */
+		if (isLocalTile(localTileX, localTileZ)) {
+			Sector loaded = sectorForLocalTile(localTileX, localTileZ);
+			if (loaded != null && loaded.isLoaded()) {
+				return loaded.getTile(
+					tileInSector(localTileX),
+					tileInSector(localTileZ)).groundElevation * 3;
+			}
+		}
 		int worldTileX = Math.addExact(
 			Math.multiplyExact(
 				nativeLayeredTerrainAppliedSectionX
