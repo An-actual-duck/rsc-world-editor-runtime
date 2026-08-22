@@ -907,6 +907,9 @@ public final class mudclient implements Runnable {
 	private boolean adaptiveWorldBuilderReadinessLogged = false;
 	private int automatedBuilderPlacementProbeStage = 0;
 	private long automatedBuilderPlacementProbeDeadline = 0L;
+	private int automatedBuilderWideElevationProbeStage = 0;
+	private long automatedBuilderWideElevationProbeDeadline = 0L;
+	private boolean automatedBuilderWideElevationReopenVerified = false;
 	private final Map<Long, ResidentObjectChunkCacheEntry> cachedResidentObjectChunks =
 		new HashMap<Long, ResidentObjectChunkCacheEntry>();
 	private final ExecutorService residentObjectBuildExecutor =
@@ -25246,6 +25249,7 @@ public final class mudclient implements Runnable {
 				+ " initialRegion=true binding=true";
 			System.out.println(evidence);
 			ClientRuntimeLogger.log(evidence);
+			verifyAutomatedBuilderWideElevationReopen();
 			if (Boolean.getBoolean(
 					"openrsc.worldBuilderAutomatedExitOnReady")) {
 				ClientRuntimeLogger.log(
@@ -25280,6 +25284,9 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 1
 			&& now >= automatedBuilderPlacementProbeDeadline) {
+			if (runAutomatedBuilderWideElevationAuthoringProbe(now)) {
+				return;
+			}
 			if (Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")) {
 				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(122, 648, 2);
 				automatedBuilderPlacementProbeDeadline = now + 2500L;
@@ -25474,10 +25481,105 @@ public final class mudclient implements Runnable {
 	}
 
 	public void observeAutomatedBuilderEditorError(String message) {
+		if ("author".equals(System.getProperty(
+				"openrsc.worldBuilderAutomatedWideElevationProbe", ""))
+			&& automatedBuilderWideElevationProbeStage == 9) {
+			if (message == null || !message.contains("Elevation stroke refused atomically")) {
+				failAutomatedBuilderWideElevationProbe("unexpected atomic-refusal response: " + message);
+				return;
+			}
+			requireAutomatedBuilderTerrainState(124, 648, 12355, "atomic target");
+			requireAutomatedBuilderTerrainState(125, 648, 65535, "overflow guard");
+			requireAutomatedBuilderTerrainState(126, 648, 0, "unchanged neighbor");
+			ClientRuntimeLogger.log(
+				"ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_ATOMIC_REFUSED operation=raise step=1"
+					+ " elevations=12355,65535 neighbor=0 mutation=false");
+			automatedBuilderWideElevationProbeStage = 10;
+			return;
+		}
 		if (Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")) {
 			ClientRuntimeLogger.log(
 				"ADAPTIVE_WORLD_BUILDER_DEFINITION_RESPONSE " + message);
 		}
+	}
+
+	public void observeAutomatedBuilderTerrainStroke(int fieldMask,int[][] tiles) {
+		if (!"author".equals(System.getProperty(
+				"openrsc.worldBuilderAutomatedWideElevationProbe", ""))
+			|| automatedBuilderWideElevationProbeStage < 1
+			|| automatedBuilderWideElevationProbeStage > 7
+			|| (automatedBuilderWideElevationProbeStage & 1) == 0) return;
+		if (fieldMask != 1 || tiles == null || tiles.length != 1) {
+			failAutomatedBuilderWideElevationProbe("invalid authoritative stroke response");return;
+		}
+		int expected = automatedBuilderWideElevationProbeStage == 1 ? 12345
+			: automatedBuilderWideElevationProbeStage == 3 ? 12365
+			: automatedBuilderWideElevationProbeStage == 5 ? 12355 : 65535;
+		int expectedX = automatedBuilderWideElevationProbeStage == 7 ? 125 : 124;
+		int[] tile = tiles[0];
+		if (tile[0] != expectedX || tile[1] != 648 || tile[7] != expected
+			|| tile[8] != 1 || tile[9] != 8 || tile[10] != 0
+			|| tile[11] != 0 || tile[12] != 0 || tile[13] != 0) {
+			failAutomatedBuilderWideElevationProbe("authoritative fields changed or elevation mismatched");return;
+		}
+		requireAutomatedBuilderTerrainState(expectedX,648,expected,"accepted stroke");
+		ClientRuntimeLogger.log(
+			"ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_ACCEPTED stage="
+				+ automatedBuilderWideElevationProbeStage + " x=" + expectedX
+				+ " y=648 elevation=" + expected + " fields=1,8,0,0,0,0 runtime=true");
+		automatedBuilderWideElevationProbeStage++;
+	}
+
+	private boolean runAutomatedBuilderWideElevationAuthoringProbe(long now) {
+		if (!"author".equals(System.getProperty(
+				"openrsc.worldBuilderAutomatedWideElevationProbe", ""))) return false;
+		if (automatedBuilderWideElevationProbeStage >= 10) return false;
+		if ((automatedBuilderWideElevationProbeStage & 1) != 0) {
+			if (now >= automatedBuilderWideElevationProbeDeadline)
+				failAutomatedBuilderWideElevationProbe("timed out awaiting authoritative response");
+			return true;
+		}
+		int operation=0,elevation=0,step=1;int[][] tiles;
+		switch(automatedBuilderWideElevationProbeStage){
+			case 0:elevation=12345;tiles=new int[][]{{124,648}};break;
+			case 2:operation=1;step=20;tiles=new int[][]{{124,648}};break;
+			case 4:operation=2;step=10;tiles=new int[][]{{124,648}};break;
+			case 6:elevation=65535;tiles=new int[][]{{125,648}};break;
+			case 8:operation=1;step=1;tiles=new int[][]{{124,648},{125,648}};break;
+			default:failAutomatedBuilderWideElevationProbe("invalid probe stage");return true;
+		}
+		if (!worldEditorInterface.sendAutomatedWideElevationProbe(
+				operation,elevation,step,tiles)) {
+			failAutomatedBuilderWideElevationProbe("could not send v2 editor packet");return true;
+		}
+		automatedBuilderWideElevationProbeStage++;
+		automatedBuilderWideElevationProbeDeadline=now+10000L;return true;
+	}
+
+	private void verifyAutomatedBuilderWideElevationReopen() {
+		if (!"verify".equals(System.getProperty(
+				"openrsc.worldBuilderAutomatedWideElevationProbe", ""))
+			|| automatedBuilderWideElevationReopenVerified) return;
+		requireAutomatedBuilderTerrainState(124,648,12355,"reopened target");
+		requireAutomatedBuilderTerrainState(125,648,65535,"reopened overflow guard");
+		requireAutomatedBuilderTerrainState(126,648,0,"reopened unchanged neighbor");
+		automatedBuilderWideElevationReopenVerified=true;
+		ClientRuntimeLogger.log(
+			"ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_REOPENED elevations=12355,65535"
+				+ " neighbor=0 fields=1,8,0,0,0,0 runtime=true");
+	}
+
+	private void requireAutomatedBuilderTerrainState(int worldX,int worldY,int elevation,String label) {
+		int[] state=world==null?null:world.getWorldEditorTerrainTileState(
+			worldX-midRegionBaseX,worldY-midRegionBaseZ);
+		if(state==null||state.length!=7||state[0]!=elevation||state[1]!=1||state[2]!=8
+			||state[3]!=0||state[4]!=0||state[5]!=0||state[6]!=0)
+			failAutomatedBuilderWideElevationProbe(label+" runtime state mismatch: "+java.util.Arrays.toString(state));
+	}
+
+	private void failAutomatedBuilderWideElevationProbe(String reason) {
+		String evidence="ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_FAILED "+reason;
+		System.out.println(evidence);ClientRuntimeLogger.log(evidence);closeConnection(true);System.exit(3);
 	}
 
 	public boolean isFullScreenModalUiActive() {

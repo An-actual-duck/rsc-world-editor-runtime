@@ -195,6 +195,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		for(int i=0;i<tiles.length;i++){int[] tile=tiles[i];
 			mc.applyWorldEditorTerrainPatch(tile[0],tile[1],tile[2],tile[7],tile[8],tile[9],tile[10],tile[11],tile[12],tile[13],(fieldMask&4)!=0,i==tiles.length-1);
 		}
+		mc.observeAutomatedBuilderTerrainStroke(fieldMask,tiles);
 		long completedNanos=System.nanoTime();long ackMs=terrainStrokeStartedNanos==0L?0L:(responseNanos-terrainStrokeStartedNanos)/1000000L;
 		long rebuildMs=(completedNanos-responseNanos)/1000000L;terrainStrokeTiles=null;terrainStrokeStartedNanos=0L;
 		lastAckMillis=ackMs;lastRebuildMillis=rebuildMs;
@@ -221,6 +222,14 @@ public final class WorldEditorInterface extends NCustomComponent {
 		terrainStrokeTiles=new int[][]{{worldX,worldY}};terrainStrokeMask=16;
 		terrainStrokeElevation=terrainStrokeColor=terrainStrokeTexture=terrainStrokeRoof=0;
 		terrainStrokeEastWall=raw;terrainStrokeNorthWall=terrainStrokeDiagonal=0;
+		terrainStrokeStartedNanos=System.nanoTime();sendTerrainStroke();return true;
+	}
+	public boolean sendAutomatedWideElevationProbe(int operation,int elevation,int step,int[][] tiles){
+		if(!"author".equals(System.getProperty("openrsc.worldBuilderAutomatedWideElevationProbe",""))
+			||!isEditorOpen()||terrainStrokeTiles!=null||tiles==null||tiles.length<1||tiles.length>TERRAIN_BATCH_LIMIT)return false;
+		terrainStrokeTiles=new int[tiles.length][2];for(int i=0;i<tiles.length;i++){if(tiles[i]==null||tiles[i].length!=2){terrainStrokeTiles=null;return false;}terrainStrokeTiles[i]=tiles[i].clone();}
+		terrainStrokeMask=1;terrainStrokeElevationOperation=operation;terrainStrokeElevation=elevation;terrainStrokeElevationStep=step;
+		terrainStrokeColor=terrainStrokeTexture=terrainStrokeRoof=terrainStrokeEastWall=terrainStrokeNorthWall=terrainStrokeDiagonal=0;
 		terrainStrokeStartedNanos=System.nanoTime();sendTerrainStroke();return true;
 	}
 	public boolean updateTerrainDrag(boolean controlDown,boolean primaryDown,int worldX,int worldY){

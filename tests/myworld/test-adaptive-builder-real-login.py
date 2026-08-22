@@ -585,7 +585,7 @@ def run_readiness_only_client(
 
 @unittest.skipUnless(os.environ.get("DISPLAY"), "real desktop-client integration needs DISPLAY")
 class AdaptiveBuilderRealLoginTest(unittest.TestCase):
-    def test_built_client_authenticates_binds_and_reaches_native_readiness(self):
+    def test_built_client_authors_saves_and_reopens_wide_elevation(self):
         for artifact in (CORE, PLUGINS, CLIENT):
             self.assertTrue(artifact.is_file(), f"build artifact missing: {artifact}")
 
@@ -808,6 +808,7 @@ world_builder_initial_y: 648
                     "spoiledmilk.clientLog": str(client_runtime_log),
                     "sun.java2d.opengl": "false",
                     "openrsc.worldBuilderAutomatedPlacementProbe": "place",
+                    "openrsc.worldBuilderAutomatedWideElevationProbe": "author",
                     "openrsc.worldBuilderAutomatedDefinitionProbe": "true",
                     "openrsc.worldBuilderAutomatedDisallowedBoundaryId": str(
                         PRODUCTION_DEFINITION_COUNTS["boundaries"]
@@ -890,6 +891,22 @@ world_builder_initial_y: 648
                     server_evidence,
                 )
                 self.assertIn("nativeTerrain=true initialRegion=true binding=true", runtime_evidence)
+                for marker in (
+                    "stage=1 x=124 y=648 elevation=12345",
+                    "stage=3 x=124 y=648 elevation=12365",
+                    "stage=5 x=124 y=648 elevation=12355",
+                    "stage=7 x=125 y=648 elevation=65535",
+                ):
+                    self.assertIn(
+                        "ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_ACCEPTED " + marker,
+                        runtime_evidence,
+                    )
+                self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_ATOMIC_REFUSED "
+                    "operation=raise step=1 elevations=12355,65535 neighbor=0 "
+                    "mutation=false",
+                    runtime_evidence,
+                )
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode=place "
                     "scenery=0@119,648,1@118,648 "
@@ -1036,6 +1053,40 @@ world_builder_initial_y: 648
                 terrain_bytes = (
                     package / "terrain/global/lp0/xp2-yp13.raw"
                 ).read_bytes()
+                self.assertEqual(48 * 48 * 11, len(terrain_bytes))
+                terrain_manifest = json.loads(
+                    (package / "manifest.json").read_text(encoding="utf-8")
+                )
+                authored_sector = next(
+                    row for row in terrain_manifest["terrainSectors"]
+                    if row["worldSpace"] == "global" and row["level"] == 0
+                    and row["sectorX"] == 2 and row["sectorY"] == 13
+                )
+                self.assertEqual("raw-layered-sector-v2-u16", authored_sector["encoding"])
+
+                def terrain_record(world_x, world_y):
+                    offset = (
+                        ((world_x % 48) * 48 + (world_y % 48)) * 11
+                    )
+                    return (
+                        int.from_bytes(terrain_bytes[offset:offset + 2], "big"),
+                        *terrain_bytes[offset + 2:offset + 7],
+                        int.from_bytes(terrain_bytes[offset + 7:offset + 11], "big"),
+                    )
+
+                self.assertEqual(
+                    (12355, 1, 8, 0, 0, 0, 0),
+                    terrain_record(124, 648),
+                )
+                self.assertEqual(
+                    (65535, 1, 8, 0, 0, 0, 0),
+                    terrain_record(125, 648),
+                )
+                self.assertEqual(
+                    (0, 1, 8, 0, 0, 0, 0),
+                    terrain_record(126, 648),
+                )
+                saved_terrain_bytes = terrain_bytes
                 boundary_offset = ((122 % 48) * 48 + (648 % 48)) * 11 + 6
                 refused_boundary_offset = ((123 % 48) * 48 + (648 % 48)) * 11 + 6
                 self.assertEqual(2, terrain_bytes[boundary_offset])
@@ -1115,6 +1166,9 @@ world_builder_initial_y: 648
                 reopened_client_log = fixture / "client-reopened.log"
                 reopened_properties = dict(client_properties)
                 reopened_properties["openrsc.worldBuilderAutomatedPlacementProbe"] = "verify"
+                reopened_properties[
+                    "openrsc.worldBuilderAutomatedWideElevationProbe"
+                ] = "verify"
                 reopened_properties["spoiledmilk.clientLog"] = str(
                     reopened_runtime_log
                 )
@@ -1149,6 +1203,12 @@ world_builder_initial_y: 648
                     "scenery=0@119,648,1@118,648 "
                     "npc=0@120,649,1@120,650 "
                     "item=10@121,648,11@121,649",
+                    reopened_evidence,
+                )
+                self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_REOPENED "
+                    "elevations=12355,65535 neighbor=0 fields=1,8,0,0,0,0 "
+                    "runtime=true",
                     reopened_evidence,
                 )
 
@@ -1233,10 +1293,14 @@ world_builder_initial_y: 648
                     ready, server, 45, "reopened server readiness",
                     second_server_log,
                 )
+                second_client_properties = dict(client_properties)
+                second_client_properties[
+                    "openrsc.worldBuilderAutomatedWideElevationProbe"
+                ] = "verify"
                 second_runtime_evidence, second_client_evidence = (
                     run_readiness_only_client(
                         client_root,
-                        client_properties,
+                        second_client_properties,
                         fixture / "client-second-runtime.log",
                         fixture / "client-second.log",
                         "second-launch manual-startup adaptive client",
@@ -1245,6 +1309,12 @@ world_builder_initial_y: 648
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_READY nativeTerrain=true "
                     "initialRegion=true binding=true",
+                    second_runtime_evidence,
+                )
+                self.assertIn(
+                    "ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_REOPENED "
+                    "elevations=12355,65535 neighbor=0 fields=1,8,0,0,0,0 "
+                    "runtime=true",
                     second_runtime_evidence,
                 )
                 self.assertNotIn(
@@ -1268,6 +1338,11 @@ world_builder_initial_y: 648
                 )
                 self.assertNotIn("Set int session id for", second_server_evidence)
                 self.assertIn("Server unloaded", second_server_evidence)
+                self.assertEqual(
+                    saved_terrain_bytes,
+                    (package / "terrain/global/lp0/xp2-yp13.raw").read_bytes(),
+                    "reopened runtime changed the saved wide terrain bytes",
+                )
                 self.assertFalse(shutdown.exists(), "second shutdown request cleanup")
                 self.assertFalse(ready.exists(), "second readiness cleanup")
                 self.assertEqual(

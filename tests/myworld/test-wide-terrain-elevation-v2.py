@@ -56,7 +56,7 @@ class WideTerrainElevationV2Test(unittest.TestCase):
             subprocess.run(["javac", "-source", "8", "-target", "8", "-cp", str(classpath), "-d", temp, str(path)], check=True)
             return subprocess.run(["java", "-cp", f"{temp}:{classpath}", name, *map(str, args)], text=True, capture_output=True)
 
-    def test_v1_promotion_v2_boundaries_save_reopen_and_non_elevation_preservation(self):
+    def test_v1_read_and_v2_boundary_decode_preserve_non_elevation_fields(self):
         source = r'''
 import com.openrsc.server.io.*;
 import com.openrsc.server.model.world.coordinate.*;
@@ -87,7 +87,8 @@ public final class WideServerProbe {
             package_at(root, [0, 255, 256, 12345, 65535], True)
             result = self.compile_run(source, "WideServerProbe", CORE, (root, 0, 255, 256, 12345, 65535, 11))
             self.assertEqual(0, result.returncode, result.stderr)
-            # Reopen the exact saved bytes and repeat the entire field matrix.
+            # Repeat the load to prove stable decoding; the built lifecycle test
+            # owns the actual author/save/shutdown/reopen persistence claim.
             result = self.compile_run(source, "WideServerProbe", CORE, (root, 0, 255, 256, 12345, 65535, 11))
             self.assertEqual(0, result.returncode, result.stderr)
         with tempfile.TemporaryDirectory(prefix="legacy-package-") as temp:

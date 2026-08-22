@@ -5737,6 +5737,12 @@ public final class World {
 			worldEditorTerrainRevision.incrementAndGet();
 		}
 	}
+	public int[] getWorldEditorTerrainTileState(int localX,int localZ){
+		Sector sector=sectorForLocalTile(localX,localZ);if(sector==null)return null;
+		com.openrsc.client.model.Tile tile=sector.getTile(tileInSector(localX),tileInSector(localZ));
+		return new int[]{tile.groundElevation,tile.groundTexture&0xff,tile.groundOverlay&0xff,tile.roofTexture&0xff,
+			tile.horizontalWall&0xff,tile.verticalWall&0xff,tile.diagonalWalls};
+	}
 	private void applyWorldEditorTerrainPatches(Sector sector,int plane,int sectionX,int sectionY){
 		if(sector==null)return;Map<Integer,TerrainPatch> snapshot;
 		synchronized(worldEditorTerrainPatchLock){Map<Integer,TerrainPatch> stored=worldEditorTerrainPatches.get(sectorFilename(plane,sectionX,sectionY));if(stored==null||stored.isEmpty())return;snapshot=new HashMap<Integer,TerrainPatch>(stored);}
