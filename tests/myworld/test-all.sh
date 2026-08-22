@@ -96,6 +96,7 @@ python3 ./tests/myworld/test-adaptive-builder-real-login.py
 python3 ./tests/myworld/test-native-terrain-wire-cache.py
 python3 ./tests/myworld/test-native-terrain-residency.py
 python3 ./tests/myworld/test-wide-terrain-elevation-client-surfaces.py
+python3 ./tests/myworld/test-terrain-foreground-picking.py
 python3 ./tests/myworld/test-fatigue-sleep-removal.py
 python3 ./tests/myworld/test-gathering-rework-plan.py
 python3 ./tests/myworld/test-dragon-hatchet-woodcutting.py

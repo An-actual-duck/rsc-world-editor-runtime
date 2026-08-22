@@ -121,6 +121,7 @@ public final class Scene {
 	private int terrainProjectionPass;
 	private int terrainProjectionTileX;
 	private int terrainProjectionTileZ;
+	private double terrainProjectionIterativeT;
 
 	public Scene(GraphicsController var1, int var2, int maxPolygonCount, int var4) {
 		this.m_Ib = new int[this.m_ib][256];
@@ -3803,6 +3804,7 @@ public final class Scene {
 		this.terrainProjectionPass = -1;
 		this.terrainProjectionTileX = Integer.MIN_VALUE;
 		this.terrainProjectionTileZ = Integer.MIN_VALUE;
+		this.terrainProjectionIterativeT = Double.NaN;
 		if (tileSize <= 0 || world == null) {
 			this.terrainProjectionResult = 1;
 			return null;
@@ -3836,16 +3838,16 @@ public final class Scene {
 
 		int[] fixedPointHit = projectScreenToTerrainTileIterative(
 			rayX, rayY, rayZ, tileSize, world);
-		if (fixedPointHit != null) {
-			this.terrainProjectionResult = 2;
-			this.terrainProjectionTileX = fixedPointHit[0];
-			this.terrainProjectionTileZ = fixedPointHit[1];
-			return fixedPointHit;
-		}
 
 		double horizontalLength =
 			Math.sqrt(rayX * rayX + rayZ * rayZ);
 		if (horizontalLength < 0.000001D) {
+			if (fixedPointHit != null) {
+				this.terrainProjectionResult = 2;
+				this.terrainProjectionTileX = fixedPointHit[0];
+				this.terrainProjectionTileZ = fixedPointHit[1];
+				return fixedPointHit;
+			}
 			this.terrainProjectionResult = 3;
 			return null;
 		}
@@ -3855,6 +3857,18 @@ public final class Scene {
 			(World.SECTION_SIZE * 5.0D + 32.0D)
 				* tileSize
 				/ horizontalLength;
+		/*
+		 * Fixed-point convergence is fast, but a discontinuous height field can
+		 * have more than one valid solution along the same screen ray. Bound the
+		 * near-to-far march by that candidate instead of returning it directly,
+		 * so a visible foreground surface always wins over terrain behind it.
+		 */
+		if (fixedPointHit != null
+			&& Double.isFinite(this.terrainProjectionIterativeT)) {
+			maxT = Math.min(
+				maxT,
+				this.terrainProjectionIterativeT + stepT);
+		}
 		double previousT = 0.0D;
 		double previousDifference = Double.NaN;
 		boolean enteredTerrainWindow = false;
@@ -3878,7 +3892,7 @@ public final class Scene {
 					this.terrainProjectionResult = 4;
 					this.terrainProjectionTileX = tileX;
 					this.terrainProjectionTileZ = tileZ;
-					return null;
+					break;
 				}
 				continue;
 			}
@@ -3943,6 +3957,12 @@ public final class Scene {
 			}
 			previousT = t;
 			previousDifference = difference;
+		}
+		if (fixedPointHit != null) {
+			this.terrainProjectionResult = 2;
+			this.terrainProjectionTileX = fixedPointHit[0];
+			this.terrainProjectionTileZ = fixedPointHit[1];
+			return fixedPointHit;
 		}
 		this.terrainProjectionResult = enteredTerrainWindow ? 7 : 8;
 		return null;
@@ -4013,6 +4033,7 @@ public final class Scene {
 			}
 			if (Math.abs(nextT - t) < 0.01D) {
 				this.terrainProjectionIterativeResult = 7;
+				this.terrainProjectionIterativeT = nextT;
 				return new int[] {tileX, tileZ};
 			}
 			t = nextT;
