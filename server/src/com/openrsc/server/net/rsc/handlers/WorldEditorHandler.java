@@ -37,7 +37,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 		}
 		try {
 			if (player.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE
-				&& (request.type == 5 || request.type == 6)
+				&& (request.type == 5 || request.type == 6 || request.type == 7)
 				&& !WorldBuilderMode.isLayeredAuthoringProfile(
 					player.getConfig())) {
 				error(player, validation.nextSequence,
@@ -49,6 +49,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			else if (request.type == 4) inspectNpc(request, player, validation.nextSequence);
 			else if (request.type == 5) paintTerrain(request, player, validation.nextSequence);
 			else if (request.type == 6) paintTerrainStroke(request, player, validation.nextSequence);
+			else if (request.type == 7) paintWideTerrainStroke(request, player, validation.nextSequence);
 			else error(player, validation.nextSequence, "Unsupported editor operation.");
 		} catch (Exception e) { error(player, validation.nextSequence, "Editor request failed: " + e.getMessage()); }
 	}
@@ -124,6 +125,15 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			+"\t"+wallDefinitionName(p,center.diagonalDefinitionId());
 		ActionSender.sendWorldEditor(p,out);
 	}
+	private void paintWideTerrainStroke(WorldEditorRequestStruct r,Player p,int next) {
+		if(!p.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE
+			|| !WorldBuilderMode.isLayeredAuthoringProfile(p.getConfig()))
+			throw new IllegalArgumentException("Wide elevation requires native layered authoring capability v2.");
+		if(r.elevationOperation<0||r.elevationOperation>2
+			||r.elevationStep<1||r.elevationStep>65535)
+			throw new IllegalArgumentException("Elevation operation capability v2 is invalid.");
+		paintNativeTerrainStroke(r,p,next);
+	}
 	private void paintNativeTerrainStroke(WorldEditorRequestStruct r,Player p,int next) {
 		validateTerrainDefinitions(p,r);
 		WorldLocation current=p.getLayeredLocation();
@@ -137,7 +147,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 		NativeTerrainStrokeResult result=p.getWorld().getServer().getWorldEditorSessions()
 			.paintNativeTerrainStroke(p,coordinates,r.plane,r.fieldMask,r.elevation,
 				r.groundTexture,r.groundOverlay,r.roofTexture,r.horizontalWall,
-				r.verticalWall,r.diagonal);
+				r.verticalWall,r.diagonal,r.elevationOperation,r.elevationStep==0?1:r.elevationStep);
 		WorldEditorStruct out=new WorldEditorStruct();out.type=8;out.sequence=next;out.fieldMask=r.fieldMask;
 		for(NativeTerrainSnapshot after:result.after)out.terrainTiles.add(nativeTerrainTile(p,after));
 		NativeLayeredTerrainTile center=result.after.get(0).tile;
@@ -165,7 +175,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 	private void applyRuntimeTerrain(Player p,WorldEditorTerrainArchive.Snapshot before,WorldEditorTerrainArchive.Snapshot s,int fieldMask){
 		int x=s.coordinates.worldX,y=s.coordinates.worldY;TileValue runtime=p.getWorld().getMutableTile(x,y);
 		if(runtime==null)throw new IllegalArgumentException("Terrain tile is outside the runtime world.");
-		if((fieldMask&1)!=0)runtime.elevation=(byte)s.elevation;
+		if((fieldMask&1)!=0)runtime.elevation=s.elevation;
 		if((fieldMask&4)!=0){runtime.overlay=(byte)s.groundOverlay;runtime.setTerrainBlocked(overlayBlocks(p,s.groundOverlay));runtime.setTerrainOverlayProjectileBlocked(s.groundOverlay==2||s.groundOverlay==11);}
 		if((fieldMask&16)!=0){applyEastWall(p,x,y,before.horizontalWall,false);runtime.horizontalWallVal=(byte)s.horizontalWall;applyEastWall(p,x,y,s.horizontalWall,true);}
 		if((fieldMask&32)!=0){applyNorthWall(p,x,y,before.verticalWall,false);runtime.verticalWallVal=(byte)s.verticalWall;applyNorthWall(p,x,y,s.verticalWall,true);}

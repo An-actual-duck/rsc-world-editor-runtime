@@ -11,7 +11,7 @@ public final class LayeredTileState {
 	private final byte horizontalWallValue;
 	private final byte overlay;
 	private final byte verticalWallValue;
-	private final byte elevation;
+	private final int elevation;
 	private final boolean projectileAllowed;
 	private final boolean originalProjectileAllowed;
 	private final boolean terrainBlocked;
@@ -28,7 +28,7 @@ public final class LayeredTileState {
 		final byte horizontalWallValue,
 		final byte overlay,
 		final byte verticalWallValue,
-		final byte elevation,
+		final int elevation,
 		final boolean projectileAllowed,
 		final boolean originalProjectileAllowed,
 		final boolean terrainBlocked,
@@ -155,7 +155,7 @@ public final class LayeredTileState {
 		return verticalWallValue;
 	}
 
-	public byte getElevation() {
+	public int getElevation() {
 		return elevation;
 	}
 

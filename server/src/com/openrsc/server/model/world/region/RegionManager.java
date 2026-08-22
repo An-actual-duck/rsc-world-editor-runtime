@@ -4193,7 +4193,7 @@ public class RegionManager {
 		tile.diagWallVal = (short) source.getDiagonalWall();
 		tile.horizontalWallVal = (byte) source.getHorizontalWall();
 		tile.verticalWallVal = (byte) source.getVerticalWall();
-		tile.elevation = (byte) source.getElevation();
+		tile.elevation = source.getElevation();
 		tile.initializeTerrainCollision();
 		NativeLayeredTerrainCollisionPlan.derive(
 			source,

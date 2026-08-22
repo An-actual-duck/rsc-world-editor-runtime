@@ -119,10 +119,14 @@ public final class NativeLayeredTerrainSector {
 	 * {@link NativeLayeredTerrainChunk#copyWireBytes()}.
 	 */
 	public byte[] copyWireBytes() {
-		byte[] result =
-			new byte[TILE_COUNT * NativeLayeredTerrainChunk.TILE_WIRE_BYTES];
+		boolean wide = NativeLayeredWorldPackage.isWideTerrainEncoding(sourceEncoding);
+		int tileBytes = wide
+			? NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES
+			: NativeLayeredTerrainChunk.LEGACY_TILE_WIRE_BYTES;
+		byte[] result = new byte[TILE_COUNT * tileBytes];
 		int offset = 0;
 		for (NativeLayeredTerrainTile tile : tiles) {
+			if (wide) result[offset++] = (byte) (tile.getElevation() >>> 8);
 			result[offset++] = (byte) tile.getElevation();
 			result[offset++] = (byte) tile.getTexture();
 			result[offset++] = (byte) tile.getOverlay();

@@ -13,20 +13,20 @@ target path and accepts authored output only inside the selected project.
 ## Stable identities
 
 The machine-readable source of truth is
-`server/conf/world-builder/adaptive-runtime-capability-v1.json`. Server and
+`server/conf/world-builder/adaptive-runtime-capability-v2.json`. Server and
 client code independently pin the same values.
 
 | Role | Identity |
 |---|---|
-| Capability | `adaptive-world-builder-runtime-capability-v1` |
+| Capability | `adaptive-world-builder-runtime-capability-v2` |
 | Runtime profile | `adaptive-world-builder` |
-| Server build | `core-framework-adaptive-builder-server-v1` |
-| Client build | `core-framework-adaptive-builder-client-v1` |
-| Loader | `generic-signed-layered-loader-v1` |
-| Authoring | `generic-signed-layered-authoring-v1` |
+| Server build | `core-framework-adaptive-builder-server-v2` |
+| Client build | `core-framework-adaptive-builder-client-v2` |
+| Loader | `generic-signed-layered-loader-v2-u16-elevation` |
+| Authoring | `generic-signed-layered-authoring-v2-u16-elevation` |
 | Definition binding | `world-builder-definition-catalog-binding-v1` |
 | Client asset binding | `world-builder-client-asset-binding-v1` |
-| Protocol | `world-builder-native-layered-protocol-v1` |
+| Protocol | `world-builder-native-layered-protocol-v2-u16-elevation` |
 | Effective composition | `world-builder-effective-static-composition-v1` |
 | Package schema | `layered-world-package-v1` |
 | Coordinate model | `signed-layered-v1` |
@@ -203,6 +203,34 @@ replacement, so legacy configuration overlays do not enter the effective
 model. Package boundary placements are inspectable and preserved exactly;
 terrain wall fields, scenery, NPCs, and ground-item spawns retain their
 existing editor operations.
+
+## Wide terrain elevation v2
+
+Native terrain capability v2 stores elevation as an unsigned 16-bit value
+from `0` through `65535`. Rendering, collision sampling, walls, roofs,
+entities, camera projection, terrain picking, and minimap geometry continue to
+consume elevation units at the historical multiplication-by-3 scale; v2
+widens the authored range but does not change that scale.
+
+The v1 terrain encodings (`uniform-layered-sector-v1`,
+`rle-layered-sector-v1`, and `raw-layered-sector-v1`) are frozen. Their
+one-byte elevation is decoded unsigned and promoted exactly into the runtime
+integer model. New or saved Builder terrain uses the explicitly named v2
+encodings ending in `-v2-u16`; raw v2 records are 11 bytes in network order:
+two elevation bytes, the five unchanged byte fields, then all four diagonal
+wall bytes. No non-elevation field is translated during promotion or save.
+
+The editor envelope is capability version 2 and carries elevation as an
+unsigned short. Absolute sets and configurable-step Raise/Lower operations
+are accepted only by native layered authoring. Every tile in a stroke is
+calculated and bounds-checked before the draft changes, so any overflow or
+underflow rejects the complete stroke. Unsupported terrain encodings, record
+widths, editor envelopes, or client/server runtime identities fail closed;
+there is no clamp, byte truncation, fallback save, or silent downgrade.
+
+Frozen legacy landscape archives remain 10-byte records and readable. They
+cannot store elevations above 255, and the legacy pack/save path refuses such
+a value instead of narrowing it.
 
 ## Empty and existing-level authoring
 

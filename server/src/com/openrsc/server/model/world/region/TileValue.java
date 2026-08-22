@@ -11,7 +11,8 @@ public class TileValue {
 	public byte horizontalWallVal = 0;
 	public byte overlay = 0;
 	public byte verticalWallVal = 0;
-	public byte elevation = 0;
+	/** Native elevation units (0..65535); renderers preserve the historical x3 scale. */
+	public int elevation = 0;
 	public boolean projectileAllowed = false;
 	public boolean originalProjectileAllowed = false;
 	private boolean terrainBlocked = false;
@@ -33,7 +34,7 @@ public class TileValue {
 		final byte horizontalWallVal,
 		final byte overlay,
 		final byte verticalWallVal,
-		final byte elevation,
+		final int elevation,
 		final boolean projectileAllowed,
 		final boolean originalProjectileAllowed,
 		final boolean terrainBlocked,

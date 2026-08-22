@@ -74,6 +74,7 @@ public final class World {
 	private static final int LAVA_GLOW_RADIUS = 384;
 	private static final int LAVA_GLOW_INTENSITY = 96;
 	private static final int LAVA_GLOW_NON_OVERWORLD_INTENSITY = 72;
+	private static final int ROOF_ELEVATION_MARKER = 1_000_000_000;
 	private static final AtomicLong LEGACY_LANDSCAPE_READ_ATTEMPTS =
 		new AtomicLong();
 	private static final int SYNTHETIC_DEEP_MIN_X = 440;
@@ -2053,11 +2054,11 @@ public final class World {
 
 			int height = Objects.requireNonNull(EntityHandler.getDoorDef(wallID)).getWallObjectHeight();
 
-			if (elevations.get(x1, z1) < 80000)
-				elevations.set(x1, z1, elevations.get(x1, z1) + height + 80000);
+			if (elevations.get(x1, z1) < ROOF_ELEVATION_MARKER)
+				elevations.set(x1, z1, elevations.get(x1, z1) + height + ROOF_ELEVATION_MARKER);
 
-			if (elevations.get(x2, z2) < 80000)
-				elevations.set(x2, z2, elevations.get(x2, z2) + height + 80000);
+			if (elevations.get(x2, z2) < ROOF_ELEVATION_MARKER)
+				elevations.set(x2, z2, elevations.get(x2, z2) + height + ROOF_ELEVATION_MARKER);
 
 		} catch (RuntimeException var8) {
 			throw GenUtil.makeThrowable(var8,
@@ -4025,17 +4026,17 @@ public final class World {
 					int ec11 = elevations.get(xp12, zp1);
 					int ec01 = elevations.get(x, zp12);
 
-					if (ec00 > 80000) {
-						ec00 -= 80000;
+					if (ec00 > ROOF_ELEVATION_MARKER) {
+						ec00 -= ROOF_ELEVATION_MARKER;
 					}
-					if (ec10 > 80000) {
-						ec10 -= 80000;
+					if (ec10 > ROOF_ELEVATION_MARKER) {
+						ec10 -= ROOF_ELEVATION_MARKER;
 					}
-					if (ec11 > 80000) {
-						ec11 -= 80000;
+					if (ec11 > ROOF_ELEVATION_MARKER) {
+						ec11 -= ROOF_ELEVATION_MARKER;
 					}
-					if (ec01 > 80000) {
-						ec01 -= 80000;
+					if (ec01 > ROOF_ELEVATION_MARKER) {
+						ec01 -= ROOF_ELEVATION_MARKER;
 					}
 
 					if (ec00 > max) {
@@ -4050,32 +4051,32 @@ public final class World {
 					if (max < ec01) {
 						max = ec01;
 					}
-					if (max >= 80000) {
-						max -= 80000;
+					if (max >= ROOF_ELEVATION_MARKER) {
+						max -= ROOF_ELEVATION_MARKER;
 					}
 
-					if (ec00 < 80000) {
+					if (ec00 < ROOF_ELEVATION_MARKER) {
 						elevations.set(x, z, max);
 					} else {
-						elevations.set(x, z, elevations.get(x, z) - 80000);
+						elevations.set(x, z, elevations.get(x, z) - ROOF_ELEVATION_MARKER);
 					}
 
-					if (ec10 < 80000) {
+					if (ec10 < ROOF_ELEVATION_MARKER) {
 						elevations.set(xp1, z, max);
 					} else {
-						elevations.set(xp1, z, elevations.get(xp1, z) - 80000);
+						elevations.set(xp1, z, elevations.get(xp1, z) - ROOF_ELEVATION_MARKER);
 					}
 
-					if (ec11 < 80000) {
+					if (ec11 < ROOF_ELEVATION_MARKER) {
 						elevations.set(xp12, zp1, max);
 					} else {
-						elevations.set(xp12, zp1, elevations.get(xp12, zp1) - 80000);
+						elevations.set(xp12, zp1, elevations.get(xp12, zp1) - ROOF_ELEVATION_MARKER);
 					}
 
-					if (ec01 < 80000) {
+					if (ec01 < ROOF_ELEVATION_MARKER) {
 						elevations.set(x, zp12, max);
 					} else {
-						elevations.set(x, zp12, elevations.get(x, zp12) - 80000);
+						elevations.set(x, zp12, elevations.get(x, zp12) - ROOF_ELEVATION_MARKER);
 					}
 				}
 			}
@@ -4108,40 +4109,40 @@ public final class World {
 					int ec11 = elevations.get(x11, z11);
 					int ec01 = elevations.get(x, z01);
 					int var32 = Objects.requireNonNull(EntityHandler.getElevationDef(roof - 1)).getUnknown1();
-					if (source.hasRoofTile(x, z) && ec00 < 80000) {
-						ec00 += var32 + 80000;
+					if (source.hasRoofTile(x, z) && ec00 < ROOF_ELEVATION_MARKER) {
+						ec00 += var32 + ROOF_ELEVATION_MARKER;
 						elevations.set(x, z, ec00);
 					}
 
-					if (source.hasRoofTile(x10, z) && ec10 < 80000) {
-						ec10 += var32 + 80000;
+					if (source.hasRoofTile(x10, z) && ec10 < ROOF_ELEVATION_MARKER) {
+						ec10 += var32 + ROOF_ELEVATION_MARKER;
 						elevations.set(x10, z, ec10);
 					}
 
-					if (source.hasRoofTile(x11, z11) && ec11 < 80000) {
-						ec11 += 80000 + var32;
+					if (source.hasRoofTile(x11, z11) && ec11 < ROOF_ELEVATION_MARKER) {
+						ec11 += ROOF_ELEVATION_MARKER + var32;
 						elevations.set(x11, z11, ec11);
 					}
 
-					if (ec10 >= 80000) {
-						ec10 -= 80000;
+					if (ec10 >= ROOF_ELEVATION_MARKER) {
+						ec10 -= ROOF_ELEVATION_MARKER;
 					}
 
-					if (ec11 >= 80000) {
-						ec11 -= 80000;
+					if (ec11 >= ROOF_ELEVATION_MARKER) {
+						ec11 -= ROOF_ELEVATION_MARKER;
 					}
 
-					if (source.hasRoofTile(x, z01) && ec01 < 80000) {
-						ec01 += var32 + 80000;
+					if (source.hasRoofTile(x, z01) && ec01 < ROOF_ELEVATION_MARKER) {
+						ec01 += var32 + ROOF_ELEVATION_MARKER;
 						elevations.set(x, z01, ec01);
 					}
 
-					if (ec00 >= 80000) {
-						ec00 -= 80000;
+					if (ec00 >= ROOF_ELEVATION_MARKER) {
+						ec00 -= ROOF_ELEVATION_MARKER;
 					}
 
-					if (ec01 >= 80000) {
-						ec01 -= 80000;
+					if (ec01 >= ROOF_ELEVATION_MARKER) {
+						ec01 -= ROOF_ELEVATION_MARKER;
 					}
 
 					final byte eaveSize = 16;
@@ -4418,7 +4419,7 @@ public final class World {
 
 			Sector sector = sectorForLocalTile(xTile, zTile);
 			if (sector != null) {
-				return (sector.getTile(tileInSector(xTile), tileInSector(zTile)).groundElevation & 0xff) * 3;
+				return sector.getTile(tileInSector(xTile), tileInSector(zTile)).groundElevation * 3;
 				// return (255 & this.elevation[region][xTile * 48 + zTile]) *
 				// 3;
 			} else
@@ -5131,7 +5132,7 @@ public final class World {
 		if (tile == null) {
 			return "missing";
 		}
-		return "e" + (tile.groundElevation & 0xff)
+		return "e" + tile.groundElevation
 			+ "/t" + (tile.groundTexture & 0xff)
 			+ "/o" + (tile.groundOverlay & 0xff)
 			+ "/r" + (tile.roofTexture & 0xff)
@@ -5736,12 +5737,18 @@ public final class World {
 			worldEditorTerrainRevision.incrementAndGet();
 		}
 	}
+	public int[] getWorldEditorTerrainTileState(int localX,int localZ){
+		Sector sector=sectorForLocalTile(localX,localZ);if(sector==null)return null;
+		com.openrsc.client.model.Tile tile=sector.getTile(tileInSector(localX),tileInSector(localZ));
+		return new int[]{tile.groundElevation,tile.groundTexture&0xff,tile.groundOverlay&0xff,tile.roofTexture&0xff,
+			tile.horizontalWall&0xff,tile.verticalWall&0xff,tile.diagonalWalls};
+	}
 	private void applyWorldEditorTerrainPatches(Sector sector,int plane,int sectionX,int sectionY){
 		if(sector==null)return;Map<Integer,TerrainPatch> snapshot;
 		synchronized(worldEditorTerrainPatchLock){Map<Integer,TerrainPatch> stored=worldEditorTerrainPatches.get(sectorFilename(plane,sectionX,sectionY));if(stored==null||stored.isEmpty())return;snapshot=new HashMap<Integer,TerrainPatch>(stored);}
 		for(TerrainPatch patch:snapshot.values()){
 			com.openrsc.client.model.Tile tile=sector.getTile(patch.localX,patch.localZ);
-			tile.groundElevation=(byte)patch.elevation;tile.groundTexture=(byte)patch.groundTexture;tile.groundOverlay=(byte)patch.groundOverlay;
+				tile.groundElevation=patch.elevation;tile.groundTexture=(byte)patch.groundTexture;tile.groundOverlay=(byte)patch.groundOverlay;
 			tile.roofTexture=(byte)patch.roofTexture;tile.horizontalWall=(byte)patch.horizontalWall;tile.verticalWall=(byte)patch.verticalWall;tile.diagonalWalls=patch.diagonal;tile.editorPaintedOverlay=patch.editorPaintedOverlay;
 		}
 	}
@@ -7218,7 +7225,7 @@ public final class World {
 			Sector sector = sectorForLocalTile(sectors, tileX, tileZ);
 			return sector == null
 				? 0
-				: (sector.getTile(tileInSector(tileX), tileInSector(tileZ)).groundElevation & 0xff) * 3;
+				: sector.getTile(tileInSector(tileX), tileInSector(tileZ)).groundElevation * 3;
 		}
 
 		private int tileType2(int tileX, int tileZ) {
@@ -7342,8 +7349,8 @@ public final class World {
 		private void clearRoofMarkers() {
 			for (int x = 0; x < LOCAL_TILE_COUNT; x++) {
 				for (int z = 0; z < LOCAL_TILE_COUNT; z++) {
-					if (elevations[x][z] >= 80000) {
-						elevations[x][z] -= 80000;
+					if (elevations[x][z] >= ROOF_ELEVATION_MARKER) {
+						elevations[x][z] -= ROOF_ELEVATION_MARKER;
 					}
 				}
 			}

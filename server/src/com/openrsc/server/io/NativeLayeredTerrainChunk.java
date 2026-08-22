@@ -10,7 +10,13 @@ import java.util.Objects;
  * sector. Chunk coordinates are global and independent from storage pages.
  */
 public final class NativeLayeredTerrainChunk {
-	public static final int TILE_WIRE_BYTES = 10;
+	public static final int LEGACY_TILE_WIRE_BYTES = 10;
+	public static final int WIDE_TILE_WIRE_BYTES = 11;
+	/** Current native terrain wire width. */
+	public static final int TILE_WIRE_BYTES = WIDE_TILE_WIRE_BYTES;
+	public static int copyWireBytesPerTile(boolean wide) {
+		return wide ? WIDE_TILE_WIRE_BYTES : LEGACY_TILE_WIRE_BYTES;
+	}
 
 	private final WorldSpaceId worldSpace;
 	private final int level;
@@ -70,9 +76,12 @@ public final class NativeLayeredTerrainChunk {
 	 * all 32 diagonal-wall bits in network byte order.
 	 */
 	public byte[] copyWireBytes() {
-		byte[] result = new byte[tiles.length * TILE_WIRE_BYTES];
+		boolean wide = NativeLayeredWorldPackage.isWideTerrainEncoding(sourceEncoding);
+		int tileBytes = copyWireBytesPerTile(wide);
+		byte[] result = new byte[tiles.length * tileBytes];
 		int offset = 0;
 		for (NativeLayeredTerrainTile tile : tiles) {
+			if (wide) result[offset++] = (byte) (tile.getElevation() >>> 8);
 			result[offset++] = (byte) tile.getElevation();
 			result[offset++] = (byte) tile.getTexture();
 			result[offset++] = (byte) tile.getOverlay();

@@ -43,6 +43,9 @@ public final class NativeLayeredWorldPackage {
 	public static final String UNIFORM_ENCODING = "uniform-layered-sector-v1";
 	public static final String RLE_ENCODING = "rle-layered-sector-v1";
 	public static final String RAW_ENCODING = "raw-layered-sector-v1";
+	public static final String UNIFORM_ENCODING_V2 = "uniform-layered-sector-v2-u16";
+	public static final String RLE_ENCODING_V2 = "rle-layered-sector-v2-u16";
+	public static final String RAW_ENCODING_V2 = "raw-layered-sector-v2-u16";
 	public static final String RLE_TILE_ORDER = "x-major-y-minor";
 	public static final String ENTITY_PLACEMENT_ENCODING_V1 =
 		"layered-entity-placements-v1";
@@ -282,9 +285,7 @@ public final class NativeLayeredWorldPackage {
 				throw new IOException("Duplicate terrain sector identity: " + identity);
 			}
 			String encoding = matchedString(value, "encoding", ID);
-			if (!UNIFORM_ENCODING.equals(encoding)
-				&& !RLE_ENCODING.equals(encoding)
-				&& !RAW_ENCODING.equals(encoding)) {
+			if (!isTerrainEncoding(encoding)) {
 				throw new IOException(
 					"Terrain payload encoding is unsupported by this loader: " + encoding);
 			}
@@ -300,14 +301,16 @@ public final class NativeLayeredWorldPackage {
 					"Terrain payload hash differs from manifest: " + relativePath);
 			}
 			NativeLayeredTerrainSector sector;
-			if (UNIFORM_ENCODING.equals(encoding)) {
+			if (UNIFORM_ENCODING.equals(encoding)
+				|| UNIFORM_ENCODING_V2.equals(encoding)) {
 				sector = NativeLayeredTerrainSector.uniform(
 					identity,
 					readUniformTile(payloadPath),
 					encoding,
 					relativePath,
 					expectedSha256);
-			} else if (RLE_ENCODING.equals(encoding)) {
+			} else if (RLE_ENCODING.equals(encoding)
+				|| RLE_ENCODING_V2.equals(encoding)) {
 				sector = NativeLayeredTerrainSector.ofTiles(
 					identity,
 					readRleTiles(payloadPath),
@@ -317,7 +320,7 @@ public final class NativeLayeredWorldPackage {
 			} else {
 				sector = NativeLayeredTerrainSector.ofTiles(
 					identity,
-					readRawTiles(payloadPath),
+					readRawTiles(payloadPath, encoding),
 					encoding,
 					relativePath,
 					expectedSha256);
@@ -821,10 +824,15 @@ public final class NativeLayeredWorldPackage {
 		throws IOException {
 		JSONObject document = readObject(path);
 		exactKeys(document, "uniform sector", "schemaVersion", "encoding", "size", "tile");
-		requireInt(document, "schemaVersion", 1);
-		requireString(document, "encoding", UNIFORM_ENCODING);
+		int version = signedInt(document, "schemaVersion");
+		String encoding = string(document, "encoding");
+		if (!((version == 1 && UNIFORM_ENCODING.equals(encoding))
+			|| (version == 2 && UNIFORM_ENCODING_V2.equals(encoding)))) {
+			throw new IOException("Uniform terrain schema/encoding pair is unsupported");
+		}
 		requireInt(document, "size", NativeLayeredTerrainSector.SIZE);
-		return readTerrainTile(object(document, "tile"), "uniform sector tile");
+		return readTerrainTile(
+			object(document, "tile"), "uniform sector tile", version == 2);
 	}
 
 	private static NativeLayeredTerrainTile[] readRleTiles(Path path)
@@ -838,8 +846,12 @@ public final class NativeLayeredWorldPackage {
 			"size",
 			"tileOrder",
 			"runs");
-		requireInt(document, "schemaVersion", 1);
-		requireString(document, "encoding", RLE_ENCODING);
+		int version = signedInt(document, "schemaVersion");
+		String encoding = string(document, "encoding");
+		if (!((version == 1 && RLE_ENCODING.equals(encoding))
+			|| (version == 2 && RLE_ENCODING_V2.equals(encoding)))) {
+			throw new IOException("RLE terrain schema/encoding pair is unsupported");
+		}
 		requireInt(document, "size", NativeLayeredTerrainSector.SIZE);
 		requireString(document, "tileOrder", RLE_TILE_ORDER);
 		JSONArray runs = array(document, "runs");
@@ -860,8 +872,8 @@ public final class NativeLayeredWorldPackage {
 				throw new IOException(
 					"runs[" + index + "].count exceeds the remaining sector capacity");
 			}
-			NativeLayeredTerrainTile tile =
-				readTerrainTile(object(run, "tile"), "runs[" + index + "].tile");
+			NativeLayeredTerrainTile tile = readTerrainTile(
+				object(run, "tile"), "runs[" + index + "].tile", version == 2);
 			Arrays.fill(tiles, expanded, expanded + count, tile);
 			expanded += count;
 		}
@@ -873,9 +885,10 @@ public final class NativeLayeredWorldPackage {
 		return tiles;
 	}
 
-	private static NativeLayeredTerrainTile[] readRawTiles(Path path)
+	private static NativeLayeredTerrainTile[] readRawTiles(Path path, String encoding)
 		throws IOException {
-		final int tileBytes = 10;
+		final boolean wide = RAW_ENCODING_V2.equals(encoding);
+		final int tileBytes = wide ? 11 : 10;
 		final int expectedBytes =
 			NativeLayeredTerrainSector.TILE_COUNT * tileBytes;
 		byte[] payload = Files.readAllBytes(path);
@@ -888,8 +901,9 @@ public final class NativeLayeredWorldPackage {
 		NativeLayeredTerrainTile[] tiles =
 			new NativeLayeredTerrainTile[NativeLayeredTerrainSector.TILE_COUNT];
 		for (int index = 0; index < tiles.length; index++) {
+			int elevation = wide ? input.getShort() & 0xffff : input.get() & 0xff;
 			tiles[index] = new NativeLayeredTerrainTile(
-				input.get() & 0xff,
+				elevation,
 				input.get() & 0xff,
 				input.get() & 0xff,
 				input.get() & 0xff,
@@ -904,7 +918,7 @@ public final class NativeLayeredWorldPackage {
 	}
 
 	private static NativeLayeredTerrainTile readTerrainTile(
-		JSONObject tile, String label) throws IOException {
+		JSONObject tile, String label, boolean wide) throws IOException {
 		exactKeys(
 			tile,
 			label,
@@ -917,13 +931,30 @@ public final class NativeLayeredWorldPackage {
 			"diagonalWall");
 		long rawDiagonal = unsignedInt(tile, "diagonalWall");
 		return new NativeLayeredTerrainTile(
-			unsignedByte(tile, "elevation"),
+			wide ? unsignedShort(tile, "elevation") : unsignedByte(tile, "elevation"),
 			unsignedByte(tile, "texture"),
 			unsignedByte(tile, "overlay"),
 			unsignedByte(tile, "roof"),
 			unsignedByte(tile, "verticalWall"),
 			unsignedByte(tile, "horizontalWall"),
 			(int) rawDiagonal);
+	}
+
+	private static int unsignedShort(JSONObject value, String key) throws IOException {
+		long raw = unsignedInt(value, key);
+		if (raw > 65535L) throw new IOException(key + " must be 0..65535");
+		return (int) raw;
+	}
+
+	public static boolean isWideTerrainEncoding(String encoding) {
+		return UNIFORM_ENCODING_V2.equals(encoding)
+			|| RLE_ENCODING_V2.equals(encoding)
+			|| RAW_ENCODING_V2.equals(encoding);
+	}
+
+	private static boolean isTerrainEncoding(String encoding) {
+		return UNIFORM_ENCODING.equals(encoding) || RLE_ENCODING.equals(encoding)
+			|| RAW_ENCODING.equals(encoding) || isWideTerrainEncoding(encoding);
 	}
 
 	public Optional<NativeLayeredTerrainSector> findSector(WorldMapSectorId identity) {

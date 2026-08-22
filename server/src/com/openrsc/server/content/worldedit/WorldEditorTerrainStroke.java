@@ -34,4 +34,28 @@ public final class WorldEditorTerrainStroke {
 		if(projected<0)throw new IllegalArgumentException("Terrain stroke draft accounting underflow.");
 		return projected;
 	}
+
+	/** Calculates a complete v2 elevation stroke without mutating caller state. */
+	public static int[] elevationTargets(
+		int[] current, int operation, int absolute, int step) {
+		if (current == null || current.length < 1 || current.length > MAX_TILES
+			|| operation < 0 || operation > 2 || absolute < 0 || absolute > 65535
+			|| step < 1 || step > 65535) {
+			throw new IllegalArgumentException("Elevation operation capability v2 is invalid.");
+		}
+		int[] result = new int[current.length];
+		for (int index = 0; index < current.length; index++) {
+			if (current[index] < 0 || current[index] > 65535) {
+				throw new IllegalArgumentException("Current elevation is outside 0..65535.");
+			}
+			long candidate = operation == 0 ? absolute
+				: (long)current[index] + (operation == 1 ? step : -step);
+			if (candidate < 0L || candidate > 65535L) {
+				throw new IllegalArgumentException(
+					"Elevation stroke refused atomically: relative operation exceeds 0..65535.");
+			}
+			result[index] = (int)candidate;
+		}
+		return result;
+	}
 }

@@ -262,7 +262,7 @@ public class PayloadCustomGenerator implements PayloadGenerator<OpcodeOut> {
 						builder.writeShort(editor.x); builder.writeShort(editor.y); builder.writeByte((byte) editor.plane);
 						builder.writeShort(editor.sectorX); builder.writeShort(editor.sectorY);
 						builder.writeByte((byte) editor.localX); builder.writeByte((byte) editor.localY);
-						builder.writeByte((byte) editor.elevation); builder.writeByte((byte) editor.groundTexture);
+						builder.writeShort(editor.elevation); builder.writeByte((byte) editor.groundTexture);
 						builder.writeByte((byte) editor.groundOverlay); builder.writeByte((byte) editor.roofTexture);
 						builder.writeByte((byte) editor.horizontalWall); builder.writeByte((byte) editor.verticalWall);
 						builder.writeInt(editor.diagonal); builder.writeShort(editor.traversalMask);
@@ -274,7 +274,7 @@ public class PayloadCustomGenerator implements PayloadGenerator<OpcodeOut> {
 						for(WorldEditorStruct.TerrainTile tile:editor.terrainTiles){
 							builder.writeShort(tile.x);builder.writeShort(tile.y);builder.writeByte((byte)tile.plane);
 							builder.writeShort(tile.sectorX);builder.writeShort(tile.sectorY);builder.writeByte((byte)tile.localX);builder.writeByte((byte)tile.localY);
-							builder.writeByte((byte)tile.elevation);builder.writeByte((byte)tile.groundTexture);builder.writeByte((byte)tile.groundOverlay);
+							builder.writeShort(tile.elevation);builder.writeByte((byte)tile.groundTexture);builder.writeByte((byte)tile.groundOverlay);
 							builder.writeByte((byte)tile.roofTexture);builder.writeByte((byte)tile.horizontalWall);builder.writeByte((byte)tile.verticalWall);
 							builder.writeInt(tile.diagonal);builder.writeShort(tile.traversalMask);builder.writeByte((byte)(tile.projectileAllowed?1:0));
 						}

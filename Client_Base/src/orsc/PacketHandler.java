@@ -1411,7 +1411,9 @@ public class PacketHandler {
 
 	private void updateWorldEditor() {
 		int type=packetsIncoming.getByte()&0xff, version=packetsIncoming.getByte()&0xff, sequence=packetsIncoming.get32();
-		if(version!=1||mc.worldEditorInterface==null||Config.isAndroid())return;
+		if(version!=2)throw new IllegalStateException(
+			"World Editor terrain capability mismatch: required v2, server sent v"+version);
+		if(mc.worldEditorInterface==null||Config.isAndroid())return;
 		if(type==1){WorldBuilderClientProfile.current().acceptAdaptiveServerBinding();mc.worldEditorInterface.open(packetsIncoming.getLong(0),sequence);return;}
 		if(type==2){mc.worldEditorInterface.closeFromServer();return;}
 		if(type==8){int fieldMask=packetsIncoming.getByte()&0xff,count=packetsIncoming.getByte()&0xff;
@@ -1419,13 +1421,13 @@ public class PacketHandler {
 			int[][] tiles=new int[count][15];boolean[] projectiles=new boolean[count];
 			for(int i=0;i<count;i++){int[] tile=tiles[i];tile[0]=packetsIncoming.getShort();tile[1]=packetsIncoming.getShort();tile[2]=packetsIncoming.getByte();
 				tile[3]=packetsIncoming.getShort();tile[4]=packetsIncoming.getShort();tile[5]=packetsIncoming.getByte()&0xff;tile[6]=packetsIncoming.getByte()&0xff;
-				tile[7]=packetsIncoming.getByte()&0xff;tile[8]=packetsIncoming.getByte()&0xff;tile[9]=packetsIncoming.getByte()&0xff;tile[10]=packetsIncoming.getByte()&0xff;
+				tile[7]=packetsIncoming.getShort()&0xffff;tile[8]=packetsIncoming.getByte()&0xff;tile[9]=packetsIncoming.getByte()&0xff;tile[10]=packetsIncoming.getByte()&0xff;
 				tile[11]=packetsIncoming.getByte()&0xff;tile[12]=packetsIncoming.getByte()&0xff;tile[13]=packetsIncoming.get32();tile[14]=packetsIncoming.getShort()&0xffff;
 				projectiles[i]=packetsIncoming.getByte()!=0;}
 			mc.worldEditorInterface.acceptTerrainStroke(sequence,fieldMask,tiles,projectiles,packetsIncoming.readString());return;}
 		if(type==3||type==7){int x=packetsIncoming.getShort(),y=packetsIncoming.getShort(),plane=packetsIncoming.getByte();
 			int sx=packetsIncoming.getShort(),sy=packetsIncoming.getShort(),lx=packetsIncoming.getByte()&0xff,ly=packetsIncoming.getByte()&0xff;
-			int elev=packetsIncoming.getByte()&0xff,texture=packetsIncoming.getByte()&0xff,overlay=packetsIncoming.getByte()&0xff,roof=packetsIncoming.getByte()&0xff;
+			int elev=packetsIncoming.getShort()&0xffff,texture=packetsIncoming.getByte()&0xff,overlay=packetsIncoming.getByte()&0xff,roof=packetsIncoming.getByte()&0xff;
 			int hw=packetsIncoming.getByte()&0xff,vw=packetsIncoming.getByte()&0xff,diag=packetsIncoming.get32(),collision=packetsIncoming.getShort()&0xffff;
 			boolean projectile=packetsIncoming.getByte()!=0,copied=packetsIncoming.getByte()!=0;
 			int fieldMask=type==7?packetsIncoming.getByte()&0xff:0;

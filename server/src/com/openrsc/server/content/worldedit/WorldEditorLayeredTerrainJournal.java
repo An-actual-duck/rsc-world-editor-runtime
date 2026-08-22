@@ -26,6 +26,8 @@ public final class WorldEditorLayeredTerrainJournal {
 		"world-builder-layered-draft-v4";
 	private static final String GROUND_ITEM_HEADER =
 		"world-builder-layered-draft-v5";
+	private static final String WIDE_ELEVATION_HEADER =
+		"world-builder-layered-draft-v6-u16-elevation";
 	private static final int MAX_LEVELS = 64;
 	private static final int MAX_TILES = 4096;
 	private static final int MAX_SECTORS = 64;
@@ -282,7 +284,7 @@ public final class WorldEditorLayeredTerrainJournal {
 			200 + levels.size() * 100 + sectors.size() * 40 + tiles.size() * 80
 				+ scenery.size() * 100 + npcs.size() * 140
 				+ groundItems.size() * 120);
-		output.append(groundItemAuthoring ? GROUND_ITEM_HEADER
+		output.append(groundItemAuthoring ? WIDE_ELEVATION_HEADER
 				: allocation ? ALLOCATION_HEADER
 				: authoring ? AUTHORING_HEADER
 				: combined ? COMBINED_HEADER : HEADER).append('\n')
@@ -438,7 +440,7 @@ public final class WorldEditorLayeredTerrainJournal {
 			int elevation, int texture, int overlay, int roof,
 			int verticalWall, int horizontalWall, int diagonal) {
 			if (x < 0 || x > 32767 || y < 0 || y > 32767
-				|| !rawByte(elevation) || !rawByte(texture)
+				|| !unsignedShort(elevation) || !rawByte(texture)
 				|| !rawByte(overlay) || !rawByte(roof)
 				|| !rawByte(verticalWall) || !rawByte(horizontalWall)) {
 				throw new IllegalArgumentException(
@@ -454,6 +456,10 @@ public final class WorldEditorLayeredTerrainJournal {
 			this.verticalWall = verticalWall;
 			this.horizontalWall = horizontalWall;
 			this.diagonal = diagonal;
+		}
+
+		private static boolean unsignedShort(int value) {
+			return value >= 0 && value <= 65535;
 		}
 	}
 
