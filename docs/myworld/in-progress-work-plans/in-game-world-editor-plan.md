@@ -744,12 +744,20 @@ must not cover the chat tabs, minimap, or other permanent desktop controls.
 Supporting right-side docking can follow later; the first implementation
 should prefer a dependable fixed location over a generalized window system.
 
-The compact dock keeps collapse, Navigate, Inspect, Brush/Terrain, Build, Save,
-and Close in its left column. Scenery, NPC, Elevation, Floor Color, Floor
-Texture, Roof, North Wall, East Wall, and Diagonal Wall occupy the right
-column. This makes every terrain field directly reachable without the compact
-Surface/Structure tab switch. The detailed expanded form retains those tabs
-as a learning/reference view.
+The compact dock uses its left column for persistent primary selection. Its
+order is collapse, Navigate, Inspect, Scenery, NPC, Items, Brush/Terrain,
+Build, Save, and Close. This keeps the four authoring families together in the
+requested Scenery, NPC, Items, Brush order while retaining navigation and
+session controls in one stable column.
+
+The right column is contextual and is redrawn for the selected primary tool.
+Brush/Terrain exposes Elevation, Floor Color, Floor Texture, Roof, North Wall,
+East Wall, and Diagonal Wall. Scenery exposes Add, Rotate, and Remove; NPC and
+Items expose Add and Remove. Navigate and Inspect do not show unrelated
+authoring controls. This keeps every terrain field directly reachable without
+the compact Surface/Structure tab switch and avoids leaving inactive brush
+extensions visible while another tool is selected. The detailed expanded form
+retains its tabs as a learning/reference fallback.
 
 Selecting a mode activates that mode and opens its flyout. Selecting the
 already active mode toggles its flyout without deactivating the safe, explicit
@@ -783,11 +791,15 @@ Rotate changes the orientation control; the normal UI must not make users add
 or subtract `12000`. Copying a tile must populate both the base definition and
 orientation, and painting must preserve the existing encoded protocol rules.
 
-Scenery and NPC flyouts expose definition search/ID, name, placement options,
-and remove/copy actions as appropriate. Activating either mode deactivates the
-Terrain field mask for application purposes without erasing its configured
-values. Mode exclusivity remains enforced in the model, not merely by drawing
-one selected button.
+Scenery, NPC, and Items flyouts expose definition search/ID, names, and
+tool-specific fine tuning such as NPC radius or item amount and respawn. Their
+common Add/Rotate/Remove actions live only in the contextual dock column, so
+the flyouts have room for future detail without duplicating the active action.
+The expanded fallback retains its explicit action buttons because it does not
+display the compact dock. Activating an entity mode deactivates the Terrain
+field mask for application purposes without erasing configured values. Mode
+exclusivity remains enforced in the model, not merely by drawing one selected
+button.
 
 Save carries a dirty/pending badge. It is disabled while a stroke is still in
 flight and reports success or failure without hiding an error in a closed
