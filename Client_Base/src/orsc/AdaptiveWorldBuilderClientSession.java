@@ -23,13 +23,13 @@ public final class AdaptiveWorldBuilderClientSession {
 	public static final String SESSION_SCHEMA =
 		"adaptive-world-builder-session-v1";
 	public static final String CAPABILITY_ID =
-		"adaptive-world-builder-runtime-capability-v2";
+		"adaptive-world-builder-runtime-capability-v4";
 	public static final String SERVER_BUILD_ID =
-		"core-framework-adaptive-builder-server-v2";
+		"rsc-world-editor-runtime-adaptive-builder-server-v4";
 	public static final String CLIENT_BUILD_ID =
-		"core-framework-adaptive-builder-client-v2";
+		"rsc-world-editor-runtime-adaptive-builder-client-v4";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v2-u16-elevation";
+		"generic-signed-layered-loader-v5-project-content-bundle-v2";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
@@ -57,9 +57,11 @@ public final class AdaptiveWorldBuilderClientSession {
 	private static final Set<String> EXACT_KEYS = Collections.unmodifiableSet(
 		new HashSet<String>(Arrays.asList(
 			"assetContract", "assetIdentity", "assetSha256", "authoring",
-			"authorableBoundaryIds", "authorableItemIds",
+			"authorableBoundaryIds", "authorableFloorIds", "authorableItemIds",
 			"authorableNpcIds", "authorableSceneryIds",
 			"capability", "clientBuild", "clientVersion", "coordinateModel",
+			"contentAssetSha256", "contentBundleSha256", "contentCapability",
+			"contentDefinitionSha256", "contentItemVisualSha256",
 			"definitionContract", "definitionIdentity", "definitionSha256",
 			"effectiveComposition", "effectiveCompositionSha256", "initialLevel",
 			"initialWorldSpace", "initialX", "initialY", "loader",
@@ -78,17 +80,20 @@ public final class AdaptiveWorldBuilderClientSession {
 	private final int[] sceneryIds;
 	private final int[] npcIds;
 	private final int[] itemIds;
+	private final int[] authorableFloorIds;
 	private final int[] authorableBoundaryIds;
 	private final int[] authorableSceneryIds;
 	private final int[] authorableNpcIds;
 	private final int[] authorableItemIds;
 	private final int[] levels;
+	private ProjectContentBundle contentBundle = ProjectContentBundle.empty();
 
 	private AdaptiveWorldBuilderClientSession(
 		Path bindingFile, Path workspaceRoot,
 		Map<String, String> fields, String token,
 		int[] tileIds, int[] boundaryIds, int[] sceneryIds,
 		int[] npcIds, int[] itemIds,
+		int[] authorableFloorIds,
 		int[] authorableBoundaryIds, int[] authorableSceneryIds,
 		int[] authorableNpcIds, int[] authorableItemIds,
 		int[] levels) {
@@ -102,6 +107,7 @@ public final class AdaptiveWorldBuilderClientSession {
 		this.sceneryIds = sceneryIds;
 		this.npcIds = npcIds;
 		this.itemIds = itemIds;
+		this.authorableFloorIds = authorableFloorIds;
 		this.authorableBoundaryIds = authorableBoundaryIds;
 		this.authorableSceneryIds = authorableSceneryIds;
 		this.authorableNpcIds = authorableNpcIds;
@@ -168,6 +174,7 @@ public final class AdaptiveWorldBuilderClientSession {
 				parseIds(fields.get("requiredSceneryIds")),
 				parseIds(fields.get("requiredNpcIds")),
 				parseIds(fields.get("requiredItemIds")),
+				parseIds(fields.get("authorableFloorIds")),
 				parseIds(fields.get("authorableBoundaryIds")),
 				parseIds(fields.get("authorableSceneryIds")),
 				parseIds(fields.get("authorableNpcIds")),
@@ -214,7 +221,7 @@ public final class AdaptiveWorldBuilderClientSession {
 		}
 	}
 
-	public void requireEvidence(Path definitionEvidence, Path assetEvidence) {
+	public synchronized void requireEvidence(Path definitionEvidence, Path assetEvidence) {
 		try {
 			Path definitions = safeRegularFile(
 				definitionEvidence, MAX_EVIDENCE_BYTES,
@@ -235,12 +242,37 @@ public final class AdaptiveWorldBuilderClientSession {
 				throw new IllegalArgumentException(
 					"Adaptive client asset evidence hash mismatch");
 			}
+			contentBundle = ProjectContentBundle.load(
+				workspaceRoot,
+				System.getProperty("openrsc.worldBuilderContentBundle", ""),
+				System.getProperty("openrsc.worldBuilderContentCapabilityId", ""),
+				System.getProperty("openrsc.worldBuilderContentBundleSha256", ""),
+				System.getProperty("openrsc.worldBuilderContentDefinitionSha256", ""),
+				System.getProperty("openrsc.worldBuilderContentAssetSha256", ""),
+				System.getProperty("openrsc.worldBuilderContentItemVisualSha256", ""));
+			if (!fields.get("contentCapability").equals(
+					System.getProperty("openrsc.worldBuilderContentCapabilityId", ""))
+				|| !fields.get("contentBundleSha256").equals(
+					System.getProperty("openrsc.worldBuilderContentBundleSha256", ""))
+				|| !fields.get("contentDefinitionSha256").equals(
+					System.getProperty("openrsc.worldBuilderContentDefinitionSha256", ""))
+				|| !fields.get("contentAssetSha256").equals(
+					System.getProperty("openrsc.worldBuilderContentAssetSha256", ""))
+				|| !fields.get("contentItemVisualSha256").equals(
+					System.getProperty("openrsc.worldBuilderContentItemVisualSha256", ""))) {
+				throw new IllegalArgumentException(
+					"Project content identities differ between launch and session");
+			}
 		} catch (IllegalArgumentException failure) {
 			throw failure;
 		} catch (Exception failure) {
 			throw new IllegalArgumentException(
 				"Unable to validate adaptive client evidence", failure);
 		}
+	}
+
+	public synchronized ProjectContentBundle contentBundle() {
+		return contentBundle;
 	}
 
 	public Path requireCredential(Path requested) {
@@ -282,6 +314,9 @@ public final class AdaptiveWorldBuilderClientSession {
 		for (int id : itemIds) require("item", id, new Lookup() {
 			@Override public Object get(int value) { return EntityHandler.findItem(value, false); }
 		});
+		for (int id : authorableFloorIds) require("authorable floor", id, new Lookup() {
+			@Override public Object get(int value) { return EntityHandler.getTileDef(value); }
+		});
 		for (int id : authorableBoundaryIds) require("authorable boundary", id, new Lookup() {
 			@Override public Object get(int value) { return EntityHandler.getDoorDef(value); }
 		});
@@ -297,7 +332,7 @@ public final class AdaptiveWorldBuilderClientSession {
 	}
 
 	private int[] definitionIdsForFamily(String family) {
-		if ("tile".equals(family)) return tileIds;
+		if ("tile".equals(family)) return authorableFloorIds;
 		if ("boundary".equals(family)) return authorableBoundaryIds;
 		if ("scenery".equals(family)) return authorableSceneryIds;
 		if ("npc".equals(family)) return authorableNpcIds;
@@ -331,6 +366,29 @@ public final class AdaptiveWorldBuilderClientSession {
 		matched(fields, "packageInventorySha256", SHA256);
 		matched(fields, "packageVersion", VERSION);
 		matched(fields, "sourceBaselineInventorySha256", SHA256);
+		boolean content = !fields.get("contentCapability").isEmpty();
+		if (content) {
+			String contentCapability = fields.get("contentCapability");
+			if (!ProjectContentBundle.CAPABILITY_ID.equals(contentCapability)
+				&& !ProjectContentBundle.CAPABILITY_ID_V1.equals(contentCapability)) {
+				throw new IllegalArgumentException("Unsupported project content capability");
+			}
+			matched(fields, "contentBundleSha256", SHA256);
+			matched(fields, "contentDefinitionSha256", SHA256);
+			matched(fields, "contentAssetSha256", SHA256);
+			matched(fields, "contentItemVisualSha256", SHA256);
+			if (ProjectContentBundle.CAPABILITY_ID_V1.equals(contentCapability)
+				&& !fields.get("contentItemVisualSha256").equals(
+					"0000000000000000000000000000000000000000000000000000000000000000")) {
+				throw new IllegalArgumentException("Bundle-v1 item visual identity must be zero");
+			}
+		} else if (!fields.get("contentBundleSha256").isEmpty()
+			|| !fields.get("contentDefinitionSha256").isEmpty()
+			|| !fields.get("contentAssetSha256").isEmpty()
+			|| !fields.get("contentItemVisualSha256").isEmpty()) {
+			throw new IllegalArgumentException(
+				"Incomplete project content identity in runtime binding");
+		}
 		if (!"global".equals(fields.get("initialWorldSpace"))) {
 			throw new IllegalArgumentException(
 				"Adaptive client supports only the bound global world space");

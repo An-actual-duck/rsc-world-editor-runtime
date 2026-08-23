@@ -299,6 +299,12 @@ public class ServerConfiguration {
 	public String WORLD_BUILDER_ASSET_ID;
 	public String WORLD_BUILDER_ASSET_SHA256;
 	public String WORLD_BUILDER_ASSET_EVIDENCE_PATH;
+	public String WORLD_BUILDER_CONTENT_BUNDLE_PATH;
+	public String WORLD_BUILDER_CONTENT_CAPABILITY_ID;
+	public String WORLD_BUILDER_CONTENT_BUNDLE_SHA256;
+	public String WORLD_BUILDER_CONTENT_DEFINITION_SHA256;
+	public String WORLD_BUILDER_CONTENT_ASSET_SHA256;
+	public String WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256;
 	public String WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256;
 	public String WORLD_BUILDER_INITIAL_WORLD_SPACE;
 	public int WORLD_BUILDER_INITIAL_LEVEL;
@@ -768,6 +774,36 @@ public class ServerConfiguration {
 			"openrsc.worldBuilderAssetEvidencePath",
 			"OPENRSC_WORLD_BUILDER_ASSET_EVIDENCE_PATH",
 			"world_builder_asset_evidence_path",
+			"");
+		WORLD_BUILDER_CONTENT_BUNDLE_PATH = readStringSystemEnvConfig(
+			"openrsc.worldBuilderContentBundle",
+			"OPENRSC_WORLD_BUILDER_CONTENT_BUNDLE",
+			"world_builder_content_bundle",
+			"");
+		WORLD_BUILDER_CONTENT_CAPABILITY_ID = readStringSystemEnvConfig(
+			"openrsc.worldBuilderContentCapabilityId",
+			"OPENRSC_WORLD_BUILDER_CONTENT_CAPABILITY_ID",
+			"world_builder_content_capability_id",
+			"");
+		WORLD_BUILDER_CONTENT_BUNDLE_SHA256 = readStringSystemEnvConfig(
+			"openrsc.worldBuilderContentBundleSha256",
+			"OPENRSC_WORLD_BUILDER_CONTENT_BUNDLE_SHA256",
+			"world_builder_content_bundle_sha256",
+			"");
+		WORLD_BUILDER_CONTENT_DEFINITION_SHA256 = readStringSystemEnvConfig(
+			"openrsc.worldBuilderContentDefinitionSha256",
+			"OPENRSC_WORLD_BUILDER_CONTENT_DEFINITION_SHA256",
+			"world_builder_content_definition_sha256",
+			"");
+		WORLD_BUILDER_CONTENT_ASSET_SHA256 = readStringSystemEnvConfig(
+			"openrsc.worldBuilderContentAssetSha256",
+			"OPENRSC_WORLD_BUILDER_CONTENT_ASSET_SHA256",
+			"world_builder_content_asset_sha256",
+			"");
+		WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256 = readStringSystemEnvConfig(
+			"openrsc.worldBuilderContentItemVisualSha256",
+			"OPENRSC_WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256",
+			"world_builder_content_item_visual_sha256",
 			"");
 		WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256 =
 			readStringSystemEnvConfig(

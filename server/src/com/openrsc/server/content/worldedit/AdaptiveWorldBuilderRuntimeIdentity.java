@@ -32,21 +32,23 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		65536 * 11 - 1;
 	public static final String PROFILE_ID = "adaptive-world-builder";
 	public static final String CAPABILITY_ID =
-		"adaptive-world-builder-runtime-capability-v2";
+		"adaptive-world-builder-runtime-capability-v4";
 	public static final String SESSION_SCHEMA =
 		"adaptive-world-builder-session-v1";
 	public static final String SERVER_BUILD_ID =
-		"core-framework-adaptive-builder-server-v2";
+		"rsc-world-editor-runtime-adaptive-builder-server-v4";
 	public static final String CLIENT_BUILD_ID =
-		"core-framework-adaptive-builder-client-v2";
+		"rsc-world-editor-runtime-adaptive-builder-client-v4";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v2-u16-elevation";
+		"generic-signed-layered-loader-v5-project-content-bundle-v2";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
 		"world-builder-definition-catalog-binding-v1";
 	public static final String ASSET_CONTRACT_ID =
 		"world-builder-client-asset-binding-v1";
+	public static final String CONTENT_CONTRACT_ID =
+		"project-local-custom-content-v2";
 	public static final String PROTOCOL_ID =
 		"world-builder-native-layered-protocol-v2-u16-elevation";
 	public static final String EFFECTIVE_COMPOSITION_ID =
@@ -140,6 +142,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 			throw new IOException(
 				"Adaptive server asset evidence hash mismatch");
 		}
+		AdaptiveWorldBuilderProjectContentBundle.load(config, storage);
 	}
 
 	public static WorldLocation initialLocation(ServerConfiguration config) {
@@ -284,6 +287,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		String requiredSceneryIds,
 		String requiredNpcIds,
 		String requiredItemIds,
+		String authorableFloorIds,
 		String authorableBoundaryIds,
 		String authorableSceneryIds,
 		String authorableNpcIds,
@@ -298,8 +302,19 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		fields.put("assetContract", ASSET_CONTRACT_ID);
 		fields.put("assetIdentity", config.WORLD_BUILDER_ASSET_ID);
 		fields.put("assetSha256", config.WORLD_BUILDER_ASSET_SHA256);
+		fields.put("contentAssetSha256",
+			config.WORLD_BUILDER_CONTENT_ASSET_SHA256);
+		fields.put("contentBundleSha256",
+			config.WORLD_BUILDER_CONTENT_BUNDLE_SHA256);
+		fields.put("contentCapability",
+			config.WORLD_BUILDER_CONTENT_CAPABILITY_ID);
+		fields.put("contentDefinitionSha256",
+			config.WORLD_BUILDER_CONTENT_DEFINITION_SHA256);
+		fields.put("contentItemVisualSha256",
+			config.WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256);
 		fields.put("authoring", AUTHORING_ID);
 		fields.put("authorableBoundaryIds", checkedIdList(authorableBoundaryIds));
+		fields.put("authorableFloorIds", checkedIdList(authorableFloorIds));
 		fields.put("authorableItemIds", checkedIdList(authorableItemIds));
 		fields.put("authorableNpcIds", checkedIdList(authorableNpcIds));
 		fields.put("authorableSceneryIds", checkedIdList(authorableSceneryIds));

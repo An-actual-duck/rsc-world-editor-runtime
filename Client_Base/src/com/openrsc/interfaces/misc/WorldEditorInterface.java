@@ -224,6 +224,14 @@ public final class WorldEditorInterface extends NCustomComponent {
 		terrainStrokeEastWall=raw;terrainStrokeNorthWall=terrainStrokeDiagonal=0;
 		terrainStrokeStartedNanos=System.nanoTime();sendTerrainStroke();return true;
 	}
+	public boolean sendAutomatedFloorPlacementProbe(int worldX,int worldY,int raw){
+		if(!Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")
+			||!isEditorOpen()||terrainStrokeTiles!=null)return false;
+		terrainStrokeTiles=new int[][]{{worldX,worldY}};terrainStrokeMask=4;
+		terrainStrokeElevation=terrainStrokeColor=terrainStrokeRoof=0;
+		terrainStrokeTexture=raw;terrainStrokeEastWall=terrainStrokeNorthWall=terrainStrokeDiagonal=0;
+		terrainStrokeStartedNanos=System.nanoTime();sendTerrainStroke();return true;
+	}
 	public boolean sendAutomatedWideElevationProbe(int operation,int elevation,int step,int[][] tiles){
 		if(!"author".equals(System.getProperty("openrsc.worldBuilderAutomatedWideElevationProbe",""))
 			||!isEditorOpen()||terrainStrokeTiles!=null||tiles==null||tiles.length<1||tiles.length>TERRAIN_BATCH_LIMIT)return false;

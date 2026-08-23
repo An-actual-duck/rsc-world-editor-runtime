@@ -13,16 +13,16 @@ target path and accepts authored output only inside the selected project.
 ## Stable identities
 
 The machine-readable source of truth is
-`server/conf/world-builder/adaptive-runtime-capability-v2.json`. Server and
+`server/conf/world-builder/adaptive-runtime-capability-v4.json`. Server and
 client code independently pin the same values.
 
 | Role | Identity |
 |---|---|
-| Capability | `adaptive-world-builder-runtime-capability-v2` |
+| Capability | `adaptive-world-builder-runtime-capability-v4` |
 | Runtime profile | `adaptive-world-builder` |
-| Server build | `core-framework-adaptive-builder-server-v2` |
-| Client build | `core-framework-adaptive-builder-client-v2` |
-| Loader | `generic-signed-layered-loader-v2-u16-elevation` |
+| Server build | `rsc-world-editor-runtime-adaptive-builder-server-v4` |
+| Client build | `rsc-world-editor-runtime-adaptive-builder-client-v4` |
+| Loader | `generic-signed-layered-loader-v5-project-content-bundle-v2` |
 | Authoring | `generic-signed-layered-authoring-v2-u16-elevation` |
 | Definition binding | `world-builder-definition-catalog-binding-v1` |
 | Client asset binding | `world-builder-client-asset-binding-v1` |
@@ -124,6 +124,96 @@ origins `target-layered`, `target-packed`, or `standalone-empty`, definition
 and asset IDs/hashes/evidence paths, and the initial global coordinate. The
 definition and asset evidence files must be inside `working/`.
 
+Target-backed projects bind the Editor-owned
+`project-local-custom-content-v2` capability. The only accepted content input
+is the exact `working/content-bundle` directory with manifest type
+`world-builder-project-content-bundle`, schema version 2. Its closed inventory
+contains captured server definition files for tiles, boundaries, scenery,
+NPCs, and items plus the existing client `library.orsc`, `models.orsc`,
+`Authentic_Sprites.orsc`, `Custom_Sprites.osar`, and `Menus.osar` archives.
+Loose images, loose models, scripts, classes, plug-ins, and target behavior are
+not content-bundle inputs and are never executed.
+
+### Versioned item-visual closure
+
+`project-local-custom-content-v1` cannot author a new ground-item visual. The
+captured server item JSON contains gameplay fields but no client item-to-sprite
+mapping, while the definition catalog contains IDs only. In particular, the
+frozen fixture declares item `9000` without the `ItemDef` values that select and
+recolour its visual. A runtime must not infer those values from the item ID.
+The client therefore refuses a bundle-v1 item that has no pre-existing packaged
+client definition. Existing IDs may retain their exact packaged visual mapping;
+new IDs cannot activate under bundle-v1.
+
+Bundle v1 remains accepted only when every target ground-item ID already has a
+packaged client visual; its new-item refusal remains fail-closed. Bundle v2
+adds a sorted manifest `itemVisuals` array, a separately bound
+`itemVisualFingerprintSha256`, and the preserved static-evidence role
+`metadata.item-visuals` at
+`server/conf/world-builder/item-visuals-v1.json`. The array contains exactly
+one record for every target ground-item ID absent from the packaged catalog,
+with exactly these fields:
+
+```json
+{
+  "itemId": 9000,
+  "authenticSpriteId": null,
+  "customSpriteAssetRole": "asset.sprite.custom",
+  "customSpriteSubspace": "items",
+  "customSpriteEntry": "0",
+  "pictureMask": 3368601,
+  "blueMask": 1122867
+}
+```
+
+- `itemId` is the exact ground-item catalog ID (`0..65535`).
+- `authenticSpriteId` is `null` for a named mapping or an unsigned-short
+  `0..65535` ID whose exact `sprites/ID.dat` palette-frame entry must decode in
+  `asset.sprite.authentic`; the decoded sprite installs at renderer slot
+  `2150 + ID`.
+- `customSpriteAssetRole` is exactly `asset.sprite.custom` or
+  `asset.spritepack`; `customSpriteSubspace` and `customSpriteEntry` identify
+  one decoded, nonempty GZIP OSAR entry in that named archive. Decoded item
+  sprites remain role-specific even when both archives contain the same
+  subspace/entry pair, so the legacy merged sprite tree cannot change the
+  selected source.
+- `pictureMask` and `blueMask` are exact signed 32-bit values.
+
+Exactly one mapping form is present: an authentic ID with all three custom
+fields null, or all three custom fields with the authentic ID null. Both
+processes verify the evidence file and decode the exact referenced archive
+entry before authentication. The client emits deterministic source,
+dimensions, pixel SHA-256, and mask evidence when each sprite is installed.
+The reviewed Editor fixture freezes definition
+`f97a96299023e4cf1d738c1f3520af0c2e4339ed95aab952814832cc77e52baf`,
+asset `e0ab18b793a91db852557689b9734eeb1d459e216be61b902d75a69e6e2c5bfa`,
+item-visual
+`f9aaf43d6cac1c96bbf10d129e1976f9638562036e1b187f684e7219a7cda8d3`,
+and bundle
+`88542556c723be2c4312f48eb2b42f65fb08a169edd21afa55eda075c6d4aa8b`.
+Floors and walls have no sprite lookup: floor IDs and axial wall IDs are
+one-less than unsigned-byte terrain values, so their exact catalog range is
+`0..254`, and their XML colour/material fields are the visual definition.
+Scenery, NPC, and ground-item placement IDs are unsigned-short values
+`0..65535`.
+
+Both processes receive and independently verify these properties:
+
+- `openrsc.worldBuilderContentBundle`
+- `openrsc.worldBuilderContentCapabilityId`
+- `openrsc.worldBuilderContentBundleSha256`
+- `openrsc.worldBuilderContentDefinitionSha256`
+- `openrsc.worldBuilderContentAssetSha256`
+- `openrsc.worldBuilderContentItemVisualSha256` (64 zeroes for bundle v1)
+
+The bundle path must resolve exactly to the isolated project's working copy.
+Unknown keys or files, path escapes, symbolic or hard links, portable-name
+collisions, incomplete family bindings, unsafe catalog holes, payload/hash
+mismatch, domain-fingerprint mismatch, catalog disagreement, and
+client/server identity disagreement all fail before editable readiness. A
+content-neutral standalone project keeps all six values empty and continues
+to use packaged definitions and assets.
+
 The desktop client independently requires:
 
 - `-Dopenrsc.worldBuilderMode=true`
@@ -132,6 +222,8 @@ The desktop client independently requires:
 - the server-produced
   `<project>/run/world-builder/runtime-binding.properties`
 - client definition and asset evidence files inside `<project>/working/`
+- the same five project-content properties used by the server for a
+  target-backed project
 
 The binding contains exact server/client builds, protocol, loader, package,
 manifest, package inventory, definitions, assets, levels, origin, initial

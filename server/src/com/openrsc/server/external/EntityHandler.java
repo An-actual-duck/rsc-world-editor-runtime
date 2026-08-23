@@ -7,6 +7,8 @@ import com.openrsc.server.constants.ItemId;
 import com.openrsc.server.constants.NpcId;
 import com.openrsc.server.constants.Spells;
 import com.openrsc.server.constants.custom.MyWorldItemId;
+import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderProjectContentBundle;
+import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderRuntimeIdentity;
 import com.openrsc.server.event.rsc.impl.projectile.RangeUtils;
 import com.openrsc.server.model.Point;
 import com.openrsc.server.model.TelePoint;
@@ -22,12 +24,19 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
+
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 import static com.openrsc.server.plugins.Functions.ZERO_RESERVED;
 import static com.openrsc.server.plugins.Functions.patchObject;
@@ -237,37 +246,63 @@ public final class EntityHandler {
 	}
 
 	public void load() {
+		AdaptiveWorldBuilderProjectContentBundle projectContent =
+			loadAdaptiveProjectContent();
 		npcs = new ArrayList<>();
 		npcsPatch = new ArrayList<>();
 		npcNames = new HashSet<>();
 		npcNamesLowerCase = new HashSet<>();
 		LOGGER.info("Loading npc definitions...");
-		loadNpcs(getServer().getConfig().CONFIG_DIR + "/defs/NpcDefs.json");
-		loadNpcs(getServer().getConfig().CONFIG_DIR + "/defs/NpcDefsCustom.json");
+		loadNpcs(projectContent.isPresent()
+			? projectContent.path("definition.npc.base").toString()
+			: getServer().getConfig().CONFIG_DIR + "/defs/NpcDefs.json");
+		loadNpcs(projectContent.isPresent()
+			? projectContent.path("definition.npc.custom").toString()
+			: getServer().getConfig().CONFIG_DIR + "/defs/NpcDefsCustom.json");
 		//loadNpcs(getServer().getConfig().CONFIG_DIR + "/defs/NpcDefsExpansion.json");
-		patchNpcs();
-		if (getServer().getConfig().WANT_MYWORLD) {
-			applyOptionalNpcOverrides(getServer().getConfig().CONFIG_DIR + "/defs/NpcDefsMyWorld.json");
+		if (projectContent.isPresent()) {
+			applyProjectNpcOverlays(
+				projectContent.path("definition.npc.patch"),
+				projectContent.path("definition.npc.world"));
+		} else {
+			patchNpcs();
+			if (getServer().getConfig().WANT_MYWORLD) {
+				applyOptionalNpcOverrides(getServer().getConfig().CONFIG_DIR + "/defs/NpcDefsMyWorld.json");
+			}
 		}
-		customNpcConditions();
+		if (!projectContent.isPresent()) customNpcConditions();
 		loadNpcNames();
 		LOGGER.info("Loaded " + npcs.size() + " total npc definitions");
 
 		items = new ArrayList<>();
 		itemsPatch = new ArrayList<>();
 		LOGGER.info("Loading item definitions...");
-		loadItems(getServer().getConfig().CONFIG_DIR + "/defs/ItemDefs.json");
-		loadItems(getServer().getConfig().CONFIG_DIR + "/defs/ItemDefsCustom.json");
+		loadItems(projectContent.isPresent()
+			? projectContent.path("definition.item.base").toString()
+			: getServer().getConfig().CONFIG_DIR + "/defs/ItemDefs.json");
+		loadItems(projectContent.isPresent()
+			? projectContent.path("definition.item.custom").toString()
+			: getServer().getConfig().CONFIG_DIR + "/defs/ItemDefsCustom.json");
 		//loadItems(getServer().getConfig().CONFIG_DIR + "/defs/ItemDefsExpansion.json");
-		patchItems();
-		customItemConditions();
-		if (getServer().getConfig().WANT_MYWORLD) {
-			applyOptionalItemOverrides(getServer().getConfig().CONFIG_DIR + "/defs/ItemDefsMyWorld.json");
+		if (projectContent.isPresent()) {
+			applyProjectItemOverlays(
+				projectContent.path("definition.item.patch"),
+				projectContent.path("definition.item.world"));
+		} else {
+			patchItems();
+			customItemConditions();
+			if (getServer().getConfig().WANT_MYWORLD) {
+				applyOptionalItemOverrides(getServer().getConfig().CONFIG_DIR + "/defs/ItemDefsMyWorld.json");
+			}
 		}
 		LOGGER.info("Loaded " + items.size() + " item definitions");
 
-		doors = (DoorDef[]) getPersistenceManager().load("defs/DoorDef.xml");
-		gameObjects = (GameObjectDef[]) getPersistenceManager().load("defs/GameObjectDef.xml");
+		doors = projectContent.isPresent()
+			? loadProjectDoors(projectContent.path("definition.boundary"))
+			: (DoorDef[]) getPersistenceManager().load("defs/DoorDef.xml");
+		gameObjects = projectContent.isPresent()
+			? loadProjectScenery(projectContent.path("definition.scenery"))
+			: (GameObjectDef[]) getPersistenceManager().load("defs/GameObjectDef.xml");
 		prayers = (PrayerDef[]) getPersistenceManager().load("defs/PrayerDef.xml");
 		if (!getServer().getConfig().LACKS_PRAYERS) {
 			// On May 24 2001 original magic/prayer rework, new spells featured
@@ -275,7 +310,9 @@ public final class EntityHandler {
 		} else {
 			spells = (SpellDef[]) getPersistenceManager().load("defs/SpellDefRetro.xml");
 		}
-		tiles = (TileDef[]) getPersistenceManager().load("defs/TileDef.xml");
+		tiles = projectContent.isPresent()
+			? loadProjectTiles(projectContent.path("definition.tile"))
+			: (TileDef[]) getPersistenceManager().load("defs/TileDef.xml");
 
 		herbSeconds = (ItemHerbSecond[]) getPersistenceManager().load(getPath("defs/extras/ItemHerbSecond.xml"));
 		dartTips = (HashMap<Integer, ItemDartTipDef>) getPersistenceManager().load(getPath("defs/extras/ItemDartTipDef.xml"));
@@ -310,6 +347,156 @@ public final class EntityHandler {
 		for (int tree : objectWoodcutting.keySet()) {
 			objectWoodcutting.get(tree).calculateWoodRates();
 		}
+	}
+
+	private AdaptiveWorldBuilderProjectContentBundle loadAdaptiveProjectContent() {
+		try {
+			return AdaptiveWorldBuilderProjectContentBundle.load(
+				getServer().getConfig(), getServer().getWorldEditStorage());
+		} catch (Exception failure) {
+			throw new IllegalStateException(
+				"Failed to validate project-local custom content", failure);
+		}
+	}
+
+	private void applyProjectNpcOverlays(Path... paths) {
+		for (Path path : paths) {
+			try {
+				JSONObject document = new JSONObject(new String(
+					Files.readAllBytes(path), java.nio.charset.StandardCharsets.UTF_8));
+				JSONArray rows = document.getJSONArray(JSONObject.getNames(document)[0]);
+				for (int index = 0; index < rows.length(); index++) {
+					JSONObject row = rows.getJSONObject(index);
+					int id = row.getInt("id");
+					if (id < 0 || id >= npcs.size() || npcs.get(id) == null) {
+						throw new IllegalArgumentException(
+							"NPC overlay references undefined id " + id);
+					}
+					NPCDef definition = new NPCDef(npcs.get(id));
+					applyNpcFields(definition, row);
+					npcs.set(id, definition);
+				}
+			} catch (Exception failure) {
+				throw new IllegalStateException(
+					"Failed to load project NPC overlays from " + path.getFileName(), failure);
+			}
+		}
+	}
+
+	private static void applyNpcFields(NPCDef definition, JSONObject row) {
+		if (row.has("name")) definition.name = row.getString("name");
+		if (row.has("description")) definition.description = row.getString("description");
+		if (row.has("command")) definition.command1 = row.getString("command");
+		if (row.has("command2")) definition.command2 = row.getString("command2");
+		if (row.has("attack")) definition.attack = row.getInt("attack");
+		if (row.has("strength")) definition.strength = row.getInt("strength");
+		if (row.has("hits")) definition.hits = row.getInt("hits");
+		if (row.has("defense")) definition.defense = row.getInt("defense");
+		if (row.has("combatlvl")) definition.combatLevel = row.getInt("combatlvl");
+		if (row.has("attackable")) definition.attackable = row.getInt("attackable") == 1;
+		if (row.has("aggressive")) definition.aggressive = row.getInt("aggressive") == 1;
+		if (row.has("hairColour")) definition.hairColour = row.getInt("hairColour");
+		if (row.has("topColour")) definition.topColour = row.getInt("topColour");
+		if (row.has("bottomColour")) definition.bottomColour = row.getInt("bottomColour");
+		if (row.has("skinColour")) definition.skinColour = row.getInt("skinColour");
+	}
+
+	private void applyProjectItemOverlays(Path... paths) {
+		for (Path path : paths) {
+			try {
+				JSONObject document = new JSONObject(new String(
+					Files.readAllBytes(path), java.nio.charset.StandardCharsets.UTF_8));
+				JSONArray rows = document.getJSONArray(JSONObject.getNames(document)[0]);
+				for (int index = 0; index < rows.length(); index++) {
+					JSONObject row = rows.getJSONObject(index);
+					int id = row.getInt("id");
+					if (id < 0 || id >= items.size() || items.get(id) == null) {
+						throw new IllegalArgumentException(
+							"Item overlay references undefined id " + id);
+					}
+					ItemDefinition definition = new ItemDefinition(items.get(id));
+					if (row.has("name")) definition.setName(row.getString("name"));
+					if (row.has("description")) definition.setDescription(row.getString("description"));
+					if (row.has("basePrice")) definition.setDefaultPrice(row.getInt("basePrice"));
+					items.set(id, definition);
+				}
+			} catch (Exception failure) {
+				throw new IllegalStateException(
+					"Failed to load project item overlays from " + path.getFileName(), failure);
+			}
+		}
+	}
+
+	private static Document projectXml(Path path, String rootName) {
+		try {
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+			factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+			factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+			factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+			factory.setXIncludeAware(false);
+			factory.setExpandEntityReferences(false);
+			Document document = factory.newDocumentBuilder().parse(path.toFile());
+			if (!rootName.equals(document.getDocumentElement().getTagName())) {
+				throw new IllegalArgumentException("Unexpected definition XML root");
+			}
+			return document;
+		} catch (Exception failure) {
+			throw new IllegalStateException(
+				"Failed to parse declarative project definitions " + path.getFileName(), failure);
+		}
+	}
+
+	private static DoorDef[] loadProjectDoors(Path path) {
+		NodeList rows = projectXml(path, "DoorDef-array").getDocumentElement()
+			.getElementsByTagName("DoorDef");
+		DoorDef[] result = new DoorDef[rows.getLength()];
+		for (int index = 0; index < rows.getLength(); index++) {
+			Element row = (Element) rows.item(index); DoorDef value = new DoorDef();
+			value.name = xmlText(row, "name", ""); value.description = xmlText(row, "description", "");
+			value.command1 = xmlText(row, "command1", ""); value.command2 = xmlText(row, "command2", "");
+			value.modelVar1 = xmlInt(row, "modelVar1", 0); value.modelVar2 = xmlInt(row, "modelVar2", 0);
+			value.modelVar3 = xmlInt(row, "modelVar3", 0); value.doorType = xmlInt(row, "doorType", 0);
+			value.unknown = xmlInt(row, "unknown", 0); result[index] = value;
+		}
+		return result;
+	}
+
+	private static GameObjectDef[] loadProjectScenery(Path path) {
+		NodeList rows = projectXml(path, "GameObjectDef-array").getDocumentElement()
+			.getElementsByTagName("GameObjectDef");
+		GameObjectDef[] result = new GameObjectDef[rows.getLength()];
+		for (int index = 0; index < rows.getLength(); index++) {
+			Element row = (Element) rows.item(index); GameObjectDef value = new GameObjectDef();
+			value.name = xmlText(row, "name", ""); value.description = xmlText(row, "description", "");
+			value.command1 = xmlText(row, "command1", ""); value.command2 = xmlText(row, "command2", "");
+			value.type = xmlInt(row, "type", 0); value.width = xmlInt(row, "width", 1);
+			value.height = xmlInt(row, "height", 1); value.groundItemVar = xmlInt(row, "groundItemVar", 0);
+			value.objectModel = xmlText(row, "objectModel", ""); result[index] = value;
+		}
+		return result;
+	}
+
+	private static TileDef[] loadProjectTiles(Path path) {
+		NodeList rows = projectXml(path, "TileDef-array").getDocumentElement()
+			.getElementsByTagName("TileDef");
+		TileDef[] result = new TileDef[rows.getLength()];
+		for (int index = 0; index < rows.getLength(); index++) {
+			Element row = (Element) rows.item(index); TileDef value = new TileDef();
+			value.colour = xmlInt(row, "colour", 0); value.unknown = xmlInt(row, "unknown", 0);
+			value.objectType = xmlInt(row, "objectType", 0); result[index] = value;
+		}
+		return result;
+	}
+
+	private static String xmlText(Element row, String name, String fallback) {
+		NodeList values = row.getElementsByTagName(name);
+		return values.getLength() == 0 ? fallback : values.item(0).getTextContent();
+	}
+	private static int xmlInt(Element row, String name, int fallback) {
+		String value = xmlText(row, name, "").trim();
+		return value.isEmpty() ? fallback : Integer.parseInt(value);
 	}
 
 	private String getPath(String filePath) {

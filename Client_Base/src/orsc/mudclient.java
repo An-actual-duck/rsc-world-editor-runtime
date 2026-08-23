@@ -65,6 +65,8 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.*;
 //import java.lang.management.ManagementFactory; //Commented out for Android
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -909,6 +911,8 @@ public final class mudclient implements Runnable {
 	private long automatedBuilderPlacementProbeDeadline = 0L;
 	private int automatedBuilderWideElevationProbeStage = 0;
 	private long automatedBuilderWideElevationProbeDeadline = 0L;
+	private boolean automatedBuilderFloorProbeSent = false;
+	private boolean automatedBuilderFloorProbeAccepted = false;
 	private boolean automatedBuilderWideElevationReopenVerified = false;
 	private final Map<Long, ResidentObjectChunkCacheEntry> cachedResidentObjectChunks =
 		new HashMap<Long, ResidentObjectChunkCacheEntry>();
@@ -1584,7 +1588,12 @@ public final class mudclient implements Runnable {
 		byte[] data = null;
 		try {
 			clientPort.showLoadingProgress(startPercentage, "Loading " + fileTitle + " - 0%");
-			java.io.InputStream inputstream = DataOperations.streamFromPath(clientPort.getCacheLocation() + filename);
+			Path projectArchive = WorldBuilderClientProfile.current().contentBundle()
+				.assetForRuntimePath("client/Cache/"
+					+ filename.replace(File.separatorChar, '/'));
+			java.io.InputStream inputstream = projectArchive == null
+				? DataOperations.streamFromPath(clientPort.getCacheLocation() + filename)
+				: Files.newInputStream(projectArchive);
 			DataInputStream datainputstream = new DataInputStream(inputstream);
 			byte[] headers = new byte[6];
 			datainputstream.readFully(headers, 0, 6);
@@ -20688,6 +20697,10 @@ public final class mudclient implements Runnable {
 					workspace = unpacker.unpackArchive(pack);
 					for (Subspace subspace : workspace.getSubspaces()) {
 						Map<String, orsc.graphics.two.SpriteArchive.Entry> entries = getSurface().spriteTree.get(subspace.getName());
+						if (entries == null) {
+							entries = new HashMap<>();
+							getSurface().spriteTree.put(subspace.getName(), entries);
+						}
 						for (orsc.graphics.two.SpriteArchive.Entry entry : subspace.getEntryList()) {
 							entries.put(entry.getID(), entry);
 						}
@@ -20697,9 +20710,83 @@ public final class mudclient implements Runnable {
 				a.printStackTrace();
 			}
 		}
-		if (S_WANT_CUSTOM_SPRITES) {
+		ProjectContentBundle projectContent =
+			WorldBuilderClientProfile.current().contentBundle();
+			if (projectContent.isPresent()) {
+			try {
+				Workspace workspace = new Unpacker().unpackArchive(
+					projectContent.path("asset.spritepack").toFile());
+				for (Subspace subspace : workspace.getSubspaces()) {
+					Map<String, orsc.graphics.two.SpriteArchive.Entry> entries =
+						getSurface().spriteTree.get(subspace.getName());
+					if (entries == null) {
+						entries = new HashMap<>();
+						getSurface().spriteTree.put(subspace.getName(), entries);
+					}
+					for (orsc.graphics.two.SpriteArchive.Entry entry : subspace.getEntryList()) {
+						entries.put(entry.getID(), entry);
+					}
+				}
+			} catch (Exception failure) {
+				throw new IllegalStateException(
+					"Unable to decode bound project sprite pack", failure);
+			}
+			}
+			installProjectItemVisuals(projectContent);
+			if (S_WANT_CUSTOM_SPRITES) {
 			loadExternalEquipmentSprites();
 		}
+	}
+
+	private void installProjectItemVisuals(ProjectContentBundle content) {
+		if (content == null || content.schemaVersion() != 2) return;
+		try {
+			for (String role : new String[] {"asset.sprite.custom", "asset.spritepack"}) {
+				boolean required = false;
+				for (ProjectContentBundle.ItemVisual visual : content.itemVisuals().values()) {
+					if (role.equals(visual.customSpriteAssetRole())) required = true;
+				}
+				if (!required) continue;
+				Workspace workspace = new Unpacker().unpackArchive(content.path(role).toFile());
+				if (workspace == null) throw new IOException("Unable to decode " + role);
+				for (Subspace subspace : workspace.getSubspaces()) {
+					Map<String, orsc.graphics.two.SpriteArchive.Entry> entries =
+						getSurface().spriteTree.get(subspace.getName());
+					if (entries == null) { entries = new HashMap<>(); getSurface().spriteTree.put(subspace.getName(), entries); }
+					for (orsc.graphics.two.SpriteArchive.Entry entry : subspace.getEntryList()) entries.put(entry.getID(), entry);
+				}
+			}
+			for (ProjectContentBundle.ItemVisual visual : content.itemVisuals().values()) {
+				Sprite decoded;
+				String source;
+				if (visual.authenticSpriteId() != null) {
+					int spriteIndex = spriteItem + visual.authenticSpriteId().intValue();
+					decoded = content.authenticItemSprite(visual.authenticSpriteId().intValue());
+					getSurface().sprites[spriteIndex] = decoded;
+					source = "asset.sprite.authentic:" + spriteIndex;
+				} else {
+					decoded = content.itemSprite(visual.itemId());
+					source = visual.customSpriteAssetRole() + ":" + visual.customSpriteSubspace() + ":" + visual.customSpriteEntry();
+				}
+				if (decoded == null || decoded.getPixels() == null || decoded.getWidth() < 1 || decoded.getHeight() < 1) throw new IOException("Decoded item visual is empty");
+				getSurface().installProjectItemSprite(visual.itemId(), decoded);
+				System.out.println("PROJECT_ITEM_VISUAL_INSTALLED itemId=" + visual.itemId()
+					+ " source=" + source + " decoded=" + decoded.getWidth() + "x" + decoded.getHeight()
+					+ " pixelsSha256=" + spritePixelSha256(decoded) + " pictureMask=" + visual.pictureMask()
+					+ " blueMask=" + visual.blueMask());
+			}
+		} catch (Exception failure) {
+			throw new IllegalStateException("Unable to install bound project item visuals", failure);
+		}
+	}
+
+	private static String spritePixelSha256(Sprite sprite) throws Exception {
+		java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+		java.nio.ByteBuffer bytes = java.nio.ByteBuffer.allocate(sprite.getPixels().length * 4);
+		for (int pixel : sprite.getPixels()) bytes.putInt(pixel);
+		byte[] hash = digest.digest(bytes.array()); StringBuilder result = new StringBuilder();
+		for (byte value : hash) result.append(String.format("%02x", value & 0xff));
+		return result.toString();
 	}
 
 	private void loadEntitiesAuthentic() {
@@ -20810,6 +20897,10 @@ public final class mudclient implements Runnable {
 			String modelName = EntityHandler.getModelName(j);
 			int k = DataOperations.getDataFileOffset(modelName + ".ob3", models);
 			if (k == 0) {
+				if (EntityHandler.isProjectRequiredModel(modelName)) {
+					throw new IllegalStateException(
+						"Project scenery references missing model " + modelName);
+				}
 				modelCache[j] = createGeneratedModel(modelName);
 			} else {
 				modelCache[j] = new RSModel(models, k, true);
@@ -25263,6 +25354,20 @@ public final class mudclient implements Runnable {
 		if (!"place".equals(mode) && !"verify".equals(mode)) {
 			return;
 		}
+		int authorableBoundaryRaw = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableBoundaryRaw", 2);
+		int authorableFloorRaw = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableFloorRaw", 0);
+		int authorableSceneryId = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableSceneryId", 1);
+		int authorableNpcId = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableNpcId", 1);
+		int authorableItemId = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableItemId", 11);
+		int authorableItemId2 = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableItemId2", -1);
+		int authorableItemId3 = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableItemId3", -1);
 		long now = System.currentTimeMillis();
 		if (automatedBuilderPlacementProbeStage == 0) {
 			if ("place".equals(mode)) {
@@ -25281,7 +25386,23 @@ public final class mudclient implements Runnable {
 				return;
 			}
 			if (Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")) {
-				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(122, 648, 2);
+				if (authorableFloorRaw > 0 && !automatedBuilderFloorProbeAccepted) {
+					if (!automatedBuilderFloorProbeSent) {
+						if (!worldEditorInterface.sendAutomatedFloorPlacementProbe(
+								127, 648, authorableFloorRaw)) {
+							failAutomatedBuilderWideElevationProbe(
+								"could not send project floor probe");
+						}
+						automatedBuilderFloorProbeSent = true;
+						automatedBuilderPlacementProbeDeadline = now + 10000L;
+					} else if (now >= automatedBuilderPlacementProbeDeadline) {
+						failAutomatedBuilderWideElevationProbe(
+							"timed out awaiting project floor response");
+					}
+					return;
+				}
+				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(
+					122, 648, authorableBoundaryRaw);
 				automatedBuilderPlacementProbeDeadline = now + 2500L;
 				automatedBuilderPlacementProbeStage = 8;
 				return;
@@ -25330,7 +25451,7 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 9
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("aobject 1 118 648");
+			sendCommandString("aobject " + authorableSceneryId + " 118 648");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 10;
 			return;
@@ -25346,7 +25467,7 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 11
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("cnpc 1 0 120 650");
+			sendCommandString("cnpc " + authorableNpcId + " 0 120 650");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 12;
 			return;
@@ -25362,11 +25483,28 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 13
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("buildergrounditem 11 1 30 121 649");
-			automatedBuilderPlacementProbeDeadline = now + 2500L;
-			automatedBuilderPlacementProbeStage = 14;
-			return;
-		}
+				sendCommandString("buildergrounditem " + authorableItemId
+					+ " 1 30 121 649");
+				automatedBuilderPlacementProbeDeadline = now + 2500L;
+				automatedBuilderPlacementProbeStage = authorableItemId2 >= 0 ? 16 : 14;
+				return;
+			}
+			if (automatedBuilderPlacementProbeStage == 16
+				&& now >= automatedBuilderPlacementProbeDeadline) {
+				sendCommandString("buildergrounditem " + authorableItemId2
+					+ " 1 30 122 649");
+				automatedBuilderPlacementProbeDeadline = now + 2500L;
+				automatedBuilderPlacementProbeStage = authorableItemId3 >= 0 ? 17 : 14;
+				return;
+			}
+			if (automatedBuilderPlacementProbeStage == 17
+				&& now >= automatedBuilderPlacementProbeDeadline) {
+				sendCommandString("buildergrounditem " + authorableItemId3
+					+ " 1 30 123 649");
+				automatedBuilderPlacementProbeDeadline = now + 2500L;
+				automatedBuilderPlacementProbeStage = 14;
+				return;
+			}
 		if (automatedBuilderPlacementProbeStage == 14
 			&& now >= automatedBuilderPlacementProbeDeadline) {
 			sendCommandString("buildergrounditem " + Integer.getInteger(
@@ -25393,7 +25531,7 @@ public final class mudclient implements Runnable {
 				&& getGameObjectInstanceX(i) + getMidRegionBaseX() == 119
 				&& getGameObjectInstanceZ(i) + getMidRegionBaseZ() == 648
 				&& isGameObjectInstanceMaterialized(i);
-			authorableScenery |= getGameObjectInstanceID(i) == 1
+			authorableScenery |= getGameObjectInstanceID(i) == authorableSceneryId
 				&& getGameObjectInstanceX(i) + getMidRegionBaseX() == 118
 				&& getGameObjectInstanceZ(i) + getMidRegionBaseZ() == 648
 				&& isGameObjectInstanceMaterialized(i);
@@ -25406,28 +25544,38 @@ public final class mudclient implements Runnable {
 				npc |= value.npcId == 0
 					&& value.currentX / tileSize + getMidRegionBaseX() == 120
 					&& value.currentZ / tileSize + getMidRegionBaseZ() == 649;
-				authorableNpc |= value.npcId == 1
+				authorableNpc |= value.npcId == authorableNpcId
 					&& value.currentX / tileSize + getMidRegionBaseX() == 120
 					&& value.currentZ / tileSize + getMidRegionBaseZ() == 650;
 			}
 		}
 		boolean item = false;
-		boolean authorableItem = false;
+			boolean authorableItem = false;
+			boolean authorableItem2 = authorableItemId2 < 0;
+			boolean authorableItem3 = authorableItemId3 < 0;
 		for (int i = 0; i < getGroundItemCount(); i++) {
 			item |= getGroundItemID(i) == 10
 				&& getGroundItemX(i) + getMidRegionBaseX() == 121
 				&& getGroundItemZ(i) + getMidRegionBaseZ() == 648;
-			authorableItem |= getGroundItemID(i) == 11
+				authorableItem |= getGroundItemID(i) == authorableItemId
 				&& getGroundItemX(i) + getMidRegionBaseX() == 121
-				&& getGroundItemZ(i) + getMidRegionBaseZ() == 649;
-		}
-		if (scenery && authorableScenery && npc && authorableNpc
-			&& item && authorableItem) {
+					&& getGroundItemZ(i) + getMidRegionBaseZ() == 649;
+				authorableItem2 |= getGroundItemID(i) == authorableItemId2
+					&& getGroundItemX(i) + getMidRegionBaseX() == 122
+					&& getGroundItemZ(i) + getMidRegionBaseZ() == 649;
+				authorableItem3 |= getGroundItemID(i) == authorableItemId3
+					&& getGroundItemX(i) + getMidRegionBaseX() == 123
+					&& getGroundItemZ(i) + getMidRegionBaseZ() == 649;
+			}
+			if (scenery && authorableScenery && npc && authorableNpc
+				&& item && authorableItem && authorableItem2 && authorableItem3) {
 			String evidence = "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode="
 				+ mode
-				+ " scenery=0@119,648,1@118,648"
-				+ " npc=0@120,649,1@120,650"
-				+ " item=10@121,648,11@121,649";
+				+ " scenery=0@119,648," + authorableSceneryId + "@118,648"
+				+ " npc=0@120,649," + authorableNpcId + "@120,650"
+					+ " item=10@121,648," + authorableItemId + "@121,649"
+					+ (authorableItemId2 < 0 ? "" : "," + authorableItemId2 + "@122,649")
+					+ (authorableItemId3 < 0 ? "" : "," + authorableItemId3 + "@123,649");
 			System.out.println(evidence);
 			ClientRuntimeLogger.log(evidence);
 			if ("place".equals(mode)) {
@@ -25444,7 +25592,7 @@ public final class mudclient implements Runnable {
 				+ " scenery=" + scenery
 				+ " authorableScenery=" + authorableScenery
 				+ " npc=" + npc + " authorableNpc=" + authorableNpc
-				+ " item=" + item + " authorableItem=" + authorableItem;
+					+ " item=" + item + " authorableItem=" + authorableItem;
 			System.out.println(evidence);
 			ClientRuntimeLogger.log(evidence);
 			automatedBuilderPlacementProbeStage = 4;
@@ -25497,6 +25645,23 @@ public final class mudclient implements Runnable {
 	}
 
 	public void observeAutomatedBuilderTerrainStroke(int fieldMask,int[][] tiles) {
+		int authorableFloorRaw = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableFloorRaw", 0);
+		if (automatedBuilderFloorProbeSent && !automatedBuilderFloorProbeAccepted
+			&& fieldMask == 4 && tiles != null && tiles.length == 1) {
+			int[] tile = tiles[0];
+			if (tile[0] != 127 || tile[1] != 648 || tile[9] != authorableFloorRaw) {
+				failAutomatedBuilderWideElevationProbe(
+					"project floor response mismatched");
+				return;
+			}
+			automatedBuilderFloorProbeAccepted = true;
+			ClientRuntimeLogger.log(
+				"ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_ACCEPTED id="
+					+ (authorableFloorRaw - 1) + " raw=" + authorableFloorRaw
+					+ " x=127 y=648 runtime=true");
+			return;
+		}
 		if (!"author".equals(System.getProperty(
 				"openrsc.worldBuilderAutomatedWideElevationProbe", ""))
 			|| automatedBuilderWideElevationProbeStage < 1
@@ -25556,6 +25721,23 @@ public final class mudclient implements Runnable {
 		requireAutomatedBuilderTerrainState(124,648,12355,"reopened target");
 		requireAutomatedBuilderTerrainState(125,648,65535,"reopened overflow guard");
 		requireAutomatedBuilderTerrainState(126,648,0,"reopened unchanged neighbor");
+		int authorableFloorRaw = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableFloorRaw", 0);
+		if (authorableFloorRaw > 0) {
+			int[] floorState = world == null ? null
+				: world.getWorldEditorTerrainTileState(
+					127 - midRegionBaseX, 648 - midRegionBaseZ);
+			if (floorState == null || floorState.length != 7
+				|| floorState[2] != authorableFloorRaw) {
+				failAutomatedBuilderWideElevationProbe(
+					"reopened project floor state mismatch: "
+						+ java.util.Arrays.toString(floorState));
+			}
+			ClientRuntimeLogger.log(
+				"ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_REOPENED id="
+					+ (authorableFloorRaw - 1) + " raw=" + authorableFloorRaw
+					+ " x=127 y=648 runtime=true");
+		}
 		automatedBuilderWideElevationReopenVerified=true;
 		ClientRuntimeLogger.log(
 			"ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_REOPENED elevations=12355,65535"
@@ -27646,8 +27828,10 @@ public final class mudclient implements Runnable {
 					this.controlSettingPanel = this.panelSettings.addScrollingList3(var3 + 1, 24 + var12 + 16, 195, 184, 500, 1, true, 1, 2);
 				}
 
-				if (!Config.S_WANT_CUSTOM_SPRITES) {
-					this.loadMediaAuthentic();
+					if (!Config.S_WANT_CUSTOM_SPRITES) {
+						this.loadMediaAuthentic();
+						this.installProjectItemVisuals(
+							WorldBuilderClientProfile.current().contentBundle());
 					if (!this.errorLoadingData) {
 						this.loadEntitiesAuthentic();
 						if (!this.errorLoadingData) {

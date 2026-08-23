@@ -4,6 +4,8 @@
 import hashlib
 import json
 import os
+import copy
+import io
 import re
 import shutil
 import socket
@@ -11,6 +13,8 @@ import subprocess
 import tempfile
 import time
 import unittest
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 
@@ -26,9 +30,176 @@ PRODUCTION_DEFINITION_COUNTS = {
     "tiles": 26,
 }
 
+CONTENT_SPECS = (
+    ("asset.sprite.authentic", "client/Cache/video/Authentic_Sprites.orsc", "application/vnd.openrsc.archive", False),
+    ("asset.sprite.custom", "client/Cache/video/Custom_Sprites.osar", "application/gzip", False),
+    ("asset.library", "client/Cache/video/library.orsc", "application/vnd.openrsc.archive", False),
+    ("asset.model", "client/Cache/video/models.orsc", "application/vnd.openrsc.archive", False),
+    ("asset.spritepack", "client/Cache/video/spritepacks/Menus.osar", "application/gzip", False),
+    ("definition.boundary", "server/conf/server/defs/DoorDef.xml", "application/xml", True),
+    ("definition.scenery", "server/conf/server/defs/GameObjectDef.xml", "application/xml", True),
+    ("definition.item.base", "server/conf/server/defs/ItemDefs.json", "application/json", True),
+    ("definition.item.custom", "server/conf/server/defs/ItemDefsCustom.json", "application/json", True),
+    ("definition.item.patch", "server/conf/server/defs/ItemDefsPatch18.json", "application/json", True),
+    ("definition.item.world", "server/conf/server/defs/ItemDefsMyWorld.json", "application/json", True),
+    ("definition.npc.base", "server/conf/server/defs/NpcDefs.json", "application/json", True),
+    ("definition.npc.custom", "server/conf/server/defs/NpcDefsCustom.json", "application/json", True),
+    ("definition.npc.patch", "server/conf/server/defs/NpcDefsPatch18.json", "application/json", True),
+    ("definition.npc.world", "server/conf/server/defs/NpcDefsMyWorld.json", "application/json", True),
+    ("definition.tile", "server/conf/server/defs/TileDef.xml", "application/xml", True),
+    ("metadata.item-visuals", "server/conf/world-builder/item-visuals-v1.json", "application/json", False),
+)
+
+
+def authentic_sprite_archive() -> bytes:
+    payload = bytes.fromhex(
+        "000103102030405060708090a0b0c00002000200000000000002000200010203"
+    )
+    output = io.BytesIO()
+    info = zipfile.ZipInfo("sprites/417.dat", date_time=(1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_STORED
+    info.external_attr = 0o100644 << 16
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr(info, payload)
+    return output.getvalue()
+
 
 def canonical_json(value) -> bytes:
     return (json.dumps(value, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def canonical_sorted(value) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+
+
+def project_content_family_bindings():
+    return [
+        {"family": "floor", "definitionRoles": ["definition.tile"], "assetRoles": ["asset.sprite.custom"]},
+        {"family": "ground-item", "definitionRoles": ["definition.item.base", "definition.item.custom", "definition.item.patch", "definition.item.world"], "assetRoles": ["asset.library", "asset.sprite.authentic", "asset.sprite.custom", "asset.spritepack"]},
+        {"family": "npc", "definitionRoles": ["definition.npc.base", "definition.npc.custom", "definition.npc.patch", "definition.npc.world"], "assetRoles": ["asset.library", "asset.sprite.authentic", "asset.sprite.custom", "asset.spritepack"]},
+        {"family": "scenery", "definitionRoles": ["definition.scenery"], "assetRoles": ["asset.library", "asset.model", "asset.sprite.custom"]},
+        {"family": "wall", "definitionRoles": ["definition.boundary"], "assetRoles": ["asset.sprite.custom"]},
+    ]
+
+
+def write_real_project_content_bundle(bundle: Path, server_root: Path,
+                                      client_root: Path):
+    payloads = {}
+    for role, runtime_path, _, _ in CONTENT_SPECS:
+        if role == "metadata.item-visuals":
+            continue
+        source = (server_root / runtime_path.removeprefix("server/")) if runtime_path.startswith("server/") else (client_root / runtime_path.removeprefix("client/"))
+        payloads[runtime_path] = source.read_bytes()
+    payloads["client/Cache/video/Authentic_Sprites.orsc"] = (
+        authentic_sprite_archive()
+    )
+
+    for runtime_path, target_count, name in (
+        ("server/conf/server/defs/TileDef.xml", 32, "fixture-floor"),
+        ("server/conf/server/defs/DoorDef.xml", 220, "fixture-wall"),
+        ("server/conf/server/defs/GameObjectDef.xml", 1333, "fixture-scenery"),
+    ):
+        root = ET.fromstring(payloads[runtime_path])
+        while len(root) < target_count:
+            row = copy.deepcopy(root[-1])
+            name_node = row.find("name")
+            if name_node is not None:
+                name_node.text = f"{name}-{len(root)}"
+            root.append(row)
+        payloads[runtime_path] = ET.tostring(root, encoding="utf-8") + b"\n"
+
+    npc_path = "server/conf/server/defs/NpcDefsCustom.json"
+    npc_document = json.loads(payloads[npc_path])
+    for npc_id in (845, 846):
+        row = copy.deepcopy(npc_document["npcs"][-1])
+        row["id"] = npc_id
+        row["name"] = f"Project content NPC {npc_id}"
+        npc_document["npcs"].append(row)
+    payloads[npc_path] = (json.dumps(npc_document, indent=4) + "\n").encode()
+
+    item_path = "server/conf/server/defs/ItemDefsCustom.json"
+    item_document = json.loads(payloads[item_path])
+    for item_id in (9000, 9001, 9002):
+        item = copy.deepcopy(item_document["items"][-1])
+        item["id"] = item_id
+        item["name"] = f"Project content item {item_id}"
+        item_document["items"].append(item)
+    payloads[item_path] = (json.dumps(item_document, indent=4) + "\n").encode()
+    item_visuals = [
+        {"itemId": 9000, "authenticSpriteId": None,
+         "customSpriteAssetRole": "asset.sprite.custom",
+         "customSpriteSubspace": "items", "customSpriteEntry": "0",
+         "pictureMask": 3368601, "blueMask": 1122867},
+        {"itemId": 9001, "authenticSpriteId": 417,
+         "customSpriteAssetRole": None, "customSpriteSubspace": None,
+         "customSpriteEntry": None, "pictureMask": -1, "blueMask": 0},
+        {"itemId": 9002, "authenticSpriteId": None,
+         "customSpriteAssetRole": "asset.spritepack",
+         "customSpriteSubspace": "GUI", "customSpriteEntry": "0",
+         "pictureMask": 4478310, "blueMask": -16776961},
+    ]
+    payloads["server/conf/world-builder/item-visuals-v1.json"] = (
+        json.dumps({"schemaVersion": 1, "manifestType": "world-builder-item-visual-evidence",
+                    "itemVisuals": item_visuals}, sort_keys=True, indent=2) + "\n"
+    ).encode()
+
+    catalog = {
+        "schemaVersion": 1,
+        "manifestType": "world-builder-definition-catalog",
+        "catalogId": "target-adopted-content-v1",
+        "tiles": list(range(32)),
+        "boundaries": list(range(220)),
+        "scenery": list(range(1333)),
+        "npcs": list(range(847)),
+        "groundItems": list(range(3309)) + [9000, 9001, 9002],
+        "catalogSha256": "0" * 64,
+    }
+    catalog["catalogSha256"] = hashlib.sha256(canonical_sorted(catalog)).hexdigest()
+    records = []
+    for role, runtime_path, media, definition in sorted(CONTENT_SPECS, key=lambda row: row[1]):
+        payload = payloads[runtime_path]
+        destination = bundle / "files" / runtime_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(payload)
+        records.append({"role": role, "bundleRelativePath": "files/" + runtime_path,
+                        "runtimeRelativePath": runtime_path, "mediaType": media,
+                        "size": len(payload), "sha256": hashlib.sha256(payload).hexdigest()})
+
+    definition_roles = {role for role, _, _, definition in CONTENT_SPECS if definition}
+    def domain_fingerprint(domain, definition):
+        digest = hashlib.sha256(domain)
+        for row in records:
+            if row["role"] == "metadata.item-visuals" or (row["role"] in definition_roles) != definition:
+                continue
+            digest.update(f'{row["role"]}\0{row["runtimeRelativePath"]}\0{row["size"]}\0{row["sha256"]}\n'.encode())
+        if definition:
+            digest.update(catalog["catalogSha256"].encode())
+        return digest.hexdigest()
+
+    manifest = {
+        "schemaVersion": 2,
+        "manifestType": "world-builder-project-content-bundle",
+        "capabilityId": "project-local-custom-content-v2",
+        "sourceKind": "target-adopted",
+        "definitionCatalog": catalog,
+        "itemVisuals": item_visuals,
+        "familyBindings": project_content_family_bindings(),
+        "files": records,
+        "definitionFingerprintSha256": domain_fingerprint(b"world-builder-project-content-definitions-v1\n", True),
+        "assetFingerprintSha256": domain_fingerprint(b"world-builder-project-content-assets-v1\n", False),
+        "itemVisualFingerprintSha256": "",
+        "bundleFingerprintSha256": "0" * 64,
+    }
+    visual_digest = hashlib.sha256(b"world-builder-project-content-item-visuals-v1\n")
+    visual_digest.update(canonical_sorted(item_visuals))
+    manifest["itemVisualFingerprintSha256"] = visual_digest.hexdigest()
+    manifest["bundleFingerprintSha256"] = hashlib.sha256(
+        b"world-builder-project-content-bundle-v2\n" + canonical_sorted(manifest)
+    ).hexdigest()
+    (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
+    authoring = dict(catalog)
+    del authoring["catalogSha256"]
+    return manifest, authoring
 
 
 def write_integration_package(root: Path, *, project_origin: str) -> None:
@@ -583,6 +754,43 @@ def run_readiness_only_client(
     return runtime_evidence, process_evidence
 
 
+def prove_bundle_v1_item_visual_contract_refusal(
+    client_root: Path, base_properties: dict, process_log: Path,
+) -> str:
+    properties = dict(base_properties)
+    properties.pop("openrsc.worldBuilderAutomatedPlacementProbe", None)
+    properties.pop("openrsc.worldBuilderAutomatedDefinitionProbe", None)
+    command = ["java", "-Xms256m", "-Xmx1024m"]
+    command.extend(f"-D{key}={value}" for key, value in properties.items())
+    command.extend(["-jar", "Open_RSC_Client.jar"])
+    with process_log.open("w", encoding="utf-8") as output:
+        process = subprocess.Popen(
+            command, cwd=client_root, stdout=output,
+            stderr=subprocess.STDOUT, text=True,
+        )
+        try:
+            process.wait(timeout=30)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=10)
+    evidence = process_log.read_text(encoding="utf-8", errors="replace")
+    required = (
+        "Project item 9000 has no authoritative client visual mapping; "
+        "project-content-bundle-v1 cannot represent a new item visual"
+    )
+    if required not in evidence:
+        raise AssertionError(
+            "bundle-v1 client did not fail on the missing item visual contract\n"
+            + evidence
+        )
+    if "login response:86" in evidence:
+        raise AssertionError(
+            "bundle-v1 client authenticated despite incomplete visual metadata"
+        )
+    return evidence
+
+
 @unittest.skipUnless(os.environ.get("DISPLAY"), "real desktop-client integration needs DISPLAY")
 class AdaptiveBuilderRealLoginTest(unittest.TestCase):
     def test_built_client_authors_saves_and_reopens_wide_elevation(self):
@@ -645,15 +853,28 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
             (client_root / "Cache/discord_inuse.txt").write_text("1", encoding="ascii")
             definitions = evidence / "adaptive-definitions.json"
             assets = evidence / "assets.bin"
-            definitions.write_text(json.dumps({
-                "schemaVersion": 1,
-                "manifestType": "world-builder-definition-catalog",
-                "catalogId": "integration.neutral.definitions.v1",
-                **{
-                    family: list(range(count))
-                    for family, count in PRODUCTION_DEFINITION_COUNTS.items()
-                },
-            }, indent=2) + "\n", encoding="utf-8")
+            content_manifest = None
+            content_bundle = working / "content-bundle"
+            if project_origin == "standalone-empty":
+                authoring_catalog = {
+                    "schemaVersion": 1,
+                    "manifestType": "world-builder-definition-catalog",
+                    "catalogId": "integration.neutral.definitions.v1",
+                    **{
+                        family: list(range(count))
+                        for family, count in PRODUCTION_DEFINITION_COUNTS.items()
+                    },
+                }
+            else:
+                content_manifest, authoring_catalog = write_real_project_content_bundle(
+                    content_bundle, server_root, client_root
+                )
+            authorable_scenery_id = 59 if content_manifest is not None else 1
+            authorable_npc_id = 846 if content_manifest is not None else 1
+            authorable_item_id = 9000 if content_manifest is not None else 11
+            definitions.write_text(
+                json.dumps(authoring_catalog, indent=2) + "\n", encoding="utf-8"
+            )
             assets.write_bytes(b"integration-neutral-asset-evidence-v1\n")
             definition_sha = hashlib.sha256(definitions.read_bytes()).hexdigest()
             asset_sha = hashlib.sha256(assets.read_bytes()).hexdigest()
@@ -695,7 +916,7 @@ want_layered_native_terrain_symmetric_residency: true
 want_layered_native_terrain_atomic_activation: true
 layered_native_world_runtime_profile: adaptive-world-builder
 world_builder_project_origin: {project_origin}
-world_builder_definition_id: integration.neutral.definitions.v1
+world_builder_definition_id: {authoring_catalog['catalogId']}
 world_builder_asset_id: integration.neutral.assets.v1
 world_builder_initial_world_space: global
 world_builder_initial_level: 0
@@ -730,7 +951,7 @@ world_builder_initial_y: 648
                 "openrsc.layeredNativeTerrainManifestSha256": manifest_sha,
                 "openrsc.layeredNativeTerrainInventorySha256": inventory,
                 "openrsc.worldBuilderProjectOrigin": project_origin,
-                "openrsc.worldBuilderDefinitionId": "integration.neutral.definitions.v1",
+                "openrsc.worldBuilderDefinitionId": authoring_catalog["catalogId"],
                 "openrsc.worldBuilderDefinitionSha256": definition_sha,
                 "openrsc.worldBuilderDefinitionEvidencePath": str(definitions),
                 "openrsc.worldBuilderAssetId": "integration.neutral.assets.v1",
@@ -742,6 +963,15 @@ world_builder_initial_y: 648
                 "openrsc.worldBuilderInitialX": "120",
                 "openrsc.worldBuilderInitialY": "648",
             }
+            if content_manifest is not None:
+                common_server_properties.update({
+                    "openrsc.worldBuilderContentBundle": str(content_bundle),
+                    "openrsc.worldBuilderContentCapabilityId": "project-local-custom-content-v2",
+                    "openrsc.worldBuilderContentBundleSha256": content_manifest["bundleFingerprintSha256"],
+                    "openrsc.worldBuilderContentDefinitionSha256": content_manifest["definitionFingerprintSha256"],
+                    "openrsc.worldBuilderContentAssetSha256": content_manifest["assetFingerprintSha256"],
+                    "openrsc.worldBuilderContentItemVisualSha256": content_manifest["itemVisualFingerprintSha256"],
+                })
             server_command = ["java", "-Xms128m", "-Xmx768m"]
             server_command.extend(f"-D{key}={value}" for key, value in common_server_properties.items())
             server_command.extend([
@@ -783,15 +1013,13 @@ world_builder_initial_y: 648
                 for key, value in expected_required.items():
                     self.assertEqual(value, binding_fields[key])
                 for family, key in (
+                    ("tiles", "authorableFloorIds"),
                     ("boundaries", "authorableBoundaryIds"),
                     ("scenery", "authorableSceneryIds"),
                     ("npcs", "authorableNpcIds"),
                     ("groundItems", "authorableItemIds"),
                 ):
-                    expected = ",".join(
-                        str(value)
-                        for value in range(PRODUCTION_DEFINITION_COUNTS[family])
-                    )
+                    expected = ",".join(str(value) for value in authoring_catalog[family])
                     self.assertEqual(expected, binding_fields[key])
 
                 client_properties = {
@@ -810,19 +1038,27 @@ world_builder_initial_y: 648
                     "openrsc.worldBuilderAutomatedPlacementProbe": "place",
                     "openrsc.worldBuilderAutomatedWideElevationProbe": "author",
                     "openrsc.worldBuilderAutomatedDefinitionProbe": "true",
-                    "openrsc.worldBuilderAutomatedDisallowedBoundaryId": str(
-                        PRODUCTION_DEFINITION_COUNTS["boundaries"]
-                    ),
-                    "openrsc.worldBuilderAutomatedDisallowedSceneryId": str(
-                        PRODUCTION_DEFINITION_COUNTS["scenery"]
-                    ),
-                    "openrsc.worldBuilderAutomatedDisallowedNpcId": str(
-                        PRODUCTION_DEFINITION_COUNTS["npcs"]
-                    ),
-                    "openrsc.worldBuilderAutomatedDisallowedItemId": str(
-                        PRODUCTION_DEFINITION_COUNTS["groundItems"]
-                    ),
+                    "openrsc.worldBuilderAutomatedDisallowedBoundaryId": str(max(authoring_catalog["boundaries"]) + 1),
+                    "openrsc.worldBuilderAutomatedDisallowedSceneryId": str(max(authoring_catalog["scenery"]) + 1),
+                    "openrsc.worldBuilderAutomatedDisallowedNpcId": str(max(authoring_catalog["npcs"]) + 1),
+                    "openrsc.worldBuilderAutomatedDisallowedItemId": str(max(authoring_catalog["groundItems"]) + 1),
                 }
+                if content_manifest is not None:
+                    client_properties.update({
+                        "openrsc.worldBuilderContentBundle": str(content_bundle),
+                        "openrsc.worldBuilderContentCapabilityId": "project-local-custom-content-v2",
+                        "openrsc.worldBuilderContentBundleSha256": content_manifest["bundleFingerprintSha256"],
+                        "openrsc.worldBuilderContentDefinitionSha256": content_manifest["definitionFingerprintSha256"],
+                        "openrsc.worldBuilderContentAssetSha256": content_manifest["assetFingerprintSha256"],
+                        "openrsc.worldBuilderContentItemVisualSha256": content_manifest["itemVisualFingerprintSha256"],
+                        "openrsc.worldBuilderAutomatedAuthorableBoundaryRaw": "220",
+                        "openrsc.worldBuilderAutomatedAuthorableFloorRaw": "32",
+                        "openrsc.worldBuilderAutomatedAuthorableSceneryId": "59",
+                        "openrsc.worldBuilderAutomatedAuthorableNpcId": "846",
+                        "openrsc.worldBuilderAutomatedAuthorableItemId": "9000",
+                        "openrsc.worldBuilderAutomatedAuthorableItemId2": "9001",
+                        "openrsc.worldBuilderAutomatedAuthorableItemId3": "9002",
+                    })
                 client_command = ["java", "-Xms256m", "-Xmx1024m"]
                 client_command.extend(
                     f"-D{key}={value}" for key, value in client_properties.items()
@@ -871,6 +1107,19 @@ world_builder_initial_y: 648
                 client_evidence = client_log.read_text(
                     encoding="utf-8", errors="replace"
                 )
+                if content_manifest is not None:
+                    for marker in (
+                        "PROJECT_ITEM_VISUAL_INSTALLED itemId=9000 "
+                        "source=asset.sprite.custom:items:0",
+                        "PROJECT_ITEM_VISUAL_INSTALLED itemId=9001 "
+                        "source=asset.sprite.authentic:2567",
+                        "pictureMask=-1 blueMask=0",
+                        "PROJECT_ITEM_VISUAL_INSTALLED itemId=9002 "
+                        "source=asset.spritepack:GUI:0",
+                        "pictureMask=3368601 blueMask=1122867",
+                        "pictureMask=4478310 blueMask=-16776961",
+                    ):
+                        self.assertIn(marker, client_evidence)
                 server_output.flush()
                 server_evidence = server_log.read_text(
                     encoding="utf-8", errors="replace"
@@ -907,11 +1156,23 @@ world_builder_initial_y: 648
                     "mutation=false",
                     runtime_evidence,
                 )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "item=10@121,648,9000@121,649,"
+                        "9001@122,649,9002@123,649",
+                        runtime_evidence,
+                    )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_ACCEPTED "
+                        "id=31 raw=32 x=127 y=648 runtime=true",
+                        runtime_evidence,
+                    )
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode=place "
-                    "scenery=0@119,648,1@118,648 "
-                    "npc=0@120,649,1@120,650 "
-                    "item=10@121,648,11@121,649",
+                    f"scenery=0@119,648,{authorable_scenery_id}@118,648 "
+                    f"npc=0@120,649,{authorable_npc_id}@120,650 "
+                    f"item=10@121,648,{authorable_item_id}@121,649",
                     runtime_evidence,
                 )
                 self.assertIn(
@@ -922,21 +1183,21 @@ world_builder_initial_y: 648
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_DEFINITION_RESPONSE "
                     "Editor request failed: East wall "
-                    + str(PRODUCTION_DEFINITION_COUNTS["boundaries"] + 1)
+                    + str(max(authoring_catalog["boundaries"]) + 2)
                     + " is not defined.",
                     runtime_evidence,
                 )
                 self.assertIn(
                     "The authenticated client cannot display item definition ID "
-                    + str(PRODUCTION_DEFINITION_COUNTS["groundItems"])
+                    + str(max(authoring_catalog["groundItems"]) + 1)
                     + " (supported range 0.."
-                    + str(PRODUCTION_DEFINITION_COUNTS["groundItems"] - 1)
+                    + str(max(authoring_catalog["groundItems"]))
                     + ").",
                     runtime_evidence,
                 )
                 for family in ("scenery", "npc", "ground-item"):
                     self.assertEqual(
-                        2,
+                        4 if family == "ground-item" and content_manifest is not None else 2,
                         server_evidence.count(
                             "WORLD_BUILDER_PLACEMENT_ACCEPTED family=" + family
                         ),
@@ -997,7 +1258,7 @@ world_builder_initial_y: 648
                     ],
                 )
                 self.assertIn(
-                    (1, 118, 648, 0),
+                    (authorable_scenery_id, 118, 648, 0),
                     [
                         (row["sceneryId"], row["position"]["x"],
                          row["position"]["y"], row["direction"])
@@ -1005,7 +1266,7 @@ world_builder_initial_y: 648
                     ],
                 )
                 self.assertNotIn(
-                    PRODUCTION_DEFINITION_COUNTS["scenery"],
+                    max(authoring_catalog["scenery"]) + 1,
                     [row["sceneryId"] for row in placement_document["scenery"]],
                 )
                 self.assertIn(
@@ -1020,14 +1281,14 @@ world_builder_initial_y: 648
                     ],
                 )
                 self.assertIn(
-                    (1, 120, 650),
+                    (authorable_npc_id, 120, 650),
                     [
                         (row["npcId"], row["start"]["x"], row["start"]["y"])
                         for row in placement_document["npcs"]
                     ],
                 )
                 self.assertNotIn(
-                    PRODUCTION_DEFINITION_COUNTS["npcs"],
+                    max(authoring_catalog["npcs"]) + 1,
                     [row["npcId"] for row in placement_document["npcs"]],
                 )
                 self.assertIn(
@@ -1039,15 +1300,28 @@ world_builder_initial_y: 648
                     ],
                 )
                 self.assertIn(
-                    (11, 1, 30, 121, 649),
+                    (authorable_item_id, 1, 30, 121, 649),
                     [
                         (row["itemId"], row["amount"], row["respawnSeconds"],
                          row["position"]["x"], row["position"]["y"])
                         for row in placement_document["groundItems"]
                     ],
                 )
+                if content_manifest is not None:
+                    for expected in (
+                        (9001, 1, 30, 122, 649), (9002, 1, 30, 123, 649),
+                    ):
+                        self.assertIn(
+                            expected,
+                            [
+                                (row["itemId"], row["amount"],
+                                 row["respawnSeconds"], row["position"]["x"],
+                                 row["position"]["y"])
+                                for row in placement_document["groundItems"]
+                            ],
+                        )
                 self.assertNotIn(
-                    PRODUCTION_DEFINITION_COUNTS["groundItems"],
+                    max(authoring_catalog["groundItems"]) + 1,
                     [row["itemId"] for row in placement_document["groundItems"]],
                 )
                 terrain_bytes = (
@@ -1089,7 +1363,10 @@ world_builder_initial_y: 648
                 saved_terrain_bytes = terrain_bytes
                 boundary_offset = ((122 % 48) * 48 + (648 % 48)) * 11 + 6
                 refused_boundary_offset = ((123 % 48) * 48 + (648 % 48)) * 11 + 6
-                self.assertEqual(2, terrain_bytes[boundary_offset])
+                self.assertEqual(
+                    220 if content_manifest is not None else 2,
+                    terrain_bytes[boundary_offset],
+                )
                 self.assertEqual(0, terrain_bytes[refused_boundary_offset])
                 if project_origin == "target-layered":
                     self.assertEqual(
@@ -1102,7 +1379,8 @@ world_builder_initial_y: 648
                         "lower-coordinate boundary addition was not canonical",
                     )
                     self.assertEqual(
-                        [(118, 648, 1), (119, 648, 0), (132, 630, 0)],
+                        [(118, 648, authorable_scenery_id),
+                         (119, 648, 0), (132, 630, 0)],
                         [
                             (row["position"]["x"], row["position"]["y"],
                              row["sceneryId"])
@@ -1111,7 +1389,8 @@ world_builder_initial_y: 648
                         "lower-coordinate scenery additions were not canonical",
                     )
                     self.assertEqual(
-                        [(120, 649, 0), (120, 650, 1), (130, 630, 0)],
+                        [(120, 649, 0), (120, 650, authorable_npc_id),
+                         (130, 630, 0)],
                         [
                             (row["start"]["x"], row["start"]["y"],
                              row["npcId"])
@@ -1120,7 +1399,9 @@ world_builder_initial_y: 648
                         "lower-coordinate NPC additions were not canonical",
                     )
                     self.assertEqual(
-                        [(121, 648, 10), (121, 649, 11), (131, 630, 10)],
+                        [(121, 648, 10), (121, 649, authorable_item_id),
+                         (122, 649, 9001), (123, 649, 9002),
+                         (131, 630, 10)],
                         [
                             (row["position"]["x"], row["position"]["y"],
                              row["itemId"])
@@ -1200,17 +1481,29 @@ world_builder_initial_y: 648
                             reopened_client.wait(timeout=10)
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode=verify "
-                    "scenery=0@119,648,1@118,648 "
-                    "npc=0@120,649,1@120,650 "
-                    "item=10@121,648,11@121,649",
+                    f"scenery=0@119,648,{authorable_scenery_id}@118,648 "
+                    f"npc=0@120,649,{authorable_npc_id}@120,650 "
+                    f"item=10@121,648,{authorable_item_id}@121,649",
                     reopened_evidence,
                 )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "item=10@121,648,9000@121,649,"
+                        "9001@122,649,9002@123,649",
+                        reopened_evidence,
+                    )
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_REOPENED "
                     "elevations=12355,65535 neighbor=0 fields=1,8,0,0,0,0 "
                     "runtime=true",
                     reopened_evidence,
                 )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_REOPENED "
+                        "id=31 raw=32 x=127 y=648 runtime=true",
+                        reopened_evidence,
+                    )
 
                 shutdown_started = time.monotonic()
                 shutdown.write_text("shutdown\n", encoding="ascii")
@@ -1317,6 +1610,12 @@ world_builder_initial_y: 648
                     "runtime=true",
                     second_runtime_evidence,
                 )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_REOPENED "
+                        "id=31 raw=32 x=127 y=648 runtime=true",
+                        second_runtime_evidence,
+                    )
                 self.assertNotIn(
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_", second_runtime_evidence
                 )

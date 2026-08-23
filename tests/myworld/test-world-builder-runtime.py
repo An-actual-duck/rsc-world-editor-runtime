@@ -239,9 +239,17 @@ class WorldBuilderRuntimeTest(unittest.TestCase):
                         public boolean allowsDefinition(String family, int id) { return true; }
                         public void requirePackageIdentity(String id, String version, String hash) { }
                         public void requireClientDefinitions() { }
+                        public ProjectContentBundle contentBundle() { return ProjectContentBundle.empty(); }
                     }
                     """
                 ),
+                encoding="utf-8",
+            )
+            project_content = fixture_path / "orsc/ProjectContentBundle.java"
+            project_content.write_text(
+                "package orsc; public final class ProjectContentBundle { "
+                "private static final ProjectContentBundle EMPTY = new ProjectContentBundle(); "
+                "public static ProjectContentBundle empty(){return EMPTY;} }\n",
                 encoding="utf-8",
             )
             native_terrain = fixture_path / "orsc/NativeLayeredTerrainSnapshot.java"
@@ -259,7 +267,7 @@ class WorldBuilderRuntimeTest(unittest.TestCase):
                 encoding="utf-8",
             )
             output = self.compile_and_run(
-                [stub, adaptive_session, native_terrain, layered_context, CLIENT_PROFILE],
+                [stub, project_content, adaptive_session, native_terrain, layered_context, CLIENT_PROFILE],
                 "orsc.WorldBuilderClientProfileHarness",
                 """
                 package orsc;

@@ -7,6 +7,8 @@ import com.openrsc.client.entityhandling.defs.extras.AnimationDef;
 import com.openrsc.client.model.Sprite;
 import com.openrsc.data.DataConversions;
 import orsc.Config;
+import orsc.ProjectContentBundle;
+import orsc.WorldBuilderClientProfile;
 import orsc.MiscFunctions;
 import orsc.RenderTelemetry;
 import orsc.graphics.Renderer2DFrame;
@@ -134,6 +136,7 @@ public class GraphicsController {
 	private int renderer2DUiBaseHeight;
 	private boolean renderer2DUiBaseCaptured;
 	public Map<String, Map<String, Entry>> spriteTree = new HashMap<>();
+	private final Map<Integer, Sprite> projectItemSprites = new HashMap<>();
 	// public int[][] image2D_pixels;
 	private int[] m_Xb;
 	private ZipFile spriteArchive;
@@ -147,9 +150,17 @@ public class GraphicsController {
 			this.height2 = var2;
 			this.width2 = var1;
 			try {
-				if (!Config.S_WANT_CUSTOM_SPRITES) {
-					spriteArchive = new ZipFile(Config.F_CACHE_DIR + File.separator + "video" + File.separator + "Authentic_Sprites.orsc");
-					sprites = new Sprite[var3];
+					ProjectContentBundle content =
+						WorldBuilderClientProfile.current().contentBundle();
+					if (!Config.S_WANT_CUSTOM_SPRITES
+						|| content.hasAuthenticItemVisuals()) {
+					File authentic = content.isPresent()
+						? content.path("asset.sprite.authentic").toFile()
+						: new File(Config.F_CACHE_DIR + File.separator + "video"
+							+ File.separator + "Authentic_Sprites.orsc");
+						spriteArchive = new ZipFile(authentic);
+						sprites = new Sprite[Math.max(var3,
+							2151 + content.maximumAuthenticSpriteId())];
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -1465,7 +1476,9 @@ public class GraphicsController {
 
 	public Sprite spriteSelect(ItemDef item) {
 		Sprite canonical;
-		if (!Config.S_WANT_CUSTOM_SPRITES) {
+		Sprite project = projectItemSprites.get(Integer.valueOf(item.id));
+		if (project != null) return resolveRemastered(item, project);
+		if (item.getSpriteLocation() == null || item.getSpriteLocation().isEmpty()) {
 			if (item.spriteID + mudclient.spriteItem >= sprites.length || null == sprites[item.spriteID + mudclient.spriteItem])
 				canonical = Sprite.getUnknownSprite(48, 32);
 			else
@@ -1532,6 +1545,13 @@ public class GraphicsController {
 
 	public Sprite resolveRemastered(ItemDef item, Sprite canonical) {
 		return remasteredSpriteResolver.resolve(RemasteredSpriteKey.forItem(item), canonical);
+	}
+
+	public void installProjectItemSprite(int itemId, Sprite sprite) {
+		if (itemId < 0 || sprite == null) {
+			throw new IllegalArgumentException("Project item sprite is invalid");
+		}
+		projectItemSprites.put(Integer.valueOf(itemId), sprite);
 	}
 
 	public String getRemasteredSpriteDiagnostics() {
@@ -4456,7 +4476,11 @@ public class GraphicsController {
 	}
 
 	public boolean fillSpriteTree() {
-		File workspaceFile = new File(Config.F_CACHE_DIR, "video" + File.separator + "Custom_Sprites.osar");
+		ProjectContentBundle content =
+			WorldBuilderClientProfile.current().contentBundle();
+		File workspaceFile = content.isPresent()
+			? content.path("asset.sprite.custom").toFile()
+			: new File(Config.F_CACHE_DIR, "video" + File.separator + "Custom_Sprites.osar");
 		if (!workspaceFile.exists())
 			return false;
 
