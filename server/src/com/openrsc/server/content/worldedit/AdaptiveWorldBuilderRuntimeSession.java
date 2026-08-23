@@ -90,7 +90,8 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 				compositionSha256,
 				definitions.tileIdsCsv(), definitions.boundaryIdsCsv(),
 				definitions.sceneryIdsCsv(), definitions.npcIdsCsv(),
-				definitions.itemIdsCsv(), authorable.boundaryIdsCsv(),
+				definitions.itemIdsCsv(), authorable.tileIdsCsv(),
+				authorable.boundaryIdsCsv(),
 				authorable.sceneryIdsCsv(), authorable.npcIdsCsv(),
 				authorable.itemIdsCsv());
 		String canonical =
@@ -115,6 +116,8 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 		String label;
 		if ("boundary".equals(family)) {
 			key = "authorableBoundaryIds"; label = "boundary";
+		} else if ("floor".equals(family)) {
+			key = "authorableFloorIds"; label = "floor";
 		} else if ("scenery".equals(family)) {
 			key = "authorableSceneryIds"; label = "scenery";
 		} else if ("npc".equals(family)) {

@@ -57,7 +57,7 @@ public final class AdaptiveWorldBuilderClientSession {
 	private static final Set<String> EXACT_KEYS = Collections.unmodifiableSet(
 		new HashSet<String>(Arrays.asList(
 			"assetContract", "assetIdentity", "assetSha256", "authoring",
-			"authorableBoundaryIds", "authorableItemIds",
+			"authorableBoundaryIds", "authorableFloorIds", "authorableItemIds",
 			"authorableNpcIds", "authorableSceneryIds",
 			"capability", "clientBuild", "clientVersion", "coordinateModel",
 			"contentAssetSha256", "contentBundleSha256", "contentCapability",
@@ -80,6 +80,7 @@ public final class AdaptiveWorldBuilderClientSession {
 	private final int[] sceneryIds;
 	private final int[] npcIds;
 	private final int[] itemIds;
+	private final int[] authorableFloorIds;
 	private final int[] authorableBoundaryIds;
 	private final int[] authorableSceneryIds;
 	private final int[] authorableNpcIds;
@@ -92,6 +93,7 @@ public final class AdaptiveWorldBuilderClientSession {
 		Map<String, String> fields, String token,
 		int[] tileIds, int[] boundaryIds, int[] sceneryIds,
 		int[] npcIds, int[] itemIds,
+		int[] authorableFloorIds,
 		int[] authorableBoundaryIds, int[] authorableSceneryIds,
 		int[] authorableNpcIds, int[] authorableItemIds,
 		int[] levels) {
@@ -105,6 +107,7 @@ public final class AdaptiveWorldBuilderClientSession {
 		this.sceneryIds = sceneryIds;
 		this.npcIds = npcIds;
 		this.itemIds = itemIds;
+		this.authorableFloorIds = authorableFloorIds;
 		this.authorableBoundaryIds = authorableBoundaryIds;
 		this.authorableSceneryIds = authorableSceneryIds;
 		this.authorableNpcIds = authorableNpcIds;
@@ -171,6 +174,7 @@ public final class AdaptiveWorldBuilderClientSession {
 				parseIds(fields.get("requiredSceneryIds")),
 				parseIds(fields.get("requiredNpcIds")),
 				parseIds(fields.get("requiredItemIds")),
+				parseIds(fields.get("authorableFloorIds")),
 				parseIds(fields.get("authorableBoundaryIds")),
 				parseIds(fields.get("authorableSceneryIds")),
 				parseIds(fields.get("authorableNpcIds")),
@@ -307,6 +311,9 @@ public final class AdaptiveWorldBuilderClientSession {
 		for (int id : itemIds) require("item", id, new Lookup() {
 			@Override public Object get(int value) { return EntityHandler.findItem(value, false); }
 		});
+		for (int id : authorableFloorIds) require("authorable floor", id, new Lookup() {
+			@Override public Object get(int value) { return EntityHandler.getTileDef(value); }
+		});
 		for (int id : authorableBoundaryIds) require("authorable boundary", id, new Lookup() {
 			@Override public Object get(int value) { return EntityHandler.getDoorDef(value); }
 		});
@@ -322,7 +329,7 @@ public final class AdaptiveWorldBuilderClientSession {
 	}
 
 	private int[] definitionIdsForFamily(String family) {
-		if ("tile".equals(family)) return tileIds;
+		if ("tile".equals(family)) return authorableFloorIds;
 		if ("boundary".equals(family)) return authorableBoundaryIds;
 		if ("scenery".equals(family)) return authorableSceneryIds;
 		if ("npc".equals(family)) return authorableNpcIds;

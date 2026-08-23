@@ -911,6 +911,8 @@ public final class mudclient implements Runnable {
 	private long automatedBuilderPlacementProbeDeadline = 0L;
 	private int automatedBuilderWideElevationProbeStage = 0;
 	private long automatedBuilderWideElevationProbeDeadline = 0L;
+	private boolean automatedBuilderFloorProbeSent = false;
+	private boolean automatedBuilderFloorProbeAccepted = false;
 	private boolean automatedBuilderWideElevationReopenVerified = false;
 	private final Map<Long, ResidentObjectChunkCacheEntry> cachedResidentObjectChunks =
 		new HashMap<Long, ResidentObjectChunkCacheEntry>();
@@ -25298,6 +25300,8 @@ public final class mudclient implements Runnable {
 		}
 		int authorableBoundaryRaw = Integer.getInteger(
 			"openrsc.worldBuilderAutomatedAuthorableBoundaryRaw", 2);
+		int authorableFloorRaw = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableFloorRaw", 0);
 		int authorableSceneryId = Integer.getInteger(
 			"openrsc.worldBuilderAutomatedAuthorableSceneryId", 1);
 		int authorableNpcId = Integer.getInteger(
@@ -25322,6 +25326,21 @@ public final class mudclient implements Runnable {
 				return;
 			}
 			if (Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")) {
+				if (authorableFloorRaw > 0 && !automatedBuilderFloorProbeAccepted) {
+					if (!automatedBuilderFloorProbeSent) {
+						if (!worldEditorInterface.sendAutomatedFloorPlacementProbe(
+								127, 648, authorableFloorRaw)) {
+							failAutomatedBuilderWideElevationProbe(
+								"could not send project floor probe");
+						}
+						automatedBuilderFloorProbeSent = true;
+						automatedBuilderPlacementProbeDeadline = now + 10000L;
+					} else if (now >= automatedBuilderPlacementProbeDeadline) {
+						failAutomatedBuilderWideElevationProbe(
+							"timed out awaiting project floor response");
+					}
+					return;
+				}
 				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(
 					122, 648, authorableBoundaryRaw);
 				automatedBuilderPlacementProbeDeadline = now + 2500L;
@@ -25540,6 +25559,23 @@ public final class mudclient implements Runnable {
 	}
 
 	public void observeAutomatedBuilderTerrainStroke(int fieldMask,int[][] tiles) {
+		int authorableFloorRaw = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableFloorRaw", 0);
+		if (automatedBuilderFloorProbeSent && !automatedBuilderFloorProbeAccepted
+			&& fieldMask == 4 && tiles != null && tiles.length == 1) {
+			int[] tile = tiles[0];
+			if (tile[0] != 127 || tile[1] != 648 || tile[9] != authorableFloorRaw) {
+				failAutomatedBuilderWideElevationProbe(
+					"project floor response mismatched");
+				return;
+			}
+			automatedBuilderFloorProbeAccepted = true;
+			ClientRuntimeLogger.log(
+				"ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_ACCEPTED id="
+					+ (authorableFloorRaw - 1) + " raw=" + authorableFloorRaw
+					+ " x=127 y=648 runtime=true");
+			return;
+		}
 		if (!"author".equals(System.getProperty(
 				"openrsc.worldBuilderAutomatedWideElevationProbe", ""))
 			|| automatedBuilderWideElevationProbeStage < 1
@@ -25599,6 +25635,23 @@ public final class mudclient implements Runnable {
 		requireAutomatedBuilderTerrainState(124,648,12355,"reopened target");
 		requireAutomatedBuilderTerrainState(125,648,65535,"reopened overflow guard");
 		requireAutomatedBuilderTerrainState(126,648,0,"reopened unchanged neighbor");
+		int authorableFloorRaw = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableFloorRaw", 0);
+		if (authorableFloorRaw > 0) {
+			int[] floorState = world == null ? null
+				: world.getWorldEditorTerrainTileState(
+					127 - midRegionBaseX, 648 - midRegionBaseZ);
+			if (floorState == null || floorState.length != 7
+				|| floorState[2] != authorableFloorRaw) {
+				failAutomatedBuilderWideElevationProbe(
+					"reopened project floor state mismatch: "
+						+ java.util.Arrays.toString(floorState));
+			}
+			ClientRuntimeLogger.log(
+				"ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_REOPENED id="
+					+ (authorableFloorRaw - 1) + " raw=" + authorableFloorRaw
+					+ " x=127 y=648 runtime=true");
+		}
 		automatedBuilderWideElevationReopenVerified=true;
 		ClientRuntimeLogger.log(
 			"ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_REOPENED elevations=12355,65535"

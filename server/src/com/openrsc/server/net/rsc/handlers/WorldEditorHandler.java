@@ -213,6 +213,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 	private void validateWall(Player p,int raw,String label){if(raw==0)return;try{if(p.getWorld().getServer().getEntityHandler().getDoorDef(raw-1)==null)throw new Exception();}catch(Exception e){throw new IllegalArgumentException(label+" "+raw+" is not defined.");}WorldBuilderPlayerSession.requireProjectDefinition(p,"boundary",raw-1);}
 	private boolean overlayBlocks(Player p,int overlay){
 		int effective=overlay==250?2:overlay;if(effective==0)return false;
+		WorldBuilderPlayerSession.requireProjectDefinition(p,"floor",effective-1);
 		try{return p.getWorld().getServer().getEntityHandler().getTileDef(effective-1).getObjectType()!=0;}
 		catch(Exception e){throw new IllegalArgumentException("Floor texture "+overlay+" is not defined.");}
 	}

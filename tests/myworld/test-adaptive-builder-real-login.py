@@ -788,7 +788,7 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
                 content_manifest, authoring_catalog = write_real_project_content_bundle(
                     content_bundle, server_root, client_root
                 )
-            authorable_scenery_id = 1332 if content_manifest is not None else 1
+            authorable_scenery_id = 59 if content_manifest is not None else 1
             authorable_npc_id = 846 if content_manifest is not None else 1
             authorable_item_id = 9000 if content_manifest is not None else 11
             definitions.write_text(
@@ -931,6 +931,7 @@ world_builder_initial_y: 648
                 for key, value in expected_required.items():
                     self.assertEqual(value, binding_fields[key])
                 for family, key in (
+                    ("tiles", "authorableFloorIds"),
                     ("boundaries", "authorableBoundaryIds"),
                     ("scenery", "authorableSceneryIds"),
                     ("npcs", "authorableNpcIds"),
@@ -968,7 +969,8 @@ world_builder_initial_y: 648
                         "openrsc.worldBuilderContentDefinitionSha256": content_manifest["definitionFingerprintSha256"],
                         "openrsc.worldBuilderContentAssetSha256": content_manifest["assetFingerprintSha256"],
                         "openrsc.worldBuilderAutomatedAuthorableBoundaryRaw": "220",
-                        "openrsc.worldBuilderAutomatedAuthorableSceneryId": "1332",
+                        "openrsc.worldBuilderAutomatedAuthorableFloorRaw": "32",
+                        "openrsc.worldBuilderAutomatedAuthorableSceneryId": "59",
                         "openrsc.worldBuilderAutomatedAuthorableNpcId": "846",
                         "openrsc.worldBuilderAutomatedAuthorableItemId": "9000",
                     })
@@ -1056,6 +1058,12 @@ world_builder_initial_y: 648
                     "mutation=false",
                     runtime_evidence,
                 )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_ACCEPTED "
+                        "id=31 raw=32 x=127 y=648 runtime=true",
+                        runtime_evidence,
+                    )
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode=place "
                     f"scenery=0@119,648,{authorable_scenery_id}@118,648 "
@@ -1366,6 +1374,12 @@ world_builder_initial_y: 648
                     "runtime=true",
                     reopened_evidence,
                 )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_REOPENED "
+                        "id=31 raw=32 x=127 y=648 runtime=true",
+                        reopened_evidence,
+                    )
 
                 shutdown_started = time.monotonic()
                 shutdown.write_text("shutdown\n", encoding="ascii")
@@ -1472,6 +1486,12 @@ world_builder_initial_y: 648
                     "runtime=true",
                     second_runtime_evidence,
                 )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_REOPENED "
+                        "id=31 raw=32 x=127 y=648 runtime=true",
+                        second_runtime_evidence,
+                    )
                 self.assertNotIn(
                     "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_", second_runtime_evidence
                 )

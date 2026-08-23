@@ -287,6 +287,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		String requiredSceneryIds,
 		String requiredNpcIds,
 		String requiredItemIds,
+		String authorableFloorIds,
 		String authorableBoundaryIds,
 		String authorableSceneryIds,
 		String authorableNpcIds,
@@ -311,6 +312,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 			config.WORLD_BUILDER_CONTENT_DEFINITION_SHA256);
 		fields.put("authoring", AUTHORING_ID);
 		fields.put("authorableBoundaryIds", checkedIdList(authorableBoundaryIds));
+		fields.put("authorableFloorIds", checkedIdList(authorableFloorIds));
 		fields.put("authorableItemIds", checkedIdList(authorableItemIds));
 		fields.put("authorableNpcIds", checkedIdList(authorableNpcIds));
 		fields.put("authorableSceneryIds", checkedIdList(authorableSceneryIds));

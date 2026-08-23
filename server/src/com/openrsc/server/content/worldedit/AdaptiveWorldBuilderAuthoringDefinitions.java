@@ -81,7 +81,7 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 		}
 		validateRuntimeDefinitions(
 			runtimeDefinitions, tiles, boundaries, scenery, npcs, items);
-		return new Result(boundaries, scenery, npcs, items);
+		return new Result(tiles, boundaries, scenery, npcs, items);
 	}
 
 	private static void requireExactSchema(
@@ -210,14 +210,17 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 	}
 
 	public static final class Result {
+		private final Set<Integer> tileIds;
 		private final Set<Integer> boundaryIds;
 		private final Set<Integer> sceneryIds;
 		private final Set<Integer> npcIds;
 		private final Set<Integer> itemIds;
 
 		private Result(
-			Set<Integer> boundaryIds, Set<Integer> sceneryIds,
+			Set<Integer> tileIds, Set<Integer> boundaryIds, Set<Integer> sceneryIds,
 			Set<Integer> npcIds, Set<Integer> itemIds) {
+			this.tileIds = Collections.unmodifiableSet(
+				new TreeSet<Integer>(tileIds));
 			this.boundaryIds = Collections.unmodifiableSet(
 				new TreeSet<Integer>(boundaryIds));
 			this.sceneryIds = Collections.unmodifiableSet(
@@ -228,6 +231,7 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 				new TreeSet<Integer>(itemIds));
 		}
 
+		public String tileIdsCsv() { return csv(tileIds); }
 		public String boundaryIdsCsv() { return csv(boundaryIds); }
 		public String sceneryIdsCsv() { return csv(sceneryIds); }
 		public String npcIdsCsv() { return csv(npcIds); }
