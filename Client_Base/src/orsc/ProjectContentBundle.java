@@ -125,7 +125,7 @@ public final class ProjectContentBundle {
 		expect(manifest, "capabilityId", capability);
 		expect(manifest, "sourceKind", "target-adopted");
 		JSONObject catalog = manifest.getJSONObject("definitionCatalog");
-		List<Integer> groundItems = validateCatalog(catalog);
+		List<Integer> groundItems = validateCatalog(catalog, v2);
 		Map<Integer, ItemVisual> itemVisuals = v2
 			? validateItemVisuals(manifest.getJSONArray("itemVisuals"), groundItems)
 			: Collections.<Integer, ItemVisual>emptyMap();
@@ -230,7 +230,7 @@ public final class ProjectContentBundle {
 		return null;
 	}
 
-	private static List<Integer> validateCatalog(JSONObject catalog) throws IOException {
+	private static List<Integer> validateCatalog(JSONObject catalog, boolean v2) throws IOException {
 		requireKeys(catalog, set("schemaVersion", "manifestType", "catalogId", "tiles",
 				"boundaries", "scenery", "npcs", "groundItems", "catalogSha256"));
 		expectInt(catalog, "schemaVersion", 1);
@@ -246,7 +246,8 @@ public final class ProjectContentBundle {
 			for (int index = 0; index < ids.length(); index++) {
 				int id = ids.getInt(index);
 				if (id < 0 || id > maximumId || id <= previous
-					|| ((family.equals("tiles") || family.equals("boundaries") || family.equals("scenery")) && id != index)) {
+					|| ((family.equals("tiles") || family.equals("boundaries")
+						|| (!v2 && family.equals("scenery"))) && id != index)) {
 					throw new IOException("Catalog IDs are not canonical");
 				}
 				previous = id;

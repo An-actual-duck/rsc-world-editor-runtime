@@ -187,7 +187,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 
 		JSONObject catalog = object(manifest, "definitionCatalog",
 			"project content manifest");
-		List<Integer> groundItems = validateCatalog(catalog);
+		List<Integer> groundItems = validateCatalog(catalog, v2);
 		Map<Integer, ItemVisual> itemVisuals = v2
 			? validateItemVisuals(array(manifest, "itemVisuals",
 				"project content manifest"), groundItems)
@@ -317,7 +317,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 	public int schemaVersion() { return schemaVersion; }
 	public Map<Integer, ItemVisual> itemVisuals() { return itemVisuals; }
 
-	private static List<Integer> validateCatalog(JSONObject catalog) throws IOException {
+	private static List<Integer> validateCatalog(JSONObject catalog, boolean v2) throws IOException {
 		requireKeys(catalog, CATALOG_KEYS_V1, "definition catalog");
 		requireInteger(catalog, "schemaVersion", 1, "definition catalog");
 		requireText(catalog, "manifestType", CATALOG_TYPE, "definition catalog");
@@ -327,7 +327,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		}
 		validateIds(catalog, "tiles", true, 254);
 		validateIds(catalog, "boundaries", true, 254);
-		validateIds(catalog, "scenery", true, 65535);
+		validateIds(catalog, "scenery", !v2, 65535);
 		validateIds(catalog, "npcs", false, 65535);
 		List<Integer> groundItems = validateIds(catalog, "groundItems", false, 65535);
 		String hash = text(catalog, "catalogSha256", "definition catalog");

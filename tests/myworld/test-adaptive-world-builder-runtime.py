@@ -879,6 +879,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "contentBundleSha256": "",
             "contentCapability": "",
             "contentDefinitionSha256": "",
+            "contentItemVisualSha256": "",
             "definitionContract": "world-builder-definition-catalog-binding-v1",
             "definitionIdentity": "creator.definitions.v1",
             "definitionSha256": hashlib.sha256(definitions.read_bytes()).hexdigest(),
