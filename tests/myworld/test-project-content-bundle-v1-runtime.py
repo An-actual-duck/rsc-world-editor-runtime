@@ -189,13 +189,42 @@ public final class BundleClientHarness {
 """
 
 
+CLIENT_ITEM_VISUAL_HARNESS = r"""
+import com.openrsc.client.entityhandling.EntityHandler;
+import com.openrsc.client.entityhandling.defs.ItemDef;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import org.json.JSONArray;
+public final class BundleClientItemVisualHarness {
+  public static void main(String[] args) throws Exception {
+    Method apply=EntityHandler.class.getDeclaredMethod(
+      "applyProjectItems", JSONArray.class, ItemDef[].class, boolean.class);
+    apply.setAccessible(true);
+    JSONArray rows=new JSONArray("[{\"id\":9000,\"name\":\"new item\"}]");
+    try {
+      apply.invoke(null, rows, new ItemDef[0], false);
+      throw new AssertionError("bundle-v1 guessed a visual for new item 9000");
+    } catch (InvocationTargetException failure) {
+      Throwable cause=failure.getCause();
+      if (!(cause instanceof IllegalArgumentException)
+          || !cause.getMessage().contains("no authoritative client visual mapping")) {
+        throw failure;
+      }
+      System.out.println(cause.getMessage());
+    }
+  }
+}
+"""
+
+
 class BundleV1RuntimeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.classes = tempfile.TemporaryDirectory(prefix="bundle-v1-classes-")
         classes = Path(cls.classes.name)
         for name, source, jar in (("BundleServerHarness.java", SERVER_HARNESS, SERVER_JAR),
-                                  ("BundleClientHarness.java", CLIENT_HARNESS, CLIENT_JAR)):
+                                  ("BundleClientHarness.java", CLIENT_HARNESS, CLIENT_JAR),
+                                  ("BundleClientItemVisualHarness.java", CLIENT_ITEM_VISUAL_HARNESS, CLIENT_JAR)):
             path = classes / name
             path.write_text(source)
             subprocess.run(["javac", "-cp", str(jar), "-d", str(classes), str(path)], check=True)
@@ -249,6 +278,15 @@ class BundleV1RuntimeTest(unittest.TestCase):
                 os.link(path, workspace / "outside-hardlink.json")
             self.run_harness("BundleServerHarness", SERVER_JAR, workspace, manifest, success=False)
             self.run_harness("BundleClientHarness", CLIENT_JAR, workspace, manifest, success=False)
+
+    def test_new_item_without_client_visual_metadata_fails_closed(self):
+        result = subprocess.run(
+            ["java", "-cp", f"{self.classes.name}:{CLIENT_JAR}",
+             "BundleClientItemVisualHarness"],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        )
+        self.assertEqual(0, result.returncode, result.stdout)
+        self.assertIn("Project item 9000 has no authoritative client visual mapping", result.stdout)
 
 
 if __name__ == "__main__":

@@ -9883,19 +9883,22 @@ public class EntityHandler {
 			}
 			ItemDef visual = id < packaged.length ? packaged[id] : null;
 			if (visual == null) visual = prior;
-			int sprite = visual == null ? id : visual.getSpriteID();
-			String location = visual == null ? "items:" + id : visual.getSpriteLocation();
+			if (visual == null) {
+				throw new IllegalArgumentException(
+					"Project item " + id + " has no authoritative client visual mapping; "
+						+ "project-content-bundle-v1 cannot represent a new item visual");
+			}
 			String command = row.optString("command",
 				prior == null || prior.getCommand() == null ? "" : String.join(",", prior.getCommand()));
 			ItemDef value = new ItemDef(
 				row.optString("name", prior == null ? "" : prior.getName()),
 				row.optString("description", prior == null ? "" : prior.getDescription()),
 				command, row.optInt("basePrice", prior == null ? 0 : prior.getBasePrice()),
-				sprite, location,
+				visual.getSpriteID(), visual.getSpriteLocation(),
 				row.optInt("isStackable", prior != null && prior.isStackable() ? 1 : 0) == 1,
 				row.optInt("isWearable", prior != null && prior.isWieldable() ? 1 : 0) == 1,
 				row.optInt("wearableID", prior == null ? 0 : prior.wearableID),
-				visual == null ? 0 : visual.getPictureMask(),
+				visual.getPictureMask(), visual.getBlueMask(),
 				row.optInt("isMembersOnly", prior != null && prior.membersItem ? 1 : 0) == 1,
 				row.optInt("isUntradable", prior != null && prior.untradeable ? 1 : 0) == 1,
 				row.optInt("isNoteable", prior != null && prior.noteable ? 1 : 0) == 1, id);

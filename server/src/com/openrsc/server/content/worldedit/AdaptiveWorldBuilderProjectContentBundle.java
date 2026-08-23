@@ -251,11 +251,11 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		if (!catalogId.matches("[a-z0-9][a-z0-9._-]{0,127}")) {
 			throw new IOException("Definition catalog identity is invalid");
 		}
-		validateIds(catalog, "tiles", true);
-		validateIds(catalog, "boundaries", true);
-		validateIds(catalog, "scenery", true);
-		validateIds(catalog, "npcs", false);
-		validateIds(catalog, "groundItems", false);
+		validateIds(catalog, "tiles", true, 254);
+		validateIds(catalog, "boundaries", true, 254);
+		validateIds(catalog, "scenery", true, 65535);
+		validateIds(catalog, "npcs", false, 65535);
+		validateIds(catalog, "groundItems", false, 65535);
 		String hash = text(catalog, "catalogSha256", "definition catalog");
 		JSONObject zeroed = new JSONObject(catalog.toString());
 		zeroed.put("catalogSha256", ZERO_HASH);
@@ -265,10 +265,11 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		}
 	}
 
-	private static void validateIds(JSONObject catalog, String key, boolean dense)
+	private static void validateIds(
+		JSONObject catalog, String key, boolean dense, int maximumId)
 		throws IOException {
 		JSONArray values = array(catalog, key, "definition catalog");
-		if (values.length() < 1 || values.length() > 65536) {
+		if (values.length() < 1 || values.length() > maximumId + 1) {
 			throw new IOException("Definition catalog " + key + " is outside its bound");
 		}
 		int previous = -1;
@@ -278,7 +279,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 				throw new IOException("Definition catalog ID is not an integer");
 			}
 			int value = ((Number) raw).intValue();
-			if (((Number) raw).longValue() != value || value < 0 || value > 65535
+			if (((Number) raw).longValue() != value || value < 0 || value > maximumId
 				|| value <= previous || (dense && value != index)) {
 				throw new IOException("Definition catalog " + key
 					+ " has holes, duplicates, or noncanonical IDs");

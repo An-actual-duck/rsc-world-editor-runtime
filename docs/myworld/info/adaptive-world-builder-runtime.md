@@ -134,6 +134,62 @@ NPCs, and items plus the existing client `library.orsc`, `models.orsc`,
 Loose images, loose models, scripts, classes, plug-ins, and target behavior are
 not content-bundle inputs and are never executed.
 
+### Bundle-v1 visual-closure blocker
+
+`project-local-custom-content-v1` cannot author a new ground-item visual. The
+captured server item JSON contains gameplay fields but no client item-to-sprite
+mapping, while the definition catalog contains IDs only. In particular, the
+frozen fixture declares item `9000` without the `ItemDef` values that select and
+recolour its visual. A runtime must not infer those values from the item ID.
+The client therefore refuses a bundle-v1 item that has no pre-existing packaged
+client definition. Existing IDs may retain their exact packaged visual mapping;
+new IDs cannot activate under bundle-v1.
+
+The smallest producer correction is a versioned successor contract (bundle-v1
+is frozen) that adds a sorted `itemVisuals` array to `definitionCatalog`. It must
+contain exactly one record for every ID in `groundItems`, with exactly these
+fields:
+
+```json
+{
+  "itemId": 9000,
+  "authenticSpriteId": 1234,
+  "customSpriteAssetRole": "asset.sprite.custom",
+  "customSpriteSubspace": "items",
+  "customSpriteEntry": "project-item-9000",
+  "pictureMask": 0,
+  "blueMask": 0
+}
+```
+
+- `itemId` is the exact ground-item catalog ID (`0..65535`).
+- `authenticSpriteId` is the numeric entry in
+  `asset.sprite.authentic`; with the current client sprite layout it is
+  `0..2350` because inventory sprites begin at 2150 in a 4501-entry array.
+- `customSpriteAssetRole` is exactly `asset.sprite.custom` or
+  `asset.spritepack`; `customSpriteSubspace` and `customSpriteEntry` identify
+  one decoded, nonempty sprite-pack entry in that named archive. The pair must
+  be unambiguous after the runtime's archive merge order.
+- `pictureMask` and `blueMask` are exact 24-bit values (`0..16777215`).
+
+The new array participates in `catalogSha256`, and therefore in the definition
+and bundle fingerprints. The successor must use a new schema/capability
+identity rather than silently changing `project-local-custom-content-v1`.
+Before activation, the runtime can then prove both authentic and custom-mode
+item references decode, every NPC layer is either `-1` or names a runtime
+animation whose required authentic entries and custom frames decode, and every
+scenery `objectModel` occurs as a decodable OB3 record in `asset.model`.
+Floors and walls have no sprite lookup: floor IDs and axial wall IDs are
+one-less than unsigned-byte terrain values, so their exact catalog range is
+`0..254`, and their XML colour/material fields are the visual definition.
+Scenery, NPC, and ground-item placement IDs are unsigned-short values
+`0..65535`.
+
+No lifecycle claim for new item `9000`, and no replacement READY handoff, is
+valid until the producer supplies this correction and a deterministic fixture
+whose new sprite/model records are decoded and selected during the real
+authenticated client/server save/reopen lifecycle.
+
 Both processes receive and independently verify these properties:
 
 - `openrsc.worldBuilderContentBundle`

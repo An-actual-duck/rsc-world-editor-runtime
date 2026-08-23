@@ -162,10 +162,13 @@ public final class ProjectContentBundle {
 		expect(catalog, "manifestType", "world-builder-definition-catalog");
 		for (String family : Arrays.asList("tiles", "boundaries", "scenery", "npcs", "groundItems")) {
 			JSONArray ids = catalog.getJSONArray(family); int previous = -1;
-			if (ids.length() < 1 || ids.length() > 65536) throw new IOException("Catalog family is outside its bound");
+			boolean byteFamily = family.equals("tiles") || family.equals("boundaries");
+			int maximumCount = byteFamily ? 255 : 65536;
+			int maximumId = byteFamily ? 254 : 65535;
+			if (ids.length() < 1 || ids.length() > maximumCount) throw new IOException("Catalog family is outside its runtime bound");
 			for (int index = 0; index < ids.length(); index++) {
 				int id = ids.getInt(index);
-				if (id < 0 || id > 65535 || id <= previous
+				if (id < 0 || id > maximumId || id <= previous
 					|| ((family.equals("tiles") || family.equals("boundaries") || family.equals("scenery")) && id != index)) {
 					throw new IOException("Catalog IDs are not canonical");
 				}
