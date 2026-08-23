@@ -13,16 +13,16 @@ target path and accepts authored output only inside the selected project.
 ## Stable identities
 
 The machine-readable source of truth is
-`server/conf/world-builder/adaptive-runtime-capability-v2.json`. Server and
+`server/conf/world-builder/adaptive-runtime-capability-v4.json`. Server and
 client code independently pin the same values.
 
 | Role | Identity |
 |---|---|
-| Capability | `adaptive-world-builder-runtime-capability-v2` |
+| Capability | `adaptive-world-builder-runtime-capability-v4` |
 | Runtime profile | `adaptive-world-builder` |
-| Server build | `core-framework-adaptive-builder-server-v2` |
-| Client build | `core-framework-adaptive-builder-client-v2` |
-| Loader | `generic-signed-layered-loader-v2-u16-elevation` |
+| Server build | `rsc-world-editor-runtime-adaptive-builder-server-v4` |
+| Client build | `rsc-world-editor-runtime-adaptive-builder-client-v4` |
+| Loader | `generic-signed-layered-loader-v4-project-content-bundle-v1` |
 | Authoring | `generic-signed-layered-authoring-v2-u16-elevation` |
 | Definition binding | `world-builder-definition-catalog-binding-v1` |
 | Client asset binding | `world-builder-client-asset-binding-v1` |
@@ -124,6 +124,32 @@ origins `target-layered`, `target-packed`, or `standalone-empty`, definition
 and asset IDs/hashes/evidence paths, and the initial global coordinate. The
 definition and asset evidence files must be inside `working/`.
 
+Target-backed projects also bind the Editor-owned
+`project-local-custom-content-v1` capability. The only accepted content input
+is the exact `working/content-bundle` directory with manifest type
+`world-builder-project-content-bundle`, schema version 1. Its closed inventory
+contains captured server definition files for tiles, boundaries, scenery,
+NPCs, and items plus the existing client `library.orsc`, `models.orsc`,
+`Authentic_Sprites.orsc`, `Custom_Sprites.osar`, and `Menus.osar` archives.
+Loose images, loose models, scripts, classes, plug-ins, and target behavior are
+not content-bundle inputs and are never executed.
+
+Both processes receive and independently verify these properties:
+
+- `openrsc.worldBuilderContentBundle`
+- `openrsc.worldBuilderContentCapabilityId`
+- `openrsc.worldBuilderContentBundleSha256`
+- `openrsc.worldBuilderContentDefinitionSha256`
+- `openrsc.worldBuilderContentAssetSha256`
+
+The bundle path must resolve exactly to the isolated project's working copy.
+Unknown keys or files, path escapes, symbolic or hard links, portable-name
+collisions, incomplete family bindings, unsafe catalog holes, payload/hash
+mismatch, domain-fingerprint mismatch, catalog disagreement, and
+client/server identity disagreement all fail before editable readiness. A
+content-neutral standalone project keeps all five values empty and continues
+to use packaged definitions and assets.
+
 The desktop client independently requires:
 
 - `-Dopenrsc.worldBuilderMode=true`
@@ -132,6 +158,8 @@ The desktop client independently requires:
 - the server-produced
   `<project>/run/world-builder/runtime-binding.properties`
 - client definition and asset evidence files inside `<project>/working/`
+- the same five project-content properties used by the server for a
+  target-backed project
 
 The binding contains exact server/client builds, protocol, loader, package,
 manifest, package inventory, definitions, assets, levels, origin, initial

@@ -65,6 +65,8 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.*;
 //import java.lang.management.ManagementFactory; //Commented out for Android
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -1584,7 +1586,12 @@ public final class mudclient implements Runnable {
 		byte[] data = null;
 		try {
 			clientPort.showLoadingProgress(startPercentage, "Loading " + fileTitle + " - 0%");
-			java.io.InputStream inputstream = DataOperations.streamFromPath(clientPort.getCacheLocation() + filename);
+			Path projectArchive = WorldBuilderClientProfile.current().contentBundle()
+				.assetForRuntimePath("client/Cache/"
+					+ filename.replace(File.separatorChar, '/'));
+			java.io.InputStream inputstream = projectArchive == null
+				? DataOperations.streamFromPath(clientPort.getCacheLocation() + filename)
+				: Files.newInputStream(projectArchive);
 			DataInputStream datainputstream = new DataInputStream(inputstream);
 			byte[] headers = new byte[6];
 			datainputstream.readFully(headers, 0, 6);
@@ -20695,6 +20702,28 @@ public final class mudclient implements Runnable {
 				}
 			} catch (IOException a) {
 				a.printStackTrace();
+			}
+		}
+		ProjectContentBundle projectContent =
+			WorldBuilderClientProfile.current().contentBundle();
+		if (projectContent.isPresent()) {
+			try {
+				Workspace workspace = new Unpacker().unpackArchive(
+					projectContent.path("asset.spritepack").toFile());
+				for (Subspace subspace : workspace.getSubspaces()) {
+					Map<String, orsc.graphics.two.SpriteArchive.Entry> entries =
+						getSurface().spriteTree.get(subspace.getName());
+					if (entries == null) {
+						entries = new HashMap<>();
+						getSurface().spriteTree.put(subspace.getName(), entries);
+					}
+					for (orsc.graphics.two.SpriteArchive.Entry entry : subspace.getEntryList()) {
+						entries.put(entry.getID(), entry);
+					}
+				}
+			} catch (Exception failure) {
+				throw new IllegalStateException(
+					"Unable to decode bound project sprite pack", failure);
 			}
 		}
 		if (S_WANT_CUSTOM_SPRITES) {

@@ -870,10 +870,14 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "authorableItemIds": "10,20",
             "authorableNpcIds": "30,31",
             "authorableSceneryIds": "0,104",
-            "capability": "adaptive-world-builder-runtime-capability-v2",
-            "clientBuild": "core-framework-adaptive-builder-client-v2",
+            "capability": "adaptive-world-builder-runtime-capability-v4",
+            "clientBuild": "rsc-world-editor-runtime-adaptive-builder-client-v4",
             "clientVersion": "10048",
             "coordinateModel": "signed-layered-v1",
+            "contentAssetSha256": "",
+            "contentBundleSha256": "",
+            "contentCapability": "",
+            "contentDefinitionSha256": "",
             "definitionContract": "world-builder-definition-catalog-binding-v1",
             "definitionIdentity": "creator.definitions.v1",
             "definitionSha256": hashlib.sha256(definitions.read_bytes()).hexdigest(),
@@ -885,7 +889,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "initialWorldSpace": "global",
             "initialX": "7",
             "initialY": "9",
-            "loader": "generic-signed-layered-loader-v2-u16-elevation",
+            "loader": "generic-signed-layered-loader-v4-project-content-bundle-v1",
             "levels": "-3,0",
             "manifestSha256": "1" * 64,
             "packageId": "creator.arbitrary-adopted-world",
@@ -901,7 +905,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "requiredNpcIds": "",
             "requiredSceneryIds": "",
             "requiredTileIds": "",
-            "serverBuild": "core-framework-adaptive-builder-server-v2",
+            "serverBuild": "rsc-world-editor-runtime-adaptive-builder-server-v4",
             "sourceBaselineInventorySha256": "3" * 64,
         }
         if empty:
@@ -1611,8 +1615,8 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertEqual(outputs[0], outputs[1])
         evidence = json.loads(outputs[0])
         self.assertEqual("world-builder-runtime-evidence", evidence["manifestType"])
-        self.assertEqual("core-framework-adaptive-builder-server-v2", evidence["buildId"])
-        self.assertEqual("generic-signed-layered-loader-v2-u16-elevation", evidence["loaderId"])
+        self.assertEqual("rsc-world-editor-runtime-adaptive-builder-server-v4", evidence["buildId"])
+        self.assertEqual("generic-signed-layered-loader-v4-project-content-bundle-v1", evidence["loaderId"])
         self.assertEqual("world-builder-native-layered-protocol-v2-u16-elevation", evidence["protocolId"])
         self.assertEqual([1, 2, 3], evidence["encodingVersions"])
         self.assertEqual(
@@ -1621,7 +1625,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         )
 
         capability = json.loads((
-            ROOT / "server/conf/world-builder/adaptive-runtime-capability-v2.json"
+            ROOT / "server/conf/world-builder/adaptive-runtime-capability-v4.json"
         ).read_text())
         server_identity = (
             ROOT / "server/src/com/openrsc/server/content/worldedit/"

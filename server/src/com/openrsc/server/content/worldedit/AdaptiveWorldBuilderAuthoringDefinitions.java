@@ -65,6 +65,20 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 		Set<Integer> scenery = ids(root, "scenery");
 		Set<Integer> npcs = ids(root, "npcs");
 		Set<Integer> items = ids(root, "groundItems");
+		AdaptiveWorldBuilderProjectContentBundle content =
+			AdaptiveWorldBuilderProjectContentBundle.load(config, storage);
+		if (content.isPresent()) {
+			JSONObject embedded = content.catalog();
+			if (!config.WORLD_BUILDER_DEFINITION_ID.equals(content.catalogId())
+				|| !tiles.equals(ids(embedded, "tiles"))
+				|| !boundaries.equals(ids(embedded, "boundaries"))
+				|| !scenery.equals(ids(embedded, "scenery"))
+				|| !npcs.equals(ids(embedded, "npcs"))
+				|| !items.equals(ids(embedded, "groundItems"))) {
+				throw new IOException(
+					"Project content catalog disagrees with authoring evidence");
+			}
+		}
 		validateRuntimeDefinitions(
 			runtimeDefinitions, tiles, boundaries, scenery, npcs, items);
 		return new Result(boundaries, scenery, npcs, items);

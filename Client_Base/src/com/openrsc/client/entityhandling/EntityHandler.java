@@ -12,11 +12,24 @@ import com.openrsc.client.entityhandling.defs.TileDef;
 import com.openrsc.client.entityhandling.defs.extras.AnimationDef;
 import com.openrsc.client.entityhandling.defs.extras.TextureDef;
 import orsc.Config;
+import orsc.ProjectContentBundle;
+import orsc.WorldBuilderClientProfile;
 import orsc.mudclient;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 public class EntityHandler {
 
@@ -9735,8 +9748,11 @@ public class EntityHandler {
 		loadProjectiles();
 		loadGUIParts();
 		loadCrowns();
+		applyProjectContentBundle(
+			WorldBuilderClientProfile.current().contentBundle());
 		if (!Config.S_WANT_CUSTOM_SPRITES) {
 			for (ItemDef item : items) {
+				if (item == null) continue;
 				REGISTRY.includeInventorySprite(item.getSpriteID());
 				if (item.membersItem && !loadMembers) {
 					item.name = "Members object";
@@ -9751,10 +9767,207 @@ public class EntityHandler {
 		}
 
 		for (GameObjectDef object : objects) {
+			if (object == null) continue;
 			object.modelID = storeModel(object
 				.getObjectModel());
 		}
 
+	}
+
+	private static void applyProjectContentBundle(ProjectContentBundle bundle) {
+		if (bundle == null || !bundle.isPresent()) return;
+		try {
+			loadProjectNpcs(bundle);
+			loadProjectItems(bundle);
+			loadProjectTiles(bundle.path("definition.tile"));
+			loadProjectDoors(bundle.path("definition.boundary"));
+			loadProjectScenery(bundle.path("definition.scenery"));
+			validateProjectCatalog(bundle.catalog());
+			System.out.println("Loaded validated project-content-bundle-v1 definitions");
+		} catch (Exception failure) {
+			throw new IllegalStateException(
+				"Unable to load declarative project content definitions", failure);
+		}
+	}
+
+	private static JSONObject json(Path path) throws Exception {
+		return new JSONObject(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
+	}
+
+	private static JSONArray firstArray(JSONObject document) {
+		String[] names = JSONObject.getNames(document);
+		if (names == null || names.length != 1
+			|| !(document.opt(names[0]) instanceof JSONArray)) {
+			throw new IllegalArgumentException("Definition JSON must contain one array");
+		}
+		return document.getJSONArray(names[0]);
+	}
+
+	private static void loadProjectNpcs(ProjectContentBundle bundle) throws Exception {
+		npcs.clear();
+		appendProjectNpcs(firstArray(json(bundle.path("definition.npc.base"))));
+		appendProjectNpcs(firstArray(json(bundle.path("definition.npc.custom"))));
+		applyProjectNpcOverlay(firstArray(json(bundle.path("definition.npc.patch"))));
+		applyProjectNpcOverlay(firstArray(json(bundle.path("definition.npc.world"))));
+	}
+
+	private static void appendProjectNpcs(JSONArray rows) {
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index); int id = npcs.size();
+			npcs.add(projectNpc(row, id, null));
+		}
+	}
+
+	private static void applyProjectNpcOverlay(JSONArray rows) {
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index); int id = row.getInt("id");
+			if (id < 0 || id >= npcs.size() || npcs.get(id) == null) {
+				throw new IllegalArgumentException("NPC overlay references undefined id " + id);
+			}
+			npcs.set(id, projectNpc(row, id, npcs.get(id)));
+		}
+	}
+
+	private static NPCDef projectNpc(JSONObject row, int id, NPCDef prior) {
+		int[] sprites = new int[12];
+		for (int layer = 0; layer < sprites.length; layer++) {
+			sprites[layer] = row.has("sprites" + (layer + 1))
+				? row.getInt("sprites" + (layer + 1))
+				: prior == null ? -1 : prior.getSprite(layer);
+		}
+		return new NPCDef(
+			row.optString("name", prior == null ? "" : prior.getName()),
+			row.optString("description", prior == null ? "" : prior.getDescription()),
+			row.optString("command", prior == null ? "" : prior.getCommand1()),
+			row.optString("command2", prior == null ? "" : prior.getCommand2()),
+			row.optInt("attack", prior == null ? 0 : prior.getAtt()),
+			row.optInt("strength", prior == null ? 0 : prior.getStr()),
+			row.optInt("hits", prior == null ? 1 : prior.getHits()),
+			row.optInt("defense", prior == null ? 0 : prior.getDef()),
+			row.optInt("attackable", prior != null && prior.isAttackable() ? 1 : 0) == 1,
+			sprites,
+			row.optInt("hairColour", prior == null ? 0 : prior.getHairColour()),
+			row.optInt("topColour", prior == null ? 0 : prior.getTopColour()),
+			row.optInt("bottomColour", prior == null ? 0 : prior.getBottomColour()),
+			row.optInt("skinColour", prior == null ? 0 : prior.getSkinColour()),
+			row.optInt("camera1", prior == null ? 145 : prior.getCamera1()),
+			row.optInt("camera2", prior == null ? 220 : prior.getCamera2()),
+			row.optInt("walkModel", prior == null ? 1 : prior.getWalkModel()),
+			row.optInt("combatModel", prior == null ? 1 : prior.getCombatModel()),
+			row.optInt("combatSprite", prior == null ? 0 : prior.getCombatSprite()), id);
+	}
+
+	private static void loadProjectItems(ProjectContentBundle bundle) throws Exception {
+		ArrayList<ItemDef> packaged = new ArrayList<ItemDef>(items); items.clear();
+		applyProjectItems(firstArray(json(bundle.path("definition.item.base"))), packaged, false);
+		applyProjectItems(firstArray(json(bundle.path("definition.item.custom"))), packaged, false);
+		applyProjectItems(firstArray(json(bundle.path("definition.item.patch"))), packaged, true);
+		applyProjectItems(firstArray(json(bundle.path("definition.item.world"))), packaged, true);
+	}
+
+	private static void applyProjectItems(JSONArray rows, ArrayList<ItemDef> packaged,
+		boolean overlay) {
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index); int id = row.getInt("id");
+			while (items.size() <= id) items.add(null);
+			ItemDef prior = items.get(id);
+			if (overlay && prior == null) {
+				throw new IllegalArgumentException("Item overlay references undefined id " + id);
+			}
+			ItemDef visual = id < packaged.size() ? packaged.get(id) : null;
+			if (visual == null) visual = prior;
+			int sprite = visual == null ? id : visual.getSpriteID();
+			String location = visual == null ? "items:" + id : visual.getSpriteLocation();
+			String command = row.optString("command",
+				prior == null || prior.getCommand() == null ? "" : String.join(",", prior.getCommand()));
+			ItemDef value = new ItemDef(
+				row.optString("name", prior == null ? "" : prior.getName()),
+				row.optString("description", prior == null ? "" : prior.getDescription()),
+				command, row.optInt("basePrice", prior == null ? 0 : prior.getBasePrice()),
+				sprite, location,
+				row.optInt("isStackable", prior != null && prior.isStackable() ? 1 : 0) == 1,
+				row.optInt("isWearable", prior != null && prior.isWieldable() ? 1 : 0) == 1,
+				row.optInt("wearableID", prior == null ? 0 : prior.wearableID),
+				visual == null ? 0 : visual.getPictureMask(),
+				row.optInt("isMembersOnly", prior != null && prior.membersItem ? 1 : 0) == 1,
+				row.optInt("isUntradable", prior != null && prior.untradeable ? 1 : 0) == 1,
+				row.optInt("isNoteable", prior != null && prior.noteable ? 1 : 0) == 1, id);
+			items.set(id, value);
+		}
+	}
+
+	private static Document projectXml(Path path, String root) throws Exception {
+		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+		factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+		factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+		factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+		factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+		factory.setXIncludeAware(false); factory.setExpandEntityReferences(false);
+		Document document = factory.newDocumentBuilder().parse(path.toFile());
+		if (!root.equals(document.getDocumentElement().getTagName())) {
+			throw new IllegalArgumentException("Unexpected definition XML root");
+		}
+		return document;
+	}
+
+	private static void loadProjectTiles(Path path) throws Exception {
+		NodeList rows = projectXml(path, "TileDef-array").getElementsByTagName("TileDef");
+		tiles.clear();
+		for (int id = 0; id < rows.getLength(); id++) {
+			Element row = (Element) rows.item(id);
+			tiles.add(new TileDef(xmlInt(row, "colour", 0), xmlInt(row, "unknown", 0),
+				xmlInt(row, "objectType", 0)));
+		}
+	}
+
+	private static void loadProjectDoors(Path path) throws Exception {
+		NodeList rows = projectXml(path, "DoorDef-array").getElementsByTagName("DoorDef");
+		doors.clear();
+		for (int id = 0; id < rows.getLength(); id++) {
+			Element row = (Element) rows.item(id);
+			doors.add(new DoorDef(xmlText(row, "name", ""), xmlText(row, "description", ""),
+				xmlText(row, "command1", ""), xmlText(row, "command2", ""),
+				xmlInt(row, "doorType", 0), xmlInt(row, "unknown", 0),
+				xmlInt(row, "modelVar1", 0), xmlInt(row, "modelVar2", 0),
+				xmlInt(row, "modelVar3", 0), id));
+		}
+	}
+
+	private static void loadProjectScenery(Path path) throws Exception {
+		NodeList rows = projectXml(path, "GameObjectDef-array").getElementsByTagName("GameObjectDef");
+		objects.clear();
+		for (int id = 0; id < rows.getLength(); id++) {
+			Element row = (Element) rows.item(id);
+			objects.add(new GameObjectDef(xmlText(row, "name", ""), xmlText(row, "description", ""),
+				xmlText(row, "command1", ""), xmlText(row, "command2", ""),
+				xmlInt(row, "type", 0), xmlInt(row, "width", 1), xmlInt(row, "height", 1),
+				xmlInt(row, "groundItemVar", 0), xmlText(row, "objectModel", ""), id));
+		}
+	}
+
+	private static void validateProjectCatalog(JSONObject catalog) {
+		if (catalog.getJSONArray("tiles").length() != tiles.size()
+			|| catalog.getJSONArray("boundaries").length() != doors.size()
+			|| catalog.getJSONArray("scenery").length() != objects.size()) {
+			throw new IllegalStateException("Project catalog disagrees with XML definitions");
+		}
+		for (Object raw : catalog.getJSONArray("npcs")) {
+			int id = ((Number) raw).intValue();
+			if (id < 0 || id >= npcs.size() || npcs.get(id) == null) throw new IllegalStateException("Project catalog references missing NPC " + id);
+		}
+		for (Object raw : catalog.getJSONArray("groundItems")) {
+			int id = ((Number) raw).intValue();
+			if (id < 0 || id >= items.size() || items.get(id) == null) throw new IllegalStateException("Project catalog references missing item " + id);
+		}
+	}
+
+	private static String xmlText(Element row, String name, String fallback) {
+		NodeList values = row.getElementsByTagName(name);
+		return values.getLength() == 0 ? fallback : values.item(0).getTextContent();
+	}
+	private static int xmlInt(Element row, String name, int fallback) {
+		String value = xmlText(row, name, "").trim(); return value.isEmpty() ? fallback : Integer.parseInt(value);
 	}
 
 	public static int storeModel(String name) {

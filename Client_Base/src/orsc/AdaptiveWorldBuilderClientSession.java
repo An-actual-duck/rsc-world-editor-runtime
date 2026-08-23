@@ -23,13 +23,13 @@ public final class AdaptiveWorldBuilderClientSession {
 	public static final String SESSION_SCHEMA =
 		"adaptive-world-builder-session-v1";
 	public static final String CAPABILITY_ID =
-		"adaptive-world-builder-runtime-capability-v2";
+		"adaptive-world-builder-runtime-capability-v4";
 	public static final String SERVER_BUILD_ID =
-		"core-framework-adaptive-builder-server-v2";
+		"rsc-world-editor-runtime-adaptive-builder-server-v4";
 	public static final String CLIENT_BUILD_ID =
-		"core-framework-adaptive-builder-client-v2";
+		"rsc-world-editor-runtime-adaptive-builder-client-v4";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v2-u16-elevation";
+		"generic-signed-layered-loader-v4-project-content-bundle-v1";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
@@ -60,6 +60,8 @@ public final class AdaptiveWorldBuilderClientSession {
 			"authorableBoundaryIds", "authorableItemIds",
 			"authorableNpcIds", "authorableSceneryIds",
 			"capability", "clientBuild", "clientVersion", "coordinateModel",
+			"contentAssetSha256", "contentBundleSha256", "contentCapability",
+			"contentDefinitionSha256",
 			"definitionContract", "definitionIdentity", "definitionSha256",
 			"effectiveComposition", "effectiveCompositionSha256", "initialLevel",
 			"initialWorldSpace", "initialX", "initialY", "loader",
@@ -83,6 +85,7 @@ public final class AdaptiveWorldBuilderClientSession {
 	private final int[] authorableNpcIds;
 	private final int[] authorableItemIds;
 	private final int[] levels;
+	private ProjectContentBundle contentBundle = ProjectContentBundle.empty();
 
 	private AdaptiveWorldBuilderClientSession(
 		Path bindingFile, Path workspaceRoot,
@@ -214,7 +217,7 @@ public final class AdaptiveWorldBuilderClientSession {
 		}
 	}
 
-	public void requireEvidence(Path definitionEvidence, Path assetEvidence) {
+	public synchronized void requireEvidence(Path definitionEvidence, Path assetEvidence) {
 		try {
 			Path definitions = safeRegularFile(
 				definitionEvidence, MAX_EVIDENCE_BYTES,
@@ -235,12 +238,34 @@ public final class AdaptiveWorldBuilderClientSession {
 				throw new IllegalArgumentException(
 					"Adaptive client asset evidence hash mismatch");
 			}
+			contentBundle = ProjectContentBundle.load(
+				workspaceRoot,
+				System.getProperty("openrsc.worldBuilderContentBundle", ""),
+				System.getProperty("openrsc.worldBuilderContentCapabilityId", ""),
+				System.getProperty("openrsc.worldBuilderContentBundleSha256", ""),
+				System.getProperty("openrsc.worldBuilderContentDefinitionSha256", ""),
+				System.getProperty("openrsc.worldBuilderContentAssetSha256", ""));
+			if (!fields.get("contentCapability").equals(
+					System.getProperty("openrsc.worldBuilderContentCapabilityId", ""))
+				|| !fields.get("contentBundleSha256").equals(
+					System.getProperty("openrsc.worldBuilderContentBundleSha256", ""))
+				|| !fields.get("contentDefinitionSha256").equals(
+					System.getProperty("openrsc.worldBuilderContentDefinitionSha256", ""))
+				|| !fields.get("contentAssetSha256").equals(
+					System.getProperty("openrsc.worldBuilderContentAssetSha256", ""))) {
+				throw new IllegalArgumentException(
+					"Project content identities differ between launch and session");
+			}
 		} catch (IllegalArgumentException failure) {
 			throw failure;
 		} catch (Exception failure) {
 			throw new IllegalArgumentException(
 				"Unable to validate adaptive client evidence", failure);
 		}
+	}
+
+	public synchronized ProjectContentBundle contentBundle() {
+		return contentBundle;
 	}
 
 	public Path requireCredential(Path requested) {
@@ -331,6 +356,18 @@ public final class AdaptiveWorldBuilderClientSession {
 		matched(fields, "packageInventorySha256", SHA256);
 		matched(fields, "packageVersion", VERSION);
 		matched(fields, "sourceBaselineInventorySha256", SHA256);
+		boolean content = !fields.get("contentCapability").isEmpty();
+		if (content) {
+			expect(fields, "contentCapability", ProjectContentBundle.CAPABILITY_ID);
+			matched(fields, "contentBundleSha256", SHA256);
+			matched(fields, "contentDefinitionSha256", SHA256);
+			matched(fields, "contentAssetSha256", SHA256);
+		} else if (!fields.get("contentBundleSha256").isEmpty()
+			|| !fields.get("contentDefinitionSha256").isEmpty()
+			|| !fields.get("contentAssetSha256").isEmpty()) {
+			throw new IllegalArgumentException(
+				"Incomplete project content identity in runtime binding");
+		}
 		if (!"global".equals(fields.get("initialWorldSpace"))) {
 			throw new IllegalArgumentException(
 				"Adaptive client supports only the bound global world space");

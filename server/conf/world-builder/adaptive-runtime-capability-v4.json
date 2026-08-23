@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 4,
+  "manifestType": "adaptive-world-builder-runtime-capability",
+  "capabilityId": "adaptive-world-builder-runtime-capability-v4",
+  "profileId": "adaptive-world-builder",
+  "serverBuildId": "rsc-world-editor-runtime-adaptive-builder-server-v4",
+  "clientBuildId": "rsc-world-editor-runtime-adaptive-builder-client-v4",
+  "loaderId": "generic-signed-layered-loader-v4-project-content-bundle-v1",
+  "authoringId": "generic-signed-layered-authoring-v2-u16-elevation",
+  "definitionContractId": "world-builder-definition-catalog-binding-v1",
+  "assetContractId": "world-builder-client-asset-binding-v1",
+  "projectContentCapabilityId": "project-local-custom-content-v1",
+  "projectContentManifestType": "world-builder-project-content-bundle",
+  "protocolId": "world-builder-native-layered-protocol-v2-u16-elevation",
+  "effectiveCompositionId": "world-builder-effective-static-composition-v1",
+  "mapFormatId": "signed-layered-v1",
+  "packageSchemaId": "layered-world-package-v1",
+  "coordinateModel": "signed-layered-v1",
+  "terrainElevation": {
+    "storageEncoding": "unsigned-16",
+    "minimum": 0,
+    "maximum": 65535,
+    "renderScale": 3,
+    "legacyV1Promotion": "unsigned-byte-lossless",
+    "operations": ["absolute", "raise", "lower"],
+    "atomicMultiTileBounds": true
+  },
+  "projectContent": {
+    "schemaVersion": 1,
+    "sourceKind": "target-adopted",
+    "directory": "working/content-bundle",
+    "declarativeOnly": true,
+    "definitionFamilies": ["boundary", "item", "npc", "scenery", "tile"],
+    "assetFamilies": ["library", "model", "sprite-authentic", "sprite-custom", "spritepack"],
+    "clientServerFingerprintBinding": true,
+    "unknownFilesRejected": true,
+    "creatorCodeExecuted": false,
+    "materialFreeFallback": true
+  },
+  "encodingVersions": [1, 2, 3],
+  "authoring": {
+    "editExistingLevels": true,
+    "createLevels": true,
+    "placementFamilies": ["boundary", "ground-item", "npc", "scenery"]
+  },
+  "activation": {
+    "worldBuilderMode": true,
+    "adaptiveMode": true,
+    "runtimeProfile": "adaptive-world-builder",
+    "builderOnly": true,
+    "loopbackOnly": true
+  },
+  "canonicalVoidTile": [0, 1, 8, 0, 0, 0, 0, 0, 0, 0]
+}

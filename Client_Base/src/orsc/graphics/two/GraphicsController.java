@@ -7,6 +7,8 @@ import com.openrsc.client.entityhandling.defs.extras.AnimationDef;
 import com.openrsc.client.model.Sprite;
 import com.openrsc.data.DataConversions;
 import orsc.Config;
+import orsc.ProjectContentBundle;
+import orsc.WorldBuilderClientProfile;
 import orsc.MiscFunctions;
 import orsc.RenderTelemetry;
 import orsc.graphics.Renderer2DFrame;
@@ -148,7 +150,13 @@ public class GraphicsController {
 			this.width2 = var1;
 			try {
 				if (!Config.S_WANT_CUSTOM_SPRITES) {
-					spriteArchive = new ZipFile(Config.F_CACHE_DIR + File.separator + "video" + File.separator + "Authentic_Sprites.orsc");
+					ProjectContentBundle content =
+						WorldBuilderClientProfile.current().contentBundle();
+					File authentic = content.isPresent()
+						? content.path("asset.sprite.authentic").toFile()
+						: new File(Config.F_CACHE_DIR + File.separator + "video"
+							+ File.separator + "Authentic_Sprites.orsc");
+					spriteArchive = new ZipFile(authentic);
 					sprites = new Sprite[var3];
 				}
 			} catch (Exception e) {
@@ -4456,7 +4464,11 @@ public class GraphicsController {
 	}
 
 	public boolean fillSpriteTree() {
-		File workspaceFile = new File(Config.F_CACHE_DIR, "video" + File.separator + "Custom_Sprites.osar");
+		ProjectContentBundle content =
+			WorldBuilderClientProfile.current().contentBundle();
+		File workspaceFile = content.isPresent()
+			? content.path("asset.sprite.custom").toFile()
+			: new File(Config.F_CACHE_DIR, "video" + File.separator + "Custom_Sprites.osar");
 		if (!workspaceFile.exists())
 			return false;
 
