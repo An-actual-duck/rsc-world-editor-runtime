@@ -40,7 +40,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 	public static final String CLIENT_BUILD_ID =
 		"rsc-world-editor-runtime-adaptive-builder-client-v4";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v4-project-content-bundle-v1";
+		"generic-signed-layered-loader-v5-project-content-bundle-v2";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
@@ -48,7 +48,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 	public static final String ASSET_CONTRACT_ID =
 		"world-builder-client-asset-binding-v1";
 	public static final String CONTENT_CONTRACT_ID =
-		"project-local-custom-content-v1";
+		"project-local-custom-content-v2";
 	public static final String PROTOCOL_ID =
 		"world-builder-native-layered-protocol-v2-u16-elevation";
 	public static final String EFFECTIVE_COMPOSITION_ID =
@@ -310,6 +310,8 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 			config.WORLD_BUILDER_CONTENT_CAPABILITY_ID);
 		fields.put("contentDefinitionSha256",
 			config.WORLD_BUILDER_CONTENT_DEFINITION_SHA256);
+		fields.put("contentItemVisualSha256",
+			config.WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256);
 		fields.put("authoring", AUTHORING_ID);
 		fields.put("authorableBoundaryIds", checkedIdList(authorableBoundaryIds));
 		fields.put("authorableFloorIds", checkedIdList(authorableFloorIds));

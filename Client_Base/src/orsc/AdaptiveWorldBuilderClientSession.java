@@ -29,7 +29,7 @@ public final class AdaptiveWorldBuilderClientSession {
 	public static final String CLIENT_BUILD_ID =
 		"rsc-world-editor-runtime-adaptive-builder-client-v4";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v4-project-content-bundle-v1";
+		"generic-signed-layered-loader-v5-project-content-bundle-v2";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
@@ -61,7 +61,7 @@ public final class AdaptiveWorldBuilderClientSession {
 			"authorableNpcIds", "authorableSceneryIds",
 			"capability", "clientBuild", "clientVersion", "coordinateModel",
 			"contentAssetSha256", "contentBundleSha256", "contentCapability",
-			"contentDefinitionSha256",
+			"contentDefinitionSha256", "contentItemVisualSha256",
 			"definitionContract", "definitionIdentity", "definitionSha256",
 			"effectiveComposition", "effectiveCompositionSha256", "initialLevel",
 			"initialWorldSpace", "initialX", "initialY", "loader",
@@ -248,7 +248,8 @@ public final class AdaptiveWorldBuilderClientSession {
 				System.getProperty("openrsc.worldBuilderContentCapabilityId", ""),
 				System.getProperty("openrsc.worldBuilderContentBundleSha256", ""),
 				System.getProperty("openrsc.worldBuilderContentDefinitionSha256", ""),
-				System.getProperty("openrsc.worldBuilderContentAssetSha256", ""));
+				System.getProperty("openrsc.worldBuilderContentAssetSha256", ""),
+				System.getProperty("openrsc.worldBuilderContentItemVisualSha256", ""));
 			if (!fields.get("contentCapability").equals(
 					System.getProperty("openrsc.worldBuilderContentCapabilityId", ""))
 				|| !fields.get("contentBundleSha256").equals(
@@ -256,7 +257,9 @@ public final class AdaptiveWorldBuilderClientSession {
 				|| !fields.get("contentDefinitionSha256").equals(
 					System.getProperty("openrsc.worldBuilderContentDefinitionSha256", ""))
 				|| !fields.get("contentAssetSha256").equals(
-					System.getProperty("openrsc.worldBuilderContentAssetSha256", ""))) {
+					System.getProperty("openrsc.worldBuilderContentAssetSha256", ""))
+				|| !fields.get("contentItemVisualSha256").equals(
+					System.getProperty("openrsc.worldBuilderContentItemVisualSha256", ""))) {
 				throw new IllegalArgumentException(
 					"Project content identities differ between launch and session");
 			}
@@ -365,13 +368,24 @@ public final class AdaptiveWorldBuilderClientSession {
 		matched(fields, "sourceBaselineInventorySha256", SHA256);
 		boolean content = !fields.get("contentCapability").isEmpty();
 		if (content) {
-			expect(fields, "contentCapability", ProjectContentBundle.CAPABILITY_ID);
+			String contentCapability = fields.get("contentCapability");
+			if (!ProjectContentBundle.CAPABILITY_ID.equals(contentCapability)
+				&& !ProjectContentBundle.CAPABILITY_ID_V1.equals(contentCapability)) {
+				throw new IllegalArgumentException("Unsupported project content capability");
+			}
 			matched(fields, "contentBundleSha256", SHA256);
 			matched(fields, "contentDefinitionSha256", SHA256);
 			matched(fields, "contentAssetSha256", SHA256);
+			matched(fields, "contentItemVisualSha256", SHA256);
+			if (ProjectContentBundle.CAPABILITY_ID_V1.equals(contentCapability)
+				&& !fields.get("contentItemVisualSha256").equals(
+					"0000000000000000000000000000000000000000000000000000000000000000")) {
+				throw new IllegalArgumentException("Bundle-v1 item visual identity must be zero");
+			}
 		} else if (!fields.get("contentBundleSha256").isEmpty()
 			|| !fields.get("contentDefinitionSha256").isEmpty()
-			|| !fields.get("contentAssetSha256").isEmpty()) {
+			|| !fields.get("contentAssetSha256").isEmpty()
+			|| !fields.get("contentItemVisualSha256").isEmpty()) {
 			throw new IllegalArgumentException(
 				"Incomplete project content identity in runtime binding");
 		}

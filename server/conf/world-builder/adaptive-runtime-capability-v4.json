@@ -5,11 +5,11 @@
   "profileId": "adaptive-world-builder",
   "serverBuildId": "rsc-world-editor-runtime-adaptive-builder-server-v4",
   "clientBuildId": "rsc-world-editor-runtime-adaptive-builder-client-v4",
-  "loaderId": "generic-signed-layered-loader-v4-project-content-bundle-v1",
+  "loaderId": "generic-signed-layered-loader-v5-project-content-bundle-v2",
   "authoringId": "generic-signed-layered-authoring-v2-u16-elevation",
   "definitionContractId": "world-builder-definition-catalog-binding-v1",
   "assetContractId": "world-builder-client-asset-binding-v1",
-  "projectContentCapabilityId": "project-local-custom-content-v1",
+  "projectContentCapabilityId": "project-local-custom-content-v2",
   "projectContentManifestType": "world-builder-project-content-bundle",
   "protocolId": "world-builder-native-layered-protocol-v2-u16-elevation",
   "effectiveCompositionId": "world-builder-effective-static-composition-v1",
@@ -26,7 +26,7 @@
     "atomicMultiTileBounds": true
   },
   "projectContent": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "sourceKind": "target-adopted",
     "directory": "working/content-bundle",
     "declarativeOnly": true,

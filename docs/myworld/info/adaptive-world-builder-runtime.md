@@ -22,7 +22,7 @@ client code independently pin the same values.
 | Runtime profile | `adaptive-world-builder` |
 | Server build | `rsc-world-editor-runtime-adaptive-builder-server-v4` |
 | Client build | `rsc-world-editor-runtime-adaptive-builder-client-v4` |
-| Loader | `generic-signed-layered-loader-v4-project-content-bundle-v1` |
+| Loader | `generic-signed-layered-loader-v5-project-content-bundle-v2` |
 | Authoring | `generic-signed-layered-authoring-v2-u16-elevation` |
 | Definition binding | `world-builder-definition-catalog-binding-v1` |
 | Client asset binding | `world-builder-client-asset-binding-v1` |
@@ -124,17 +124,17 @@ origins `target-layered`, `target-packed`, or `standalone-empty`, definition
 and asset IDs/hashes/evidence paths, and the initial global coordinate. The
 definition and asset evidence files must be inside `working/`.
 
-Target-backed projects also bind the Editor-owned
-`project-local-custom-content-v1` capability. The only accepted content input
+Target-backed projects bind the Editor-owned
+`project-local-custom-content-v2` capability. The only accepted content input
 is the exact `working/content-bundle` directory with manifest type
-`world-builder-project-content-bundle`, schema version 1. Its closed inventory
+`world-builder-project-content-bundle`, schema version 2. Its closed inventory
 contains captured server definition files for tiles, boundaries, scenery,
 NPCs, and items plus the existing client `library.orsc`, `models.orsc`,
 `Authentic_Sprites.orsc`, `Custom_Sprites.osar`, and `Menus.osar` archives.
 Loose images, loose models, scripts, classes, plug-ins, and target behavior are
 not content-bundle inputs and are never executed.
 
-### Bundle-v1 visual-closure blocker
+### Versioned item-visual closure
 
 `project-local-custom-content-v1` cannot author a new ground-item visual. The
 captured server item JSON contains gameplay fields but no client item-to-sprite
@@ -145,15 +145,19 @@ The client therefore refuses a bundle-v1 item that has no pre-existing packaged
 client definition. Existing IDs may retain their exact packaged visual mapping;
 new IDs cannot activate under bundle-v1.
 
-The smallest producer correction is a versioned successor contract (bundle-v1
-is frozen) that adds a sorted `itemVisuals` array to `definitionCatalog`. It must
-contain exactly one record for every ID in `groundItems`, with exactly these
-fields:
+Bundle v1 remains accepted only when every target ground-item ID already has a
+packaged client visual; its new-item refusal remains fail-closed. Bundle v2
+adds a sorted manifest `itemVisuals` array, a separately bound
+`itemVisualFingerprintSha256`, and the preserved static-evidence role
+`metadata.item-visuals` at
+`server/conf/world-builder/item-visuals-v1.json`. The array contains exactly
+one record for every target ground-item ID absent from the packaged catalog,
+with exactly these fields:
 
 ```json
 {
   "itemId": 9000,
-  "authenticSpriteId": 1234,
+  "authenticSpriteId": null,
   "customSpriteAssetRole": "asset.sprite.custom",
   "customSpriteSubspace": "items",
   "customSpriteEntry": "project-item-9000",
@@ -163,32 +167,32 @@ fields:
 ```
 
 - `itemId` is the exact ground-item catalog ID (`0..65535`).
-- `authenticSpriteId` is the numeric entry in
-  `asset.sprite.authentic`; with the current client sprite layout it is
-  `0..2350` because inventory sprites begin at 2150 in a 4501-entry array.
+- `authenticSpriteId` is `null` for a named mapping or an unsigned-short
+  `0..65535` ID whose exact `2150 + ID` entry must decode in
+  `asset.sprite.authentic`.
 - `customSpriteAssetRole` is exactly `asset.sprite.custom` or
   `asset.spritepack`; `customSpriteSubspace` and `customSpriteEntry` identify
   one decoded, nonempty sprite-pack entry in that named archive. The pair must
   be unambiguous after the runtime's archive merge order.
-- `pictureMask` and `blueMask` are exact 24-bit values (`0..16777215`).
+- `pictureMask` and `blueMask` are exact signed 32-bit values.
 
-The new array participates in `catalogSha256`, and therefore in the definition
-and bundle fingerprints. The successor must use a new schema/capability
-identity rather than silently changing `project-local-custom-content-v1`.
-Before activation, the runtime can then prove both authentic and custom-mode
-item references decode, every NPC layer is either `-1` or names a runtime
-animation whose required authentic entries and custom frames decode, and every
-scenery `objectModel` occurs as a decodable OB3 record in `asset.model`.
+Exactly one mapping form is present: an authentic ID with all three custom
+fields null, or all three custom fields with the authentic ID null. Both
+processes verify the evidence file and decode the exact referenced archive
+entry before authentication. The client emits deterministic source,
+dimensions, pixel SHA-256, and mask evidence when each sprite is installed.
+The reviewed Editor fixture freezes definition
+`6a070461aaf4d8b304ae295e485c909bd04242017f63a539d7fa74d62872dcfe`,
+asset `2320bfd31effa33c0e8cc47ec919e881809f69599b5504c6369e547697f844bc`,
+item-visual
+`aa7c9deae89d9cda0497dad1bf00ac7f2f28b0143d127b584acecb9726f9ac6c`,
+and bundle
+`44510eb65894689c510ef55072a3e5406dfae3821d6368c5b0a6869ce516a9e1`.
 Floors and walls have no sprite lookup: floor IDs and axial wall IDs are
 one-less than unsigned-byte terrain values, so their exact catalog range is
 `0..254`, and their XML colour/material fields are the visual definition.
 Scenery, NPC, and ground-item placement IDs are unsigned-short values
 `0..65535`.
-
-No lifecycle claim for new item `9000`, and no replacement READY handoff, is
-valid until the producer supplies this correction and a deterministic fixture
-whose new sprite/model records are decoded and selected during the real
-authenticated client/server save/reopen lifecycle.
 
 Both processes receive and independently verify these properties:
 
@@ -197,13 +201,14 @@ Both processes receive and independently verify these properties:
 - `openrsc.worldBuilderContentBundleSha256`
 - `openrsc.worldBuilderContentDefinitionSha256`
 - `openrsc.worldBuilderContentAssetSha256`
+- `openrsc.worldBuilderContentItemVisualSha256` (64 zeroes for bundle v1)
 
 The bundle path must resolve exactly to the isolated project's working copy.
 Unknown keys or files, path escapes, symbolic or hard links, portable-name
 collisions, incomplete family bindings, unsafe catalog holes, payload/hash
 mismatch, domain-fingerprint mismatch, catalog disagreement, and
 client/server identity disagreement all fail before editable readiness. A
-content-neutral standalone project keeps all five values empty and continues
+content-neutral standalone project keeps all six values empty and continues
 to use packaged definitions and assets.
 
 The desktop client independently requires:

@@ -168,6 +168,7 @@ public final class BundleServerHarness {
     ServerConfiguration config=new ServerConfiguration();
     config.WORLD_BUILDER_CONTENT_BUNDLE_PATH=args[1]; config.WORLD_BUILDER_CONTENT_CAPABILITY_ID="project-local-custom-content-v1";
     config.WORLD_BUILDER_CONTENT_BUNDLE_SHA256=args[2]; config.WORLD_BUILDER_CONTENT_DEFINITION_SHA256=args[3]; config.WORLD_BUILDER_CONTENT_ASSET_SHA256=args[4];
+    config.WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256="0000000000000000000000000000000000000000000000000000000000000000";
     AdaptiveWorldBuilderProjectContentBundle bundle=AdaptiveWorldBuilderProjectContentBundle.load(config,storage);
     if (!bundle.isPresent() || !bundle.catalog().getJSONArray("npcs").toList().contains(846)) throw new AssertionError("NPC 846 absent");
     System.out.println(bundle.bundleSha256());

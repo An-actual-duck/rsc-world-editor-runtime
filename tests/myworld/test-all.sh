@@ -89,6 +89,7 @@ python3 ./tests/myworld/test-layered-production-promotion.py
 python3 ./tests/myworld/test-world-builder-layered-import.py
 python3 ./tests/myworld/test-adaptive-world-builder-runtime.py
 python3 ./tests/myworld/test-project-content-bundle-v1-runtime.py
+python3 ./tests/myworld/test-project-content-bundle-v2-runtime.py
 python3 ./tests/myworld/test-adaptive-id-list-validation.py
 python3 ./tests/myworld/test-project-bound-placement-definitions.py
 python3 ./tests/myworld/test-custom-login-decoder.py

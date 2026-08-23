@@ -5,6 +5,8 @@ import hashlib
 import json
 import os
 import copy
+import gzip
+import io
 import re
 import shutil
 import socket
@@ -45,7 +47,24 @@ CONTENT_SPECS = (
     ("definition.npc.patch", "server/conf/server/defs/NpcDefsPatch18.json", "application/json", True),
     ("definition.npc.world", "server/conf/server/defs/NpcDefsMyWorld.json", "application/json", True),
     ("definition.tile", "server/conf/server/defs/TileDef.xml", "application/xml", True),
+    ("metadata.item-visuals", "server/conf/world-builder/item-visuals-v1.json", "application/json", False),
 )
+
+
+def sprite_archive(subspace: str, entry: str, rgb: int) -> bytes:
+    payload = bytearray((1,))
+    payload.extend(subspace.encode("ascii") + b"\0")
+    payload.extend((0, 1))
+    payload.extend(entry.encode("ascii") + b"\0")
+    payload.extend((0, 1, 1))  # sprite type, one frame, two palette colours
+    payload.extend(b"\0\0\0")
+    payload.extend(bytes(((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255)))
+    payload.extend((0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 2))
+    payload.extend((1, 0, 0, 1))
+    output = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", fileobj=output, mtime=0) as archive:
+        archive.write(payload)
+    return output.getvalue()
 
 
 def canonical_json(value) -> bytes:
@@ -70,6 +89,8 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
                                       client_root: Path):
     payloads = {}
     for role, runtime_path, _, _ in CONTENT_SPECS:
+        if role == "metadata.item-visuals":
+            continue
         source = (server_root / runtime_path.removeprefix("server/")) if runtime_path.startswith("server/") else (client_root / runtime_path.removeprefix("client/"))
         payloads[runtime_path] = source.read_bytes()
 
@@ -98,11 +119,29 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
 
     item_path = "server/conf/server/defs/ItemDefsCustom.json"
     item_document = json.loads(payloads[item_path])
-    item = copy.deepcopy(item_document["items"][-1])
-    item["id"] = 9000
-    item["name"] = "Project content item 9000"
-    item_document["items"].append(item)
+    for item_id in (9000, 9001, 9002):
+        item = copy.deepcopy(item_document["items"][-1])
+        item["id"] = item_id
+        item["name"] = f"Project content item {item_id}"
+        item_document["items"].append(item)
     payloads[item_path] = (json.dumps(item_document, indent=4) + "\n").encode()
+    item_visuals = [
+        {"itemId": 9000, "authenticSpriteId": None,
+         "customSpriteAssetRole": "asset.sprite.custom",
+         "customSpriteSubspace": "items", "customSpriteEntry": "0",
+         "pictureMask": 0, "blueMask": 0},
+        {"itemId": 9001, "authenticSpriteId": 417,
+         "customSpriteAssetRole": None, "customSpriteSubspace": None,
+         "customSpriteEntry": None, "pictureMask": -1, "blueMask": 0},
+        {"itemId": 9002, "authenticSpriteId": None,
+         "customSpriteAssetRole": "asset.spritepack",
+         "customSpriteSubspace": "GUI", "customSpriteEntry": "0",
+         "pictureMask": 0, "blueMask": -16776961},
+    ]
+    payloads["server/conf/world-builder/item-visuals-v1.json"] = (
+        json.dumps({"schemaVersion": 1, "manifestType": "world-builder-item-visuals",
+                    "itemVisuals": item_visuals}, sort_keys=True, indent=2) + "\n"
+    ).encode()
 
     catalog = {
         "schemaVersion": 1,
@@ -112,7 +151,7 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
         "boundaries": list(range(220)),
         "scenery": list(range(1333)),
         "npcs": list(range(847)),
-        "groundItems": list(range(3309)) + [9000],
+        "groundItems": list(range(3309)) + [9000, 9001, 9002],
         "catalogSha256": "0" * 64,
     }
     catalog["catalogSha256"] = hashlib.sha256(canonical_sorted(catalog)).hexdigest()
@@ -130,7 +169,7 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
     def domain_fingerprint(domain, definition):
         digest = hashlib.sha256(domain)
         for row in records:
-            if (row["role"] in definition_roles) != definition:
+            if row["role"] == "metadata.item-visuals" or (row["role"] in definition_roles) != definition:
                 continue
             digest.update(f'{row["role"]}\0{row["runtimeRelativePath"]}\0{row["size"]}\0{row["sha256"]}\n'.encode())
         if definition:
@@ -138,19 +177,27 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
         return digest.hexdigest()
 
     manifest = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "manifestType": "world-builder-project-content-bundle",
-        "capabilityId": "project-local-custom-content-v1",
+        "capabilityId": "project-local-custom-content-v2",
         "sourceKind": "target-adopted",
         "definitionCatalog": catalog,
+        "itemVisuals": item_visuals,
         "familyBindings": project_content_family_bindings(),
         "files": records,
         "definitionFingerprintSha256": domain_fingerprint(b"world-builder-project-content-definitions-v1\n", True),
         "assetFingerprintSha256": domain_fingerprint(b"world-builder-project-content-assets-v1\n", False),
+        "itemVisualFingerprintSha256": "",
         "bundleFingerprintSha256": "0" * 64,
     }
+    visual_row = next(row for row in records if row["role"] == "metadata.item-visuals")
+    visual_digest = hashlib.sha256(b"world-builder-project-content-item-visuals-v1\n")
+    visual_digest.update(
+        f'{visual_row["role"]}\0{visual_row["runtimeRelativePath"]}\0{visual_row["size"]}\0{visual_row["sha256"]}\n'.encode()
+    )
+    manifest["itemVisualFingerprintSha256"] = visual_digest.hexdigest()
     manifest["bundleFingerprintSha256"] = hashlib.sha256(
-        b"world-builder-project-content-bundle-v1\n" + canonical_sorted(manifest)
+        b"world-builder-project-content-bundle-v2\n" + canonical_sorted(manifest)
     ).hexdigest()
     (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
     authoring = dict(catalog)
@@ -922,10 +969,11 @@ world_builder_initial_y: 648
             if content_manifest is not None:
                 common_server_properties.update({
                     "openrsc.worldBuilderContentBundle": str(content_bundle),
-                    "openrsc.worldBuilderContentCapabilityId": "project-local-custom-content-v1",
+                    "openrsc.worldBuilderContentCapabilityId": "project-local-custom-content-v2",
                     "openrsc.worldBuilderContentBundleSha256": content_manifest["bundleFingerprintSha256"],
                     "openrsc.worldBuilderContentDefinitionSha256": content_manifest["definitionFingerprintSha256"],
                     "openrsc.worldBuilderContentAssetSha256": content_manifest["assetFingerprintSha256"],
+                    "openrsc.worldBuilderContentItemVisualSha256": content_manifest["itemVisualFingerprintSha256"],
                 })
             server_command = ["java", "-Xms128m", "-Xmx768m"]
             server_command.extend(f"-D{key}={value}" for key, value in common_server_properties.items())
@@ -1001,45 +1049,24 @@ world_builder_initial_y: 648
                 if content_manifest is not None:
                     client_properties.update({
                         "openrsc.worldBuilderContentBundle": str(content_bundle),
-                        "openrsc.worldBuilderContentCapabilityId": "project-local-custom-content-v1",
+                        "openrsc.worldBuilderContentCapabilityId": "project-local-custom-content-v2",
                         "openrsc.worldBuilderContentBundleSha256": content_manifest["bundleFingerprintSha256"],
                         "openrsc.worldBuilderContentDefinitionSha256": content_manifest["definitionFingerprintSha256"],
                         "openrsc.worldBuilderContentAssetSha256": content_manifest["assetFingerprintSha256"],
+                        "openrsc.worldBuilderContentItemVisualSha256": content_manifest["itemVisualFingerprintSha256"],
                         "openrsc.worldBuilderAutomatedAuthorableBoundaryRaw": "220",
                         "openrsc.worldBuilderAutomatedAuthorableFloorRaw": "32",
                         "openrsc.worldBuilderAutomatedAuthorableSceneryId": "59",
                         "openrsc.worldBuilderAutomatedAuthorableNpcId": "846",
                         "openrsc.worldBuilderAutomatedAuthorableItemId": "9000",
+                        "openrsc.worldBuilderAutomatedAuthorableItemId2": "9001",
+                        "openrsc.worldBuilderAutomatedAuthorableItemId3": "9002",
                     })
                 client_command = ["java", "-Xms256m", "-Xmx1024m"]
                 client_command.extend(
                     f"-D{key}={value}" for key, value in client_properties.items()
                 )
                 client_command.extend(["-jar", "Open_RSC_Client.jar"])
-
-                if content_manifest is not None:
-                    blocked_evidence = prove_bundle_v1_item_visual_contract_refusal(
-                        client_root, client_properties,
-                        fixture / "client-bundle-v1-blocked.log",
-                    )
-                    self.assertIn("Got server configs!", blocked_evidence)
-                    server_output.flush()
-                    self.assertNotIn(
-                        "Player Loaded: Builder",
-                        server_log.read_text(encoding="utf-8", errors="replace"),
-                    )
-                    shutdown.write_text("shutdown\n", encoding="ascii")
-                    self.assertEqual(
-                        0, server.wait(timeout=30),
-                        "server clean shutdown after bundle-v1 refusal",
-                    )
-                    server_output.flush()
-                    refusal_server_evidence = server_log.read_text(
-                        encoding="utf-8", errors="replace"
-                    )
-                    self.assertIn("Server unloaded", refusal_server_evidence)
-                    self.assertFalse(ready.exists(), "readiness cleanup")
-                    return
 
                 cold_runtime_evidence, cold_client_evidence = (
                     run_readiness_only_client(
@@ -1083,6 +1110,18 @@ world_builder_initial_y: 648
                 client_evidence = client_log.read_text(
                     encoding="utf-8", errors="replace"
                 )
+                if content_manifest is not None:
+                    for marker in (
+                        "PROJECT_ITEM_VISUAL_INSTALLED itemId=9000 "
+                        "source=asset.sprite.custom:items:0",
+                        "PROJECT_ITEM_VISUAL_INSTALLED itemId=9001 "
+                        "source=asset.sprite.authentic:2567",
+                        "pictureMask=-1 blueMask=0",
+                        "PROJECT_ITEM_VISUAL_INSTALLED itemId=9002 "
+                        "source=asset.spritepack:GUI:0",
+                        "pictureMask=0 blueMask=-16776961",
+                    ):
+                        self.assertIn(marker, client_evidence)
                 server_output.flush()
                 server_evidence = server_log.read_text(
                     encoding="utf-8", errors="replace"
@@ -1121,6 +1160,12 @@ world_builder_initial_y: 648
                 )
                 if content_manifest is not None:
                     self.assertIn(
+                        "item=10@121,648,9000@121,649,"
+                        "9001@122,649,9002@123,649",
+                        runtime_evidence,
+                    )
+                if content_manifest is not None:
+                    self.assertIn(
                         "ADAPTIVE_WORLD_BUILDER_PROJECT_FLOOR_ACCEPTED "
                         "id=31 raw=32 x=127 y=648 runtime=true",
                         runtime_evidence,
@@ -1154,7 +1199,7 @@ world_builder_initial_y: 648
                 )
                 for family in ("scenery", "npc", "ground-item"):
                     self.assertEqual(
-                        2,
+                        4 if family == "ground-item" and content_manifest is not None else 2,
                         server_evidence.count(
                             "WORLD_BUILDER_PLACEMENT_ACCEPTED family=" + family
                         ),
@@ -1264,6 +1309,19 @@ world_builder_initial_y: 648
                         for row in placement_document["groundItems"]
                     ],
                 )
+                if content_manifest is not None:
+                    for expected in (
+                        (9001, 1, 30, 122, 649), (9002, 1, 30, 123, 649),
+                    ):
+                        self.assertIn(
+                            expected,
+                            [
+                                (row["itemId"], row["amount"],
+                                 row["respawnSeconds"], row["position"]["x"],
+                                 row["position"]["y"])
+                                for row in placement_document["groundItems"]
+                            ],
+                        )
                 self.assertNotIn(
                     max(authoring_catalog["groundItems"]) + 1,
                     [row["itemId"] for row in placement_document["groundItems"]],
@@ -1344,6 +1402,7 @@ world_builder_initial_y: 648
                     )
                     self.assertEqual(
                         [(121, 648, 10), (121, 649, authorable_item_id),
+                         (122, 649, 9001), (123, 649, 9002),
                          (131, 630, 10)],
                         [
                             (row["position"]["x"], row["position"]["y"],
@@ -1429,6 +1488,12 @@ world_builder_initial_y: 648
                     f"item=10@121,648,{authorable_item_id}@121,649",
                     reopened_evidence,
                 )
+                if content_manifest is not None:
+                    self.assertIn(
+                        "item=10@121,648,9000@121,649,"
+                        "9001@122,649,9002@123,649",
+                        reopened_evidence,
+                    )
                 self.assertIn(
                     "ADAPTIVE_WORLD_BUILDER_WIDE_ELEVATION_REOPENED "
                     "elevations=12355,65535 neighbor=0 fields=1,8,0,0,0,0 "

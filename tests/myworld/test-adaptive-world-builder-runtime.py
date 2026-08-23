@@ -890,7 +890,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "initialWorldSpace": "global",
             "initialX": "7",
             "initialY": "9",
-            "loader": "generic-signed-layered-loader-v4-project-content-bundle-v1",
+            "loader": "generic-signed-layered-loader-v5-project-content-bundle-v2",
             "levels": "-3,0",
             "manifestSha256": "1" * 64,
             "packageId": "creator.arbitrary-adopted-world",
@@ -1617,7 +1617,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         evidence = json.loads(outputs[0])
         self.assertEqual("world-builder-runtime-evidence", evidence["manifestType"])
         self.assertEqual("rsc-world-editor-runtime-adaptive-builder-server-v4", evidence["buildId"])
-        self.assertEqual("generic-signed-layered-loader-v4-project-content-bundle-v1", evidence["loaderId"])
+        self.assertEqual("generic-signed-layered-loader-v5-project-content-bundle-v2", evidence["loaderId"])
         self.assertEqual("world-builder-native-layered-protocol-v2-u16-elevation", evidence["protocolId"])
         self.assertEqual([1, 2, 3], evidence["encodingVersions"])
         self.assertEqual(

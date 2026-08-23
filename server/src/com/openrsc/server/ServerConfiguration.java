@@ -304,6 +304,7 @@ public class ServerConfiguration {
 	public String WORLD_BUILDER_CONTENT_BUNDLE_SHA256;
 	public String WORLD_BUILDER_CONTENT_DEFINITION_SHA256;
 	public String WORLD_BUILDER_CONTENT_ASSET_SHA256;
+	public String WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256;
 	public String WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256;
 	public String WORLD_BUILDER_INITIAL_WORLD_SPACE;
 	public int WORLD_BUILDER_INITIAL_LEVEL;
@@ -798,6 +799,11 @@ public class ServerConfiguration {
 			"openrsc.worldBuilderContentAssetSha256",
 			"OPENRSC_WORLD_BUILDER_CONTENT_ASSET_SHA256",
 			"world_builder_content_asset_sha256",
+			"");
+		WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256 = readStringSystemEnvConfig(
+			"openrsc.worldBuilderContentItemVisualSha256",
+			"OPENRSC_WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256",
+			"world_builder_content_item_visual_sha256",
 			"");
 		WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256 =
 			readStringSystemEnvConfig(

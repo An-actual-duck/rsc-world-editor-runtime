@@ -9790,7 +9790,8 @@ public class EntityHandler {
 			loadProjectDoors(bundle.path("definition.boundary"));
 			loadProjectScenery(bundle.path("definition.scenery"));
 			validateProjectCatalog(bundle.catalog());
-			System.out.println("Loaded validated project-content-bundle-v1 definitions");
+			System.out.println("Loaded validated project-content-bundle-v"
+				+ bundle.schemaVersion() + " definitions");
 		} catch (Exception failure) {
 			throw new IllegalStateException(
 				"Unable to load declarative project content definitions", failure);
@@ -9866,14 +9867,19 @@ public class EntityHandler {
 
 	private static void loadProjectItems(ProjectContentBundle bundle) throws Exception {
 		ItemDef[] packaged = items.toArray(new ItemDef[items.size()]); items.clear();
-		applyProjectItems(firstArray(json(bundle.path("definition.item.base"))), packaged, false);
-		applyProjectItems(firstArray(json(bundle.path("definition.item.custom"))), packaged, false);
-		applyProjectItems(firstArray(json(bundle.path("definition.item.patch"))), packaged, true);
-		applyProjectItems(firstArray(json(bundle.path("definition.item.world"))), packaged, true);
+		applyProjectItems(firstArray(json(bundle.path("definition.item.base"))), packaged, false, bundle);
+		applyProjectItems(firstArray(json(bundle.path("definition.item.custom"))), packaged, false, bundle);
+		applyProjectItems(firstArray(json(bundle.path("definition.item.patch"))), packaged, true, bundle);
+		applyProjectItems(firstArray(json(bundle.path("definition.item.world"))), packaged, true, bundle);
 	}
 
 	private static void applyProjectItems(JSONArray rows, ItemDef[] packaged,
 		boolean overlay) {
+		applyProjectItems(rows, packaged, overlay, ProjectContentBundle.empty());
+	}
+
+	private static void applyProjectItems(JSONArray rows, ItemDef[] packaged,
+		boolean overlay, ProjectContentBundle bundle) {
 		for (int index = 0; index < rows.length(); index++) {
 			JSONObject row = rows.getJSONObject(index); int id = row.getInt("id");
 			while (items.size() <= id) items.add(null);
@@ -9883,22 +9889,32 @@ public class EntityHandler {
 			}
 			ItemDef visual = id < packaged.length ? packaged[id] : null;
 			if (visual == null) visual = prior;
-			if (visual == null) {
+			ProjectContentBundle.ItemVisual supplied = bundle.itemVisual(id);
+			if (visual == null && supplied == null) {
 				throw new IllegalArgumentException(
 					"Project item " + id + " has no authoritative client visual mapping; "
 						+ "project-content-bundle-v1 cannot represent a new item visual");
 			}
 			String command = row.optString("command",
 				prior == null || prior.getCommand() == null ? "" : String.join(",", prior.getCommand()));
+			int spriteId = supplied == null ? visual.getSpriteID()
+				: supplied.authenticSpriteId() == null ? 0
+				: supplied.authenticSpriteId().intValue();
+			String spriteLocation = supplied == null ? visual.getSpriteLocation()
+				: supplied.spriteLocation();
+			int pictureMask = supplied == null ? visual.getPictureMask()
+				: supplied.pictureMask();
+			int blueMask = supplied == null ? visual.getBlueMask()
+				: supplied.blueMask();
 			ItemDef value = new ItemDef(
 				row.optString("name", prior == null ? "" : prior.getName()),
 				row.optString("description", prior == null ? "" : prior.getDescription()),
 				command, row.optInt("basePrice", prior == null ? 0 : prior.getBasePrice()),
-				visual.getSpriteID(), visual.getSpriteLocation(),
+				spriteId, spriteLocation,
 				row.optInt("isStackable", prior != null && prior.isStackable() ? 1 : 0) == 1,
 				row.optInt("isWearable", prior != null && prior.isWieldable() ? 1 : 0) == 1,
 				row.optInt("wearableID", prior == null ? 0 : prior.wearableID),
-				visual.getPictureMask(), visual.getBlueMask(),
+				pictureMask, blueMask,
 				row.optInt("isMembersOnly", prior != null && prior.membersItem ? 1 : 0) == 1,
 				row.optInt("isUntradable", prior != null && prior.untradeable ? 1 : 0) == 1,
 				row.optInt("isNoteable", prior != null && prior.noteable ? 1 : 0) == 1, id);

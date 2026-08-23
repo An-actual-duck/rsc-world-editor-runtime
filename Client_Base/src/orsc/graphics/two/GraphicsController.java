@@ -149,15 +149,17 @@ public class GraphicsController {
 			this.height2 = var2;
 			this.width2 = var1;
 			try {
-				if (!Config.S_WANT_CUSTOM_SPRITES) {
 					ProjectContentBundle content =
 						WorldBuilderClientProfile.current().contentBundle();
+					if (!Config.S_WANT_CUSTOM_SPRITES
+						|| content.hasAuthenticItemVisuals()) {
 					File authentic = content.isPresent()
 						? content.path("asset.sprite.authentic").toFile()
 						: new File(Config.F_CACHE_DIR + File.separator + "video"
 							+ File.separator + "Authentic_Sprites.orsc");
-					spriteArchive = new ZipFile(authentic);
-					sprites = new Sprite[var3];
+						spriteArchive = new ZipFile(authentic);
+						sprites = new Sprite[Math.max(var3,
+							2151 + content.maximumAuthenticSpriteId())];
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -1473,7 +1475,7 @@ public class GraphicsController {
 
 	public Sprite spriteSelect(ItemDef item) {
 		Sprite canonical;
-		if (!Config.S_WANT_CUSTOM_SPRITES) {
+		if (item.getSpriteLocation() == null || item.getSpriteLocation().isEmpty()) {
 			if (item.spriteID + mudclient.spriteItem >= sprites.length || null == sprites[item.spriteID + mudclient.spriteItem])
 				canonical = Sprite.getUnknownSprite(48, 32);
 			else
