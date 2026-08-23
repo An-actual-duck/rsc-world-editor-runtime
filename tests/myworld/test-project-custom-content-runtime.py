@@ -436,6 +436,41 @@ class ProjectCustomContentRuntimeTest(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual("empty", result.stdout.strip())
 
+    def test_material_free_schema_one_remains_strict_without_assets(self):
+        mutations = {
+            "unknown-field": lambda catalog: catalog.update({"creatorCode": "never"}),
+            "identity-mismatch": lambda catalog: catalog.update(
+                {"catalogId": "other.definitions.v1"}
+            ),
+            "noncanonical-inventory": lambda catalog: catalog.update(
+                {"tiles": [7, 7]}
+            ),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory(
+                    prefix=f"project-content-material-free-{name}-") as temp:
+                root = Path(temp)
+                evidence = root / "working/runtime/shared/evidence"
+                evidence.mkdir(parents=True)
+                catalog = {
+                    "schemaVersion": 1,
+                    "manifestType": "world-builder-definition-catalog",
+                    "catalogId": "creator.definitions.v2",
+                    "tiles": [], "boundaries": [], "scenery": [],
+                    "npcs": [], "groundItems": [],
+                }
+                mutate(catalog)
+                catalog_path = evidence / "definitions.json"
+                catalog_path.write_bytes(canonical_json(catalog))
+                missing = evidence / "absent-assets.json"
+                client, server = self.run_both(root, catalog_path, missing)
+                self.assertNotEqual(
+                    0, client.returncode, "client accepted " + name
+                )
+                self.assertNotEqual(
+                    0, server.returncode, "server accepted " + name
+                )
+
     def test_both_sides_reject_hostile_or_disagreeing_evidence(self):
         mutations = {
             "unknown-catalog-key": lambda c, m, e: c.update({"code": "never"}),
@@ -468,7 +503,7 @@ class ProjectCustomContentRuntimeTest(unittest.TestCase):
     def test_both_sides_reject_links_and_malformed_payloads(self):
         cases = (
             "symlink", "hardlink", "bad-png", "bad-ob3",
-            "bad-ob3-index", "bad-texture-size",
+            "bad-ob3-index", "bad-texture-size", "oversized-png-header",
         )
         for name in cases:
             with self.subTest(name=name), tempfile.TemporaryDirectory(
@@ -493,6 +528,10 @@ class ProjectCustomContentRuntimeTest(unittest.TestCase):
                     malformed = bytearray(paths["model"].read_bytes())
                     malformed[-1] = 3
                     paths["model"].write_bytes(malformed)
+                elif name == "oversized-png-header":
+                    malformed = bytearray(paths["texture"].read_bytes())
+                    malformed[16:20] = struct.pack(">I", 100000)
+                    paths["texture"].write_bytes(malformed)
                 else:
                     write_png(paths["texture"], 32, 32)
                     texture_row = next(

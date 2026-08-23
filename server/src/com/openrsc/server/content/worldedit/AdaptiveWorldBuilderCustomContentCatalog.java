@@ -7,6 +7,7 @@ import org.json.JSONObject;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -99,6 +100,8 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 		int schema = integer(root, "schemaVersion",
 			"adaptive definition catalog");
 		if (schema == 1) {
+			validateMaterialFreeCatalog(
+				root, config.WORLD_BUILDER_DEFINITION_ID);
 			return new AdaptiveWorldBuilderCustomContentCatalog(
 				false, null, "", "", Collections.<String, Asset>emptyMap());
 		}
@@ -114,6 +117,7 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 			"adaptive definition catalog");
 		requireText(root, "catalogId", config.WORLD_BUILDER_DEFINITION_ID,
 			"adaptive definition catalog");
+		validateAuthoringInventories(root);
 		Object rawContent = root.opt("customContent");
 		if (!(rawContent instanceof JSONObject)) {
 			throw new IOException(
@@ -343,6 +347,50 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 		if (!referencedAssets.equals(assets.keySet())) {
 			throw new IOException(
 				"Adaptive asset inventory contains missing or unreferenced payloads");
+		}
+	}
+
+	private static void validateMaterialFreeCatalog(
+		JSONObject root, String expectedCatalogId) throws IOException {
+		requireKeys(root, set(
+			"schemaVersion", "manifestType", "catalogId", "tiles",
+			"boundaries", "scenery", "npcs", "groundItems"),
+			"adaptive definition catalog");
+		requireText(root, "manifestType", CATALOG_TYPE,
+			"adaptive definition catalog");
+		requireText(root, "catalogId", expectedCatalogId,
+			"adaptive definition catalog");
+		validateAuthoringInventories(root);
+	}
+
+	private static void validateAuthoringInventories(JSONObject root)
+		throws IOException {
+		for (String family : Arrays.asList(
+			"tiles", "boundaries", "scenery", "npcs", "groundItems")) {
+			Object raw = root.opt(family);
+			if (!(raw instanceof JSONArray)) {
+				throw new IOException(
+					"Adaptive " + family + " authoring inventory must be an array");
+			}
+			JSONArray ids = (JSONArray)raw;
+			if (ids.length() > MAX_DEFINITIONS_PER_FAMILY) {
+				throw new IOException(
+					"Adaptive " + family + " authoring inventory exceeds its bound");
+			}
+			int prior = -1;
+			for (int index = 0; index < ids.length(); index++) {
+				Object value = ids.get(index);
+				if (!(value instanceof Integer) && !(value instanceof Long)) {
+					throw new IOException(
+						"Adaptive " + family + " authoring ID is not an integer");
+				}
+				long id = ((Number)value).longValue();
+				if (id < 0L || id > Integer.MAX_VALUE || id <= prior) {
+					throw new IOException(
+						"Adaptive " + family + " authoring IDs are not canonical");
+				}
+				prior = (int)id;
+			}
 		}
 	}
 
@@ -593,7 +641,9 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 				|| frames < 1 || frames > 27 || width % frames != 0) {
 				throw new IOException("Adaptive PNG dimensions are outside the contract");
 			}
-			BufferedImage image = ImageIO.read(path.toFile());
+			byte[] payload = Files.readAllBytes(path);
+			validatePngHeader(payload, width, height);
+			BufferedImage image = ImageIO.read(new ByteArrayInputStream(payload));
 			if (image == null || image.getWidth() != width
 				|| image.getHeight() != height) {
 				throw new IOException("Adaptive PNG payload dimensions differ from evidence");
@@ -612,6 +662,28 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 			}
 			byte[] data = Files.readAllBytes(path);
 			validateOb3(data);
+		}
+	}
+
+	private static void validatePngHeader(byte[] payload, int width, int height)
+		throws IOException {
+		byte[] signature = new byte[]{(byte)137,80,78,71,13,10,26,10};
+		if (payload.length < 24) throw new IOException("Adaptive PNG payload is truncated");
+		for (int index = 0; index < signature.length; index++) {
+			if (payload[index] != signature[index]) {
+				throw new IOException("Adaptive PNG signature is invalid");
+			}
+		}
+		if (payload[8] != 0 || payload[9] != 0 || payload[10] != 0
+			|| payload[11] != 13 || payload[12] != 'I' || payload[13] != 'H'
+			|| payload[14] != 'D' || payload[15] != 'R') {
+			throw new IOException("Adaptive PNG IHDR is not canonical");
+		}
+		int declaredWidth = ByteBuffer.wrap(payload, 16, 4).getInt();
+		int declaredHeight = ByteBuffer.wrap(payload, 20, 4).getInt();
+		if (declaredWidth != width || declaredHeight != height) {
+			throw new IOException(
+				"Adaptive PNG header dimensions differ from evidence");
 		}
 	}
 

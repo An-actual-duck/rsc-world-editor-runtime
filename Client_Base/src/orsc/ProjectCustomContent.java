@@ -5,6 +5,7 @@ import org.json.JSONObject;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -97,7 +98,10 @@ public final class ProjectCustomContent {
 		String expectedCatalogId, String expectedManifestId) throws IOException {
 		JSONObject root = json(catalogPath, "definition catalog");
 		int schema = integer(root, "schemaVersion", "definition catalog");
-		if (schema == 1) return EMPTY;
+		if (schema == 1) {
+			validateMaterialFreeCatalog(root, expectedCatalogId);
+			return EMPTY;
+		}
 		if (schema != 2) throw new IOException("Unsupported definition catalog schema");
 		requireKeys(root, set(
 			"schemaVersion", "manifestType", "catalogId", "tiles",
@@ -105,6 +109,7 @@ public final class ProjectCustomContent {
 			"definition catalog");
 		expect(root, "manifestType", CATALOG_TYPE, "definition catalog");
 		expect(root, "catalogId", expectedCatalogId, "definition catalog");
+		validateAuthoringInventories(root);
 		Object raw = root.opt("customContent");
 		if (!(raw instanceof JSONObject)) {
 			throw new IOException("Definition catalog customContent must be an object");
@@ -299,6 +304,44 @@ public final class ProjectCustomContent {
 		}
 	}
 
+	private static void validateMaterialFreeCatalog(
+		JSONObject root, String expectedCatalogId) throws IOException {
+		requireKeys(root, set(
+			"schemaVersion", "manifestType", "catalogId", "tiles",
+			"boundaries", "scenery", "npcs", "groundItems"),
+			"definition catalog");
+		expect(root, "manifestType", CATALOG_TYPE, "definition catalog");
+		expect(root, "catalogId", expectedCatalogId, "definition catalog");
+		validateAuthoringInventories(root);
+	}
+
+	private static void validateAuthoringInventories(JSONObject root)
+		throws IOException {
+		for (String family : Arrays.asList(
+			"tiles", "boundaries", "scenery", "npcs", "groundItems")) {
+			Object raw = root.opt(family);
+			if (!(raw instanceof JSONArray)) {
+				throw new IOException(family + " authoring inventory must be an array");
+			}
+			JSONArray ids = (JSONArray)raw;
+			if (ids.length() > 65536) {
+				throw new IOException(family + " authoring inventory exceeds its bound");
+			}
+			int prior = -1;
+			for (int index = 0; index < ids.length(); index++) {
+				Object value = ids.get(index);
+				if (!(value instanceof Integer) && !(value instanceof Long)) {
+					throw new IOException(family + " authoring ID is not an integer");
+				}
+				long id = ((Number)value).longValue();
+				if (id < 0L || id > Integer.MAX_VALUE || id <= prior) {
+					throw new IOException(family + " authoring IDs are not canonical");
+				}
+				prior = (int)id;
+			}
+		}
+	}
+
 	private static void validateRow(
 		String family, JSONObject row, Map<String, Asset> assets,
 		Set<String> referenced) throws IOException {
@@ -398,7 +441,9 @@ public final class ProjectCustomContent {
 	private static void validatePayload(String kind, Path path, int width, int height, int frames) throws IOException {
 		if (kind.endsWith("-png")) {
 			if (width < 1 || width > 4096 || height < 1 || height > 4096 || frames < 1 || frames > 27 || width % frames != 0) throw new IOException("PNG dimensions outside contract");
-			BufferedImage image = ImageIO.read(path.toFile());
+			byte[] payload = Files.readAllBytes(path);
+			validatePngHeader(payload, width, height);
+			BufferedImage image = ImageIO.read(new ByteArrayInputStream(payload));
 			if (image == null || image.getWidth() != width || image.getHeight() != height) throw new IOException("PNG dimensions differ from evidence");
 			if (!"npc-animation-png".equals(kind) && frames != 1) throw new IOException("only animations may have multiple frames");
 			if ("texture-png".equals(kind)
@@ -408,6 +453,25 @@ public final class ProjectCustomContent {
 		} else {
 			if (width != 0 || height != 0 || frames != 0) throw new IOException("OB3 dimensions must be zero");
 			validateOb3(Files.readAllBytes(path));
+		}
+	}
+
+	private static void validatePngHeader(byte[] payload, int width, int height)
+		throws IOException {
+		byte[] signature = new byte[]{(byte)137,80,78,71,13,10,26,10};
+		if (payload.length < 24) throw new IOException("truncated PNG payload");
+		for (int index = 0; index < signature.length; index++) {
+			if (payload[index] != signature[index]) throw new IOException("invalid PNG signature");
+		}
+		if (payload[8] != 0 || payload[9] != 0 || payload[10] != 0
+			|| payload[11] != 13 || payload[12] != 'I' || payload[13] != 'H'
+			|| payload[14] != 'D' || payload[15] != 'R') {
+			throw new IOException("PNG IHDR is not canonical");
+		}
+		int declaredWidth = ByteBuffer.wrap(payload, 16, 4).getInt();
+		int declaredHeight = ByteBuffer.wrap(payload, 20, 4).getInt();
+		if (declaredWidth != width || declaredHeight != height) {
+			throw new IOException("PNG header dimensions differ from evidence");
 		}
 	}
 
