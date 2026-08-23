@@ -705,9 +705,11 @@ public final class EntityHandler {
 
 	private void loadNpcNames() {
 		for (NPCDef npc : getServer().getConfig().BASED_CONFIG_DATA < 85 ? getServer().getEntityHandler().npcsPatch : getServer().getEntityHandler().npcs) {
+			if (npc == null) continue;
 			npcNames.add(npc.getName());
 		}
 		for (NPCDef npc : getServer().getConfig().BASED_CONFIG_DATA < 85 ? getServer().getEntityHandler().npcsPatch : getServer().getEntityHandler().npcs) {
+			if (npc == null) continue;
 			npcNamesLowerCase.add(npc.getName().toLowerCase());
 		}
 	}

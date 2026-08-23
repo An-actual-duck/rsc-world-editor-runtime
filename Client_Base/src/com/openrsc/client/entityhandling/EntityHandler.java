@@ -9748,7 +9748,10 @@ public class EntityHandler {
 		if (!Config.S_WANT_CUSTOM_SPRITES) {
 			for (ItemDef item : items) {
 				if (item == null) continue;
-				REGISTRY.includeInventorySprite(item.getSpriteID());
+				if (WorldBuilderClientProfile.current().customContent()
+					.item(item.id) == null) {
+					REGISTRY.includeInventorySprite(item.getSpriteID());
+				}
 				if (item.membersItem && !loadMembers) {
 					item.name = "Members object";
 					item.description = "You need to be a member to use this object";
@@ -9921,6 +9924,20 @@ public class EntityHandler {
 	}
 
 	private static void validateCustomDependencies(ProjectCustomContent content) {
+		JSONObject definitions = content.definitions();
+		JSONArray customTiles = definitions.getJSONArray("tiles");
+		for (int index = 0; index < customTiles.length(); index++) {
+			requireTextureResource(
+				customTiles.getJSONObject(index).getInt("colour"), "tile colour");
+		}
+		JSONArray customBoundaries = definitions.getJSONArray("boundaries");
+		for (int index = 0; index < customBoundaries.length(); index++) {
+			JSONObject boundary = customBoundaries.getJSONObject(index);
+			requireTextureResource(
+				boundary.getInt("modelVar2"), "boundary front texture");
+			requireTextureResource(
+				boundary.getInt("modelVar3"), "boundary back texture");
+		}
 		for (int id = 0; id < npcs.size(); id++) {
 			NPCDef npc = npcs.get(id);
 			if (npc == null) continue;
@@ -9937,6 +9954,14 @@ public class EntityHandler {
 		if (REGISTRY.modelCount() >= 1000) {
 			throw new IllegalStateException(
 				"Adaptive scenery models exceed the client model-cache bound");
+		}
+	}
+
+	private static void requireTextureResource(int resource, String label) {
+		if (resource >= 0
+			&& (resource >= textures.size() || textures.get(resource) == null)) {
+			throw new IllegalStateException(
+				"Adaptive " + label + " references undefined texture " + resource);
 		}
 	}
 

@@ -20722,6 +20722,15 @@ public final class mudclient implements Runnable {
 					.getNumber();
 				continue label0;
 			}
+			ProjectCustomContent.AnimationAsset projectAnimation =
+				WorldBuilderClientProfile.current().customContent()
+					.animation(animationIndex);
+			if (projectAnimation != null) {
+				EntityHandler.getAnimationDef(animationIndex).number = animationNumber;
+				animationNumber += 27;
+				if (animationNumber == 1998) animationNumber = 3300;
+				continue;
+			}
 
 			loadSprite(animationNumber, "entity", 15);
 			if (EntityHandler.getAnimationDef(animationIndex).hasA()) {

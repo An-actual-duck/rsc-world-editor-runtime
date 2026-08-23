@@ -13,19 +13,19 @@ target path and accepts authored output only inside the selected project.
 ## Stable identities
 
 The machine-readable source of truth is
-`server/conf/world-builder/adaptive-runtime-capability-v2.json`. Server and
+`server/conf/world-builder/adaptive-runtime-capability-v3.json`. Server and
 client code independently pin the same values.
 
 | Role | Identity |
 |---|---|
-| Capability | `adaptive-world-builder-runtime-capability-v2` |
+| Capability | `adaptive-world-builder-runtime-capability-v3` |
 | Runtime profile | `adaptive-world-builder` |
-| Server build | `core-framework-adaptive-builder-server-v2` |
-| Client build | `core-framework-adaptive-builder-client-v2` |
-| Loader | `generic-signed-layered-loader-v2-u16-elevation` |
+| Server build | `rsc-world-editor-runtime-adaptive-builder-server-v3` |
+| Client build | `rsc-world-editor-runtime-adaptive-builder-client-v3` |
+| Loader | `generic-signed-layered-loader-v3-project-content` |
 | Authoring | `generic-signed-layered-authoring-v2-u16-elevation` |
-| Definition binding | `world-builder-definition-catalog-binding-v1` |
-| Client asset binding | `world-builder-client-asset-binding-v1` |
+| Definition binding | `world-builder-definition-catalog-binding-v2` |
+| Client asset binding | `world-builder-project-content-asset-binding-v2` |
 | Protocol | `world-builder-native-layered-protocol-v2-u16-elevation` |
 | Effective composition | `world-builder-effective-static-composition-v1` |
 | Package schema | `layered-world-package-v1` |
@@ -51,9 +51,10 @@ standalone preparer remains responsible for inventorying those files and for
 supplying the actual client asset identity and hash.
 
 The definition catalog is the project authoring authority, not an inventory of
-definitions already referenced by the map. It is the World Editor's strict
-eight-field schema-version-1 JSON with exactly `schemaVersion`, `manifestType`,
-`catalogId`, `tiles`, `boundaries`, `scenery`, `npcs`, and `groundItems`.
+definitions already referenced by the map. A material-free project retains the
+World Editor's strict eight-field schema-version-1 JSON with exactly
+`schemaVersion`, `manifestType`, `catalogId`, `tiles`, `boundaries`, `scenery`,
+`npcs`, and `groundItems`.
 `manifestType` must be `world-builder-definition-catalog`, and `catalogId` must
 equal the configured definition identity. Each family is a strictly increasing
 array of non-negative integer IDs; for example:
@@ -69,6 +70,50 @@ families as separate `authorable*Ids` fields. Both adopted and standalone
 projects use those fields for new boundary, scenery, NPC, and ground-item
 placements; a valid catalog ID remains authorable even when the map does not
 currently use it.
+
+## Project-local custom content
+
+Definition-catalog schema version 2 adds exactly one `customContent` object.
+That object binds a portable bundle ID and semantic version, an asset-manifest
+ID, and ordered definition arrays for textures, animations, tiles, boundaries,
+scenery, NPCs, and items. Each definition carries an explicit `add` or
+`replace` operation. Adds may extend ID-indexed catalogs only where the client
+and server can represent the result safely; renderer-indexed textures and
+animations must extend their packaged catalogs contiguously. Sparse NPC,
+scenery, boundary, tile, and item additions remain explicit, with null holes
+never treated as definitions. NPC ID 846 is covered by tests only as one
+beyond-packaged-catalog example and has no special runtime behavior.
+The v3 capability descriptor publishes the exact packaged counts used by the
+producer when assigning IDs: 55 textures, 1,080 animations, 26 tiles, 214
+boundaries, 1,332 scenery definitions, 845 NPCs, and 3,309 items. A future
+runtime whose packaged catalogs change must publish a new capability identity
+and matching counts instead of silently reinterpreting a bundle.
+
+The asset evidence is a strict `world-builder-custom-content-assets`
+schema-version-1 JSON manifest. It binds the same bundle ID and version and a
+sorted inventory of project-local payloads. Every row contains exactly a
+portable key, one of the four kinds below, a manifest-relative canonical path,
+byte size, SHA-256, decoded dimensions, and frame count:
+
+- `texture-png` supplies floor and wall texture pixels;
+- `npc-animation-png` supplies one horizontal 15, 18, 24, or 27-frame sheet as
+  determined exactly by the animation's `hasA` and `hasF` flags;
+- `item-sprite-png` supplies inventory and ground-item pixels; and
+- `scenery-model-ob3` supplies one structurally validated scenery model.
+
+All listed payloads must be referenced and all referenced payloads must exist
+with the declared kind. Catalog, manifest, and payload fingerprints are checked
+independently by client and server before the binding handshake. Unknown keys,
+noncanonical or escaping paths, symbolic links, hard links, malformed images or
+models, oversized inventories, ID collisions, unsafe ID holes, missing
+animation/model/texture/sprite dependencies, bundle disagreement, and evidence
+mismatch fail before editable world activation.
+
+The bundle is data only. It cannot contain or activate Java classes, scripts,
+serialized objects, server plug-ins, packet handlers, commands, quests, or any
+other creator-supplied behavior. Asset files remain below the isolated UUID
+project's `working/` tree. Schema version 1 continues to load without a custom
+manifest or custom payloads, preserving existing material-free projects.
 
 ## Required project layout
 

@@ -41,6 +41,9 @@ public final class ProjectCustomContent {
 		Pattern.compile("[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?");
 	private static final Pattern KEY =
 		Pattern.compile("[a-z0-9][a-z0-9._/-]{0,255}");
+	private static final Pattern ASSET_PATH = Pattern.compile(
+		"(?:[A-Za-z0-9][A-Za-z0-9._-]{0,127}/){0,15}"
+			+ "[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
 	private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 	private static final Set<String> KINDS = Collections.unmodifiableSet(
 		new HashSet<String>(Arrays.asList(
@@ -307,7 +310,13 @@ public final class ProjectCustomContent {
 			integer(row, "charColour", family); integer(row, "blueMask", family);
 			integer(row, "genderModel", family); bool(row, "hasA", family); bool(row, "hasF", family);
 			Asset asset = requireAsset(row, "npc-animation-png", assets, referenced);
-			if (integer(row, "frameCount", family) != asset.frames) throw new IOException("animation frame mismatch");
+			int frames = integer(row, "frameCount", family);
+			int requiredFrames = 15
+				+ (row.getBoolean("hasA") ? 3 : 0)
+				+ (row.getBoolean("hasF") ? 9 : 0);
+			if (frames != asset.frames || frames != requiredFrames) {
+				throw new IOException("animation frame count differs from flags or asset");
+			}
 		} else if ("tiles".equals(family)) {
 			integer(row, "colour", family); integer(row, "tileValue", family); integer(row, "objectType", family);
 		} else if ("boundaries".equals(family)) {
@@ -317,7 +326,7 @@ public final class ProjectCustomContent {
 			entity(row, family);
 			for (String key : Arrays.asList("type", "width", "height", "groundItemVar")) integer(row, key, family);
 			text(row, "modelName", 1, 128, family);
-			if (!string(row, "assetKey", family).isEmpty()) requireAsset(row, "scenery-model-ob3", assets, referenced);
+			requireAsset(row, "scenery-model-ob3", assets, referenced);
 		} else if ("npcs".equals(family)) {
 			entity(row, family);
 			for (String key : Arrays.asList(
@@ -343,7 +352,7 @@ public final class ProjectCustomContent {
 				"rangedDefense", "magicDefense", "spriteId")) integer(row, key, family);
 			longInteger(row, "armourBonus", family);
 			for (String key : Arrays.asList("isFemaleOnly", "isMembersOnly", "isStackable", "isUntradable", "isWearable", "isNoteable")) bool(row, key, family);
-			if (!string(row, "assetKey", family).isEmpty()) requireAsset(row, "item-sprite-png", assets, referenced);
+			requireAsset(row, "item-sprite-png", assets, referenced);
 		}
 	}
 
@@ -365,7 +374,8 @@ public final class ProjectCustomContent {
 	private static Path safeAsset(
 		Path workspaceRoot, Path manifestPath, String relative,
 		long size, String hash) throws IOException {
-		if (relative.isEmpty() || relative.indexOf('\\') >= 0 || relative.indexOf('\0') >= 0) throw new IOException("invalid asset path");
+		if (!ASSET_PATH.matcher(relative).matches()
+			|| relative.indexOf('\\') >= 0 || relative.indexOf('\0') >= 0) throw new IOException("invalid asset path");
 		Path raw = Paths.get(relative);
 		if (raw.isAbsolute() || !raw.normalize().equals(raw) || relative.startsWith("/") || relative.endsWith("/")) throw new IOException("noncanonical asset path");
 		Path working = workspaceRoot.resolve("working").toRealPath();
@@ -391,6 +401,10 @@ public final class ProjectCustomContent {
 			BufferedImage image = ImageIO.read(path.toFile());
 			if (image == null || image.getWidth() != width || image.getHeight() != height) throw new IOException("PNG dimensions differ from evidence");
 			if (!"npc-animation-png".equals(kind) && frames != 1) throw new IOException("only animations may have multiple frames");
+			if ("texture-png".equals(kind)
+				&& (width != height || (width != 64 && width != 128))) {
+				throw new IOException("textures must be square 64x64 or 128x128 PNGs");
+			}
 		} else {
 			if (width != 0 || height != 0 || frames != 0) throw new IOException("OB3 dimensions must be zero");
 			validateOb3(Files.readAllBytes(path));

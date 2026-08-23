@@ -52,6 +52,9 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 		Pattern.compile("[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?");
 	private static final Pattern ASSET_KEY =
 		Pattern.compile("[a-z0-9][a-z0-9._/-]{0,255}");
+	private static final Pattern ASSET_PATH = Pattern.compile(
+		"(?:[A-Za-z0-9][A-Za-z0-9._-]{0,127}/){0,15}"
+			+ "[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
 	private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 	private static final Set<String> ASSET_KINDS = Collections.unmodifiableSet(
 		new HashSet<String>(Arrays.asList(
@@ -60,6 +63,8 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 	private static final Map<String, Set<String>> DEFINITION_KEYS =
 		definitionKeys();
 	private static final int MAX_DEFINITIONS_PER_FAMILY = 65536;
+	private static final int PACKAGED_TEXTURE_COUNT = 55;
+	private static final int PACKAGED_ANIMATION_COUNT = 1080;
 
 	private final boolean custom;
 	private final JSONObject definitions;
@@ -246,6 +251,7 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 				"Adaptive asset inventory fingerprint mismatch");
 		}
 		validateDefinitions(content, assets);
+		validateRendererDependencies(content);
 		return new AdaptiveWorldBuilderCustomContentCatalog(
 			true, content, bundleId, bundleVersion, assets);
 	}
@@ -356,8 +362,12 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 			Asset asset = requireAsset(
 				row, "assetKey", "npc-animation-png", assets, referencedAssets);
 			int frames = integer(row, "frameCount", family);
-			if (frames != asset.frames()) {
-				throw new IOException("Adaptive animation frame count differs from its asset");
+			int requiredFrames = 15
+				+ (row.getBoolean("hasA") ? 3 : 0)
+				+ (row.getBoolean("hasF") ? 9 : 0);
+			if (frames != asset.frames() || frames != requiredFrames) {
+				throw new IOException(
+					"Adaptive animation frame count differs from its flags or asset");
 			}
 		} else if ("tiles".equals(family)) {
 			integer(row, "colour", family); integer(row, "tileValue", family);
@@ -373,10 +383,7 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 			for (String key : Arrays.asList(
 				"type", "width", "height", "groundItemVar")) integer(row, key, family);
 			text(row, "modelName", 1, 128, family);
-			String key = string(row, "assetKey", family);
-			if (!key.isEmpty()) {
-				requireAsset(row, "assetKey", "scenery-model-ob3", assets, referencedAssets);
-			}
+			requireAsset(row, "assetKey", "scenery-model-ob3", assets, referencedAssets);
 		} else if ("npcs".equals(family)) {
 			commonEntity(row, family);
 			for (String key : Arrays.asList(
@@ -418,10 +425,74 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 			for (String key : Arrays.asList(
 				"isFemaleOnly", "isMembersOnly", "isStackable", "isUntradable",
 				"isWearable", "isNoteable")) bool(row, key, family);
-			String key = string(row, "assetKey", family);
-			if (!key.isEmpty()) {
-				requireAsset(row, "assetKey", "item-sprite-png", assets, referencedAssets);
+			requireAsset(row, "assetKey", "item-sprite-png", assets, referencedAssets);
+		}
+	}
+
+	private static void validateRendererDependencies(JSONObject content)
+		throws IOException {
+		int textureCount = validateContiguousFamily(
+			content.getJSONArray("textures"), PACKAGED_TEXTURE_COUNT, "texture");
+		int animationCount = validateContiguousFamily(
+			content.getJSONArray("animations"), PACKAGED_ANIMATION_COUNT,
+			"animation");
+		JSONArray tiles = content.getJSONArray("tiles");
+		for (int index = 0; index < tiles.length(); index++) {
+			requireRendererResource(
+				tiles.getJSONObject(index).getInt("colour"), textureCount,
+				"tile colour", "texture");
+		}
+		JSONArray boundaries = content.getJSONArray("boundaries");
+		for (int index = 0; index < boundaries.length(); index++) {
+			JSONObject row = boundaries.getJSONObject(index);
+			requireRendererResource(
+				row.getInt("modelVar2"), textureCount,
+				"boundary front texture", "texture");
+			requireRendererResource(
+				row.getInt("modelVar3"), textureCount,
+				"boundary back texture", "texture");
+		}
+		JSONArray npcs = content.getJSONArray("npcs");
+		for (int index = 0; index < npcs.length(); index++) {
+			JSONArray sprites = npcs.getJSONObject(index).getJSONArray("sprites");
+			for (int layer = 0; layer < sprites.length(); layer++) {
+				requireRendererResource(
+					sprites.getInt(layer), animationCount,
+					"NPC sprite", "animation");
 			}
+		}
+	}
+
+	private static int validateContiguousFamily(
+		JSONArray rows, int packagedCount, String family) throws IOException {
+		int count = packagedCount;
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index);
+			int id = row.getInt("id");
+			String operation = row.getString("operation");
+			boolean exists = id < count;
+			if (("add".equals(operation) && exists)
+				|| ("replace".equals(operation) && !exists)) {
+				throw new IOException(
+					"Adaptive " + family + " " + id
+						+ " has an unsafe " + operation + " collision contract");
+			}
+			if ("add".equals(operation)) {
+				if (id != count) {
+					throw new IOException(
+						"Adaptive " + family + " IDs cannot create a renderer hole");
+				}
+				count++;
+			}
+		}
+		return count;
+	}
+
+	private static void requireRendererResource(
+		int id, int count, String label, String family) throws IOException {
+		if (id >= count) {
+			throw new IOException(
+				"Adaptive " + label + " references undefined " + family + " " + id);
 		}
 	}
 
@@ -469,7 +540,8 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 	private static Path safeAsset(
 		WorldEditStorageContext storage, Path manifestPath, String relative,
 		long expectedSize, String expectedHash) throws IOException {
-		if (relative.isEmpty() || relative.indexOf('\\') >= 0
+		if (!ASSET_PATH.matcher(relative).matches()
+			|| relative.indexOf('\\') >= 0
 			|| relative.indexOf('\0') >= 0) {
 			throw new IOException("Adaptive asset path is invalid");
 		}
@@ -528,6 +600,11 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 			}
 			if (!"npc-animation-png".equals(kind) && frames != 1) {
 				throw new IOException("Only NPC animation assets may declare multiple frames");
+			}
+			if ("texture-png".equals(kind)
+				&& (width != height || (width != 64 && width != 128))) {
+				throw new IOException(
+					"Adaptive textures must be square 64x64 or 128x128 PNGs");
 			}
 		} else {
 			if (width != 0 || height != 0 || frames != 0) {

@@ -30,6 +30,15 @@
     "declarativeOnly": true,
     "definitionFamilies": ["animation", "boundary", "item", "npc", "scenery", "texture", "tile"],
     "assetFamilies": ["item-sprite-png", "npc-animation-png", "scenery-model-ob3", "texture-png"],
+    "packagedCatalogCounts": {
+      "textures": 55,
+      "animations": 1080,
+      "tiles": 26,
+      "boundaries": 214,
+      "scenery": 1332,
+      "npcs": 845,
+      "items": 3309
+    },
     "baseDefinitionReplacement": "explicit-operation",
     "projectLocal": true
   },

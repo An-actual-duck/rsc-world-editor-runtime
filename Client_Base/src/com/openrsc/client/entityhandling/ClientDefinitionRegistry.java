@@ -286,6 +286,10 @@ final class ClientDefinitionRegistry {
 		}
 		int index = models.indexOf(name);
 		if (index < 0) {
+			if (models.size() >= 1000) {
+				throw new IllegalStateException(
+					"Adaptive scenery models exceed the client model-cache bound");
+			}
 			models.add(name);
 			return models.size() - 1;
 		}
