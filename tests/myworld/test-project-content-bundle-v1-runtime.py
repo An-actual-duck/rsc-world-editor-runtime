@@ -5,6 +5,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -231,7 +232,7 @@ class BundleV1RuntimeTest(unittest.TestCase):
         self.run_harness("BundleClientHarness", CLIENT_JAR, workspace, manifest)
 
     def test_unknown_key_extra_file_and_payload_tamper_fail_closed(self):
-        for mutation in ("unknown", "extra", "payload"):
+        for mutation in ("unknown", "extra", "payload", "hardlink"):
             workspace, manifest = self.workspace()
             bundle = workspace / "working/content-bundle"
             if mutation == "unknown":
@@ -240,9 +241,12 @@ class BundleV1RuntimeTest(unittest.TestCase):
                 (bundle / "manifest.json").write_bytes(pretty(document))
             elif mutation == "extra":
                 (bundle / "creator.class").write_bytes(b"forbidden")
-            else:
+            elif mutation == "payload":
                 path = bundle / "files/server/conf/server/defs/NpcDefsCustom.json"
                 path.write_bytes(path.read_bytes() + b" ")
+            else:
+                path = bundle / "files/server/conf/server/defs/NpcDefsCustom.json"
+                os.link(path, workspace / "outside-hardlink.json")
             self.run_harness("BundleServerHarness", SERVER_JAR, workspace, manifest, success=False)
             self.run_harness("BundleClientHarness", CLIENT_JAR, workspace, manifest, success=False)
 

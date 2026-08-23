@@ -201,6 +201,15 @@ public final class ProjectContentBundle {
 		Path result = path.toAbsolutePath().normalize();
 		if (!Files.isRegularFile(result, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(result)
 			|| Files.size(result) < 1L || Files.size(result) > maximum) throw new IOException("Content file is missing or unsafe");
+		try {
+			Object links = Files.getAttribute(
+				result, "unix:nlink", LinkOption.NOFOLLOW_LINKS);
+			if (links instanceof Number && ((Number) links).longValue() != 1L) {
+				throw new IOException("Content file is hard linked");
+			}
+		} catch (UnsupportedOperationException unsupported) {
+			result.toRealPath();
+		}
 		return result.toRealPath();
 	}
 	private static void requireKeys(JSONObject value, Set<String> keys) throws IOException {

@@ -20,8 +20,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Set;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +51,7 @@ public class EntityHandler {
 	private static final ArrayList<DoorDef> doors = REGISTRY.mutableDoors();
 	private static final ArrayList<ElevationDef> elevation = REGISTRY.mutableElevations();
 	private static final ArrayList<GameObjectDef> objects = REGISTRY.mutableObjects();
+	private static final Set<String> PROJECT_REQUIRED_MODELS = new HashSet<>();
 	public static ItemDef noteDef, certificateDef;
 
 	private static final int[] MYWORLD_STAFF_BASE_IDS = {
@@ -116,6 +119,10 @@ public class EntityHandler {
 
 	public static String getModelName(int id) {
 		return REGISTRY.modelName(id);
+	}
+
+	public static boolean isProjectRequiredModel(String name) {
+		return PROJECT_REQUIRED_MODELS.contains(name);
 	}
 
 	public static int invPictureCount() {
@@ -9936,13 +9943,19 @@ public class EntityHandler {
 
 	private static void loadProjectScenery(Path path) throws Exception {
 		NodeList rows = projectXml(path, "GameObjectDef-array").getElementsByTagName("GameObjectDef");
+		ArrayList<GameObjectDef> packaged = new ArrayList<GameObjectDef>(objects);
+		PROJECT_REQUIRED_MODELS.clear();
 		objects.clear();
 		for (int id = 0; id < rows.getLength(); id++) {
 			Element row = (Element) rows.item(id);
-			objects.add(new GameObjectDef(xmlText(row, "name", ""), xmlText(row, "description", ""),
+			GameObjectDef value = new GameObjectDef(xmlText(row, "name", ""), xmlText(row, "description", ""),
 				xmlText(row, "command1", ""), xmlText(row, "command2", ""),
 				xmlInt(row, "type", 0), xmlInt(row, "width", 1), xmlInt(row, "height", 1),
-				xmlInt(row, "groundItemVar", 0), xmlText(row, "objectModel", ""), id));
+				xmlInt(row, "groundItemVar", 0), xmlText(row, "objectModel", ""), id);
+			objects.add(value);
+			if (id >= packaged.size()) {
+				PROJECT_REQUIRED_MODELS.add(value.getObjectModel());
+			}
 		}
 	}
 
@@ -9955,6 +9968,13 @@ public class EntityHandler {
 		for (Object raw : catalog.getJSONArray("npcs")) {
 			int id = ((Number) raw).intValue();
 			if (id < 0 || id >= npcs.size() || npcs.get(id) == null) throw new IllegalStateException("Project catalog references missing NPC " + id);
+			for (int layer = 0; layer < 12; layer++) {
+				int animation = npcs.get(id).getSprite(layer);
+				if (animation >= animations.size()) {
+					throw new IllegalStateException(
+						"Project NPC " + id + " references missing animation " + animation);
+				}
+			}
 		}
 		for (Object raw : catalog.getJSONArray("groundItems")) {
 			int id = ((Number) raw).intValue();

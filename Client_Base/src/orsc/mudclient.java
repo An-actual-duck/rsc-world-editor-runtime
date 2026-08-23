@@ -20839,6 +20839,10 @@ public final class mudclient implements Runnable {
 			String modelName = EntityHandler.getModelName(j);
 			int k = DataOperations.getDataFileOffset(modelName + ".ob3", models);
 			if (k == 0) {
+				if (EntityHandler.isProjectRequiredModel(modelName)) {
+					throw new IllegalStateException(
+						"Project scenery references missing model " + modelName);
+				}
 				modelCache[j] = createGeneratedModel(modelName);
 			} else {
 				modelCache[j] = new RSModel(models, k, true);
@@ -25292,6 +25296,14 @@ public final class mudclient implements Runnable {
 		if (!"place".equals(mode) && !"verify".equals(mode)) {
 			return;
 		}
+		int authorableBoundaryRaw = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableBoundaryRaw", 2);
+		int authorableSceneryId = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableSceneryId", 1);
+		int authorableNpcId = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableNpcId", 1);
+		int authorableItemId = Integer.getInteger(
+			"openrsc.worldBuilderAutomatedAuthorableItemId", 11);
 		long now = System.currentTimeMillis();
 		if (automatedBuilderPlacementProbeStage == 0) {
 			if ("place".equals(mode)) {
@@ -25310,7 +25322,8 @@ public final class mudclient implements Runnable {
 				return;
 			}
 			if (Boolean.getBoolean("openrsc.worldBuilderAutomatedDefinitionProbe")) {
-				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(122, 648, 2);
+				worldEditorInterface.sendAutomatedBoundaryPlacementProbe(
+					122, 648, authorableBoundaryRaw);
 				automatedBuilderPlacementProbeDeadline = now + 2500L;
 				automatedBuilderPlacementProbeStage = 8;
 				return;
@@ -25359,7 +25372,7 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 9
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("aobject 1 118 648");
+			sendCommandString("aobject " + authorableSceneryId + " 118 648");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 10;
 			return;
@@ -25375,7 +25388,7 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 11
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("cnpc 1 0 120 650");
+			sendCommandString("cnpc " + authorableNpcId + " 0 120 650");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 12;
 			return;
@@ -25391,7 +25404,8 @@ public final class mudclient implements Runnable {
 		}
 		if (automatedBuilderPlacementProbeStage == 13
 			&& now >= automatedBuilderPlacementProbeDeadline) {
-			sendCommandString("buildergrounditem 11 1 30 121 649");
+			sendCommandString("buildergrounditem " + authorableItemId
+				+ " 1 30 121 649");
 			automatedBuilderPlacementProbeDeadline = now + 2500L;
 			automatedBuilderPlacementProbeStage = 14;
 			return;
@@ -25422,7 +25436,7 @@ public final class mudclient implements Runnable {
 				&& getGameObjectInstanceX(i) + getMidRegionBaseX() == 119
 				&& getGameObjectInstanceZ(i) + getMidRegionBaseZ() == 648
 				&& isGameObjectInstanceMaterialized(i);
-			authorableScenery |= getGameObjectInstanceID(i) == 1
+			authorableScenery |= getGameObjectInstanceID(i) == authorableSceneryId
 				&& getGameObjectInstanceX(i) + getMidRegionBaseX() == 118
 				&& getGameObjectInstanceZ(i) + getMidRegionBaseZ() == 648
 				&& isGameObjectInstanceMaterialized(i);
@@ -25435,7 +25449,7 @@ public final class mudclient implements Runnable {
 				npc |= value.npcId == 0
 					&& value.currentX / tileSize + getMidRegionBaseX() == 120
 					&& value.currentZ / tileSize + getMidRegionBaseZ() == 649;
-				authorableNpc |= value.npcId == 1
+				authorableNpc |= value.npcId == authorableNpcId
 					&& value.currentX / tileSize + getMidRegionBaseX() == 120
 					&& value.currentZ / tileSize + getMidRegionBaseZ() == 650;
 			}
@@ -25446,7 +25460,7 @@ public final class mudclient implements Runnable {
 			item |= getGroundItemID(i) == 10
 				&& getGroundItemX(i) + getMidRegionBaseX() == 121
 				&& getGroundItemZ(i) + getMidRegionBaseZ() == 648;
-			authorableItem |= getGroundItemID(i) == 11
+			authorableItem |= getGroundItemID(i) == authorableItemId
 				&& getGroundItemX(i) + getMidRegionBaseX() == 121
 				&& getGroundItemZ(i) + getMidRegionBaseZ() == 649;
 		}
@@ -25454,9 +25468,9 @@ public final class mudclient implements Runnable {
 			&& item && authorableItem) {
 			String evidence = "ADAPTIVE_WORLD_BUILDER_PLACEMENTS_VISIBLE mode="
 				+ mode
-				+ " scenery=0@119,648,1@118,648"
-				+ " npc=0@120,649,1@120,650"
-				+ " item=10@121,648,11@121,649";
+				+ " scenery=0@119,648," + authorableSceneryId + "@118,648"
+				+ " npc=0@120,649," + authorableNpcId + "@120,650"
+				+ " item=10@121,648," + authorableItemId + "@121,649";
 			System.out.println(evidence);
 			ClientRuntimeLogger.log(evidence);
 			if ("place".equals(mode)) {
