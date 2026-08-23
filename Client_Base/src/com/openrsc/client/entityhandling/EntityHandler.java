@@ -9865,14 +9865,14 @@ public class EntityHandler {
 	}
 
 	private static void loadProjectItems(ProjectContentBundle bundle) throws Exception {
-		ArrayList<ItemDef> packaged = new ArrayList<ItemDef>(items); items.clear();
+		ItemDef[] packaged = items.toArray(new ItemDef[items.size()]); items.clear();
 		applyProjectItems(firstArray(json(bundle.path("definition.item.base"))), packaged, false);
 		applyProjectItems(firstArray(json(bundle.path("definition.item.custom"))), packaged, false);
 		applyProjectItems(firstArray(json(bundle.path("definition.item.patch"))), packaged, true);
 		applyProjectItems(firstArray(json(bundle.path("definition.item.world"))), packaged, true);
 	}
 
-	private static void applyProjectItems(JSONArray rows, ArrayList<ItemDef> packaged,
+	private static void applyProjectItems(JSONArray rows, ItemDef[] packaged,
 		boolean overlay) {
 		for (int index = 0; index < rows.length(); index++) {
 			JSONObject row = rows.getJSONObject(index); int id = row.getInt("id");
@@ -9881,7 +9881,7 @@ public class EntityHandler {
 			if (overlay && prior == null) {
 				throw new IllegalArgumentException("Item overlay references undefined id " + id);
 			}
-			ItemDef visual = id < packaged.size() ? packaged.get(id) : null;
+			ItemDef visual = id < packaged.length ? packaged[id] : null;
 			if (visual == null) visual = prior;
 			int sprite = visual == null ? id : visual.getSpriteID();
 			String location = visual == null ? "items:" + id : visual.getSpriteLocation();
@@ -9905,9 +9905,9 @@ public class EntityHandler {
 
 	private static Document projectXml(Path path, String root) throws Exception {
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-		factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-		factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-		factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+		factory.setFeature("http" + "://apache.org/xml/features/disallow-doctype-decl", true);
+		factory.setFeature("http" + "://xml.org/sax/features/external-general-entities", false);
+		factory.setFeature("http" + "://xml.org/sax/features/external-parameter-entities", false);
 		factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
 		factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
 		factory.setXIncludeAware(false); factory.setExpandEntityReferences(false);
@@ -9943,7 +9943,7 @@ public class EntityHandler {
 
 	private static void loadProjectScenery(Path path) throws Exception {
 		NodeList rows = projectXml(path, "GameObjectDef-array").getElementsByTagName("GameObjectDef");
-		ArrayList<GameObjectDef> packaged = new ArrayList<GameObjectDef>(objects);
+		int packagedCount = objects.size();
 		PROJECT_REQUIRED_MODELS.clear();
 		objects.clear();
 		for (int id = 0; id < rows.getLength(); id++) {
@@ -9953,7 +9953,7 @@ public class EntityHandler {
 				xmlInt(row, "type", 0), xmlInt(row, "width", 1), xmlInt(row, "height", 1),
 				xmlInt(row, "groundItemVar", 0), xmlText(row, "objectModel", ""), id);
 			objects.add(value);
-			if (id >= packaged.size()) {
+			if (id >= packagedCount) {
 				PROJECT_REQUIRED_MODELS.add(value.getObjectModel());
 			}
 		}

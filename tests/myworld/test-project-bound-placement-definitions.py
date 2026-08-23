@@ -84,16 +84,19 @@ import java.util.Map;
 public final class ProjectBoundDefinitionFixture {
     public static void main(String[] args) throws Exception {
         AdaptiveWorldBuilderRuntimeSession bound = session("target-layered", false);
+        allow(bound, "floor", 3);
         allow(bound, "boundary", 1); allow(bound, "boundary", 10);
         allow(bound, "scenery", 0); allow(bound, "scenery", 104);
         allow(bound, "npc", 2); allow(bound, "npc", 30);
         allow(bound, "item", 10); allow(bound, "item", 20);
         refuse(bound, "boundary", 0); refuse(bound, "boundary", 11);
+        refuse(bound, "floor", 2);
         refuse(bound, "scenery", 1); refuse(bound, "npc", 1);
         refuse(bound, "item", 1); refuse(bound, "item", 100);
 
         AdaptiveWorldBuilderRuntimeSession fullStandalone =
             session("standalone-empty", false);
+        allow(fullStandalone, "floor", 3);
         allow(fullStandalone, "boundary", 10);
         allow(fullStandalone, "scenery", 104);
         allow(fullStandalone, "npc", 30);
@@ -101,6 +104,7 @@ public final class ProjectBoundDefinitionFixture {
 
         AdaptiveWorldBuilderRuntimeSession narrowStandalone =
             session("standalone-empty", true);
+        refuse(narrowStandalone, "floor", 3);
         refuse(narrowStandalone, "boundary", 1);
         refuse(narrowStandalone, "scenery", 0);
         refuse(narrowStandalone, "npc", 2);
@@ -118,6 +122,7 @@ public final class ProjectBoundDefinitionFixture {
         fields.put("requiredItemIds", "10");
         fields.put("requiredTileIds", "3");
 		fields.put("authorableBoundaryIds", empty ? "" : "1,10");
+		fields.put("authorableFloorIds", empty ? "" : "3");
 		fields.put("authorableSceneryIds", empty ? "" : "0,104");
 		fields.put("authorableNpcIds", empty ? "" : "2,30");
 		fields.put("authorableItemIds", empty ? "" : "10,20");

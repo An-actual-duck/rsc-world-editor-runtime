@@ -867,6 +867,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "assetSha256": hashlib.sha256(assets.read_bytes()).hexdigest(),
             "authoring": "generic-signed-layered-authoring-v2-u16-elevation",
             "authorableBoundaryIds": "1,10",
+            "authorableFloorIds": "0,3",
             "authorableItemIds": "10,20",
             "authorableNpcIds": "30,31",
             "authorableSceneryIds": "0,104",
