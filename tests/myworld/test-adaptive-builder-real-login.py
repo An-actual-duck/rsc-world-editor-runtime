@@ -710,6 +710,43 @@ def run_readiness_only_client(
     return runtime_evidence, process_evidence
 
 
+def prove_bundle_v1_item_visual_contract_refusal(
+    client_root: Path, base_properties: dict, process_log: Path,
+) -> str:
+    properties = dict(base_properties)
+    properties.pop("openrsc.worldBuilderAutomatedPlacementProbe", None)
+    properties.pop("openrsc.worldBuilderAutomatedDefinitionProbe", None)
+    command = ["java", "-Xms256m", "-Xmx1024m"]
+    command.extend(f"-D{key}={value}" for key, value in properties.items())
+    command.extend(["-jar", "Open_RSC_Client.jar"])
+    with process_log.open("w", encoding="utf-8") as output:
+        process = subprocess.Popen(
+            command, cwd=client_root, stdout=output,
+            stderr=subprocess.STDOUT, text=True,
+        )
+        try:
+            process.wait(timeout=30)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=10)
+    evidence = process_log.read_text(encoding="utf-8", errors="replace")
+    required = (
+        "Project item 9000 has no authoritative client visual mapping; "
+        "project-content-bundle-v1 cannot represent a new item visual"
+    )
+    if required not in evidence:
+        raise AssertionError(
+            "bundle-v1 client did not fail on the missing item visual contract\n"
+            + evidence
+        )
+    if "login response:86" in evidence:
+        raise AssertionError(
+            "bundle-v1 client authenticated despite incomplete visual metadata"
+        )
+    return evidence
+
+
 @unittest.skipUnless(os.environ.get("DISPLAY"), "real desktop-client integration needs DISPLAY")
 class AdaptiveBuilderRealLoginTest(unittest.TestCase):
     def test_built_client_authors_saves_and_reopens_wide_elevation(self):
@@ -979,6 +1016,30 @@ world_builder_initial_y: 648
                     f"-D{key}={value}" for key, value in client_properties.items()
                 )
                 client_command.extend(["-jar", "Open_RSC_Client.jar"])
+
+                if content_manifest is not None:
+                    blocked_evidence = prove_bundle_v1_item_visual_contract_refusal(
+                        client_root, client_properties,
+                        fixture / "client-bundle-v1-blocked.log",
+                    )
+                    self.assertIn("Got server configs!", blocked_evidence)
+                    server_output.flush()
+                    self.assertNotIn(
+                        "Player Loaded: Builder",
+                        server_log.read_text(encoding="utf-8", errors="replace"),
+                    )
+                    shutdown.write_text("shutdown\n", encoding="ascii")
+                    self.assertEqual(
+                        0, server.wait(timeout=30),
+                        "server clean shutdown after bundle-v1 refusal",
+                    )
+                    server_output.flush()
+                    refusal_server_evidence = server_log.read_text(
+                        encoding="utf-8", errors="replace"
+                    )
+                    self.assertIn("Server unloaded", refusal_server_evidence)
+                    self.assertFalse(ready.exists(), "readiness cleanup")
+                    return
 
                 cold_runtime_evidence, cold_client_evidence = (
                     run_readiness_only_client(
