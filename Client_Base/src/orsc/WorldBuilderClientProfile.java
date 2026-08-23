@@ -344,6 +344,11 @@ public final class WorldBuilderClientProfile {
 		if (isAdaptive()) adaptiveSession.requireClientDefinitions();
 	}
 
+	public ProjectCustomContent customContent() {
+		return isAdaptive()
+			? adaptiveSession.customContent() : ProjectCustomContent.empty();
+	}
+
 	public boolean hasAuthoringDefinitionBinding() {
 		return isAdaptive();
 	}

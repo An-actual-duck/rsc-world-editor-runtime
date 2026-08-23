@@ -72,17 +72,23 @@ public final class AdaptiveWorldBuilderAuthoringDefinitions {
 
 	private static void requireExactSchema(
 		JSONObject root, String expectedCatalogId) throws IOException {
+		Object version = root.opt("schemaVersion");
+		if (!(version instanceof Integer)) {
+			throw new IOException(
+				"Adaptive authoring definition catalog schemaVersion must be an integer");
+		}
+		int schemaVersion = ((Integer) version).intValue();
 		Set<String> expected = new HashSet<String>(Arrays.asList(
 			"schemaVersion", "manifestType", "catalogId", "tiles",
 			"boundaries", "scenery", "npcs", "groundItems"));
+		if (schemaVersion == 2) expected.add("customContent");
 		if (!root.keySet().equals(expected)) {
 			throw new IOException(
-				"Adaptive authoring definition catalog fields differ from schema v1");
+				"Adaptive authoring definition catalog fields differ from schema");
 		}
-		Object version = root.opt("schemaVersion");
-		if (!(version instanceof Integer) || ((Integer) version).intValue() != 1) {
+		if (schemaVersion != 1 && schemaVersion != 2) {
 			throw new IOException(
-				"Adaptive authoring definition catalog schemaVersion must be 1");
+				"Adaptive authoring definition catalog schemaVersion is unsupported");
 		}
 		if (!MANIFEST_TYPE.equals(root.opt("manifestType"))) {
 			throw new IOException(

@@ -7,6 +7,8 @@ import com.openrsc.server.constants.ItemId;
 import com.openrsc.server.constants.NpcId;
 import com.openrsc.server.constants.Spells;
 import com.openrsc.server.constants.custom.MyWorldItemId;
+import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderCustomContentCatalog;
+import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderRuntimeIdentity;
 import com.openrsc.server.event.rsc.impl.projectile.RangeUtils;
 import com.openrsc.server.model.Point;
 import com.openrsc.server.model.TelePoint;
@@ -250,7 +252,6 @@ public final class EntityHandler {
 			applyOptionalNpcOverrides(getServer().getConfig().CONFIG_DIR + "/defs/NpcDefsMyWorld.json");
 		}
 		customNpcConditions();
-		loadNpcNames();
 		LOGGER.info("Loaded " + npcs.size() + " total npc definitions");
 
 		items = new ArrayList<>();
@@ -276,6 +277,8 @@ public final class EntityHandler {
 			spells = (SpellDef[]) getPersistenceManager().load("defs/SpellDefRetro.xml");
 		}
 		tiles = (TileDef[]) getPersistenceManager().load("defs/TileDef.xml");
+		applyAdaptiveProjectContent();
+		loadNpcNames();
 
 		herbSeconds = (ItemHerbSecond[]) getPersistenceManager().load(getPath("defs/extras/ItemHerbSecond.xml"));
 		dartTips = (HashMap<Integer, ItemDartTipDef>) getPersistenceManager().load(getPath("defs/extras/ItemDartTipDef.xml"));
@@ -310,6 +313,199 @@ public final class EntityHandler {
 		for (int tree : objectWoodcutting.keySet()) {
 			objectWoodcutting.get(tree).calculateWoodRates();
 		}
+	}
+
+	private void applyAdaptiveProjectContent() {
+		if (!AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(getServer().getConfig())) {
+			return;
+		}
+		final AdaptiveWorldBuilderCustomContentCatalog catalog;
+		try {
+			catalog = AdaptiveWorldBuilderCustomContentCatalog.load(
+				getServer().getConfig(), getServer().getWorldEditStorage());
+		} catch (Exception failure) {
+			throw new IllegalStateException(
+				"Failed to validate adaptive project-local custom content", failure);
+		}
+		if (!catalog.hasCustomContent()) return;
+		JSONObject definitions = catalog.definitions();
+		applyAdaptiveTiles(definitions.getJSONArray("tiles"));
+		applyAdaptiveBoundaries(definitions.getJSONArray("boundaries"));
+		applyAdaptiveScenery(definitions.getJSONArray("scenery"));
+		applyAdaptiveNpcs(definitions.getJSONArray("npcs"));
+		applyAdaptiveItems(definitions.getJSONArray("items"));
+		LOGGER.info(
+			"Loaded bounded adaptive project content {}@{} ({} assets)",
+			catalog.bundleId(), catalog.bundleVersion(), catalog.assets().size());
+	}
+
+	private void applyAdaptiveTiles(JSONArray rows) {
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index);
+			int id = row.getInt("id");
+			requireAdaptiveOperation(
+				"tile", id, row.getString("operation"),
+				id < tiles.length && tiles[id] != null);
+			if (id >= tiles.length) tiles = Arrays.copyOf(tiles, id + 1);
+			TileDef definition = new TileDef();
+			definition.colour = row.getInt("colour");
+			definition.unknown = row.getInt("tileValue");
+			definition.objectType = row.getInt("objectType");
+			tiles[id] = definition;
+		}
+	}
+
+	private void applyAdaptiveBoundaries(JSONArray rows) {
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index);
+			int id = row.getInt("id");
+			requireAdaptiveOperation(
+				"boundary", id, row.getString("operation"),
+				id < doors.length && doors[id] != null);
+			if (id >= doors.length) doors = Arrays.copyOf(doors, id + 1);
+			DoorDef definition = new DoorDef();
+			definition.name = row.getString("name");
+			definition.description = row.getString("description");
+			definition.command1 = row.getString("command1");
+			definition.command2 = row.getString("command2");
+			definition.doorType = row.getInt("doorType");
+			definition.unknown = row.getInt("unknown");
+			definition.modelVar1 = row.getInt("wallHeight");
+			definition.modelVar2 = row.getInt("modelVar2");
+			definition.modelVar3 = row.getInt("modelVar3");
+			doors[id] = definition;
+		}
+	}
+
+	private void applyAdaptiveScenery(JSONArray rows) {
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index);
+			int id = row.getInt("id");
+			requireAdaptiveOperation(
+				"scenery", id, row.getString("operation"),
+				id < gameObjects.length && gameObjects[id] != null);
+			if (id >= gameObjects.length) {
+				gameObjects = Arrays.copyOf(gameObjects, id + 1);
+			}
+			GameObjectDef definition = new GameObjectDef();
+			definition.name = row.getString("name");
+			definition.description = row.getString("description");
+			definition.command1 = row.getString("command1");
+			definition.command2 = row.getString("command2");
+			definition.type = row.getInt("type");
+			definition.width = boundedPositive(
+				row.getInt("width"), 64, "scenery width");
+			definition.height = boundedPositive(
+				row.getInt("height"), 64, "scenery height");
+			definition.groundItemVar = row.getInt("groundItemVar");
+			definition.objectModel = row.getString("modelName");
+			gameObjects[id] = definition;
+		}
+	}
+
+	private void applyAdaptiveNpcs(JSONArray rows) {
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index);
+			int id = row.getInt("id");
+			requireAdaptiveOperation(
+				"NPC", id, row.getString("operation"),
+				id < npcs.size() && npcs.get(id) != null);
+			while (npcs.size() <= id) npcs.add(null);
+			NPCDef definition = new NPCDef.NPCDefinitionBuilder(
+				id, row.getString("name"))
+				.description(row.getString("description"))
+				.command(row.getString("command1"))
+				.attack(row.getInt("attack"))
+				.strength(row.getInt("strength"))
+				.hits(row.getInt("hits"))
+				.defense(row.getInt("defense"))
+				.ranged(row.getBoolean("ranged") ? 1 : 0)
+				.projectileRange(row.getInt("projectileRange"))
+				.meleeOffense(row.getInt("meleeOffense"))
+				.rangedOffense(row.getInt("rangedOffense"))
+				.magicOffense(row.getInt("magicOffense"))
+				.meleeDefense(row.getInt("meleeDefense"))
+				.rangedDefense(row.getInt("rangedDefense"))
+				.magicDefense(row.getInt("magicDefense"))
+				.combatLevel(row.getInt("combatLevel"))
+				.members(Boolean.valueOf(row.getBoolean("members")))
+				.attackable(Boolean.valueOf(row.getBoolean("attackable")))
+				.aggressive(Boolean.valueOf(row.getBoolean("aggressive")))
+				.build();
+			definition.command2 = row.getString("command2");
+			definition.respawnTime = boundedPositive(
+				row.getInt("respawnTime"), 86400, "NPC respawn time");
+			JSONArray sprites = row.getJSONArray("sprites");
+			for (int sprite = 0; sprite < 12; sprite++) {
+				definition.sprites[sprite] = sprites.getInt(sprite);
+			}
+			definition.hairColour = row.getInt("hairColour");
+			definition.topColour = row.getInt("topColour");
+			definition.bottomColour = row.getInt("bottomColour");
+			definition.skinColour = row.getInt("skinColour");
+			definition.camera1 = row.getInt("camera1");
+			definition.camera2 = row.getInt("camera2");
+			definition.walkModel = boundedPositive(
+				row.getInt("walkModel"), 1000, "NPC walk model");
+			definition.combatModel = boundedPositive(
+				row.getInt("combatModel"), 1000, "NPC combat model");
+			definition.combatSprite = row.getInt("combatSprite");
+			definition.roundMode = row.getInt("roundMode");
+			npcs.set(id, definition);
+		}
+	}
+
+	private void applyAdaptiveItems(JSONArray rows) {
+		for (int index = 0; index < rows.length(); index++) {
+			JSONObject row = rows.getJSONObject(index);
+			int id = row.getInt("id");
+			requireAdaptiveOperation(
+				"item", id, row.getString("operation"),
+				id < items.size() && items.get(id) != null);
+			ItemDefinition definition = new ItemDefinition(
+				id, row.getString("name"), row.getString("description"),
+				commands(row.getString("command")),
+				row.getBoolean("isFemaleOnly"),
+				row.getBoolean("isMembersOnly"),
+				row.getBoolean("isStackable"),
+				row.getBoolean("isUntradable"),
+				row.getBoolean("isWearable"), row.getInt("appearanceId"),
+				row.getInt("wearableId"), row.getInt("wearSlot"),
+				row.getInt("requiredLevel"), row.getInt("requiredSkillId"),
+				row.getLong("armourBonus"), row.getInt("weaponAimBonus"),
+				row.getInt("weaponPowerBonus"), row.getInt("magicBonus"),
+				row.getInt("prayerBonus"), row.getInt("basePrice"),
+				row.getBoolean("isNoteable"));
+			definition.setMeleeOffense(row.getInt("meleeOffense"));
+			definition.setRangedOffense(row.getInt("rangedOffense"));
+			definition.setMagicOffense(row.getInt("magicOffense"));
+			definition.setWeaponSpeed(row.getInt("weaponSpeed"));
+			definition.setMeleeDefense(row.getInt("meleeDefense"));
+			definition.setRangedDefense(row.getInt("rangedDefense"));
+			definition.setMagicDefense(row.getInt("magicDefense"));
+			addItemDefinition(definition);
+		}
+	}
+
+	private static String[] commands(String value) {
+		return value.isEmpty() ? new String[0] : value.split(",", -1);
+	}
+
+	private static void requireAdaptiveOperation(
+		String family, int id, String operation, boolean exists) {
+		if (("add".equals(operation) && exists)
+			|| ("replace".equals(operation) && !exists)) {
+			throw new IllegalStateException(
+				"Adaptive " + family + " definition " + id
+					+ " has an unsafe " + operation + " collision contract");
+		}
+	}
+
+	private static int boundedPositive(int value, int maximum, String label) {
+		if (value < 1 || value > maximum) {
+			throw new IllegalStateException(label + " is outside 1.." + maximum);
+		}
+		return value;
 	}
 
 	private String getPath(String filePath) {

@@ -23,19 +23,19 @@ public final class AdaptiveWorldBuilderClientSession {
 	public static final String SESSION_SCHEMA =
 		"adaptive-world-builder-session-v1";
 	public static final String CAPABILITY_ID =
-		"adaptive-world-builder-runtime-capability-v2";
+		"adaptive-world-builder-runtime-capability-v3";
 	public static final String SERVER_BUILD_ID =
-		"core-framework-adaptive-builder-server-v2";
+		"rsc-world-editor-runtime-adaptive-builder-server-v3";
 	public static final String CLIENT_BUILD_ID =
-		"core-framework-adaptive-builder-client-v2";
+		"rsc-world-editor-runtime-adaptive-builder-client-v3";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v2-u16-elevation";
+		"generic-signed-layered-loader-v3-project-content";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
-		"world-builder-definition-catalog-binding-v1";
+		"world-builder-definition-catalog-binding-v2";
 	public static final String ASSET_CONTRACT_ID =
-		"world-builder-client-asset-binding-v1";
+		"world-builder-project-content-asset-binding-v2";
 	public static final String PROTOCOL_ID =
 		"world-builder-native-layered-protocol-v2-u16-elevation";
 	public static final String EFFECTIVE_COMPOSITION_ID =
@@ -83,6 +83,7 @@ public final class AdaptiveWorldBuilderClientSession {
 	private final int[] authorableNpcIds;
 	private final int[] authorableItemIds;
 	private final int[] levels;
+	private ProjectCustomContent customContent = ProjectCustomContent.empty();
 
 	private AdaptiveWorldBuilderClientSession(
 		Path bindingFile, Path workspaceRoot,
@@ -214,7 +215,8 @@ public final class AdaptiveWorldBuilderClientSession {
 		}
 	}
 
-	public void requireEvidence(Path definitionEvidence, Path assetEvidence) {
+	public synchronized void requireEvidence(
+		Path definitionEvidence, Path assetEvidence) {
 		try {
 			Path definitions = safeRegularFile(
 				definitionEvidence, MAX_EVIDENCE_BYTES,
@@ -235,12 +237,19 @@ public final class AdaptiveWorldBuilderClientSession {
 				throw new IllegalArgumentException(
 					"Adaptive client asset evidence hash mismatch");
 			}
+			customContent = ProjectCustomContent.load(
+				workspaceRoot, definitions, assets,
+				fields.get("definitionIdentity"), fields.get("assetIdentity"));
 		} catch (IllegalArgumentException failure) {
 			throw failure;
 		} catch (Exception failure) {
 			throw new IllegalArgumentException(
 				"Unable to validate adaptive client evidence", failure);
 		}
+	}
+
+	public synchronized ProjectCustomContent customContent() {
+		return customContent;
 	}
 
 	public Path requireCredential(Path requested) {

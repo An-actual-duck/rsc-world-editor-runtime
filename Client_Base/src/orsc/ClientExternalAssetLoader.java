@@ -54,6 +54,8 @@ final class ClientExternalAssetLoader {
 	private final Path userDirectory;
 	private final Class<?> resourceAnchor;
 	private final Map<String, Sprite> itemSpriteCache = new HashMap<String, Sprite>();
+	private final Map<Integer, Sprite[]> projectAnimationCache =
+		new HashMap<Integer, Sprite[]>();
 	private Set<String> embeddedAssetResources;
 
 	ClientExternalAssetLoader() {
@@ -193,6 +195,16 @@ final class ClientExternalAssetLoader {
 		if (item == null || item.getSpriteLocation() == null) {
 			return null;
 		}
+		ProjectCustomContent.Asset projectAsset =
+			WorldBuilderClientProfile.current().customContent().item(item.id);
+		if (projectAsset != null) {
+			String cacheKey = "project:" + item.id;
+			Sprite cached = this.itemSpriteCache.get(cacheKey);
+			if (cached != null) return cached;
+			Sprite loaded = loadExternalItemSprite(projectAsset.path().toFile());
+			if (loaded != null) this.itemSpriteCache.put(cacheKey, loaded);
+			return loaded;
+		}
 		String spriteLocation = item.getSpriteLocation();
 		if (!spriteLocation.startsWith(EXTERNAL_ITEM_PREFIX)) {
 			return null;
@@ -232,6 +244,46 @@ final class ClientExternalAssetLoader {
 			this.itemSpriteCache.put(assetSpec, loadedSprite);
 		}
 		return loadedSprite;
+	}
+
+	Sprite getProjectAnimationSprite(int animationId, int offset) {
+		ProjectCustomContent.AnimationAsset project =
+			WorldBuilderClientProfile.current().customContent().animation(animationId);
+		if (project == null || offset < 0 || offset >= project.frameCount()) {
+			return null;
+		}
+		Sprite[] frames = projectAnimationCache.get(Integer.valueOf(animationId));
+		if (frames == null) {
+			frames = new Sprite[project.frameCount()];
+			int loaded = loadExternalAnimationSheetFrames(
+				project.asset().path().toFile(), frames, 64, frames.length);
+			if (loaded != frames.length) {
+				throw new IllegalStateException(
+					"Adaptive project animation " + animationId
+						+ " did not decode all bound frames");
+			}
+			projectAnimationCache.put(Integer.valueOf(animationId), frames);
+		}
+		return frames[offset];
+	}
+
+	Sprite loadProjectTextureSprite(ProjectCustomContent.Asset asset) {
+		if (asset == null) return null;
+		try {
+			BufferedImage image = readAssetImage(asset.path().toFile());
+			if (image == null || image.getWidth() != asset.width()
+				|| image.getHeight() != asset.height()) {
+				throw new IllegalStateException(
+					"Adaptive project texture differs from its validated evidence");
+			}
+			int[] pixels = new int[image.getWidth() * image.getHeight()];
+			image.getRGB(0, 0, image.getWidth(), image.getHeight(), pixels, 0,
+				image.getWidth());
+			return createSprite(pixels, image.getWidth(), image.getHeight());
+		} catch (IOException failure) {
+			throw new IllegalStateException(
+				"Unable to decode adaptive project texture", failure);
+		}
 	}
 
 	Sprite loadExternalItemSprite(File sourceFile) {

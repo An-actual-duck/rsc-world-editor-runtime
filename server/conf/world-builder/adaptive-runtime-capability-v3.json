@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 3,
+  "manifestType": "adaptive-world-builder-runtime-capability",
+  "capabilityId": "adaptive-world-builder-runtime-capability-v3",
+  "profileId": "adaptive-world-builder",
+  "serverBuildId": "rsc-world-editor-runtime-adaptive-builder-server-v3",
+  "clientBuildId": "rsc-world-editor-runtime-adaptive-builder-client-v3",
+  "loaderId": "generic-signed-layered-loader-v3-project-content",
+  "authoringId": "generic-signed-layered-authoring-v2-u16-elevation",
+  "definitionContractId": "world-builder-definition-catalog-binding-v2",
+  "assetContractId": "world-builder-project-content-asset-binding-v2",
+  "protocolId": "world-builder-native-layered-protocol-v2-u16-elevation",
+  "effectiveCompositionId": "world-builder-effective-static-composition-v1",
+  "mapFormatId": "signed-layered-v1",
+  "packageSchemaId": "layered-world-package-v1",
+  "coordinateModel": "signed-layered-v1",
+  "terrainElevation": {
+    "storageEncoding": "unsigned-16",
+    "minimum": 0,
+    "maximum": 65535,
+    "renderScale": 3,
+    "legacyV1Promotion": "unsigned-byte-lossless",
+    "operations": ["absolute", "raise", "lower"],
+    "atomicMultiTileBounds": true
+  },
+  "projectContent": {
+    "definitionCatalogSchemas": [1, 2],
+    "customContentSchema": 1,
+    "assetManifestSchema": 1,
+    "declarativeOnly": true,
+    "definitionFamilies": ["animation", "boundary", "item", "npc", "scenery", "texture", "tile"],
+    "assetFamilies": ["item-sprite-png", "npc-animation-png", "scenery-model-ob3", "texture-png"],
+    "baseDefinitionReplacement": "explicit-operation",
+    "projectLocal": true
+  },
+  "encodingVersions": [1, 2, 3],
+  "authoring": {
+    "editExistingLevels": true,
+    "createLevels": true,
+    "placementFamilies": ["boundary", "ground-item", "npc", "scenery"]
+  },
+  "activation": {
+    "worldBuilderMode": true,
+    "adaptiveMode": true,
+    "runtimeProfile": "adaptive-world-builder",
+    "builderOnly": true,
+    "loopbackOnly": true
+  },
+  "canonicalVoidTile": [0, 1, 8, 0, 0, 0, 0, 0, 0, 0]
+}
