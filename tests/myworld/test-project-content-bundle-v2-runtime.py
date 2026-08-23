@@ -210,8 +210,9 @@ class BundleV2RuntimeTest(unittest.TestCase):
         manifest_bytes = (EDITOR_BUNDLE / "manifest.json").read_bytes()
         self.assertEqual(EDITOR_MANIFEST_SHA256, hashlib.sha256(manifest_bytes).hexdigest())
         for line in (EDITOR_FIXTURE / "SHA256SUMS").read_text().splitlines():
-            expected, staged_path = line.split(None, 1)
-            relative = staged_path.split("/bundle/", 1)[1]
+            expected, fixture_path = line.split(None, 1)
+            self.assertTrue(fixture_path.startswith("bundle/"), fixture_path)
+            relative = fixture_path.removeprefix("bundle/")
             self.assertEqual(
                 expected,
                 hashlib.sha256((EDITOR_BUNDLE / relative).read_bytes()).hexdigest(),
