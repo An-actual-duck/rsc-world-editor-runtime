@@ -12,9 +12,9 @@ from pathlib import Path
 
 IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
 MAX_CATALOG_BYTES = 16 * 1024 * 1024
-SERVER_BUILD_ID = "rsc-world-editor-runtime-adaptive-builder-server-v3"
-CLIENT_BUILD_ID = "rsc-world-editor-runtime-adaptive-builder-client-v3"
-LOADER_ID = "generic-signed-layered-loader-v3-project-content"
+SERVER_BUILD_ID = "core-framework-adaptive-builder-server-v2"
+CLIENT_BUILD_ID = "core-framework-adaptive-builder-client-v2"
+LOADER_ID = "generic-signed-layered-loader-v2-u16-elevation"
 PROTOCOL_ID = "world-builder-native-layered-protocol-v2-u16-elevation"
 
 

@@ -138,8 +138,8 @@ public final class ElevationOperationProbe {static void ok(boolean v,String m){i
         self.assertEqual(0, result.returncode, result.stderr)
 
     def test_capability_and_consumers_are_explicit(self):
-        capability = json.loads((ROOT / "server/conf/world-builder/adaptive-runtime-capability-v3.json").read_text())
-        self.assertEqual(3, capability["schemaVersion"])
+        capability = json.loads((ROOT / "server/conf/world-builder/adaptive-runtime-capability-v2.json").read_text())
+        self.assertEqual(2, capability["schemaVersion"])
         self.assertEqual({"storageEncoding": "unsigned-16", "minimum": 0, "maximum": 65535, "renderScale": 3,
                           "legacyV1Promotion": "unsigned-byte-lossless", "operations": ["absolute", "raise", "lower"],
                           "atomicMultiTileBounds": True}, capability["terrainElevation"])

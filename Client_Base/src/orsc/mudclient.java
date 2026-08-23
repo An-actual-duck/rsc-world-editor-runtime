@@ -65,7 +65,6 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.*;
 //import java.lang.management.ManagementFactory; //Commented out for Android
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -6080,10 +6079,6 @@ public final class mudclient implements Runnable {
 	}
 
 	public Sprite spriteSelect(AnimationDef animation, int offset) {
-		int animationId = EntityHandler.getAnimationId(animation);
-		Sprite projectSprite = this.externalAssetLoader.getProjectAnimationSprite(
-			animationId, offset);
-		if (projectSprite != null) return projectSprite;
 		return getSurface().spriteSelect(animation, offset);
 	}
 
@@ -20722,15 +20717,6 @@ public final class mudclient implements Runnable {
 					.getNumber();
 				continue label0;
 			}
-			ProjectCustomContent.AnimationAsset projectAnimation =
-				WorldBuilderClientProfile.current().customContent()
-					.animation(animationIndex);
-			if (projectAnimation != null) {
-				EntityHandler.getAnimationDef(animationIndex).number = animationNumber;
-				animationNumber += 27;
-				if (animationNumber == 1998) animationNumber = 3300;
-				continue;
-			}
 
 			loadSprite(animationNumber, "entity", 15);
 			if (EntityHandler.getAnimationDef(animationIndex).hasA()) {
@@ -20821,24 +20807,9 @@ public final class mudclient implements Runnable {
 		}
 
 		for (int j = 0; j < EntityHandler.getModelCount(); j++) {
-			if (j >= modelCache.length) {
-				throw new IllegalStateException(
-					"Adaptive project models exceed the client model-cache bound");
-			}
 			String modelName = EntityHandler.getModelName(j);
-			ProjectCustomContent.Asset projectModel =
-				WorldBuilderClientProfile.current().customContent().model(modelName);
 			int k = DataOperations.getDataFileOffset(modelName + ".ob3", models);
-			if (projectModel != null) {
-				try {
-					modelCache[j] = new RSModel(
-						Files.readAllBytes(projectModel.path()), 0, true);
-				} catch (IOException failure) {
-					throw new IllegalStateException(
-						"Unable to load adaptive project model " + modelName,
-						failure);
-				}
-			} else if (k == 0) {
+			if (k == 0) {
 				modelCache[j] = createGeneratedModel(modelName);
 			} else {
 				modelCache[j] = new RSModel(models, k, true);
@@ -21151,25 +21122,12 @@ public final class mudclient implements Runnable {
 
 	private void loadTextures() {
 		clientPort.showLoadingProgress(50, "Textures");
-		int baseTextureCount = Math.max(
-			getSurface().spriteTree.get("textures").size(),
-			EntityHandler.textureCount());
+		int baseTextureCount = getSurface().spriteTree.get("textures").size();
 		int customTextureCount = getCustomTextureCount();
 		this.scene.setFrustum(0, 11, 7, baseTextureCount + customTextureCount);
 		for (int i = 0; i < baseTextureCount; i++) {
 			Sprite sprite;
-			ProjectCustomContent.Asset projectTexture =
-				WorldBuilderClientProfile.current().customContent().texture(i);
-			if (projectTexture != null) {
-				sprite = this.externalAssetLoader.loadProjectTextureSprite(projectTexture);
-			} else if (getSurface().spriteTree.get("textures").containsKey(
-					String.valueOf(i))) {
-				sprite = getSurface().spriteTree.get("textures")
-					.get(String.valueOf(i)).getFrames()[0].getSprite();
-			} else {
-				throw new IllegalStateException(
-					"Adaptive project texture " + i + " has no visual payload");
-			}
+			sprite = getSurface().spriteTree.get("textures").get(String.valueOf(i)).getFrames()[0].getSprite();
 
 			int length = sprite.getWidth() * sprite.getHeight();
 			int[] pixels = sprite.getPixels();
@@ -21244,15 +21202,8 @@ public final class mudclient implements Runnable {
 		int customTextureCount = getCustomTextureCount();
 		this.scene.setFrustum(0, 11, 7, baseTextureCount + customTextureCount);
 		for (int i = 0; i < baseTextureCount; i++) {
-			ProjectCustomContent.Asset projectTexture =
-				WorldBuilderClientProfile.current().customContent().texture(i);
-			Sprite sprite;
-			if (projectTexture != null) {
-				sprite = this.externalAssetLoader.loadProjectTextureSprite(projectTexture);
-			} else {
-				loadSprite(spriteTexture + i, "texture", 1);
-				sprite = getSurface().sprites[spriteTexture + i];
-			}
+			loadSprite(spriteTexture + i, "texture", 1);
+			Sprite sprite = getSurface().sprites[spriteTexture + i];
 			loadTextureFromPixels(i, sprite.getPixels(), sprite.getWidth(), sprite.getHeight(), sprite.getSomething1() / 64 - 1);
 		}
 		if (customTextureCount > 0) {

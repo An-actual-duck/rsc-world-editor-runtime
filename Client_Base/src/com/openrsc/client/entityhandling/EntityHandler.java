@@ -11,11 +11,7 @@ import com.openrsc.client.entityhandling.defs.SpriteDef;
 import com.openrsc.client.entityhandling.defs.TileDef;
 import com.openrsc.client.entityhandling.defs.extras.AnimationDef;
 import com.openrsc.client.entityhandling.defs.extras.TextureDef;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import orsc.Config;
-import orsc.ProjectCustomContent;
-import orsc.WorldBuilderClientProfile;
 import orsc.mudclient;
 
 import java.util.ArrayList;
@@ -151,10 +147,6 @@ public class EntityHandler {
 
 	public static AnimationDef getAnimationDef(int id) {
 		return REGISTRY.animation(id);
-	}
-
-	public static int getAnimationId(AnimationDef definition) {
-		return animations.indexOf(definition);
 	}
 
 	public static int spellCount() {
@@ -9743,15 +9735,9 @@ public class EntityHandler {
 		loadProjectiles();
 		loadGUIParts();
 		loadCrowns();
-		applyAdaptiveProjectContent(
-			WorldBuilderClientProfile.current().customContent());
 		if (!Config.S_WANT_CUSTOM_SPRITES) {
 			for (ItemDef item : items) {
-				if (item == null) continue;
-				if (WorldBuilderClientProfile.current().customContent()
-					.item(item.id) == null) {
-					REGISTRY.includeInventorySprite(item.getSpriteID());
-				}
+				REGISTRY.includeInventorySprite(item.getSpriteID());
 				if (item.membersItem && !loadMembers) {
 					item.name = "Members object";
 					item.description = "You need to be a member to use this object";
@@ -9765,230 +9751,10 @@ public class EntityHandler {
 		}
 
 		for (GameObjectDef object : objects) {
-			if (object == null) continue;
 			object.modelID = storeModel(object
 				.getObjectModel());
 		}
 
-	}
-
-	private static void applyAdaptiveProjectContent(
-		ProjectCustomContent content) {
-		if (content == null || !content.isPresent()) return;
-		JSONObject definitions = content.definitions();
-		applyCustomTextures(definitions.getJSONArray("textures"));
-		applyCustomAnimations(definitions.getJSONArray("animations"));
-		applyCustomTiles(definitions.getJSONArray("tiles"));
-		applyCustomBoundaries(definitions.getJSONArray("boundaries"));
-		applyCustomScenery(definitions.getJSONArray("scenery"));
-		applyCustomNpcs(definitions.getJSONArray("npcs"));
-		applyCustomItems(definitions.getJSONArray("items"));
-		validateCustomDependencies(content);
-		System.out.println("Loaded adaptive project content "
-			+ content.bundleId() + "@" + content.bundleVersion()
-			+ " (" + content.assetCount() + " assets)");
-	}
-
-	private static void applyCustomTextures(JSONArray rows) {
-		for (int index = 0; index < rows.length(); index++) {
-			JSONObject row = rows.getJSONObject(index);
-			int id = row.getInt("id");
-			requireOperation("texture", id, row.getString("operation"),
-				id < textures.size() && textures.get(id) != null);
-			if (id > textures.size()) {
-				throw new IllegalStateException(
-					"Adaptive textures cannot create an unsafe renderer ID hole");
-			}
-			TextureDef definition = new TextureDef(
-				row.getString("dataName"), row.getString("animationName"));
-			if (id == textures.size()) textures.add(definition);
-			else textures.set(id, definition);
-		}
-	}
-
-	private static void applyCustomAnimations(JSONArray rows) {
-		for (int index = 0; index < rows.length(); index++) {
-			JSONObject row = rows.getJSONObject(index);
-			int id = row.getInt("id");
-			requireOperation("animation", id, row.getString("operation"),
-				id < animations.size() && animations.get(id) != null);
-			if (id > animations.size()) {
-				throw new IllegalStateException(
-					"Adaptive animations cannot create an unsafe renderer ID hole");
-			}
-			AnimationDef definition = new AnimationDef(
-				row.getString("name"), row.getString("category"),
-				row.getInt("charColour"), row.getInt("blueMask"),
-				row.getInt("genderModel"), row.getBoolean("hasA"),
-				row.getBoolean("hasF"), 0);
-			if (id == animations.size()) animations.add(definition);
-			else animations.set(id, definition);
-		}
-	}
-
-	private static void applyCustomTiles(JSONArray rows) {
-		for (int index = 0; index < rows.length(); index++) {
-			JSONObject row = rows.getJSONObject(index);
-			int id = row.getInt("id");
-			requireOperation("tile", id, row.getString("operation"),
-				id < tiles.size() && tiles.get(id) != null);
-			pad(tiles, id);
-			TileDef definition = new TileDef(
-				row.getInt("colour"), row.getInt("tileValue"),
-				row.getInt("objectType"));
-			put(tiles, id, definition);
-		}
-	}
-
-	private static void applyCustomBoundaries(JSONArray rows) {
-		for (int index = 0; index < rows.length(); index++) {
-			JSONObject row = rows.getJSONObject(index);
-			int id = row.getInt("id");
-			requireOperation("boundary", id, row.getString("operation"),
-				id < doors.size() && doors.get(id) != null);
-			pad(doors, id);
-			put(doors, id, new DoorDef(
-				row.getString("name"), row.getString("description"),
-				row.getString("command1"), row.getString("command2"),
-				row.getInt("doorType"), row.getInt("unknown"),
-				row.getInt("wallHeight"), row.getInt("modelVar2"),
-				row.getInt("modelVar3"), id));
-		}
-	}
-
-	private static void applyCustomScenery(JSONArray rows) {
-		for (int index = 0; index < rows.length(); index++) {
-			JSONObject row = rows.getJSONObject(index);
-			int id = row.getInt("id");
-			requireOperation("scenery", id, row.getString("operation"),
-				id < objects.size() && objects.get(id) != null);
-			pad(objects, id);
-			put(objects, id, new GameObjectDef(
-				row.getString("name"), row.getString("description"),
-				row.getString("command1"), row.getString("command2"),
-				row.getInt("type"), boundedPositive(row.getInt("width"), 64,
-					"scenery width"), boundedPositive(row.getInt("height"), 64,
-					"scenery height"), row.getInt("groundItemVar"),
-				row.getString("modelName"), id));
-		}
-	}
-
-	private static void applyCustomNpcs(JSONArray rows) {
-		for (int index = 0; index < rows.length(); index++) {
-			JSONObject row = rows.getJSONObject(index);
-			int id = row.getInt("id");
-			requireOperation("NPC", id, row.getString("operation"),
-				id < npcs.size() && npcs.get(id) != null);
-			pad(npcs, id);
-			JSONArray spriteRows = row.getJSONArray("sprites");
-			int[] sprites = new int[12];
-			for (int sprite = 0; sprite < sprites.length; sprite++) {
-				sprites[sprite] = spriteRows.getInt(sprite);
-			}
-			put(npcs, id, new NPCDef(
-				row.getString("name"), row.getString("description"),
-				row.getString("command1"), row.getString("command2"),
-				row.getInt("attack"), row.getInt("strength"),
-				row.getInt("hits"), row.getInt("defense"),
-				row.getBoolean("attackable"), sprites,
-				row.getInt("hairColour"), row.getInt("topColour"),
-				row.getInt("bottomColour"), row.getInt("skinColour"),
-				row.getInt("camera1"), row.getInt("camera2"),
-				boundedPositive(row.getInt("walkModel"), 1000, "NPC walk model"),
-				boundedPositive(row.getInt("combatModel"), 1000, "NPC combat model"),
-				row.getInt("combatSprite"), id));
-		}
-	}
-
-	private static void applyCustomItems(JSONArray rows) {
-		for (int index = 0; index < rows.length(); index++) {
-			JSONObject row = rows.getJSONObject(index);
-			int id = row.getInt("id");
-			requireOperation("item", id, row.getString("operation"),
-				id < items.size() && items.get(id) != null);
-			pad(items, id);
-			String spriteLocation = row.getString("spriteLocation");
-			if (!row.getString("assetKey").isEmpty()) {
-				spriteLocation = "project-custom:" + id;
-			}
-			put(items, id, new ItemDef(
-				row.getString("name"), row.getString("description"),
-				row.getString("command"), row.getInt("basePrice"),
-				row.getInt("spriteId"), spriteLocation,
-				row.getBoolean("isStackable"), row.getBoolean("isWearable"),
-				row.getInt("wearableId"), 0, 0,
-				row.getBoolean("isMembersOnly"),
-				row.getBoolean("isUntradable"),
-				row.getBoolean("isNoteable"), id));
-		}
-	}
-
-	private static void validateCustomDependencies(ProjectCustomContent content) {
-		JSONObject definitions = content.definitions();
-		JSONArray customTiles = definitions.getJSONArray("tiles");
-		for (int index = 0; index < customTiles.length(); index++) {
-			requireTextureResource(
-				customTiles.getJSONObject(index).getInt("colour"), "tile colour");
-		}
-		JSONArray customBoundaries = definitions.getJSONArray("boundaries");
-		for (int index = 0; index < customBoundaries.length(); index++) {
-			JSONObject boundary = customBoundaries.getJSONObject(index);
-			requireTextureResource(
-				boundary.getInt("modelVar2"), "boundary front texture");
-			requireTextureResource(
-				boundary.getInt("modelVar3"), "boundary back texture");
-		}
-		for (int id = 0; id < npcs.size(); id++) {
-			NPCDef npc = npcs.get(id);
-			if (npc == null) continue;
-			for (int layer = 0; layer < 12; layer++) {
-				int animation = npc.getSprite(layer);
-				if (animation >= 0
-					&& (animation >= animations.size()
-						|| animations.get(animation) == null)) {
-					throw new IllegalStateException(
-						"NPC " + id + " references undefined animation " + animation);
-				}
-			}
-		}
-		if (REGISTRY.modelCount() >= 1000) {
-			throw new IllegalStateException(
-				"Adaptive scenery models exceed the client model-cache bound");
-		}
-	}
-
-	private static void requireTextureResource(int resource, String label) {
-		if (resource >= 0
-			&& (resource >= textures.size() || textures.get(resource) == null)) {
-			throw new IllegalStateException(
-				"Adaptive " + label + " references undefined texture " + resource);
-		}
-	}
-
-	private static void requireOperation(
-		String family, int id, String operation, boolean exists) {
-		if (("add".equals(operation) && exists)
-			|| ("replace".equals(operation) && !exists)) {
-			throw new IllegalStateException(
-				"Adaptive " + family + " definition " + id
-					+ " has an unsafe " + operation + " collision contract");
-		}
-	}
-
-	private static int boundedPositive(int value, int maximum, String label) {
-		if (value < 1 || value > maximum) {
-			throw new IllegalStateException(label + " is outside 1.." + maximum);
-		}
-		return value;
-	}
-
-	private static <T> void pad(ArrayList<T> values, int id) {
-		while (values.size() < id) values.add(null);
-	}
-
-	private static <T> void put(ArrayList<T> values, int id, T value) {
-		if (values.size() == id) values.add(value);
-		else values.set(id, value);
 	}
 
 	public static int storeModel(String name) {

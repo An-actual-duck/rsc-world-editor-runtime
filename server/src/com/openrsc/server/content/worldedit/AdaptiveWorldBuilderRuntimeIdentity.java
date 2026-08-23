@@ -32,21 +32,21 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		65536 * 11 - 1;
 	public static final String PROFILE_ID = "adaptive-world-builder";
 	public static final String CAPABILITY_ID =
-		"adaptive-world-builder-runtime-capability-v3";
+		"adaptive-world-builder-runtime-capability-v2";
 	public static final String SESSION_SCHEMA =
 		"adaptive-world-builder-session-v1";
 	public static final String SERVER_BUILD_ID =
-		"rsc-world-editor-runtime-adaptive-builder-server-v3";
+		"core-framework-adaptive-builder-server-v2";
 	public static final String CLIENT_BUILD_ID =
-		"rsc-world-editor-runtime-adaptive-builder-client-v3";
+		"core-framework-adaptive-builder-client-v2";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v3-project-content";
+		"generic-signed-layered-loader-v2-u16-elevation";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
-		"world-builder-definition-catalog-binding-v2";
+		"world-builder-definition-catalog-binding-v1";
 	public static final String ASSET_CONTRACT_ID =
-		"world-builder-project-content-asset-binding-v2";
+		"world-builder-client-asset-binding-v1";
 	public static final String PROTOCOL_ID =
 		"world-builder-native-layered-protocol-v2-u16-elevation";
 	public static final String EFFECTIVE_COMPOSITION_ID =

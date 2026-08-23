@@ -853,16 +853,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         composition.write_bytes(b"{}\n")
         definitions = evidence / "definitions.bin"
         assets = evidence / "assets.bin"
-        definitions.write_bytes(canonical_json({
-            "schemaVersion": 1,
-            "manifestType": "world-builder-definition-catalog",
-            "catalogId": "creator.definitions.v1",
-            "tiles": [],
-            "boundaries": [1, 10],
-            "scenery": [0, 104],
-            "npcs": [30, 31],
-            "groundItems": [10, 20],
-        }))
+        definitions.write_bytes(b"content-neutral definitions\n")
         assets.write_bytes(b"content-neutral assets\n")
         credential = (
             root / "project/working/runtime/server/inc/sqlite/"
@@ -871,7 +862,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         credential.parent.mkdir(parents=True)
         credential.write_text("Abcdefghijk23456789Z", encoding="ascii")
         fields = {
-            "assetContract": "world-builder-project-content-asset-binding-v2",
+            "assetContract": "world-builder-client-asset-binding-v1",
             "assetIdentity": "creator.assets.v1",
             "assetSha256": hashlib.sha256(assets.read_bytes()).hexdigest(),
             "authoring": "generic-signed-layered-authoring-v2-u16-elevation",
@@ -879,11 +870,11 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "authorableItemIds": "10,20",
             "authorableNpcIds": "30,31",
             "authorableSceneryIds": "0,104",
-            "capability": "adaptive-world-builder-runtime-capability-v3",
-            "clientBuild": "rsc-world-editor-runtime-adaptive-builder-client-v3",
+            "capability": "adaptive-world-builder-runtime-capability-v2",
+            "clientBuild": "core-framework-adaptive-builder-client-v2",
             "clientVersion": "10048",
             "coordinateModel": "signed-layered-v1",
-            "definitionContract": "world-builder-definition-catalog-binding-v2",
+            "definitionContract": "world-builder-definition-catalog-binding-v1",
             "definitionIdentity": "creator.definitions.v1",
             "definitionSha256": hashlib.sha256(definitions.read_bytes()).hexdigest(),
             "effectiveComposition": "world-builder-effective-static-composition-v1",
@@ -894,7 +885,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "initialWorldSpace": "global",
             "initialX": "7",
             "initialY": "9",
-            "loader": "generic-signed-layered-loader-v3-project-content",
+            "loader": "generic-signed-layered-loader-v2-u16-elevation",
             "levels": "-3,0",
             "manifestSha256": "1" * 64,
             "packageId": "creator.arbitrary-adopted-world",
@@ -910,7 +901,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "requiredNpcIds": "",
             "requiredSceneryIds": "",
             "requiredTileIds": "",
-            "serverBuild": "rsc-world-editor-runtime-adaptive-builder-server-v3",
+            "serverBuild": "core-framework-adaptive-builder-server-v2",
             "sourceBaselineInventorySha256": "3" * 64,
         }
         if empty:
@@ -1431,16 +1422,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             definitions.write_bytes(b"mismatched definitions\n")
             mismatch = self.run_client_binding(binding, definitions, assets, fields)
             self.assertNotEqual(0, mismatch.returncode)
-            definitions.write_bytes(canonical_json({
-                "schemaVersion": 1,
-                "manifestType": "world-builder-definition-catalog",
-                "catalogId": "creator.definitions.v1",
-                "tiles": [],
-                "boundaries": [1, 10],
-                "scenery": [0, 104],
-                "npcs": [30, 31],
-                "groundItems": [10, 20],
-            }))
+            definitions.write_bytes(b"content-neutral definitions\n")
 
             assets.write_bytes(b"mismatched assets\n")
             mismatch = self.run_client_binding(binding, definitions, assets, fields)
@@ -1629,8 +1611,8 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertEqual(outputs[0], outputs[1])
         evidence = json.loads(outputs[0])
         self.assertEqual("world-builder-runtime-evidence", evidence["manifestType"])
-        self.assertEqual("rsc-world-editor-runtime-adaptive-builder-server-v3", evidence["buildId"])
-        self.assertEqual("generic-signed-layered-loader-v3-project-content", evidence["loaderId"])
+        self.assertEqual("core-framework-adaptive-builder-server-v2", evidence["buildId"])
+        self.assertEqual("generic-signed-layered-loader-v2-u16-elevation", evidence["loaderId"])
         self.assertEqual("world-builder-native-layered-protocol-v2-u16-elevation", evidence["protocolId"])
         self.assertEqual([1, 2, 3], evidence["encodingVersions"])
         self.assertEqual(
@@ -1639,7 +1621,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         )
 
         capability = json.loads((
-            ROOT / "server/conf/world-builder/adaptive-runtime-capability-v3.json"
+            ROOT / "server/conf/world-builder/adaptive-runtime-capability-v2.json"
         ).read_text())
         server_identity = (
             ROOT / "server/src/com/openrsc/server/content/worldedit/"

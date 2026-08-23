@@ -8,7 +8,6 @@
     <property name="pc_client" location="../PC_Client/src"/>
     <property name="build" location="build"/>
     <property name="lib" location="../PC_Client/lib"/>
-    <property name="jsonlib" location="../server/lib/json-20190722.jar"/>
     <property name="jar" location="Open_RSC_Client.jar"/>
     <property name="release.marker.file" location="../output/release-build-marker-disabled"/>
     <property name="javac.source" value="1.8"/>
@@ -22,7 +21,6 @@
         <fileset dir="${lib}">
             <include name="**/*.jar"/>
         </fileset>
-        <pathelement location="${jsonlib}"/>
     </path>
 
     <target name="clean">
@@ -62,7 +60,6 @@
              path while retaining every unique class, asset, and native. -->
         <jar basedir="${build}" destfile="${jar}" duplicate="preserve">
             <zipgroupfileset dir="${lib}" includes="**/*.jar"/>
-            <zipfileset src="${jsonlib}"/>
             <manifest>
                 <attribute name="Main-Class" value="orsc.OpenRSC"/>
             </manifest>

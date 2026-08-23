@@ -268,10 +268,9 @@ final class ClientDefinitionRegistry {
 	}
 
 	GameObjectDef object(int id) {
-		if (id < 0 || id >= objects.size() || objects.get(id) == null
-			|| objects.get(id).id != id) {
+		if (id < 0 || id >= objects.size() || (objects.get(id) != null && objects.get(id).id != id)) {
 			for (int i = objects.size() - 1; i >= 0; i--) {
-				if (objects.get(i) != null && objects.get(i).id == id) {
+				if (objects.get(i).id == id) {
 					return objects.get(i);
 				}
 			}
@@ -286,10 +285,6 @@ final class ClientDefinitionRegistry {
 		}
 		int index = models.indexOf(name);
 		if (index < 0) {
-			if (models.size() >= 1000) {
-				throw new IllegalStateException(
-					"Adaptive scenery models exceed the client model-cache bound");
-			}
 			models.add(name);
 			return models.size() - 1;
 		}

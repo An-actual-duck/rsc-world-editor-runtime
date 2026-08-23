@@ -223,9 +223,6 @@ class WorldBuilderRuntimeTest(unittest.TestCase):
                             throw new IllegalArgumentException("stub adaptive session refusal");
                         }
                         public void requireEvidence(Path definitions, Path assets) { }
-                        public ProjectCustomContent customContent() {
-                            return ProjectCustomContent.empty();
-                        }
                         public Path requireCredential(Path credential) { return credential; }
                         public String packageId() { return ""; }
                         public String packageVersion() { return ""; }
@@ -247,14 +244,6 @@ class WorldBuilderRuntimeTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            project_content = fixture_path / "orsc/ProjectCustomContent.java"
-            project_content.write_text(
-                "package orsc; public final class ProjectCustomContent { "
-                "private static final ProjectCustomContent EMPTY = "
-                "new ProjectCustomContent(); "
-                "public static ProjectCustomContent empty() { return EMPTY; } }\n",
-                encoding="utf-8",
-            )
             native_terrain = fixture_path / "orsc/NativeLayeredTerrainSnapshot.java"
             native_terrain.write_text(
                 "package orsc; public final class NativeLayeredTerrainSnapshot { "
@@ -270,8 +259,7 @@ class WorldBuilderRuntimeTest(unittest.TestCase):
                 encoding="utf-8",
             )
             output = self.compile_and_run(
-                [stub, adaptive_session, project_content, native_terrain,
-                 layered_context, CLIENT_PROFILE],
+                [stub, adaptive_session, native_terrain, layered_context, CLIENT_PROFILE],
                 "orsc.WorldBuilderClientProfileHarness",
                 """
                 package orsc;
