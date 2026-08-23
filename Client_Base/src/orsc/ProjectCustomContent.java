@@ -416,7 +416,7 @@ public final class ProjectCustomContent {
 		int vertices = ((data[0] & 255) << 8) | (data[1] & 255);
 		int faces = ((data[2] & 255) << 8) | (data[3] & 255);
 		if (vertices < 1 || faces < 1) throw new IOException("invalid OB3 counts");
-		long offset = 4L + vertices * 6L + faces * 5L;
+		long offset = 4L + vertices * 6L + faces * 6L;
 		if (offset > data.length) throw new IOException("truncated OB3");
 		long indices = 0;
 		int faceOffset = 4 + vertices * 6;
@@ -426,6 +426,17 @@ public final class ProjectCustomContent {
 			indices += count;
 		}
 		if (offset + indices * (vertices < 256 ? 1L : 2L) != data.length) throw new IOException("noncanonical OB3 length");
+		int cursor = (int) offset;
+		for (long index = 0; index < indices; index++) {
+			int vertex;
+			if (vertices < 256) {
+				vertex = data[cursor++] & 255;
+			} else {
+				vertex = ((data[cursor] & 255) << 8) | (data[cursor + 1] & 255);
+				cursor += 2;
+			}
+			if (vertex >= vertices) throw new IOException("OB3 face references undefined vertex");
+		}
 	}
 
 	private static JSONObject json(Path path, String label) throws IOException {

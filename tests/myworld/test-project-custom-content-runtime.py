@@ -133,6 +133,48 @@ public final class ProjectCustomContentServerHarness {
 """
 
 
+ASSET_HARNESS = r"""
+package orsc;
+
+import com.openrsc.client.model.Sprite;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import orsc.graphics.three.RSModel;
+
+public final class ProjectCustomContentAssetHarness {
+    public static void main(String[] args) throws Exception {
+        ProjectCustomContent content = ProjectCustomContent.load(
+            Paths.get(args[0]), Paths.get(args[1]), Paths.get(args[2]),
+            "creator.definitions.v2", "creator.assets.v1");
+        ClientExternalAssetLoader loader = new ClientExternalAssetLoader(
+            Paths.get(args[0]), ProjectCustomContentAssetHarness.class);
+        Sprite texture = loader.loadProjectTextureSprite(content.texture(55));
+        if (texture == null || texture.getWidth() != 64 || texture.getHeight() != 64) {
+            throw new AssertionError("project texture did not decode exactly");
+        }
+        Sprite item = loader.loadExternalItemSprite(
+            content.item(3309).path().toFile());
+        if (item == null || item.getWidth() != 48 || item.getHeight() != 32) {
+            throw new AssertionError("project item sprite did not decode");
+        }
+        Sprite[] animation = new Sprite[15];
+        int frames = loader.loadExternalAnimationSheetFrames(
+            content.animation(1080).asset().path().toFile(), animation, 64, 15);
+        if (frames != 15) {
+            throw new AssertionError("project NPC animation did not decode all frames");
+        }
+        byte[] modelBytes = Files.readAllBytes(
+            content.model("creator-crystal").path());
+        RSModel model = new RSModel(modelBytes, 0, true);
+        if (model == null) {
+            throw new AssertionError("project scenery model did not decode");
+        }
+        System.out.println("render-assets-ok");
+    }
+}
+"""
+
+
 def canonical_json(value):
     return (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
@@ -160,7 +202,7 @@ def write_ob3(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(
         b"\x00\x03\x00\x01" + b"\x00" * 18
-        + b"\x03\x00\x00\x00\x00" + b"\x00\x01\x02"
+        + b"\x03\x00\x00\x00\x00\x00" + b"\x00\x01\x02"
     )
 
 
@@ -312,6 +354,7 @@ class ProjectCustomContentRuntimeTest(unittest.TestCase):
         sources = [
             ("ProjectCustomContentClientHarness.java", CLIENT_HARNESS, CLIENT_JAR),
             ("ProjectCustomContentServerHarness.java", SERVER_HARNESS, SERVER_JAR),
+            ("ProjectCustomContentAssetHarness.java", ASSET_HARNESS, CLIENT_JAR),
         ]
         for name, source, jar in sources:
             source_path = classes / name
@@ -349,6 +392,14 @@ class ProjectCustomContentRuntimeTest(unittest.TestCase):
         )
         return client, server
 
+    def run_asset_harness(self, root, catalog_path, manifest_path):
+        return subprocess.run(
+            ["java", "-cp", self.client_classpath,
+             "orsc.ProjectCustomContentAssetHarness", str(root),
+             str(catalog_path), str(manifest_path)],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+
     def test_all_definition_and_asset_families_agree_with_beyond_base_npc(self):
         with tempfile.TemporaryDirectory(prefix="project-content-valid-") as temp:
             root = Path(temp)
@@ -361,6 +412,9 @@ class ProjectCustomContentRuntimeTest(unittest.TestCase):
                     "creator.shared-area@1.2.3",
                     result.stdout.strip().splitlines()[-1],
                 )
+            render = self.run_asset_harness(root, catalog_path, manifest_path)
+            self.assertEqual(0, render.returncode, render.stderr)
+            self.assertEqual("render-assets-ok", render.stdout.strip())
 
     def test_material_free_schema_one_needs_no_custom_asset_manifest(self):
         with tempfile.TemporaryDirectory(prefix="project-content-empty-") as temp:
@@ -412,7 +466,10 @@ class ProjectCustomContentRuntimeTest(unittest.TestCase):
                 self.assertNotEqual(0, server.returncode, "server accepted " + name)
 
     def test_both_sides_reject_links_and_malformed_payloads(self):
-        cases = ("symlink", "hardlink", "bad-png", "bad-ob3", "bad-texture-size")
+        cases = (
+            "symlink", "hardlink", "bad-png", "bad-ob3",
+            "bad-ob3-index", "bad-texture-size",
+        )
         for name in cases:
             with self.subTest(name=name), tempfile.TemporaryDirectory(
                     prefix=f"project-content-{name}-") as temp:
@@ -432,6 +489,10 @@ class ProjectCustomContentRuntimeTest(unittest.TestCase):
                     paths["texture"].write_bytes(b"not a png")
                 elif name == "bad-ob3":
                     paths["model"].write_bytes(b"\x00\x03\x00\x01")
+                elif name == "bad-ob3-index":
+                    malformed = bytearray(paths["model"].read_bytes())
+                    malformed[-1] = 3
+                    paths["model"].write_bytes(malformed)
                 else:
                     write_png(paths["texture"], 32, 32)
                     texture_row = next(

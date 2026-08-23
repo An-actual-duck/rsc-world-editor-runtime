@@ -622,7 +622,7 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 		if (vertices < 1 || vertices > 65535 || faces < 1 || faces > 65535) {
 			throw new IOException("Adaptive OB3 counts are outside their bounds");
 		}
-		long offset = 4L + vertices * 6L + faces * 5L;
+		long offset = 4L + vertices * 6L + faces * 6L;
 		if (offset > data.length) throw new IOException("Adaptive OB3 payload is truncated");
 		long indices = 0L;
 		int faceCountOffset = 4 + vertices * 6;
@@ -634,6 +634,17 @@ public final class AdaptiveWorldBuilderCustomContentCatalog {
 		long expected = offset + indices * (vertices < 256 ? 1L : 2L);
 		if (expected != data.length) {
 			throw new IOException("Adaptive OB3 payload length is not canonical");
+		}
+		int cursor = (int) offset;
+		for (long index = 0; index < indices; index++) {
+			int vertex = vertices < 256
+				? data[cursor++] & 255
+				: unsignedShort(data, cursor);
+			if (vertices >= 256) cursor += 2;
+			if (vertex >= vertices) {
+				throw new IOException(
+					"Adaptive OB3 face references an undefined vertex");
+			}
 		}
 	}
 
