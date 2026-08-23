@@ -245,29 +245,32 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 
 		String catalogHash = text(catalog, "catalogSha256",
 			"definition catalog");
-		String expectedDefinition = recordFingerprint(
+		String calculatedDefinition = recordFingerprint(
 			"world-builder-project-content-definitions-v1\n",
 			records, specs, true, catalogHash);
-		String expectedAssets = recordFingerprint(
+		String calculatedAssets = recordFingerprint(
 			"world-builder-project-content-assets-v1\n",
 			records, specs, false, "");
 		String definition = text(manifest, "definitionFingerprintSha256",
 			"project content manifest");
 		String assets = text(manifest, "assetFingerprintSha256",
 			"project content manifest");
-		if (!definition.equals(expectedDefinition)
-			|| !assets.equals(expectedAssets)) {
+		// Bundle v2 producer identities are opaque values authenticated by the
+		// self-fingerprinted manifest; v1 retains its legacy record derivation.
+		if (!SHA256.matcher(definition).matches() || !SHA256.matcher(assets).matches()
+			|| (!v2 && (!definition.equals(calculatedDefinition)
+				|| !assets.equals(calculatedAssets)))) {
 			throw new IOException("Project content domain fingerprint mismatch");
 		}
 		String itemVisualHash = v2
 			? text(manifest, "itemVisualFingerprintSha256", "project content manifest")
 			: ZERO_HASH;
 		if (v2) {
-			JSONObject visualRow = records.get(indexOfRole(specs, "metadata.item-visuals"));
-			Spec visualSpec = specs.get(indexOfRole(specs, "metadata.item-visuals"));
-			String expectedItemVisual = singleRecordFingerprint(
-				"world-builder-project-content-item-visuals-v1\n",
-				visualRow, visualSpec);
+			String expectedItemVisual = sha256((
+				"world-builder-project-content-item-visuals-v1\n"
+					+ canonical(array(manifest, "itemVisuals",
+						"project content manifest")))
+				.getBytes(StandardCharsets.UTF_8));
 			if (!SHA256.matcher(itemVisualHash).matches()
 				|| !itemVisualHash.equals(expectedItemVisual)) {
 				throw new IOException("Project content item visual fingerprint mismatch");
@@ -454,7 +457,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		}
 		requireKeys(evidence, ITEM_VISUAL_DOCUMENT_KEYS, "item visual evidence");
 		requireInteger(evidence, "schemaVersion", 1, "item visual evidence");
-		requireText(evidence, "manifestType", "world-builder-item-visuals",
+		requireText(evidence, "manifestType", "world-builder-item-visual-evidence",
 			"item visual evidence");
 		JSONArray rows = array(evidence, "itemVisuals", "item visual evidence");
 		if (!canonical(rows).equals(canonical(itemVisualArray(visuals)))) {
@@ -471,6 +474,9 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 	private static void validateItemVisualArchives(Map<String, Path> paths,
 		Map<Integer, ItemVisual> visuals) throws IOException {
 		Map<String, Set<String>> named = new HashMap<String, Set<String>>();
+		for (String role : Arrays.asList("asset.sprite.custom", "asset.spritepack")) {
+			named.put(role, decodeOsarEntries(paths.get(role)));
+		}
 		for (ItemVisual visual : visuals.values()) {
 			if (visual.authenticSpriteId != null) {
 				validateAuthenticSprite(paths.get("asset.sprite.authentic"),
@@ -478,10 +484,6 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 			} else {
 				String key = visual.customSpriteSubspace + "\0" + visual.customSpriteEntry;
 				Set<String> entries = named.get(visual.customSpriteAssetRole);
-				if (entries == null) {
-					entries = decodeOsarEntries(paths.get(visual.customSpriteAssetRole));
-					named.put(visual.customSpriteAssetRole, entries);
-				}
 				if (!entries.contains(key)) {
 					throw new IOException("Item visual archive entry is missing: " + visual.itemId);
 				}
@@ -491,7 +493,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 
 	private static void validateAuthenticSprite(Path archive, int spriteId)
 		throws IOException {
-		String selected = Integer.toString(2150 + spriteId);
+		String selected = "sprites/" + spriteId + ".dat";
 		try (ZipFile zip = new ZipFile(archive.toFile())) {
 			Set<String> names = new HashSet<String>();
 			ZipEntry target = null;
@@ -499,7 +501,8 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 			while (entries.hasMoreElements()) {
 				ZipEntry entry = entries.nextElement();
 				String name = entry.getName();
-				if (entry.isDirectory() || !name.matches("[0-9]+") || !names.add(name)) {
+				if (entry.isDirectory() || !name.matches("sprites/[0-9]+\\.dat")
+					|| !names.add(name)) {
 					throw new IOException("Authentic sprite archive contains an unsafe entry");
 				}
 				if (selected.equals(name)) target = entry;
@@ -516,20 +519,32 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 	private static void validateAuthenticSpritePayload(byte[] bytes) throws IOException {
 		ByteBuffer input = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
 		try {
-				if (input.remaining() < 25) throw new IOException("Truncated authentic sprite");
-				int width = input.getInt();
-				int height = input.getInt();
+			int type = input.get() & 0xff;
+			if (type != 0) throw new IOException("Authentic item sprite type is invalid");
+			int frames = input.get() & 0xff;
+			if (frames < 1) throw new IOException("Authentic item sprite is empty");
+			int colours = (input.get() & 0xff) + 1;
+			if (input.remaining() < colours * 3) throw new IOException("Authentic sprite palette is truncated");
+			input.position(input.position() + colours * 3);
+			for (int frame = 0; frame < frames; frame++) {
+				int width = input.getShort() & 0xffff;
+				int height = input.getShort() & 0xffff;
 				int shifted = input.get() & 0xff;
-				input.getInt(); input.getInt();
-				int boundWidth = input.getInt();
-				int boundHeight = input.getInt();
+				input.getShort(); input.getShort();
+				int boundWidth = input.getShort() & 0xffff;
+				int boundHeight = input.getShort() & 0xffff;
 				long pixels = (long) width * height;
 				if (width < 1 || height < 1 || boundWidth < 1 || boundHeight < 1
-					|| shifted > 1 || pixels > 16777216L
-					|| input.remaining() != pixels * 4L) {
+					|| shifted > 1 || pixels > 16777216L || input.remaining() < pixels) {
 					throw new IOException("Authentic sprite dimensions are unsafe");
 				}
-				input.position(input.limit());
+				for (long pixel = 0; pixel < pixels; pixel++) {
+					if ((input.get() & 0xff) >= colours) {
+						throw new IOException("Authentic sprite palette index is invalid");
+					}
+				}
+			}
+			if (input.hasRemaining()) throw new IOException("Authentic sprite has trailing content");
 		} catch (java.nio.BufferUnderflowException failure) {
 			throw new IOException("Authentic sprite entry is truncated", failure);
 		}
@@ -642,17 +657,6 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		if (!catalogHash.isEmpty()) {
 			digest.update(catalogHash.getBytes(StandardCharsets.US_ASCII));
 		}
-		return hex(digest.digest());
-	}
-
-	private static String singleRecordFingerprint(
-		String domain, JSONObject row, Spec spec) throws IOException {
-		MessageDigest digest = digest();
-		digest.update(domain.getBytes(StandardCharsets.UTF_8));
-		digest.update((spec.role + "\0" + spec.runtimePath + "\0"
-			+ exactLong(row, "size", "content row") + "\0"
-			+ text(row, "sha256", "content row") + "\n")
-			.getBytes(StandardCharsets.UTF_8));
 		return hex(digest.digest());
 	}
 
@@ -902,13 +906,6 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 	}
 	private static Set<String> set(String... values) {
 		return Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(values)));
-	}
-
-	private static int indexOfRole(List<Spec> specs, String role) {
-		for (int index = 0; index < specs.size(); index++) {
-			if (role.equals(specs.get(index).role)) return index;
-		}
-		throw new IllegalArgumentException("Unknown content role: " + role);
 	}
 
 	private static List<Spec> specs(boolean v2) {

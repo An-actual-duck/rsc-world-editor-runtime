@@ -20697,6 +20697,10 @@ public final class mudclient implements Runnable {
 					workspace = unpacker.unpackArchive(pack);
 					for (Subspace subspace : workspace.getSubspaces()) {
 						Map<String, orsc.graphics.two.SpriteArchive.Entry> entries = getSurface().spriteTree.get(subspace.getName());
+						if (entries == null) {
+							entries = new HashMap<>();
+							getSurface().spriteTree.put(subspace.getName(), entries);
+						}
 						for (orsc.graphics.two.SpriteArchive.Entry entry : subspace.getEntryList()) {
 							entries.put(entry.getID(), entry);
 						}
@@ -20728,14 +20732,13 @@ public final class mudclient implements Runnable {
 					"Unable to decode bound project sprite pack", failure);
 			}
 			}
-			installProjectItemVisuals(projectContent, true);
+			installProjectItemVisuals(projectContent);
 			if (S_WANT_CUSTOM_SPRITES) {
 			loadExternalEquipmentSprites();
 		}
 	}
 
-	private void installProjectItemVisuals(ProjectContentBundle content,
-		boolean loadAuthentic) {
+	private void installProjectItemVisuals(ProjectContentBundle content) {
 		if (content == null || content.schemaVersion() != 2) return;
 		try {
 			for (String role : new String[] {"asset.sprite.custom", "asset.spritepack"}) {
@@ -20758,19 +20761,15 @@ public final class mudclient implements Runnable {
 				String source;
 				if (visual.authenticSpriteId() != null) {
 					int spriteIndex = spriteItem + visual.authenticSpriteId().intValue();
-					if (loadAuthentic && !getSurface().loadSprite(spriteIndex, "media.object")) {
-						throw new IOException("Unable to load authentic item sprite " + spriteIndex);
-					}
-					decoded = getSurface().sprites[spriteIndex];
+					decoded = content.authenticItemSprite(visual.authenticSpriteId().intValue());
+					getSurface().sprites[spriteIndex] = decoded;
 					source = "asset.sprite.authentic:" + spriteIndex;
 				} else {
-					Map<String, orsc.graphics.two.SpriteArchive.Entry> subspace = getSurface().spriteTree.get(visual.customSpriteSubspace());
-					orsc.graphics.two.SpriteArchive.Entry entry = subspace == null ? null : subspace.get(visual.customSpriteEntry());
-					if (entry == null || entry.getFrames().length < 1 || entry.getFrames()[0] == null) throw new IOException("Decoded item visual is absent");
-					decoded = entry.getFrames()[0].getSprite();
+					decoded = content.itemSprite(visual.itemId());
 					source = visual.customSpriteAssetRole() + ":" + visual.customSpriteSubspace() + ":" + visual.customSpriteEntry();
 				}
 				if (decoded == null || decoded.getPixels() == null || decoded.getWidth() < 1 || decoded.getHeight() < 1) throw new IOException("Decoded item visual is empty");
+				getSurface().installProjectItemSprite(visual.itemId(), decoded);
 				System.out.println("PROJECT_ITEM_VISUAL_INSTALLED itemId=" + visual.itemId()
 					+ " source=" + source + " decoded=" + decoded.getWidth() + "x" + decoded.getHeight()
 					+ " pixelsSha256=" + spritePixelSha256(decoded) + " pictureMask=" + visual.pictureMask()
@@ -27832,7 +27831,7 @@ public final class mudclient implements Runnable {
 					if (!Config.S_WANT_CUSTOM_SPRITES) {
 						this.loadMediaAuthentic();
 						this.installProjectItemVisuals(
-							WorldBuilderClientProfile.current().contentBundle(), false);
+							WorldBuilderClientProfile.current().contentBundle());
 					if (!this.errorLoadingData) {
 						this.loadEntitiesAuthentic();
 						if (!this.errorLoadingData) {

@@ -160,20 +160,23 @@ with exactly these fields:
   "authenticSpriteId": null,
   "customSpriteAssetRole": "asset.sprite.custom",
   "customSpriteSubspace": "items",
-  "customSpriteEntry": "project-item-9000",
-  "pictureMask": 0,
-  "blueMask": 0
+  "customSpriteEntry": "0",
+  "pictureMask": 3368601,
+  "blueMask": 1122867
 }
 ```
 
 - `itemId` is the exact ground-item catalog ID (`0..65535`).
 - `authenticSpriteId` is `null` for a named mapping or an unsigned-short
-  `0..65535` ID whose exact `2150 + ID` entry must decode in
-  `asset.sprite.authentic`.
+  `0..65535` ID whose exact `sprites/ID.dat` palette-frame entry must decode in
+  `asset.sprite.authentic`; the decoded sprite installs at renderer slot
+  `2150 + ID`.
 - `customSpriteAssetRole` is exactly `asset.sprite.custom` or
   `asset.spritepack`; `customSpriteSubspace` and `customSpriteEntry` identify
-  one decoded, nonempty sprite-pack entry in that named archive. The pair must
-  be unambiguous after the runtime's archive merge order.
+  one decoded, nonempty GZIP OSAR entry in that named archive. Decoded item
+  sprites remain role-specific even when both archives contain the same
+  subspace/entry pair, so the legacy merged sprite tree cannot change the
+  selected source.
 - `pictureMask` and `blueMask` are exact signed 32-bit values.
 
 Exactly one mapping form is present: an authentic ID with all three custom
@@ -182,12 +185,12 @@ processes verify the evidence file and decode the exact referenced archive
 entry before authentication. The client emits deterministic source,
 dimensions, pixel SHA-256, and mask evidence when each sprite is installed.
 The reviewed Editor fixture freezes definition
-`6a070461aaf4d8b304ae295e485c909bd04242017f63a539d7fa74d62872dcfe`,
-asset `2320bfd31effa33c0e8cc47ec919e881809f69599b5504c6369e547697f844bc`,
+`f97a96299023e4cf1d738c1f3520af0c2e4339ed95aab952814832cc77e52baf`,
+asset `e0ab18b793a91db852557689b9734eeb1d459e216be61b902d75a69e6e2c5bfa`,
 item-visual
-`aa7c9deae89d9cda0497dad1bf00ac7f2f28b0143d127b584acecb9726f9ac6c`,
+`f9aaf43d6cac1c96bbf10d129e1976f9638562036e1b187f684e7219a7cda8d3`,
 and bundle
-`44510eb65894689c510ef55072a3e5406dfae3821d6368c5b0a6869ce516a9e1`.
+`88542556c723be2c4312f48eb2b42f65fb08a169edd21afa55eda075c6d4aa8b`.
 Floors and walls have no sprite lookup: floor IDs and axial wall IDs are
 one-less than unsigned-byte terrain values, so their exact catalog range is
 `0..254`, and their XML colour/material fields are the visual definition.

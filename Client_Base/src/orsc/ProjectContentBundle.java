@@ -1,5 +1,11 @@
 package orsc;
 
+import com.openrsc.client.model.Sprite;
+import orsc.graphics.two.SpriteArchive.Entry;
+import orsc.graphics.two.SpriteArchive.Subspace;
+import orsc.graphics.two.SpriteArchive.Unpacker;
+import orsc.graphics.two.SpriteArchive.Workspace;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -19,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,24 +49,29 @@ public final class ProjectContentBundle {
 	private static final List<Spec> SPECS_V2 = specs(true);
 	private static final ProjectContentBundle EMPTY =
 		new ProjectContentBundle(null, null, Collections.<String, Path>emptyMap(),
-			Collections.<Integer, ItemVisual>emptyMap(), 0, ZERO_HASH);
+			Collections.<Integer, ItemVisual>emptyMap(),
+			Collections.<Integer, Sprite>emptyMap(), 0, ZERO_HASH);
 
 	private final Path root;
 	private final JSONObject catalog;
 	private final Map<String, Path> paths;
 	private final Map<Integer, ItemVisual> itemVisuals;
+	private final Map<Integer, Sprite> itemSprites;
 	private final int schemaVersion;
 	private final String itemVisualSha256;
 
 	private ProjectContentBundle(Path root, JSONObject catalog,
 		Map<String, Path> paths, Map<Integer, ItemVisual> itemVisuals,
-		int schemaVersion, String itemVisualSha256) {
+		Map<Integer, Sprite> itemSprites, int schemaVersion,
+		String itemVisualSha256) {
 		this.root = root;
 		this.catalog = catalog;
 		this.paths = Collections.unmodifiableMap(
 			new LinkedHashMap<String, Path>(paths));
 		this.itemVisuals = Collections.unmodifiableMap(
 			new LinkedHashMap<Integer, ItemVisual>(itemVisuals));
+		this.itemSprites = Collections.unmodifiableMap(
+			new LinkedHashMap<Integer, Sprite>(itemSprites));
 		this.schemaVersion = schemaVersion;
 		this.itemVisualSha256 = itemVisualSha256;
 	}
@@ -168,14 +180,22 @@ public final class ProjectContentBundle {
 			validateItemVisualEvidence(paths.get("metadata.item-visuals"), itemVisuals);
 			validateItemVisualArchives(paths, itemVisuals);
 		}
+		Map<Integer, Sprite> itemSprites = v2
+			? decodeItemVisuals(paths, itemVisuals)
+			: Collections.<Integer, Sprite>emptyMap();
 
-		String definition = fingerprint("world-builder-project-content-definitions-v1\n",
+		String calculatedDefinition = fingerprint("world-builder-project-content-definitions-v1\n",
 			records, specs, true,
 			catalog.getString("catalogSha256"));
-		String assets = fingerprint("world-builder-project-content-assets-v1\n",
+		String calculatedAssets = fingerprint("world-builder-project-content-assets-v1\n",
 			records, specs, false, "");
-		if (!definition.equals(manifest.getString("definitionFingerprintSha256"))
-			|| !assets.equals(manifest.getString("assetFingerprintSha256"))) {
+		String definition = manifest.getString("definitionFingerprintSha256");
+		String assets = manifest.getString("assetFingerprintSha256");
+		// Bundle v2 producer identities are opaque values authenticated by the
+		// self-fingerprinted manifest; v1 retains its legacy record derivation.
+		if (!SHA.matcher(definition).matches() || !SHA.matcher(assets).matches()
+			|| (!v2 && (!definition.equals(calculatedDefinition)
+				|| !assets.equals(calculatedAssets)))) {
 			throw new IOException("Content domain fingerprint mismatch");
 		}
 		JSONObject zero = new JSONObject(manifest.toString());
@@ -183,10 +203,10 @@ public final class ProjectContentBundle {
 		String itemVisualHash = v2
 			? manifest.getString("itemVisualFingerprintSha256") : ZERO_HASH;
 		if (v2) {
-			int visualIndex = indexOfRole(specs, "metadata.item-visuals");
-			String calculated = singleRecordFingerprint(
-				"world-builder-project-content-item-visuals-v1\n",
-				records.get(visualIndex), specs.get(visualIndex));
+			String calculated = sha256((
+				"world-builder-project-content-item-visuals-v1\n"
+					+ canonical(manifest.getJSONArray("itemVisuals")))
+				.getBytes(StandardCharsets.UTF_8));
 			if (!calculated.equals(itemVisualHash)) {
 				throw new IOException("Content item visual fingerprint mismatch");
 			}
@@ -200,7 +220,7 @@ public final class ProjectContentBundle {
 			|| !itemVisualHash.equals(expectedItemVisuals)) {
 			throw new IOException("Content identity differs between client and server");
 		}
-		return new ProjectContentBundle(root, catalog, paths, itemVisuals,
+		return new ProjectContentBundle(root, catalog, paths, itemVisuals, itemSprites,
 			v2 ? 2 : 1, itemVisualHash);
 	}
 
@@ -210,6 +230,7 @@ public final class ProjectContentBundle {
 	public String itemVisualSha256() { return itemVisualSha256; }
 	public ItemVisual itemVisual(int itemId) { return itemVisuals.get(Integer.valueOf(itemId)); }
 	public Map<Integer, ItemVisual> itemVisuals() { return itemVisuals; }
+	public Sprite itemSprite(int itemId) { return itemSprites.get(Integer.valueOf(itemId)); }
 	public boolean hasAuthenticItemVisuals() {
 		for (ItemVisual visual : itemVisuals.values()) if (visual.authenticSpriteId != null) return true;
 		return false;
@@ -218,6 +239,15 @@ public final class ProjectContentBundle {
 		int result = -1;
 		for (ItemVisual visual : itemVisuals.values()) if (visual.authenticSpriteId != null) result = Math.max(result, visual.authenticSpriteId.intValue());
 		return result;
+	}
+	public Sprite authenticItemSprite(int authenticSpriteId) throws IOException {
+		for (ItemVisual visual : itemVisuals.values()) {
+			if (visual.authenticSpriteId != null
+				&& visual.authenticSpriteId.intValue() == authenticSpriteId) {
+				return itemSprite(visual.itemId);
+			}
+		}
+		throw new IOException("Authentic project item sprite ID is not mapped");
 	}
 	public Path path(String role) {
 		Path path = paths.get(role);
@@ -323,7 +353,7 @@ public final class ProjectContentBundle {
 		JSONObject evidence = new JSONObject(text);
 		requireKeys(evidence, set("schemaVersion", "manifestType", "itemVisuals"));
 		expectInt(evidence, "schemaVersion", 1);
-		expect(evidence, "manifestType", "world-builder-item-visuals");
+		expect(evidence, "manifestType", "world-builder-item-visual-evidence");
 		JSONArray expected = new JSONArray();
 		for (ItemVisual visual : visuals.values()) expected.put(visual.json());
 		if (!canonical(expected).equals(canonical(evidence.getJSONArray("itemVisuals")))) {
@@ -334,33 +364,78 @@ public final class ProjectContentBundle {
 	private static void validateItemVisualArchives(Map<String, Path> paths,
 		Map<Integer, ItemVisual> visuals) throws IOException {
 		Map<String, Set<String>> named = new LinkedHashMap<String, Set<String>>();
+		for (String role : Arrays.asList("asset.sprite.custom", "asset.spritepack")) {
+			named.put(role, decodeOsarEntries(paths.get(role)));
+		}
 		for (ItemVisual visual : visuals.values()) {
 			if (visual.authenticSpriteId != null) {
 				validateAuthenticSprite(paths.get("asset.sprite.authentic"),
 					visual.authenticSpriteId.intValue());
 			} else {
+				String key = visual.customSpriteSubspace + "\0" + visual.customSpriteEntry;
 				Set<String> entries = named.get(visual.customSpriteAssetRole);
-				if (entries == null) {
-					entries = decodeOsarEntries(paths.get(visual.customSpriteAssetRole));
-					named.put(visual.customSpriteAssetRole, entries);
-				}
-				if (!entries.contains(visual.customSpriteSubspace + "\0"
-					+ visual.customSpriteEntry)) {
+				if (!entries.contains(key)) {
 					throw new IOException("Item visual archive entry is missing: " + visual.itemId);
 				}
 			}
 		}
 	}
 
+	private static Map<Integer, Sprite> decodeItemVisuals(Map<String, Path> paths,
+		Map<Integer, ItemVisual> visuals) throws IOException {
+		Map<String, Map<String, Sprite>> named = new LinkedHashMap<String, Map<String, Sprite>>();
+		for (String role : Arrays.asList("asset.sprite.custom", "asset.spritepack")) {
+			Workspace workspace = new Unpacker().unpackArchive(paths.get(role).toFile());
+			if (workspace == null) throw new IOException("Unable to decode " + role);
+			Map<String, Sprite> entries = new HashMap<String, Sprite>();
+			for (Subspace subspace : workspace.getSubspaces()) {
+				for (Entry entry : subspace.getEntryList()) {
+					if (entry.getFrames().length < 1 || entry.getFrames()[0] == null) {
+						throw new IOException("Decoded item sprite frame is absent");
+					}
+					entries.put(subspace.getName() + "\0" + entry.getID(),
+						entry.getFrames()[0].getSprite());
+				}
+			}
+			named.put(role, entries);
+		}
+		Map<Integer, Sprite> result = new LinkedHashMap<Integer, Sprite>();
+		for (ItemVisual visual : visuals.values()) {
+			Sprite sprite = visual.authenticSpriteId == null
+				? named.get(visual.customSpriteAssetRole).get(
+					visual.customSpriteSubspace + "\0" + visual.customSpriteEntry)
+				: decodeAuthenticSprite(paths.get("asset.sprite.authentic"),
+					visual.authenticSpriteId.intValue());
+			if (sprite == null || sprite.getPixels() == null || sprite.getWidth() < 1
+				|| sprite.getHeight() < 1 || sprite.getPixels().length < 1) {
+				throw new IOException("Decoded item visual is empty: " + visual.itemId);
+			}
+			result.put(Integer.valueOf(visual.itemId), sprite);
+		}
+		return result;
+	}
+
+	private static Sprite decodeAuthenticSprite(Path archive, int spriteId)
+		throws IOException {
+		try (ZipFile zip = new ZipFile(archive.toFile())) {
+			ZipEntry entry = zip.getEntry("sprites/" + spriteId + ".dat");
+			if (entry == null || entry.getSize() < 16L || entry.getSize() > MAX_FILE) {
+				throw new IOException("Authentic project item sprite entry is missing or unsafe");
+			}
+			return decodeAuthenticPayload(readBounded(zip.getInputStream(entry), MAX_FILE));
+		}
+	}
+
 	private static void validateAuthenticSprite(Path archive, int spriteId)
 		throws IOException {
-		String selected = Integer.toString(2150 + spriteId);
+		String selected = "sprites/" + spriteId + ".dat";
 		try (ZipFile zip = new ZipFile(archive.toFile())) {
 			Set<String> names = new HashSet<String>(); ZipEntry target = null;
 			java.util.Enumeration<? extends ZipEntry> entries = zip.entries();
 			while (entries.hasMoreElements()) {
 				ZipEntry entry = entries.nextElement(); String name = entry.getName();
-				if (entry.isDirectory() || !name.matches("[0-9]+") || !names.add(name)) {
+				if (entry.isDirectory() || !name.matches("sprites/[0-9]+\\.dat")
+					|| !names.add(name)) {
 					throw new IOException("Authentic sprite archive contains an unsafe entry");
 				}
 				if (selected.equals(name)) target = entry;
@@ -368,22 +443,49 @@ public final class ProjectContentBundle {
 			if (target == null || target.getSize() < 16L || target.getSize() > MAX_FILE) {
 				throw new IOException("Authentic item sprite entry is missing or unsafe");
 			}
-			validateAuthenticPayload(readBounded(zip.getInputStream(target), MAX_FILE));
+			decodeAuthenticPayload(readBounded(zip.getInputStream(target), MAX_FILE));
 		}
 	}
 
-	private static void validateAuthenticPayload(byte[] bytes) throws IOException {
+	private static Sprite decodeAuthenticPayload(byte[] bytes) throws IOException {
 		ByteBuffer input = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
 		try {
-				if (input.remaining() < 25) throw new IOException("Truncated authentic sprite");
-				int width = input.getInt(), height = input.getInt(); int shifted = input.get() & 0xff;
-				input.getInt(); input.getInt(); int bw = input.getInt(), bh = input.getInt();
-				long pixels = (long) width * height;
+			int type = input.get() & 0xff;
+			if (type != 0) throw new IOException("Authentic item sprite type is invalid");
+			int frames = input.get() & 0xff;
+			if (frames < 1) throw new IOException("Authentic item sprite is empty");
+			int colours = (input.get() & 0xff) + 1;
+			if (input.remaining() < colours * 3) throw new IOException("Authentic sprite palette is truncated");
+			int[] palette = new int[colours];
+			for (int colour = 0; colour < colours; colour++) {
+				palette[colour] = (input.get() & 0xff) << 16
+					| (input.get() & 0xff) << 8 | input.get() & 0xff;
+			}
+			Sprite first = null;
+			for (int frame = 0; frame < frames; frame++) {
+				int width = input.getShort() & 0xffff, height = input.getShort() & 0xffff;
+				int shifted = input.get() & 0xff;
+				int x = input.getShort(), y = input.getShort();
+				int bw = input.getShort() & 0xffff, bh = input.getShort() & 0xffff;
+				long count = (long) width * height;
 				if (width < 1 || height < 1 || bw < 1 || bh < 1 || shifted > 1
-					|| pixels > 16777216L || input.remaining() != pixels * 4L) {
+					|| count > 16777216L || input.remaining() < count) {
 					throw new IOException("Authentic sprite dimensions are unsafe");
 				}
-				input.position(input.limit());
+				int[] pixels = new int[(int) count];
+				for (int pixel = 0; pixel < pixels.length; pixel++) {
+					int index = input.get() & 0xff;
+					if (index >= colours) throw new IOException("Authentic sprite palette index is invalid");
+					pixels[pixel] = palette[index];
+				}
+				if (first == null) {
+					first = new Sprite(pixels, width, height);
+					first.setRequiresShift(shifted == 1);
+					first.setShift(x, y); first.setSomething(bw, bh);
+				}
+			}
+			if (input.hasRemaining()) throw new IOException("Authentic sprite has trailing content");
+			return first;
 		} catch (java.nio.BufferUnderflowException failure) {
 			throw new IOException("Authentic sprite entry is truncated", failure);
 		}
@@ -467,14 +569,6 @@ public final class ProjectContentBundle {
 		if (!catalogHash.isEmpty()) digest.update(catalogHash.getBytes(StandardCharsets.US_ASCII));
 		return hex(digest.digest());
 	}
-	private static String singleRecordFingerprint(String domain, JSONObject row,
-		Spec spec) throws IOException {
-		MessageDigest digest = digest(); digest.update(domain.getBytes(StandardCharsets.UTF_8));
-		digest.update((spec.role + "\0" + spec.path + "\0" + row.getLong("size")
-			+ "\0" + row.getString("sha256") + "\n").getBytes(StandardCharsets.UTF_8));
-		return hex(digest.digest());
-	}
-
 	private static Path safeFile(Path path, long maximum) throws IOException {
 		Path result = path.toAbsolutePath().normalize();
 		if (!Files.isRegularFile(result, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(result)
@@ -554,10 +648,6 @@ public final class ProjectContentBundle {
 	private static MessageDigest digest() { try { return MessageDigest.getInstance("SHA-256"); } catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); } }
 	private static String hex(byte[] bytes) { StringBuilder out = new StringBuilder(); for (byte value : bytes) out.append(String.format("%02x", value & 0xff)); return out.toString(); }
 
-	private static int indexOfRole(List<Spec> specs, String role) {
-		for (int index = 0; index < specs.size(); index++) if (role.equals(specs.get(index).role)) return index;
-		throw new IllegalArgumentException("Unknown content role: " + role);
-	}
 	private static List<Spec> specs(boolean v2) {
 		List<Spec> values = Arrays.asList(
 			new Spec("asset.sprite.authentic", "client/Cache/video/Authentic_Sprites.orsc", "application/vnd.openrsc.archive", false, false),

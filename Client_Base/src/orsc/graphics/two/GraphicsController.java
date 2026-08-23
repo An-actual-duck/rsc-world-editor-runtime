@@ -136,6 +136,7 @@ public class GraphicsController {
 	private int renderer2DUiBaseHeight;
 	private boolean renderer2DUiBaseCaptured;
 	public Map<String, Map<String, Entry>> spriteTree = new HashMap<>();
+	private final Map<Integer, Sprite> projectItemSprites = new HashMap<>();
 	// public int[][] image2D_pixels;
 	private int[] m_Xb;
 	private ZipFile spriteArchive;
@@ -1475,6 +1476,8 @@ public class GraphicsController {
 
 	public Sprite spriteSelect(ItemDef item) {
 		Sprite canonical;
+		Sprite project = projectItemSprites.get(Integer.valueOf(item.id));
+		if (project != null) return resolveRemastered(item, project);
 		if (item.getSpriteLocation() == null || item.getSpriteLocation().isEmpty()) {
 			if (item.spriteID + mudclient.spriteItem >= sprites.length || null == sprites[item.spriteID + mudclient.spriteItem])
 				canonical = Sprite.getUnknownSprite(48, 32);
@@ -1542,6 +1545,13 @@ public class GraphicsController {
 
 	public Sprite resolveRemastered(ItemDef item, Sprite canonical) {
 		return remasteredSpriteResolver.resolve(RemasteredSpriteKey.forItem(item), canonical);
+	}
+
+	public void installProjectItemSprite(int itemId, Sprite sprite) {
+		if (itemId < 0 || sprite == null) {
+			throw new IllegalArgumentException("Project item sprite is invalid");
+		}
+		projectItemSprites.put(Integer.valueOf(itemId), sprite);
 	}
 
 	public String getRemasteredSpriteDiagnostics() {

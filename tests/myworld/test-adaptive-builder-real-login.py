@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 import copy
-import gzip
 import io
 import re
 import shutil
@@ -15,6 +14,7 @@ import tempfile
 import time
 import unittest
 import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 
 
@@ -51,19 +51,16 @@ CONTENT_SPECS = (
 )
 
 
-def sprite_archive(subspace: str, entry: str, rgb: int) -> bytes:
-    payload = bytearray((1,))
-    payload.extend(subspace.encode("ascii") + b"\0")
-    payload.extend((0, 1))
-    payload.extend(entry.encode("ascii") + b"\0")
-    payload.extend((0, 1, 1))  # sprite type, one frame, two palette colours
-    payload.extend(b"\0\0\0")
-    payload.extend(bytes(((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255)))
-    payload.extend((0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 2))
-    payload.extend((1, 0, 0, 1))
+def authentic_sprite_archive() -> bytes:
+    payload = bytes.fromhex(
+        "000103102030405060708090a0b0c00002000200000000000002000200010203"
+    )
     output = io.BytesIO()
-    with gzip.GzipFile(filename="", mode="wb", fileobj=output, mtime=0) as archive:
-        archive.write(payload)
+    info = zipfile.ZipInfo("sprites/417.dat", date_time=(1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_STORED
+    info.external_attr = 0o100644 << 16
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr(info, payload)
     return output.getvalue()
 
 
@@ -93,6 +90,9 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
             continue
         source = (server_root / runtime_path.removeprefix("server/")) if runtime_path.startswith("server/") else (client_root / runtime_path.removeprefix("client/"))
         payloads[runtime_path] = source.read_bytes()
+    payloads["client/Cache/video/Authentic_Sprites.orsc"] = (
+        authentic_sprite_archive()
+    )
 
     for runtime_path, target_count, name in (
         ("server/conf/server/defs/TileDef.xml", 32, "fixture-floor"),
@@ -129,17 +129,17 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
         {"itemId": 9000, "authenticSpriteId": None,
          "customSpriteAssetRole": "asset.sprite.custom",
          "customSpriteSubspace": "items", "customSpriteEntry": "0",
-         "pictureMask": 0, "blueMask": 0},
+         "pictureMask": 3368601, "blueMask": 1122867},
         {"itemId": 9001, "authenticSpriteId": 417,
          "customSpriteAssetRole": None, "customSpriteSubspace": None,
          "customSpriteEntry": None, "pictureMask": -1, "blueMask": 0},
         {"itemId": 9002, "authenticSpriteId": None,
          "customSpriteAssetRole": "asset.spritepack",
          "customSpriteSubspace": "GUI", "customSpriteEntry": "0",
-         "pictureMask": 0, "blueMask": -16776961},
+         "pictureMask": 4478310, "blueMask": -16776961},
     ]
     payloads["server/conf/world-builder/item-visuals-v1.json"] = (
-        json.dumps({"schemaVersion": 1, "manifestType": "world-builder-item-visuals",
+        json.dumps({"schemaVersion": 1, "manifestType": "world-builder-item-visual-evidence",
                     "itemVisuals": item_visuals}, sort_keys=True, indent=2) + "\n"
     ).encode()
 
@@ -190,11 +190,8 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
         "itemVisualFingerprintSha256": "",
         "bundleFingerprintSha256": "0" * 64,
     }
-    visual_row = next(row for row in records if row["role"] == "metadata.item-visuals")
     visual_digest = hashlib.sha256(b"world-builder-project-content-item-visuals-v1\n")
-    visual_digest.update(
-        f'{visual_row["role"]}\0{visual_row["runtimeRelativePath"]}\0{visual_row["size"]}\0{visual_row["sha256"]}\n'.encode()
-    )
+    visual_digest.update(canonical_sorted(item_visuals))
     manifest["itemVisualFingerprintSha256"] = visual_digest.hexdigest()
     manifest["bundleFingerprintSha256"] = hashlib.sha256(
         b"world-builder-project-content-bundle-v2\n" + canonical_sorted(manifest)
@@ -1119,7 +1116,8 @@ world_builder_initial_y: 648
                         "pictureMask=-1 blueMask=0",
                         "PROJECT_ITEM_VISUAL_INSTALLED itemId=9002 "
                         "source=asset.spritepack:GUI:0",
-                        "pictureMask=0 blueMask=-16776961",
+                        "pictureMask=3368601 blueMask=1122867",
+                        "pictureMask=4478310 blueMask=-16776961",
                     ):
                         self.assertIn(marker, client_evidence)
                 server_output.flush()
