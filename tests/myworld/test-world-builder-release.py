@@ -263,6 +263,7 @@ class WorldBuilderReleaseTest(unittest.TestCase):
                         prefix + "builder-runtime/Client_Base/Open_RSC_Client.jar",
                         prefix + "builder-runtime/server/core.jar",
                         prefix + "builder-runtime/server/plugins.jar",
+                        prefix + "builder-runtime/server/myworld.conf",
                         prefix + "builder-runtime/server/inc/sqlite/myworld_seed.db",
                         prefix + "builder-runtime/launcher/world-builder-tools.jar",
                         prefix + "builder-runtime/layered-world/package/manifest.json",
@@ -292,6 +293,11 @@ class WorldBuilderReleaseTest(unittest.TestCase):
                         f"{source_commit}\n",
                         archive.read(prefix + "SOURCE-COMMIT.txt").decode(),
                     )
+                    builder_config = archive.read(
+                        prefix + "builder-runtime/server/myworld.conf"
+                    ).decode()
+                    self.assertIn("restrict_item_id: -1", builder_config)
+                    self.assertIn("restrict_scenery_id: -1", builder_config)
                     identity = json.loads(
                         archive.read(prefix + "RELEASE-IDENTITY.json").decode()
                     )
