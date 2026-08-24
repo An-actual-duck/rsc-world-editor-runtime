@@ -1704,6 +1704,15 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "AdaptiveWorldBuilderRuntimeIdentity.PLAYER_LOCATION_ORIGIN",
             player_service,
         )
+        self.assertIn(
+            "LayeredPlayerLocationPersistence.restore(", player_service
+        )
+        self.assertIn('remember ? "remembered" : "initialized"', player_service)
+        player_session = (
+            ROOT / "server/src/com/openrsc/server/content/worldedit/"
+            "WorldBuilderPlayerSession.java"
+        ).read_text()
+        self.assertNotIn("player.teleportLayered(initial", player_session)
         self.assertIn("if(destinationMissing){", sessions)
         self.assertIn("if(destinationMissing&&!isAdaptive(player)){", sessions)
         commands = (

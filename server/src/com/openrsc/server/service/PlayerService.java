@@ -183,17 +183,33 @@ public class PlayerService implements IPlayerService {
 		if (AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(configuration)) {
 			WorldLocation initial =
 				AdaptiveWorldBuilderRuntimeIdentity.initialLocation(configuration);
-			player.setInitialLayeredLocation(initial);
+			LayeredPlayerLocationPersistence.RestoreResult restored =
+				LayeredPlayerLocationPersistence.restore(
+					player.getCache().getCacheMap(),
+					player.getLocation(),
+					configuration.WANT_LAYERED_SYNTHETIC_DEEP_FIXTURE,
+					player.getWorld().getRegionManager()
+						::hasNativeLayeredTerrain);
+			WorldLocation location = restored.getLocation();
+			boolean remember = !restored.isRewriteRequired()
+				&& player.getWorld().getRegionManager()
+					.hasNativeLayeredTerrain(location);
+			String origin = remember
+				? restored.getOrigin()
+				: AdaptiveWorldBuilderRuntimeIdentity.PLAYER_LOCATION_ORIGIN;
+			if (!remember) location = initial;
+			player.setInitialLayeredLocation(location);
 			LayeredPlayerLocationPersistence.write(
 				player.getCache().getCacheMap(),
-				initial,
+				location,
 				player.getLocation(),
-				AdaptiveWorldBuilderRuntimeIdentity.PLAYER_LOCATION_ORIGIN,
+				origin,
 				configuration.WANT_LAYERED_SYNTHETIC_DEEP_FIXTURE,
 				true);
 			LOGGER.info(
-				"adaptive-world-builder player location initialized playerId={} location={}",
-				player.getDatabaseID(), initial);
+				"adaptive-world-builder player location {} playerId={} location={}",
+				remember ? "remembered" : "initialized",
+				player.getDatabaseID(), location);
 			return;
 		}
 		LayeredPlayerLocationPersistence.RestoreResult restored =

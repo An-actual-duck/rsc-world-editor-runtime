@@ -2,7 +2,6 @@ package com.openrsc.server.content.worldedit;
 
 import com.openrsc.server.model.entity.player.Group;
 import com.openrsc.server.model.entity.player.Player;
-import com.openrsc.server.model.world.coordinate.WorldLocation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import org.apache.logging.log4j.LogManager;
@@ -30,9 +29,6 @@ public final class WorldBuilderPlayerSession {
 		}
 		player.setCacheInvulnerable(true);
 		if (AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(player.getConfig())) {
-			WorldLocation initial =
-				AdaptiveWorldBuilderRuntimeIdentity.initialLocation(player.getConfig());
-			player.teleportLayered(initial, false);
 			player.setAttribute(BINDING_PENDING_ATTRIBUTE, Boolean.TRUE);
 			player.message(player.getConfig().MESSAGE_PREFIX
 				+ "Verifying the isolated Builder runtime before authoring.");
