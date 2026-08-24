@@ -70,6 +70,16 @@ projects use those fields for new boundary, scenery, NPC, and ground-item
 placements; a valid catalog ID remains authorable even when the map does not
 currently use it.
 
+NPC base and custom definition files are one sequential registry; embedded
+`id` fields do not create sparse slots. Before authentication, both runtime
+consumers therefore count the exact base/custom rows and require every catalog
+NPC plus every patch/world overlay ID to be below that count. The Editor may
+normalize a sparse neutral provider record or unresolved placement by adding
+project-local custom rows and deterministic gap placeholders. Those rows are
+ordinary hashed content-bundle evidence: the selected server is unchanged,
+target code is never executed, and an unbacked sparse catalog fails closed
+before either side activates.
+
 ## Required project layout
 
 The runtime accepts the Phase 3 project layout only:

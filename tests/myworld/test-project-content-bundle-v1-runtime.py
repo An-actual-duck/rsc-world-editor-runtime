@@ -99,7 +99,11 @@ def fixture_payloads():
         "server/conf/server/defs/ItemDefsPatch18.json": pretty({"items": [{"id": 9002, "name": "fixture-patch-item"}]}),
         "server/conf/server/defs/ItemDefsMyWorld.json": pretty({"items": [{"id": 9001, "name": "fixture-world-item"}]}),
         "server/conf/server/defs/NpcDefs.json": pretty({"npcs": [{"id": 0, "name": "fixture-base-npc"}]}),
-        "server/conf/server/defs/NpcDefsCustom.json": pretty({"npcs": [{"id": 12, "name": "fixture-appended-npc"}]}),
+        "server/conf/server/defs/NpcDefsCustom.json": pretty({"npcs": [
+            {"id": npc_id, "name": ("fixture-appended-npc" if npc_id == 846
+                                      else f"fixture-gap-npc-{npc_id}")}
+            for npc_id in range(1, 847)
+        ]}),
         "server/conf/server/defs/NpcDefsPatch18.json": pretty({"npcs": [{"id": 100, "name": "fixture-patch-npc"}]}),
         "server/conf/server/defs/NpcDefsMyWorld.json": pretty({"npcs": [{"id": 846, "name": "fixture-world-npc"}]}),
         "server/conf/server/defs/TileDef.xml": xml_array("TileDef-array", "TileDef", 32, "<colour>{index}</colour>"),
@@ -126,7 +130,7 @@ def create_bundle(root):
     catalog = {"schemaVersion": 1, "manifestType": "world-builder-definition-catalog",
                "catalogId": "target-adopted-content-v1", "tiles": list(range(32)),
                "boundaries": list(range(220)), "scenery": list(range(60)),
-               "npcs": [0, 1, 100, 846], "groundItems": [0, 9000, 9001, 9002],
+               "npcs": list(range(847)), "groundItems": [0, 9000, 9001, 9002],
                "catalogSha256": ZERO}
     catalog["catalogSha256"] = self_hash(catalog, "catalogSha256")
 
@@ -254,10 +258,10 @@ class BundleV1RuntimeTest(unittest.TestCase):
 
     def test_canonical_editor_fixture_hashes_and_both_consumers(self):
         workspace, manifest = self.workspace()
-        self.assertEqual("20a86967a205f0f63f502e5a333e8a5d30299df28a89b13251a36761de2e8420", manifest["definitionCatalog"]["catalogSha256"])
-        self.assertEqual("50a1a2958fca3483dcae4fe5e8d9243a4262d79db4ce53109f009fd777e7f3a7", manifest["definitionFingerprintSha256"])
+        self.assertEqual("e54a8b2243c13dde38b028e22ab2f49e91ef9d5e84546474ea8c1035a6867539", manifest["definitionCatalog"]["catalogSha256"])
+        self.assertEqual("2403b1148a0d02e444f34d33936362ed6505bb79b071bad0188f3e294366a495", manifest["definitionFingerprintSha256"])
         self.assertEqual("3f035094478cf32a0e809083214524f4595d5847acde78a98291c3758112e70e", manifest["assetFingerprintSha256"])
-        self.assertEqual("985489d7674e571ed99587adf97e6ff4121692096fec2b7bf00442dc2b325cd9", manifest["bundleFingerprintSha256"])
+        self.assertEqual("8ada74bce12459d4ca422dbf3356d8ec1aa1d904093ec38e2f70184a4b12d157", manifest["bundleFingerprintSha256"])
         self.run_harness("BundleServerHarness", SERVER_JAR, workspace, manifest)
         self.run_harness("BundleClientHarness", CLIENT_JAR, workspace, manifest)
 
