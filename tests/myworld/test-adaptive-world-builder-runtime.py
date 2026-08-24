@@ -1708,6 +1708,23 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "LayeredPlayerLocationPersistence.restore(", player_service
         )
         self.assertIn('remember ? "remembered" : "initialized"', player_service)
+        login_handler = (
+            ROOT / "server/src/com/openrsc/server/net/rsc/LoginPacketHandler.java"
+        ).read_text()
+        self.assertIn(
+            "!AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(\n"
+            "\t\t\t\tloadedPlayer.getConfig())",
+            login_handler,
+        )
+        self.assertEqual(
+            5,
+            login_handler.count(
+                "applyFirstTimeLocation(loadedPlayer, firstTimeLocation);"
+            ),
+        )
+        self.assertNotIn(
+            "if (loadedPlayer.getLastLogin() == 0L)", login_handler
+        )
         player_session = (
             ROOT / "server/src/com/openrsc/server/content/worldedit/"
             "WorldBuilderPlayerSession.java"
