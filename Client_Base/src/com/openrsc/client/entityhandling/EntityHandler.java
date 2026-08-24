@@ -9989,9 +9989,11 @@ public class EntityHandler {
 			if (id < 0 || id >= npcs.size() || npcs.get(id) == null) throw new IllegalStateException("Project catalog references missing NPC " + id);
 			for (int layer = 0; layer < 12; layer++) {
 				int animation = npcs.get(id).getSprite(layer);
-				if (animation >= animations.size()) {
-					throw new IllegalStateException(
-						"Project NPC " + id + " references missing animation " + animation);
+				if (animation < -1 || animation >= animations.size()) {
+					npcs.get(id).sprites[layer] = -1;
+					System.out.println("PROJECT_NPC_VISUAL_PLACEHOLDER npcId=" + id
+						+ " layer=" + (layer + 1) + " animation=" + animation
+						+ " replacement=-1");
 				}
 			}
 		}
