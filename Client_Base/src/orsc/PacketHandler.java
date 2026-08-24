@@ -2533,7 +2533,14 @@ public class PacketHandler {
 		props.setProperty("S_ALLOW_RESIZE", allowResize == 1 ? "true" : "false"); // 49
 		props.setProperty("S_LENIENT_CONTACT_DETAILS", lenientContactDetails == 1 ? "true" : "false"); // 50
 		props.setProperty("S_WANT_FATIGUE", wantFatigue == 1 ? "true" : "false"); // 51
-		props.setProperty("S_WANT_CUSTOM_SPRITES", wantCustomSprites == 1 ? "true" : "false"); // 52
+		boolean projectContentSprites = WorldBuilderClientProfile.current()
+			.contentBundle().isPresent();
+		props.setProperty("S_WANT_CUSTOM_SPRITES",
+			wantCustomSprites == 1 || projectContentSprites ? "true" : "false"); // 52
+		if (projectContentSprites && wantCustomSprites != 1) {
+			System.out.println(
+				"WORLD_BUILDER_PROJECT_CUSTOM_SPRITES enabled=true source=project-content-bundle");
+		}
 		props.setProperty("S_WANT_PLAYER_COMMANDS", wantPlayerCommands == 1 ? "true" : "false"); // 53
 		props.setProperty("S_WANT_PETS", wantPets == 1 ? "true" : "false"); // 54
 		props.setProperty("S_MAX_WALKING_SPEED", Integer.toString(maxWalkingSpeed)); // 55

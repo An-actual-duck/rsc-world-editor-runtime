@@ -114,6 +114,10 @@ def write_real_project_content_bundle(bundle: Path, server_root: Path,
         row = copy.deepcopy(npc_document["npcs"][-1])
         row["id"] = npc_id
         row["name"] = f"Project content NPC {npc_id}"
+        if npc_id == 845:
+            row["sprites1"] = 250
+        else:
+            row["sprites12"] = 65535
         npc_document["npcs"].append(row)
     payloads[npc_path] = (json.dumps(npc_document, indent=4) + "\n").encode()
 
@@ -895,6 +899,7 @@ class AdaptiveBuilderRealLoginTest(unittest.TestCase):
                 "want_sync_scene_baseline": "true",
                 "monitor_online": "false",
                 "custom_landscape": "false",
+                "custom_sprites": "false",
                 "want_myworld": "false",
             }
             for key, value in replacements.items():
@@ -1109,6 +1114,10 @@ world_builder_initial_y: 648
                 )
                 if content_manifest is not None:
                     for marker in (
+                        "WORLD_BUILDER_PROJECT_CUSTOM_SPRITES enabled=true "
+                        "source=project-content-bundle",
+                        "PROJECT_NPC_VISUAL_PLACEHOLDER npcId=846 layer=12 "
+                        "animation=65535 replacement=-1",
                         "PROJECT_ITEM_VISUAL_INSTALLED itemId=9000 "
                         "source=asset.sprite.custom:items:0",
                         "PROJECT_ITEM_VISUAL_INSTALLED itemId=9001 "
