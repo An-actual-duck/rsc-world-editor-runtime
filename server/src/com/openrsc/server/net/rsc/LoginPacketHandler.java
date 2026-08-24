@@ -75,6 +75,25 @@ public class LoginPacketHandler {
 		}
 	}
 
+	private static void applyFirstTimeLocation(
+		final Player loadedPlayer,
+		final Point firstTimeLocation) {
+		if (loadedPlayer.getLastLogin() != 0L) {
+			return;
+		}
+		/*
+		 * Adaptive Builder location authority has already selected and persisted
+		 * the exact project-backed initial location while loading the player. The
+		 * ordinary account bootstrap point is a legacy game default and must not
+		 * overwrite that bound location after the load completes.
+		 */
+		if (!AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(
+				loadedPlayer.getConfig())) {
+			loadedPlayer.setInitialLocation(firstTimeLocation);
+		}
+		loadedPlayer.setChangingAppearance(true);
+	}
+
 	public void processLogin(Packet packet, Channel channel, Server server) {
 		final String IP = ((InetSocketAddress) channel.remoteAddress()).getAddress().getHostAddress();
 		ConnectionAttachment attachment = channel.attr(RSCConnectionHandler.attachment).get();
@@ -218,10 +237,7 @@ public class LoginPacketHandler {
 
 								attachment.authenticClient.set((short) clientVersion.get());
 
-								if (loadedPlayer.getLastLogin() == 0L) {
-									loadedPlayer.setInitialLocation(firstTimeLocation);
-									loadedPlayer.setChangingAppearance(true);
-								}
+								applyFirstTimeLocation(loadedPlayer, firstTimeLocation);
 
 								loadedPlayer.setClientVersion((short) getVersion(clientVersion.get(), loadedPlayer));
 								loadedPlayer.setClientLimitations(cl);
@@ -300,10 +316,7 @@ public class LoginPacketHandler {
 
 								attachment.authenticClient.set((short) clientVersion.get());
 
-								if (loadedPlayer.getLastLogin() == 0L) {
-									loadedPlayer.setInitialLocation(firstTimeLocation);
-									loadedPlayer.setChangingAppearance(true);
-								}
+								applyFirstTimeLocation(loadedPlayer, firstTimeLocation);
 
 								loadedPlayer.setClientVersion((short) getVersion(clientVersion.get(), loadedPlayer));
 								loadedPlayer.setClientLimitations(cl);
@@ -381,10 +394,7 @@ public class LoginPacketHandler {
 
 									attachment.authenticClient.set((short) clientVersion.get());
 
-									if (loadedPlayer.getLastLogin() == 0L) {
-										loadedPlayer.setInitialLocation(firstTimeLocation);
-										loadedPlayer.setChangingAppearance(true);
-									}
+									applyFirstTimeLocation(loadedPlayer, firstTimeLocation);
 
 									loadedPlayer.setClientVersion((short) getVersion(clientVersion.get(), loadedPlayer));
 									loadedPlayer.setClientLimitations(cl);
@@ -449,10 +459,7 @@ public class LoginPacketHandler {
 
 								attachment.authenticClient.set((short) clientVersion.get());
 
-								if (loadedPlayer.getLastLogin() == 0L) {
-									loadedPlayer.setInitialLocation(firstTimeLocation);
-									loadedPlayer.setChangingAppearance(true);
-								}
+								applyFirstTimeLocation(loadedPlayer, firstTimeLocation);
 
 								loadedPlayer.setClientVersion((short) getVersion(clientVersion.get(), loadedPlayer));
 								loadedPlayer.setClientLimitations(cl);
@@ -576,10 +583,7 @@ public class LoginPacketHandler {
 							/* Server Configs */
 							ActionSender.sendServerConfigs(loadedPlayer);
 
-							if (loadedPlayer.getLastLogin() == 0L) {
-								loadedPlayer.setInitialLocation(firstTimeLocation);
-								loadedPlayer.setChangingAppearance(true);
-							}
+							applyFirstTimeLocation(loadedPlayer, firstTimeLocation);
 
 							loadedPlayer.setClientVersion(clientVersion);
 							loadedPlayer.setClientLimitations(cl);
