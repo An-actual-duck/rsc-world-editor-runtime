@@ -1143,6 +1143,18 @@ world_builder_initial_y: 648
                         "Adaptive World Builder binding accepted for authenticated player Builder"
                     ),
                 )
+                self.assertEqual(
+                    1,
+                    server_evidence.count(
+                        "adaptive-world-builder player location initialized"
+                    ),
+                )
+                self.assertEqual(
+                    1,
+                    server_evidence.count(
+                        "adaptive-world-builder player location remembered"
+                    ),
+                )
                 self.assertIn(
                     "location=WorldLocation{worldSpace=global, "
                     "coordinate=WorldCoordinate{x=120, y=648, level=0}}",
