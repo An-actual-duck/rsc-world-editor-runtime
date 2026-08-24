@@ -238,6 +238,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 			records.add(row);
 		}
 		validateExactTree(root, paths.values(), specs.size());
+		validateNpcRegistry(paths, catalog);
 		if (v2) {
 			validateItemVisualEvidence(paths.get("metadata.item-visuals"), itemVisuals);
 			validateItemVisualArchives(paths, itemVisuals);
@@ -367,6 +368,54 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 			result.add(Integer.valueOf(value));
 		}
 		return result;
+	}
+
+	private static void validateNpcRegistry(
+		Map<String,Path> paths, JSONObject catalog) throws IOException {
+		int count = definitionArray(paths.get("definition.npc.base"), "NPC base").length()
+			+ definitionArray(paths.get("definition.npc.custom"), "NPC custom").length();
+		if (count < 1 || count > 65536) {
+			throw new IOException("Project NPC sequential registry is outside 1..65536");
+		}
+		JSONArray ids = array(catalog, "npcs", "definition catalog");
+		for (int index = 0; index < ids.length(); index++) {
+			int id = ids.getInt(index);
+			if (id < 0 || id >= count) {
+				throw new IOException("Project NPC catalog ID " + id
+					+ " is not backed by the sequential definition registry");
+			}
+		}
+		for (String role : Arrays.asList("definition.npc.patch", "definition.npc.world")) {
+			JSONArray rows = definitionArray(paths.get(role), role);
+			for (int index = 0; index < rows.length(); index++) {
+				Object raw = rows.get(index);
+				if (!(raw instanceof JSONObject)) {
+					throw new IOException(role + " row is not an object");
+				}
+				int id = ((JSONObject)raw).getInt("id");
+				if (id < 0 || id >= count) {
+					throw new IOException(role + " references undefined NPC ID " + id);
+				}
+			}
+		}
+	}
+
+	private static JSONArray definitionArray(Path path, String label) throws IOException {
+		String text = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+		JSONObject document;
+		try {
+			document = new JSONObject(text);
+		} catch (RuntimeException malformed) {
+			throw new IOException(label + " definition JSON is malformed", malformed);
+		}
+		String[] names = JSONObject.getNames(document);
+		if (names == null || names.length != 1
+			|| !(document.opt(names[0]) instanceof JSONArray)) {
+			throw new IOException(label + " must contain exactly one definition array");
+		}
+		JSONArray rows = document.getJSONArray(names[0]);
+		if (rows.length() > 65536) throw new IOException(label + " exceeds 65,536 rows");
+		return rows;
 	}
 
 	private static void validateBindings(JSONArray rows) throws IOException {

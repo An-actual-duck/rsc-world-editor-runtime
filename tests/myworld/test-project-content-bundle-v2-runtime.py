@@ -19,12 +19,12 @@ SERVER_JAR = ROOT / "server/core.jar"
 CLIENT_JAR = ROOT / "Client_Base/Open_RSC_Client.jar"
 EDITOR_FIXTURE = ROOT / "tests/myworld/fixtures/editor-da94ead-project-content-v2"
 EDITOR_BUNDLE = EDITOR_FIXTURE / "bundle"
-EDITOR_MANIFEST_SHA256 = "ec4f049954860e799d3de822fc8801c1c155f3a595db0baba8a8ec34d041fac9"
+EDITOR_MANIFEST_SHA256 = "4f2f04523dc5410383763339f2b43afdaac28429d8cfcda480d4a07055f9dd98"
 EDITOR_FINGERPRINTS = {
-    "definitionFingerprintSha256": "f97a96299023e4cf1d738c1f3520af0c2e4339ed95aab952814832cc77e52baf",
+    "definitionFingerprintSha256": "8c665783e452affe6d385f3c01639025a17b2d676b2e38d9ebf944d0cbbd0dab",
     "assetFingerprintSha256": "e0ab18b793a91db852557689b9734eeb1d459e216be61b902d75a69e6e2c5bfa",
     "itemVisualFingerprintSha256": "f9aaf43d6cac1c96bbf10d129e1976f9638562036e1b187f684e7219a7cda8d3",
-    "bundleFingerprintSha256": "88542556c723be2c4312f48eb2b42f65fb08a169edd21afa55eda075c6d4aa8b",
+    "bundleFingerprintSha256": "e78509ce33f8fcfcc452ead2bd0a0b3cd10ca0263218b143a6f180b12aaea0e0",
 }
 
 REAL_LOGIN_PATH = ROOT / "tests/myworld/test-adaptive-builder-real-login.py"
@@ -270,7 +270,7 @@ class BundleV2RuntimeTest(unittest.TestCase):
         for mutation in (
             "hostile", "missing", "duplicate", "archive-entry",
             "evidence-identity", "raw-osar", "truncated-gzip",
-            "authentic-path", "authentic-payload",
+            "authentic-path", "authentic-payload", "npc-registry",
         ):
             with self.subTest(mutation=mutation):
                 workspace, manifest = self.workspace()
@@ -313,12 +313,18 @@ class BundleV2RuntimeTest(unittest.TestCase):
                     )
                     with zipfile.ZipFile(archive, "w") as target:
                         target.writestr(entry, payload if mutation == "authentic-path" else payload[:-4])
+                elif mutation == "npc-registry":
+                    path = bundle / "files/server/conf/server/defs/NpcDefsCustom.json"
+                    npc_document = json.loads(path.read_text())
+                    npc_document["npcs"] = npc_document["npcs"][:1]
+                    path.write_text(json.dumps(npc_document, sort_keys=True, indent=2) + "\n")
                 (bundle / "manifest.json").write_text(
                     json.dumps(document, sort_keys=True, indent=2) + "\n"
                 )
                 if mutation in (
                     "archive-entry", "evidence-identity", "raw-osar",
                     "truncated-gzip", "authentic-path", "authentic-payload",
+                    "npc-registry",
                 ):
                     manifest = resign(bundle)
                 self.run_harnesses(workspace, manifest, success=False)
