@@ -52,6 +52,8 @@ public class EntityHandler {
 	private static final ArrayList<ElevationDef> elevation = REGISTRY.mutableElevations();
 	private static final ArrayList<GameObjectDef> objects = REGISTRY.mutableObjects();
 	private static final Set<String> PROJECT_REQUIRED_MODELS = new HashSet<>();
+	private static final LinkedHashMap<Integer, String> PROJECT_PACKAGED_MODEL_FALLBACKS =
+		new LinkedHashMap<>();
 	public static ItemDef noteDef, certificateDef;
 
 	private static final int[] MYWORLD_STAFF_BASE_IDS = {
@@ -123,6 +125,10 @@ public class EntityHandler {
 
 	public static boolean isProjectRequiredModel(String name) {
 		return PROJECT_REQUIRED_MODELS.contains(name);
+	}
+
+	public static String getProjectPackagedModelFallback(int sceneryId) {
+		return PROJECT_PACKAGED_MODEL_FALLBACKS.get(sceneryId);
 	}
 
 	public static int invPictureCount() {
@@ -9977,7 +9983,13 @@ public class EntityHandler {
 	private static void loadProjectScenery(Path path) throws Exception {
 		NodeList rows = projectXml(path, "GameObjectDef-array").getElementsByTagName("GameObjectDef");
 		int packagedCount = objects.size();
+		LinkedHashMap<Integer, String> packagedModels = new LinkedHashMap<>();
+		for (int id = 0; id < packagedCount; id++) {
+			GameObjectDef packaged = objects.get(id);
+			if (packaged != null) packagedModels.put(id, packaged.getObjectModel());
+		}
 		PROJECT_REQUIRED_MODELS.clear();
+		PROJECT_PACKAGED_MODEL_FALLBACKS.clear();
 		objects.clear();
 		for (int id = 0; id < rows.getLength(); id++) {
 			Element row = (Element) rows.item(id);
@@ -9988,8 +10000,19 @@ public class EntityHandler {
 			objects.add(value);
 			if (id >= packagedCount) {
 				PROJECT_REQUIRED_MODELS.add(value.getObjectModel());
+			} else {
+				String requested = value.getObjectModel();
+				String packaged = packagedModels.get(id);
+				if (isUsableModelName(requested) && isUsableModelName(packaged)
+					&& !requested.equalsIgnoreCase(packaged)) {
+					PROJECT_PACKAGED_MODEL_FALLBACKS.put(id, packaged);
+				}
 			}
 		}
+	}
+
+	private static boolean isUsableModelName(String name) {
+		return name != null && !name.trim().isEmpty() && !"na".equalsIgnoreCase(name.trim());
 	}
 
 	private static void validateProjectCatalog(JSONObject catalog) {

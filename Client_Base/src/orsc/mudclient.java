@@ -20892,6 +20892,18 @@ public final class mudclient implements Runnable {
 			errorLoadingData = true;
 			return;
 		}
+		for (int sceneryId = 0; sceneryId < EntityHandler.objectCount(); sceneryId++) {
+			GameObjectDef object = EntityHandler.getObjectDef(sceneryId);
+			if (object == null) continue;
+			String requested = object.getObjectModel();
+			String resolved = ProjectSceneryModelFallbackResolver.resolve(models, requested,
+				EntityHandler.getProjectPackagedModelFallback(sceneryId));
+			if (!requested.equals(resolved)) {
+				object.modelID = EntityHandler.storeModel(resolved);
+				System.out.println("PROJECT_SCENERY_MODEL_ALIAS_RESOLVED sceneryId=" + sceneryId
+					+ " requested=" + requested + " resolved=" + resolved);
+			}
+		}
 
 		for (int j = 0; j < EntityHandler.getModelCount(); j++) {
 			String modelName = EntityHandler.getModelName(j);

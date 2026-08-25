@@ -145,6 +145,17 @@ NPCs, and items plus the existing client `library.orsc`, `models.orsc`,
 Loose images, loose models, scripts, classes, plug-ins, and target behavior are
 not content-bundle inputs and are never executed.
 
+For an in-range scenery ID, a captured server definition can name a historical
+model alias that the packaged client never used and the captured model archive
+does not contain. The client retains its trusted packaged definition for that
+same ID while applying the project catalog. At model-load time it uses that
+packaged model only when the requested archive entry is proven absent and the
+packaged entry is proven present. A real project model always wins, explicit
+empty/`na` models remain invisible, and beyond-packaged scenery IDs still
+require their exact project model. Each activated alias resolution is reported
+with its scenery ID and both model names; no target code is executed to infer
+the mapping.
+
 ### Versioned item-visual closure
 
 `project-local-custom-content-v1` cannot author a new ground-item visual. The
