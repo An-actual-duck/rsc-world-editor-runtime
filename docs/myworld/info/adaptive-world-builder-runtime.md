@@ -13,16 +13,16 @@ target path and accepts authored output only inside the selected project.
 ## Stable identities
 
 The machine-readable source of truth is
-`server/conf/world-builder/adaptive-runtime-capability-v4.json`. Server and
+`server/conf/world-builder/adaptive-runtime-capability-v5.json`. Server and
 client code independently pin the same values.
 
 | Role | Identity |
 |---|---|
-| Capability | `adaptive-world-builder-runtime-capability-v4` |
+| Capability | `adaptive-world-builder-runtime-capability-v5` |
 | Runtime profile | `adaptive-world-builder` |
-| Server build | `rsc-world-editor-runtime-adaptive-builder-server-v4` |
-| Client build | `rsc-world-editor-runtime-adaptive-builder-client-v4` |
-| Loader | `generic-signed-layered-loader-v5-project-content-bundle-v2` |
+| Server build | `rsc-world-editor-runtime-adaptive-builder-server-v5` |
+| Client build | `rsc-world-editor-runtime-adaptive-builder-client-v5` |
+| Loader | `generic-signed-layered-loader-v6-project-content-bundle-v3` |
 | Authoring | `generic-signed-layered-authoring-v2-u16-elevation` |
 | Definition binding | `world-builder-definition-catalog-binding-v1` |
 | Client asset binding | `world-builder-client-asset-binding-v1` |
@@ -135,9 +135,10 @@ and asset IDs/hashes/evidence paths, and the initial global coordinate. The
 definition and asset evidence files must be inside `working/`.
 
 Target-backed projects bind the Editor-owned
-`project-local-custom-content-v2` capability. The only accepted content input
+`project-local-custom-content-v3` capability. Bundle v1 and v2 remain accepted
+for existing projects. The only accepted content input
 is the exact `working/content-bundle` directory with manifest type
-`world-builder-project-content-bundle`, schema version 2. Its closed inventory
+`world-builder-project-content-bundle`, schema version 3. Its closed inventory
 contains captured server definition files for tiles, boundaries, scenery,
 NPCs, and items plus the existing client `library.orsc`, `models.orsc`,
 `Authentic_Sprites.orsc`, `Custom_Sprites.osar`, and `Menus.osar` archives.
@@ -206,6 +207,26 @@ one-less than unsigned-byte terrain values, so their exact catalog range is
 `0..254`, and their XML colour/material fields are the visual definition.
 Scenery, NPC, and ground-item placement IDs are unsigned-short values
 `0..65535`.
+
+### Versioned NPC animation-registry closure
+
+Bundle v3 adds the definition-evidence role `metadata.npc-animations` at
+`server/conf/world-builder/npc-animations-v1.json`. Its exact manifest type is
+`world-builder-npc-animation-registry`, schema version 1. Records are sorted by
+unique `animationId` and preserve the target's `name`, `category`, signed
+colour and gender fields, combat/special-frame flags, exact 15/18/27 renderer
+shape, custom OSAR subspace/entry/hash, authentic base sprite ID, and one
+SHA-256 for every consecutive authentic frame.
+
+Both processes structurally decode the bound custom archive, require the exact
+`category/name` entry and renderer frame count, and verify every authentic
+frame payload before authentication. The client installs the definitions by
+their original IDs before loading project NPCs, including safe sparse IDs, so
+private-server NPC definitions no longer depend on a coincidentally matching
+packaged animation registry. Unknown keys, duplicate IDs, unsafe names,
+special frames without combat frames, missing entries, malformed archives,
+nonconsecutive ranges, and hash drift fail closed. No target classes or JARs
+are inspected or executed.
 
 Both processes receive and independently verify these properties:
 

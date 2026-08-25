@@ -37,12 +37,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Strict consumer for the Editor-owned project-content-bundle-v1/v2 contract.
+ * Strict consumer for the Editor-owned project-content-bundle-v1/v2/v3 contract.
  * The bundle contains captured declarative definitions and existing client
  * archives only. It never discovers or executes target classes, scripts, or
  * plug-ins.
  */
 public final class AdaptiveWorldBuilderProjectContentBundle {
+	public static final String CAPABILITY_ID_V3 = "project-local-custom-content-v3";
 	public static final String CAPABILITY_ID = "project-local-custom-content-v2";
 	public static final String CAPABILITY_ID_V1 = "project-local-custom-content-v1";
 	public static final String MANIFEST_TYPE =
@@ -80,6 +81,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 
 	private static final List<Spec> SPECS_V1 = specs(false);
 	private static final List<Spec> SPECS_V2 = specs(true);
+	private static final List<Spec> SPECS_V3 = specs(3);
 	private static final List<Binding> BINDINGS = bindings();
 	private static final AdaptiveWorldBuilderProjectContentBundle EMPTY =
 		new AdaptiveWorldBuilderProjectContentBundle(
@@ -134,8 +136,10 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 			return EMPTY;
 		}
 		String capability = trim(config.WORLD_BUILDER_CONTENT_CAPABILITY_ID);
+		boolean v3 = CAPABILITY_ID_V3.equals(capability);
 		boolean v2 = CAPABILITY_ID.equals(capability);
-		if (!v2 && !CAPABILITY_ID_V1.equals(capability)) {
+		boolean successor = v2 || v3;
+		if (!successor && !CAPABILITY_ID_V1.equals(capability)) {
 			throw new IOException("Project content capability identity is unsupported");
 		}
 		requireSha(config.WORLD_BUILDER_CONTENT_BUNDLE_SHA256,
@@ -146,7 +150,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 			"content asset fingerprint");
 		requireSha(config.WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256,
 			"content item visual fingerprint");
-		if (!v2 && !ZERO_HASH.equals(
+		if (!successor && !ZERO_HASH.equals(
 				config.WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256)) {
 			throw new IOException("Bundle-v1 item visual fingerprint must be zero");
 		}
@@ -174,9 +178,9 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		} catch (RuntimeException failure) {
 			throw new IOException("Project content manifest is invalid JSON", failure);
 		}
-		requireKeys(manifest, v2 ? ROOT_KEYS_V2 : ROOT_KEYS_V1,
+		requireKeys(manifest, successor ? ROOT_KEYS_V2 : ROOT_KEYS_V1,
 			"project content manifest");
-		requireInteger(manifest, "schemaVersion", v2 ? 2 : 1,
+		requireInteger(manifest, "schemaVersion", v3 ? 3 : v2 ? 2 : 1,
 			"project content manifest");
 		requireText(manifest, "manifestType", MANIFEST_TYPE,
 			"project content manifest");
@@ -187,15 +191,15 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 
 		JSONObject catalog = object(manifest, "definitionCatalog",
 			"project content manifest");
-		List<Integer> groundItems = validateCatalog(catalog, v2);
-		Map<Integer, ItemVisual> itemVisuals = v2
+		List<Integer> groundItems = validateCatalog(catalog, successor);
+		Map<Integer, ItemVisual> itemVisuals = successor
 			? validateItemVisuals(array(manifest, "itemVisuals",
 				"project content manifest"), groundItems)
 			: Collections.<Integer, ItemVisual>emptyMap();
 		validateBindings(array(manifest, "familyBindings",
 			"project content manifest"));
 		JSONArray rows = array(manifest, "files", "project content manifest");
-		List<Spec> specs = v2 ? SPECS_V2 : SPECS_V1;
+		List<Spec> specs = v3 ? SPECS_V3 : v2 ? SPECS_V2 : SPECS_V1;
 		if (rows.length() != specs.size()) {
 			throw new IOException("Project content inventory must contain exactly "
 				+ specs.size() + " files");
@@ -239,9 +243,15 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		}
 		validateExactTree(root, paths.values(), specs.size());
 		validateNpcRegistry(paths, catalog);
-		if (v2) {
+		if (successor) {
 			validateItemVisualEvidence(paths.get("metadata.item-visuals"), itemVisuals);
 			validateItemVisualArchives(paths, itemVisuals);
+		}
+		if (v3) {
+			AdaptiveWorldBuilderNpcAnimationRegistry.validate(
+				paths.get("metadata.npc-animations"),
+				paths.get("asset.sprite.custom"),
+				paths.get("asset.sprite.authentic"));
 		}
 
 		String catalogHash = text(catalog, "catalogSha256",
@@ -256,17 +266,17 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 			"project content manifest");
 		String assets = text(manifest, "assetFingerprintSha256",
 			"project content manifest");
-		// Bundle v2 producer identities are opaque values authenticated by the
+		// Bundle v2/v3 producer identities are opaque values authenticated by the
 		// self-fingerprinted manifest; v1 retains its legacy record derivation.
 		if (!SHA256.matcher(definition).matches() || !SHA256.matcher(assets).matches()
-			|| (!v2 && (!definition.equals(calculatedDefinition)
+			|| (!successor && (!definition.equals(calculatedDefinition)
 				|| !assets.equals(calculatedAssets)))) {
 			throw new IOException("Project content domain fingerprint mismatch");
 		}
-		String itemVisualHash = v2
+		String itemVisualHash = successor
 			? text(manifest, "itemVisualFingerprintSha256", "project content manifest")
 			: ZERO_HASH;
-		if (v2) {
+		if (successor) {
 			String expectedItemVisual = sha256((
 				"world-builder-project-content-item-visuals-v1\n"
 					+ canonical(array(manifest, "itemVisuals",
@@ -282,7 +292,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		JSONObject zeroed = new JSONObject(manifest.toString());
 		zeroed.put("bundleFingerprintSha256", ZERO_HASH);
 		String calculatedBundle = sha256((
-			"world-builder-project-content-bundle-v" + (v2 ? "2" : "1")
+			"world-builder-project-content-bundle-v" + (v3 ? "3" : v2 ? "2" : "1")
 				+ "\n" + canonical(zeroed))
 			.getBytes(StandardCharsets.UTF_8));
 		if (!bundle.equals(calculatedBundle)) {
@@ -300,7 +310,7 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 				"Project item visual identity differs from the launched identity");
 		}
 		return new AdaptiveWorldBuilderProjectContentBundle(
-			root, catalog, paths, itemVisuals, v2 ? 2 : 1,
+			root, catalog, paths, itemVisuals, v3 ? 3 : v2 ? 2 : 1,
 			text(catalog, "catalogId", "definition catalog"),
 			bundle, definition, assets, itemVisualHash);
 	}
@@ -958,6 +968,9 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 	}
 
 	private static List<Spec> specs(boolean v2) {
+		return specs(v2 ? 2 : 1);
+	}
+	private static List<Spec> specs(int version) {
 		List<Spec> values = Arrays.asList(
 			new Spec("asset.sprite.authentic", "client/Cache/video/Authentic_Sprites.orsc", "application/vnd.openrsc.archive", false, false),
 			new Spec("asset.sprite.custom", "client/Cache/video/Custom_Sprites.osar", "application/gzip", false, false),
@@ -975,11 +988,16 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 			new Spec("definition.npc.world", "server/conf/server/defs/NpcDefsMyWorld.json", "application/json", true, false),
 			new Spec("definition.npc.patch", "server/conf/server/defs/NpcDefsPatch18.json", "application/json", true, false),
 			new Spec("definition.tile", "server/conf/server/defs/TileDef.xml", "application/xml", true, false));
-		if (v2) {
+		if (version >= 2) {
 			values = new ArrayList<Spec>(values);
 			values.add(new Spec("metadata.item-visuals",
 				"server/conf/world-builder/item-visuals-v1.json",
 				"application/json", false, true));
+		}
+		if (version >= 3) {
+			values.add(new Spec("metadata.npc-animations",
+				"server/conf/world-builder/npc-animations-v1.json",
+				"application/json", true, true));
 		}
 		Collections.sort(values, new Comparator<Spec>() {
 			public int compare(Spec left, Spec right) { return left.runtimePath.compareTo(right.runtimePath); }
@@ -1050,6 +1068,10 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 		Binding(String family, List<String> definitionRoles, List<String> assetRoles) {
 			this.family = family; this.definitionRoles = definitionRoles; this.assetRoles = assetRoles;
 		}
+	}
+
+	static void validateStrictJson(String document) throws IOException {
+		StrictJsonScanner.validate(document);
 	}
 
 	/** Minimal strict scanner used before org.json so duplicate keys fail closed. */

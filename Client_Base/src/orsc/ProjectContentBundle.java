@@ -36,8 +36,9 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/** Client-side verifier and path router for project-content-bundle-v1/v2. */
+/** Client-side verifier and path router for project-content-bundle-v1/v2/v3. */
 public final class ProjectContentBundle {
+	public static final String CAPABILITY_ID_V3 = "project-local-custom-content-v3";
 	public static final String CAPABILITY_ID = "project-local-custom-content-v2";
 	public static final String CAPABILITY_ID_V1 = "project-local-custom-content-v1";
 	private static final String MANIFEST_TYPE = "world-builder-project-content-bundle";
@@ -47,22 +48,28 @@ public final class ProjectContentBundle {
 	private static final long MAX_FILE = 256L * 1024L * 1024L;
 	private static final List<Spec> SPECS_V1 = specs(false);
 	private static final List<Spec> SPECS_V2 = specs(true);
+	private static final List<Spec> SPECS_V3 = specs(3);
 	private static final ProjectContentBundle EMPTY =
 		new ProjectContentBundle(null, null, Collections.<String, Path>emptyMap(),
 			Collections.<Integer, ItemVisual>emptyMap(),
-			Collections.<Integer, Sprite>emptyMap(), 0, ZERO_HASH);
+			Collections.<Integer, Sprite>emptyMap(),
+			Collections.<Integer, ProjectNpcAnimationRegistry.EntryDef>emptyMap(),
+			0, ZERO_HASH);
 
 	private final Path root;
 	private final JSONObject catalog;
 	private final Map<String, Path> paths;
 	private final Map<Integer, ItemVisual> itemVisuals;
 	private final Map<Integer, Sprite> itemSprites;
+	private final Map<Integer, ProjectNpcAnimationRegistry.EntryDef> npcAnimations;
 	private final int schemaVersion;
 	private final String itemVisualSha256;
 
 	private ProjectContentBundle(Path root, JSONObject catalog,
 		Map<String, Path> paths, Map<Integer, ItemVisual> itemVisuals,
-		Map<Integer, Sprite> itemSprites, int schemaVersion,
+		Map<Integer, Sprite> itemSprites,
+		Map<Integer, ProjectNpcAnimationRegistry.EntryDef> npcAnimations,
+		int schemaVersion,
 		String itemVisualSha256) {
 		this.root = root;
 		this.catalog = catalog;
@@ -72,6 +79,8 @@ public final class ProjectContentBundle {
 			new LinkedHashMap<Integer, ItemVisual>(itemVisuals));
 		this.itemSprites = Collections.unmodifiableMap(
 			new LinkedHashMap<Integer, Sprite>(itemSprites));
+		this.npcAnimations = Collections.unmodifiableMap(
+			new LinkedHashMap<Integer, ProjectNpcAnimationRegistry.EntryDef>(npcAnimations));
 		this.schemaVersion = schemaVersion;
 		this.itemVisualSha256 = itemVisualSha256;
 	}
@@ -100,13 +109,15 @@ public final class ProjectContentBundle {
 			}
 			return EMPTY;
 		}
+		boolean v3 = CAPABILITY_ID_V3.equals(capability);
 		boolean v2 = CAPABILITY_ID.equals(capability);
-		if ((!v2 && !CAPABILITY_ID_V1.equals(capability))
+		boolean successor = v2 || v3;
+		if ((!successor && !CAPABILITY_ID_V1.equals(capability))
 			|| !SHA.matcher(expectedBundle).matches()
 			|| !SHA.matcher(expectedDefinitions).matches()
 			|| !SHA.matcher(expectedAssets).matches()
 			|| !SHA.matcher(expectedItemVisuals).matches()
-			|| (!v2 && !ZERO_HASH.equals(expectedItemVisuals))) {
+			|| (!successor && !ZERO_HASH.equals(expectedItemVisuals))) {
 			throw new IOException("Project content launch identities are invalid");
 		}
 		Path expected = workspaceRoot.resolve("working/content-bundle")
@@ -123,7 +134,7 @@ public final class ProjectContentBundle {
 		String document = new String(Files.readAllBytes(manifestPath), StandardCharsets.UTF_8);
 		StrictJsonScanner.validate(document);
 		JSONObject manifest = new JSONObject(document);
-		requireKeys(manifest, v2 ? set(
+		requireKeys(manifest, successor ? set(
 			"schemaVersion", "manifestType", "capabilityId", "sourceKind",
 			"definitionCatalog", "itemVisuals", "familyBindings", "files",
 			"definitionFingerprintSha256", "assetFingerprintSha256",
@@ -132,19 +143,19 @@ public final class ProjectContentBundle {
 			"definitionCatalog", "familyBindings", "files",
 			"definitionFingerprintSha256", "assetFingerprintSha256",
 			"bundleFingerprintSha256"));
-		expectInt(manifest, "schemaVersion", v2 ? 2 : 1);
+		expectInt(manifest, "schemaVersion", v3 ? 3 : v2 ? 2 : 1);
 		expect(manifest, "manifestType", MANIFEST_TYPE);
 		expect(manifest, "capabilityId", capability);
 		expect(manifest, "sourceKind", "target-adopted");
 		JSONObject catalog = manifest.getJSONObject("definitionCatalog");
-		List<Integer> groundItems = validateCatalog(catalog, v2);
-		Map<Integer, ItemVisual> itemVisuals = v2
+		List<Integer> groundItems = validateCatalog(catalog, successor);
+		Map<Integer, ItemVisual> itemVisuals = successor
 			? validateItemVisuals(manifest.getJSONArray("itemVisuals"), groundItems)
 			: Collections.<Integer, ItemVisual>emptyMap();
 		validateBindings(manifest.getJSONArray("familyBindings"));
 
 		JSONArray rows = manifest.getJSONArray("files");
-		List<Spec> specs = v2 ? SPECS_V2 : SPECS_V1;
+		List<Spec> specs = v3 ? SPECS_V3 : v2 ? SPECS_V2 : SPECS_V1;
 		if (rows.length() != specs.size()) throw new IOException("Content inventory is incomplete");
 		Map<String, Path> paths = new LinkedHashMap<String, Path>();
 		List<JSONObject> records = new ArrayList<JSONObject>();
@@ -177,13 +188,17 @@ public final class ProjectContentBundle {
 		Set<Path> expectedFiles = new HashSet<Path>(paths.values()); expectedFiles.add(manifestPath);
 		if (!actual.equals(expectedFiles)) throw new IOException("Content bundle contains extra files");
 		validateNpcRegistry(paths, catalog);
-		if (v2) {
+		if (successor) {
 			validateItemVisualEvidence(paths.get("metadata.item-visuals"), itemVisuals);
 			validateItemVisualArchives(paths, itemVisuals);
 		}
-		Map<Integer, Sprite> itemSprites = v2
+		Map<Integer, Sprite> itemSprites = successor
 			? decodeItemVisuals(paths, itemVisuals)
 			: Collections.<Integer, Sprite>emptyMap();
+		Map<Integer, ProjectNpcAnimationRegistry.EntryDef> npcAnimations = v3
+			? ProjectNpcAnimationRegistry.load(paths.get("metadata.npc-animations"),
+				paths.get("asset.sprite.custom"), paths.get("asset.sprite.authentic"))
+			: Collections.<Integer, ProjectNpcAnimationRegistry.EntryDef>emptyMap();
 
 		String calculatedDefinition = fingerprint("world-builder-project-content-definitions-v1\n",
 			records, specs, true,
@@ -192,18 +207,18 @@ public final class ProjectContentBundle {
 			records, specs, false, "");
 		String definition = manifest.getString("definitionFingerprintSha256");
 		String assets = manifest.getString("assetFingerprintSha256");
-		// Bundle v2 producer identities are opaque values authenticated by the
+		// Bundle v2/v3 producer identities are opaque values authenticated by the
 		// self-fingerprinted manifest; v1 retains its legacy record derivation.
 		if (!SHA.matcher(definition).matches() || !SHA.matcher(assets).matches()
-			|| (!v2 && (!definition.equals(calculatedDefinition)
+			|| (!successor && (!definition.equals(calculatedDefinition)
 				|| !assets.equals(calculatedAssets)))) {
 			throw new IOException("Content domain fingerprint mismatch");
 		}
 		JSONObject zero = new JSONObject(manifest.toString());
 		zero.put("bundleFingerprintSha256", ZERO_HASH);
-		String itemVisualHash = v2
+		String itemVisualHash = successor
 			? manifest.getString("itemVisualFingerprintSha256") : ZERO_HASH;
-		if (v2) {
+		if (successor) {
 			String calculated = sha256((
 				"world-builder-project-content-item-visuals-v1\n"
 					+ canonical(manifest.getJSONArray("itemVisuals")))
@@ -213,7 +228,7 @@ public final class ProjectContentBundle {
 			}
 		}
 		String bundle = sha256(("world-builder-project-content-bundle-v"
-			+ (v2 ? "2" : "1") + "\n"
+			+ (v3 ? "3" : v2 ? "2" : "1") + "\n"
 			+ canonical(zero)).getBytes(StandardCharsets.UTF_8));
 		if (!bundle.equals(manifest.getString("bundleFingerprintSha256"))
 			|| !bundle.equals(expectedBundle) || !definition.equals(expectedDefinitions)
@@ -222,7 +237,7 @@ public final class ProjectContentBundle {
 			throw new IOException("Content identity differs between client and server");
 		}
 		return new ProjectContentBundle(root, catalog, paths, itemVisuals, itemSprites,
-			v2 ? 2 : 1, itemVisualHash);
+			npcAnimations, v3 ? 3 : v2 ? 2 : 1, itemVisualHash);
 	}
 
 	public boolean isPresent() { return root != null; }
@@ -231,6 +246,7 @@ public final class ProjectContentBundle {
 	public String itemVisualSha256() { return itemVisualSha256; }
 	public ItemVisual itemVisual(int itemId) { return itemVisuals.get(Integer.valueOf(itemId)); }
 	public Map<Integer, ItemVisual> itemVisuals() { return itemVisuals; }
+	public Map<Integer, ProjectNpcAnimationRegistry.EntryDef> npcAnimations() { return npcAnimations; }
 	public Sprite itemSprite(int itemId) { return itemSprites.get(Integer.valueOf(itemId)); }
 	public boolean hasAuthenticItemVisuals() {
 		for (ItemVisual visual : itemVisuals.values()) if (visual.authenticSpriteId != null) return true;
@@ -256,7 +272,8 @@ public final class ProjectContentBundle {
 		return path;
 	}
 	public Path assetForRuntimePath(String runtimePath) {
-		for (Spec spec : schemaVersion == 2 ? SPECS_V2 : SPECS_V1)
+		for (Spec spec : schemaVersion == 3 ? SPECS_V3
+			: schemaVersion == 2 ? SPECS_V2 : SPECS_V1)
 			if (!spec.definition && !spec.metadata && spec.path.equals(runtimePath)) return path(spec.role);
 		return null;
 	}
@@ -698,6 +715,9 @@ public final class ProjectContentBundle {
 	private static String hex(byte[] bytes) { StringBuilder out = new StringBuilder(); for (byte value : bytes) out.append(String.format("%02x", value & 0xff)); return out.toString(); }
 
 	private static List<Spec> specs(boolean v2) {
+		return specs(v2 ? 2 : 1);
+	}
+	private static List<Spec> specs(int version) {
 		List<Spec> values = Arrays.asList(
 			new Spec("asset.sprite.authentic", "client/Cache/video/Authentic_Sprites.orsc", "application/vnd.openrsc.archive", false, false),
 			new Spec("asset.sprite.custom", "client/Cache/video/Custom_Sprites.osar", "application/gzip", false, false),
@@ -715,9 +735,14 @@ public final class ProjectContentBundle {
 			new Spec("definition.npc.world", "server/conf/server/defs/NpcDefsMyWorld.json", "application/json", true, false),
 			new Spec("definition.npc.patch", "server/conf/server/defs/NpcDefsPatch18.json", "application/json", true, false),
 			new Spec("definition.tile", "server/conf/server/defs/TileDef.xml", "application/xml", true, false));
-		if (v2) {
+		if (version >= 2) {
 			values = new ArrayList<Spec>(values);
 			values.add(new Spec("metadata.item-visuals", "server/conf/world-builder/item-visuals-v1.json", "application/json", false, true));
+		}
+		if (version >= 3) {
+			values.add(new Spec("metadata.npc-animations",
+				"server/conf/world-builder/npc-animations-v1.json",
+				"application/json", true, true));
 		}
 		Collections.sort(values, new Comparator<Spec>() { public int compare(Spec a, Spec b) { return a.path.compareTo(b.path); } });
 		return Collections.unmodifiableList(values);
@@ -754,6 +779,10 @@ public final class ProjectContentBundle {
 		}
 	}
 	private static final class UnsafeBundle extends RuntimeException { UnsafeBundle(String message) { super(message); } }
+
+	static void validateStrictJson(String document) throws IOException {
+		StrictJsonScanner.validate(document);
+	}
 
 	/** Minimal strict scanner used before org.json so duplicate keys fail closed. */
 	private static final class StrictJsonScanner {

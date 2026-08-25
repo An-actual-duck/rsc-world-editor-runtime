@@ -9784,6 +9784,7 @@ public class EntityHandler {
 	private static void applyProjectContentBundle(ProjectContentBundle bundle) {
 		if (bundle == null || !bundle.isPresent()) return;
 		try {
+			loadProjectNpcAnimations(bundle);
 			loadProjectNpcs(bundle);
 			loadProjectItems(bundle);
 			loadProjectTiles(bundle.path("definition.tile"));
@@ -9795,6 +9796,19 @@ public class EntityHandler {
 		} catch (Exception failure) {
 			throw new IllegalStateException(
 				"Unable to load declarative project content definitions", failure);
+		}
+	}
+
+	private static void loadProjectNpcAnimations(ProjectContentBundle bundle) {
+		for (orsc.ProjectNpcAnimationRegistry.EntryDef definition
+			: bundle.npcAnimations().values()) {
+			while (animations.size() <= definition.id()) {
+				animations.add(new AnimationDef("missing", "npc", 0, 0, 0,
+					false, false, 0));
+			}
+			animations.set(definition.id(), definition.animationDef());
+			System.out.println("PROJECT_NPC_ANIMATION_INSTALLED animationId="
+				+ definition.id());
 		}
 	}
 

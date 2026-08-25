@@ -23,13 +23,13 @@ public final class AdaptiveWorldBuilderClientSession {
 	public static final String SESSION_SCHEMA =
 		"adaptive-world-builder-session-v1";
 	public static final String CAPABILITY_ID =
-		"adaptive-world-builder-runtime-capability-v4";
+		"adaptive-world-builder-runtime-capability-v5";
 	public static final String SERVER_BUILD_ID =
-		"rsc-world-editor-runtime-adaptive-builder-server-v4";
+		"rsc-world-editor-runtime-adaptive-builder-server-v5";
 	public static final String CLIENT_BUILD_ID =
-		"rsc-world-editor-runtime-adaptive-builder-client-v4";
+		"rsc-world-editor-runtime-adaptive-builder-client-v5";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v5-project-content-bundle-v2";
+		"generic-signed-layered-loader-v6-project-content-bundle-v3";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =
@@ -369,7 +369,8 @@ public final class AdaptiveWorldBuilderClientSession {
 		boolean content = !fields.get("contentCapability").isEmpty();
 		if (content) {
 			String contentCapability = fields.get("contentCapability");
-			if (!ProjectContentBundle.CAPABILITY_ID.equals(contentCapability)
+			if (!ProjectContentBundle.CAPABILITY_ID_V3.equals(contentCapability)
+				&& !ProjectContentBundle.CAPABILITY_ID.equals(contentCapability)
 				&& !ProjectContentBundle.CAPABILITY_ID_V1.equals(contentCapability)) {
 				throw new IllegalArgumentException("Unsupported project content capability");
 			}
