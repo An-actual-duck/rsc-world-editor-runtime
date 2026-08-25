@@ -26,10 +26,12 @@ def canonical(value):
 
 
 def sprite_entry(frames=15):
-    # Type 0, frame count, two-colour palette, then bounded 1x1 frames.
+    # Type 0, frame count, two-colour palette, then 1x1 frames.  Zero legacy
+    # bounds are legal: the real client decoder preserves them and render-time
+    # code falls back to the frame width/height.
     payload = bytearray((0, frames, 1, 0, 0, 0, 255, 0, 255))
     for _ in range(frames):
-        payload.extend(struct.pack(">HHBhhHHB", 1, 1, 0, 0, 0, 1, 1, 1))
+        payload.extend(struct.pack(">HHBhhHHB", 1, 1, 0, 0, 0, 0, 0, 1))
     return bytes(payload)
 
 

@@ -119,8 +119,8 @@ final class AdaptiveWorldBuilderNpcAnimationRegistry {
 						int shifted = input.get() & 0xff; input.getShort(); input.getShort();
 						int boundWidth = input.getShort() & 0xffff, boundHeight = input.getShort() & 0xffff;
 						long pixels = (long)width * height;
-						if (width < 1 || height < 1 || boundWidth < 1 || boundHeight < 1
-							|| shifted > 1 || pixels > 16777216L || input.remaining() < pixels) {
+						if (width < 1 || height < 1 || shifted > 1
+							|| pixels > 16777216L || input.remaining() < pixels) {
 							throw new IOException("NPC custom sprite frame is unsafe");
 						}
 						for (long p = 0; p < pixels; p++) if ((input.get() & 0xff) >= colours) {
