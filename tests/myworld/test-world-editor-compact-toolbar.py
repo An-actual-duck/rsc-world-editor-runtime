@@ -15,6 +15,7 @@ CLIENT = ROOT / "Client_Base/src"
 PC_CLIENT = ROOT / "PC_Client/src"
 UI = CLIENT / "com/openrsc/interfaces/misc/WorldEditorInterface.java"
 TOOLBAR_STATE = CLIENT / "com/openrsc/interfaces/misc/WorldEditorToolbarState.java"
+RECTANGLE_OPTIONS = CLIENT / "com/openrsc/interfaces/misc/WorldEditorRectangleOptions.java"
 ICON_REGISTRY = CLIENT / "com/openrsc/interfaces/misc/WorldEditorIconRegistry.java"
 BUILD_SETTINGS = CLIENT / "orsc/WorldEditorBuildSettings.java"
 TERRAIN_GRID = CLIENT / "orsc/graphics/three/WorldEditorTerrainGrid.java"
@@ -103,6 +104,70 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
             """,
         )
         self.assertEqual("toolbar-state-ok", output.strip())
+
+    def test_rectangle_wall_state_transitions_are_independent_and_non_destructive(self):
+        output = self.compile_and_run(
+            [RECTANGLE_OPTIONS],
+            "com.openrsc.interfaces.misc.RectangleOptionsHarness",
+            """
+                package com.openrsc.interfaces.misc;
+                public final class RectangleOptionsHarness {
+                    private static void require(boolean value, String message) {
+                        if (!value) throw new AssertionError(message);
+                    }
+                    public static void main(String[] args) {
+                        WorldEditorRectangleOptions state = new WorldEditorRectangleOptions();
+                        require(state.isSmartWalls(), "Smart Walls must default on");
+                        require(!state.isFill(), "Smart Walls must not force Fill");
+                        require(!state.isDiagonalPlacementEnabled(), "diagonal must default disabled under Smart Walls");
+                        state.toggleDiagonalWall();
+                        require(state.isDiagonalWall() && !state.isDiagonalPlacementEnabled(),
+                            "Smart Walls must suppress, not corrupt, the diagonal selection");
+                        state.toggleEastWall();
+                        require(!state.isNorthWall() && state.isEastWall(), "east-only transition failed");
+                        require(state.rectangleFlags() == 10, "east-only flags changed");
+                        state.toggleNorthWall();
+                        require(state.isNorthWall() && state.isEastWall(), "both-direction transition failed");
+                        require(state.rectangleFlags() == 14, "both-direction flags changed");
+                        state.toggleEastWall();
+                        require(state.isNorthWall() && !state.isEastWall(), "north-only transition failed");
+                        require(state.rectangleFlags() == 6, "north-only flags changed");
+                        state.toggleBothCardinalWalls();
+                        require(state.isNorthWall() && state.isEastWall(), "combined wall toggle did not select both");
+                        state.toggleBothCardinalWalls();
+                        require(!state.isNorthWall() && !state.isEastWall(), "combined wall toggle did not clear both");
+                        state.toggleNorthWall();
+                        state.toggleSmartWalls();
+                        require(!state.isSmartWalls() && !state.isFill(), "Smart toggle changed Fill");
+                        require(state.isNorthWall() && !state.isEastWall(), "Smart toggle corrupted cardinal state");
+                        require(state.isDiagonalPlacementEnabled(), "raw diagonal selection was not restored");
+                        require(state.rawWallMask() == (32 | 64), "raw wall mask changed");
+                        state.toggleSmartWalls();
+                        require(state.isNorthWall() && !state.isEastWall(), "reopening Smart Walls corrupted state");
+                        System.out.println("rectangle-options-ok");
+                    }
+                }
+            """,
+        )
+        self.assertEqual("rectangle-options-ok", output.strip())
+
+    def test_rectangle_and_square_tools_open_their_own_flyouts_and_keep_wall_options(self):
+        ui = UI.read_text()
+        selection = re.search(r"private void selectTerrainTool\(.*?\{(?P<body>.*?)\n\t\}", ui, re.S)
+        self.assertIsNotNone(selection)
+        body = selection.group("body")
+        self.assertIn("terrainTool=selected", body)
+        self.assertIn("terrainActiveField=0", body)
+        self.assertIn("toolbar.open(WorldEditorToolbarState.Flyout.TERRAIN)", body)
+        self.assertIn("updatePresentationBounds()", body)
+        self.assertIn("else selectTerrainTool(TerrainTool.FREEHAND)", ui)
+        self.assertIn("selectTerrainTool(terrainSelection)", ui)
+        self.assertIn("else openTerrainTool(field)", ui)
+        self.assertIn("openTerrainTool(18)", ui)
+        self.assertIn("drawDisabledTerrainIcon(WorldEditorIconRegistry.Key.FIELD_WALL_DIAGONAL", ui)
+        self.assertNotIn('drawContextActionIcon(WorldEditorIconRegistry.Key.TOOL_RECTANGLE,"F"', ui)
+        for preserved in ("Mode.SCENERY", "Mode.NPC", "Mode.ITEMS", "TerrainTool.LINE"):
+            self.assertIn(preserved, ui)
 
     def test_icon_registry_caches_valid_png_and_bounds_malformed_assets(self):
         with tempfile.TemporaryDirectory() as working:
@@ -216,7 +281,7 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         self.assertIn("if(click!=1&&click!=2)return false", ui)
         self.assertIn("if(click==2)toggleTerrainField(field)", ui)
         self.assertIn("else openTerrainTool(field)", ui)
-        self.assertIn("else toggleBrushFlyout()", ui)
+        self.assertIn("else selectTerrainTool(TerrainTool.FREEHAND)", ui)
         self.assertIn("viewed?0x526f24:selected?0x365b82", ui)
         self.assertIn("int strokeSize=terrainBrushSize", ui)
         self.assertNotIn("mask&112", ui)
@@ -250,13 +315,13 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         self.assertNotIn("terrainStructureTab?", paint_mask.group("body"))
         for mask in (
             "paintElevation?1:0", "paintFloorColor?2:0", "paintFloorTexture?4:0",
-            "paintRoof?8:0", "paintEastWall?16:0", "paintNorthWall?32:0",
-            "paintDiagonalWall?64:0",
+            "paintRoof?8:0", "rectangleOptions.isEastWall()?16:0",
+            "rectangleOptions.isNorthWall()?32:0", "rectangleOptions.isDiagonalWall()?64:0",
         ):
             self.assertIn(mask, paint_mask.group("body"))
         for field in range(6, 10):
             self.assertIn(f"return {field}", ui)
-        self.assertIn("?18:10", ui)
+        self.assertIn("rectangleOptions.isSmartWalls())return -1", ui)
         self.assertIn("return 11", ui)
         self.assertIn("return 12", ui)
 

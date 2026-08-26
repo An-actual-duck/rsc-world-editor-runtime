@@ -178,10 +178,11 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			+wallDefinitionName(p,center.horizontalWall-1)+"\t"+wallDefinitionName(p,center.diagonalDefinitionId()));
 	}
 	private void paintTerrainRectangle(WorldEditorRequestStruct r,Player p,int next) throws Exception {
-		boolean fill=(r.rectangleFlags&1)!=0,smartWalls=(r.rectangleFlags&2)!=0,paintSmartWall=(r.rectangleFlags&4)!=0;
+		boolean fill=(r.rectangleFlags&1)!=0,smartWalls=(r.rectangleFlags&2)!=0;
+		boolean paintSmartNorthWall=(r.rectangleFlags&4)!=0,paintSmartEastWall=(r.rectangleFlags&8)!=0;
 		WorldEditorTerrainStroke.RectanglePlan plan=WorldEditorTerrainStroke.rectanglePlan(
-			r.x,r.y,r.endX,r.endY,fill,r.fieldMask,smartWalls,paintSmartWall);
-		validateTerrainDefinitions(p,r);if(paintSmartWall)validateWall(p,r.smartWall,"Smart wall");
+			r.x,r.y,r.endX,r.endY,fill,r.fieldMask,smartWalls,paintSmartNorthWall,paintSmartEastWall);
+		validateTerrainDefinitions(p,r);if(paintSmartNorthWall||paintSmartEastWall)validateWall(p,r.smartWall,"Smart wall");
 		if(r.elevationOperation<0||r.elevationOperation>2||r.elevationStep<1||r.elevationStep>65535)
 			throw new IllegalArgumentException("Elevation operation capability v2 is invalid.");
 		int horizontalWall=smartWalls?r.smartWall:r.horizontalWall,verticalWall=smartWalls?r.smartWall:r.verticalWall;
