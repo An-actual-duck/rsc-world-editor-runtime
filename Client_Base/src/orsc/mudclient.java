@@ -1542,6 +1542,16 @@ public final class mudclient implements Runnable {
 			? ADAPTIVE_RUNTIME_FATAL_EXIT_STATUS : 0;
 	}
 
+	/** Ends only the isolated client so its supervisor can reload an atomic Paste. */
+	public void restartWorldBuilderAfterRegionPaste() {
+		if (!WorldBuilderClientProfile.current().isAdaptive()) return;
+		try {
+			closeConnection(true);
+		} finally {
+			System.exit(0);
+		}
+	}
+
 	private void closeProgram() {
 		try {
 			new Throwable().printStackTrace();
@@ -8849,6 +8859,7 @@ public final class mudclient implements Runnable {
 						this.drawWorldEditorTerrainToolPreview(renderer3DFrame);
 						this.drawWorldEditorSceneryMovePreview(renderer3DFrame);
 						this.drawWorldEditorRegionSelectionPreview(renderer3DFrame);
+						this.drawWorldEditorRegionPastePreview(renderer3DFrame);
 						this.drawQueuedStaticProjectiles();
 						this.drawQueuedProjectileEffectOverlays();
 						this.drawQueuedProjectileImpactOverlays();
@@ -12004,6 +12015,8 @@ public final class mudclient implements Runnable {
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PLACE_GROUND_ITEM,"Place "+EntityHandler.getItemDef(worldEditorInterface.getGroundItemId()).getName(),localZ);
 		if(worldEditorInterface.isRegionSelecting()&&!worldEditorInterface.isRegionClosed())
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_ADD_REGION_MARKER,"Add next region marker",localZ);
+		if(worldEditorInterface.isRegionPasteSelectingDestination())
+			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_SET_REGION_PASTE_DESTINATION,"Place snapshot marker 1 here",localZ);
 	}
 	private boolean addProjectedEditorTileFallback(){
 		boolean editorOpen=worldEditorInterface!=null&&worldEditorInterface.isEditorOpen();
@@ -19680,6 +19693,7 @@ public final class mudclient implements Runnable {
 					break;
 				}
 				case WORLD_EDITOR_ADD_REGION_MARKER: { worldEditorInterface.addRegionMarker(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
+				case WORLD_EDITOR_SET_REGION_PASTE_DESTINATION: { worldEditorInterface.setRegionPasteDestination(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
 				case MOD_SUMMON_PLAYER: {
 					String playerName = var9;
 					playerName = playerName.replaceAll(" ", "_");
@@ -23935,6 +23949,11 @@ public final class mudclient implements Runnable {
 		else if(hover!=null&&markers.length>0&&(hover[0]!=markers[markers.length-1][0]||hover[1]!=markers[markers.length-1][1]))drawWorldEditorRegionSegment(frame,markers[markers.length-1],hover,0xffc04d);
 		for(int index=0;index<markers.length;index++)drawWorldEditorRegionMarker(frame,markers[index][0]-midRegionBaseX,markers[index][1]-midRegionBaseZ,String.valueOf(index+1),index==0?0xff4dff:0x55e6a5);
 		if(hover!=null&&markers.length<256)drawWorldEditorRegionMarker(frame,hover[0]-midRegionBaseX,hover[1]-midRegionBaseZ,String.valueOf(markers.length+1),0xffc04d);
+	}
+	private void drawWorldEditorRegionPastePreview(Renderer3DFrame frame){
+		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.regionPastePreviewTiles(),collisions=worldEditorInterface.regionPasteCollisionTiles();int[] anchor=worldEditorInterface.regionPasteAnchorTile();if(tiles.length==0&&anchor==null)return;
+		if(tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,collisions.length>0?0xff981f:0x45f3ff);}}
+		if(anchor!=null)drawWorldEditorRegionMarker(frame,anchor[0]-midRegionBaseX,anchor[1]-midRegionBaseZ,"1",0xff4dff);for(int[] collision:collisions)drawWorldEditorRegionMarker(frame,collision[0]-midRegionBaseX,collision[1]-midRegionBaseZ,"!",0xff3030);
 	}
 	private void drawWorldEditorRegionSegment(Renderer3DFrame frame,int[] firstWorld,int[] secondWorld,int color){
 		int firstX=firstWorld[0]-midRegionBaseX,firstZ=firstWorld[1]-midRegionBaseZ,secondX=secondWorld[0]-midRegionBaseX,secondZ=secondWorld[1]-midRegionBaseZ;if(firstX<0||firstZ<0||secondX<0||secondZ<0||firstX>=World.LOCAL_TILE_COUNT||firstZ>=World.LOCAL_TILE_COUNT||secondX>=World.LOCAL_TILE_COUNT||secondZ>=World.LOCAL_TILE_COUNT)return;
