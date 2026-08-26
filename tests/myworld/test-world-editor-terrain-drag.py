@@ -114,7 +114,9 @@ ui = UI.read_text(encoding="utf-8")
 client = CLIENT.read_text(encoding="utf-8")
 assert "TerrainTool terrainTool=TerrainTool.FREEHAND" in ui
 assert "lineFootprint(terrainLineAnchorX,terrainLineAnchorY,worldX,worldY" in ui
+assert "worldX,worldY,terrainBrushSize,TERRAIN_BATCH_LIMIT" in ui
 assert "terrainDragReleasePending=true" in ui
+assert "so it cannot partially commit" in ui
 assert 'inspectionStatus="Line cannot cross a legacy wilderness-level boundary."' in ui
 assert "terrainLineAnchorX>=0" in ui and 'inspectionStatus="Line anchor cancelled."' in ui
 assert "worldEditorInterface.terrainPaintActionLabel()" in client

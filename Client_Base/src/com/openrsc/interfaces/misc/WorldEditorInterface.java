@@ -115,7 +115,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public int[][] terrainToolPreviewTiles(){
 		if(!isTerrainPainting()||terrainDragHoverX<0||terrainDragHoverY<0)return new int[0][2];
 		try{return terrainTool==TerrainTool.LINE&&terrainLineAnchorX>=0
-			?WorldEditorTerrainBrush.lineFootprint(terrainLineAnchorX,terrainLineAnchorY,terrainDragHoverX,terrainDragHoverY,terrainBrushSize,TERRAIN_DRAG_LIMIT)
+			?WorldEditorTerrainBrush.lineFootprint(terrainLineAnchorX,terrainLineAnchorY,terrainDragHoverX,terrainDragHoverY,terrainBrushSize,TERRAIN_BATCH_LIMIT)
 			:WorldEditorTerrainBrush.centeredFootprint(terrainDragHoverX,terrainDragHoverY,terrainBrushSize);
 		}catch(IllegalArgumentException ignored){return new int[0][2];}
 	}
@@ -236,8 +236,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 		terrainStrokeStartedNanos=System.nanoTime();sendTerrainStroke();
 	}
 	private void commitTerrainLine(int worldX,int worldY,int mask){
-		int[][] tiles;try{tiles=WorldEditorTerrainBrush.lineFootprint(terrainLineAnchorX,terrainLineAnchorY,worldX,worldY,terrainBrushSize,TERRAIN_DRAG_LIMIT);}
-		catch(IllegalArgumentException exception){inspectionStatus="Line is too large; choose a closer destination.";inspectionDetails=new String[]{"A terrain operation may contain at most "+TERRAIN_DRAG_LIMIT+" unique tiles."};return;}
+		int[][] tiles;try{tiles=WorldEditorTerrainBrush.lineFootprint(terrainLineAnchorX,terrainLineAnchorY,worldX,worldY,terrainBrushSize,TERRAIN_BATCH_LIMIT);}
+		catch(IllegalArgumentException exception){inspectionStatus="Line is too large for one atomic commit; choose a closer destination.";inspectionDetails=new String[]{"This release limits a line to "+TERRAIN_BATCH_LIMIT+" unique tiles so it cannot partially commit."};return;}
 		int plane=editorLevel(terrainLineAnchorY);for(int[] tile:tiles){
 			if(tile[0]<0||tile[0]>32767||tile[1]<0||tile[1]>32767){inspectionStatus="Line crosses unsupported terrain coordinates; choose another destination.";return;}
 			if(!isLayeredReview()&&Math.floorDiv(tile[1],944)!=plane){inspectionStatus="Line cannot cross a legacy wilderness-level boundary.";return;}
@@ -275,8 +275,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 		long now=System.nanoTime();if(recoverTerrainStrokeTimeout(now))return true;
 		if(isTerrainPainting()){if(worldX>=0&&worldY>=0){terrainDragHoverX=worldX;terrainDragHoverY=worldY;}else if(!terrainDragActive){terrainDragHoverX=terrainDragHoverY=-1;}}
 		if(terrainTool==TerrainTool.LINE){
-			if(terrainLineAnchorX>=0&&terrainDragHoverX>=0){try{WorldEditorTerrainBrush.lineFootprint(terrainLineAnchorX,terrainLineAnchorY,terrainDragHoverX,terrainDragHoverY,terrainBrushSize,TERRAIN_DRAG_LIMIT);}
-				catch(IllegalArgumentException ignored){inspectionStatus="Line preview exceeds "+TERRAIN_DRAG_LIMIT+" unique tiles.";}}
+			if(terrainLineAnchorX>=0&&terrainDragHoverX>=0){try{WorldEditorTerrainBrush.lineFootprint(terrainLineAnchorX,terrainLineAnchorY,terrainDragHoverX,terrainDragHoverY,terrainBrushSize,TERRAIN_BATCH_LIMIT);}
+				catch(IllegalArgumentException ignored){inspectionStatus="Line preview exceeds the "+TERRAIN_BATCH_LIMIT+"-tile atomic limit.";}}
 			return false;
 		}
 		boolean gesture=controlDown&&primaryDown&&isTerrainPainting();
