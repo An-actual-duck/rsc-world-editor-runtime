@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 BRUSH = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorTerrainBrush.java"
 FRAMING = ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/WorldEditorPacketFraming.java"
+SERVER = ROOT / "server/src/com/openrsc/server/Server.java"
 
 HARNESS = r"""
 import com.openrsc.interfaces.misc.WorldEditorTerrainBrush;
@@ -57,4 +58,17 @@ with tempfile.TemporaryDirectory(prefix="world-editor-terrain-drag-") as temp:
     subprocess.run(["javac", "-d", temp, str(BRUSH), str(FRAMING), str(harness)], check=True)
     subprocess.run(["java", "-cp", temp, "WorldEditorTerrainDragHarness"], check=True)
 
-print("PASS: terrain drags interpolate continuously and accept full wide batches")
+server = SERVER.read_text(encoding="utf-8")
+method_start = server.index("private void processWorldBuilderControlPlanePackets()")
+method_end = server.index("\n\t}", method_start)
+control_plane = server[method_start:method_end]
+assert "if (!getConfig().WORLD_BUILDER_MODE)" in control_plane
+assert control_plane.index("if (!getConfig().WORLD_BUILDER_MODE)") < control_plane.index(
+    "for (final Player player : getWorld().getPlayers())"
+)
+assert "player.processIncomingPackets()" in control_plane
+assert "player.processOutgoingPackets()" in control_plane
+assert server.count("processWorldBuilderControlPlanePackets();") == 1
+assert "} else {\n\t\t\t\t\tprocessWorldBuilderControlPlanePackets();" in server
+
+print("PASS: terrain drags interpolate, accept wide batches, and use Builder-only low-latency control")

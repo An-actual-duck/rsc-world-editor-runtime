@@ -1173,6 +1173,7 @@ public class Server implements Runnable {
 
 					//LOGGER.info("Tick " + getCurrentTick() + " processed.");
 				} else {
+					processWorldBuilderControlPlanePackets();
 					if (getConfig().WANT_CUSTOM_WALK_SPEED) {
 						final boolean movementDiagnosticsEnabled = movementStutterDiagnostics.isEnabled();
 						final long movementPollStarted = movementDiagnosticsEnabled ? System.nanoTime() : 0L;
@@ -1291,6 +1292,24 @@ public class Server implements Runnable {
 			} catch (final Throwable t) {
 				LOGGER.error("Exception in Server run()", t);
 			}
+		}
+	}
+
+	/**
+	 * The isolated Builder is an editor control plane, not a public game world.
+	 * Drain its single loopback player's requests and queued replies on the
+	 * scheduler's 10 ms cadence so authoritative tools do not wait for the
+	 * ordinary 640 ms gameplay tick. Normal servers never enter this path.
+	 * Gameplay simulation, movement, events, and client world updates remain on
+	 * the ordinary tick; this only advances already queued network control data.
+	 */
+	private void processWorldBuilderControlPlanePackets() {
+		if (!getConfig().WORLD_BUILDER_MODE) {
+			return;
+		}
+		for (final Player player : getWorld().getPlayers()) {
+			incrementLastIncomingPacketsDuration(player.processIncomingPackets());
+			incrementLastOutgoingPacketsDuration(player.processOutgoingPackets());
 		}
 	}
 
