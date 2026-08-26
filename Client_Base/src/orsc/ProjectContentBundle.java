@@ -272,6 +272,7 @@ public final class ProjectContentBundle {
 		return path;
 	}
 	public Path assetForRuntimePath(String runtimePath) {
+		if (!isPresent()) return null;
 		for (Spec spec : schemaVersion == 3 ? SPECS_V3
 			: schemaVersion == 2 ? SPECS_V2 : SPECS_V1)
 			if (!spec.definition && !spec.metadata && spec.path.equals(runtimePath)) return path(spec.role);

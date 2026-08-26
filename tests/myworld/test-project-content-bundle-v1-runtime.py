@@ -194,6 +194,21 @@ public final class BundleClientHarness {
 """
 
 
+CLIENT_EMPTY_HARNESS = r"""
+import orsc.ProjectContentBundle;
+public final class EmptyBundleClientHarness {
+  public static void main(String[] args) {
+    ProjectContentBundle bundle=ProjectContentBundle.empty();
+    if (bundle.isPresent()) throw new AssertionError("empty bundle is present");
+    if (bundle.assetForRuntimePath("client/Cache/video/library.orsc") != null)
+      throw new AssertionError("empty bundle routed the ordinary library archive");
+    if (bundle.assetForRuntimePath("client/Cache/video/models.orsc") != null)
+      throw new AssertionError("empty bundle routed the ordinary model archive");
+  }
+}
+"""
+
+
 CLIENT_ITEM_VISUAL_HARNESS = r"""
 import com.openrsc.client.entityhandling.EntityHandler;
 import com.openrsc.client.entityhandling.defs.ItemDef;
@@ -229,6 +244,7 @@ class BundleV1RuntimeTest(unittest.TestCase):
         classes = Path(cls.classes.name)
         for name, source, jar in (("BundleServerHarness.java", SERVER_HARNESS, SERVER_JAR),
                                   ("BundleClientHarness.java", CLIENT_HARNESS, CLIENT_JAR),
+                                  ("EmptyBundleClientHarness.java", CLIENT_EMPTY_HARNESS, CLIENT_JAR),
                                   ("BundleClientItemVisualHarness.java", CLIENT_ITEM_VISUAL_HARNESS, CLIENT_JAR)):
             path = classes / name
             path.write_text(source)
@@ -264,6 +280,14 @@ class BundleV1RuntimeTest(unittest.TestCase):
         self.assertEqual("8ada74bce12459d4ca422dbf3356d8ec1aa1d904093ec38e2f70184a4b12d157", manifest["bundleFingerprintSha256"])
         self.run_harness("BundleServerHarness", SERVER_JAR, workspace, manifest)
         self.run_harness("BundleClientHarness", CLIENT_JAR, workspace, manifest)
+
+    def test_content_neutral_client_uses_ordinary_runtime_assets(self):
+        result = subprocess.run(
+            ["java", "-cp", f"{self.classes.name}:{CLIENT_JAR}",
+             "EmptyBundleClientHarness"],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        )
+        self.assertEqual(0, result.returncode, result.stdout)
 
     def test_unknown_key_extra_file_and_payload_tamper_fail_closed(self):
         for mutation in ("unknown", "extra", "payload", "hardlink"):
