@@ -23905,6 +23905,13 @@ public final class mudclient implements Runnable {
 		drawWorldEditorTerrainPreviewEdge(frame,x1,z1,x2,z1,color);drawWorldEditorTerrainPreviewEdge(frame,x2,z1,x2,z2,color);
 		drawWorldEditorTerrainPreviewEdge(frame,x2,z2,x1,z2,color);drawWorldEditorTerrainPreviewEdge(frame,x1,z2,x1,z1,color);
 		drawWorldEditorTerrainPreviewEdge(frame,x1,z1,x2,z2,color);drawWorldEditorTerrainPreviewEdge(frame,x2,z1,x1,z2,color);
+		int centerX=x1+tileSize/2,centerZ=z1+tileSize/2,centerY=-world.getElevation(centerX,centerZ)-10;int[] point=new int[2];
+		if(!projectWorldEditorGridPoint(frame,centerX,centerY,centerZ,point))return;int pinY=point[1]-22;
+		drawWorldEditorGridLine(point[0]-1,point[1],point[0]-1,pinY+5,0);drawWorldEditorGridLine(point[0]+1,point[1],point[0]+1,pinY+5,0);
+		drawWorldEditorGridLine(point[0],point[1],point[0],pinY+5,color);
+		for(int dy=-7;dy<=7;dy++){int width=7-Math.abs(dy);drawWorldEditorGridLine(point[0]-width-1,pinY+dy,point[0]+width+1,pinY+dy,0);}
+		for(int dy=-6;dy<=6;dy++){int width=6-Math.abs(dy);drawWorldEditorGridLine(point[0]-width,pinY+dy,point[0]+width,pinY+dy,color);}
+		drawWorldEditorGridLine(point[0]-2,pinY,point[0]+2,pinY,0xffffff);drawWorldEditorGridLine(point[0],pinY-2,point[0],pinY+2,0xffffff);
 	}
 	private static void toggleWorldEditorPreviewEdge(Set<Long> edges,int orientation,int x,int z){long key=((long)orientation<<40)|((long)x&0xfffffL)<<20|((long)z&0xfffffL);if(!edges.add(key))edges.remove(key);}
 	private void drawWorldEditorTerrainPreviewEdge(Renderer3DFrame frame,int x1,int z1,int x2,int z2,int color){
