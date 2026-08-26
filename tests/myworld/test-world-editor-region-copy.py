@@ -69,6 +69,7 @@ server = SERVER.read_text(encoding="utf-8")
 commands = COMMANDS.read_text(encoding="utf-8")
 
 assert "Mode { NAVIGATE, INSPECT, TERRAIN, SCENERY, NPC, ITEMS, REGION }" in ui
+assert '"Region Copy"' in ui
 assert "addRegionMarker" in ui and "closeRegionSelection" in ui
 assert "removeLastRegionMarker" in ui and "cancelRegionSelection" in ui
 assert "requestRegionCopy" in ui and 'mc.sendCommandString("copyregion")' in ui

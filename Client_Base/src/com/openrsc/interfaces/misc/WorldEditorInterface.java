@@ -29,7 +29,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public enum NpcTool { PLACE, REMOVE }
 	public enum GroundItemTool { PLACE, REMOVE }
 	public enum TerrainTool { FREEHAND, LINE, RECTANGLE }
-	private static final String[] TABS={"Navigate","Inspect","Terrain","Scenery","NPC","Items","Region"};
+	private static final String[] TABS={"Navigate","Inspect","Terrain","Scenery","NPC","Items","Region Copy"};
 	private final mudclient mc;
 	private final WorldEditorIconRegistry icons=new WorldEditorIconRegistry();
 	private final WorldEditorToolbarState toolbar=new WorldEditorToolbarState();
