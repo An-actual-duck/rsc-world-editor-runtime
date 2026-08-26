@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+import subprocess
+import tempfile
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+GEOMETRY = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorRegionSelection.java"
+UI = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.java"
+CLIENT = ROOT / "Client_Base/src/orsc/mudclient.java"
+BRIDGE = ROOT / "Client_Base/src/orsc/WorldBuilderRegionCopyClientBridge.java"
+SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRegionCopyRequest.java"
+COMMANDS = ROOT / "server/plugins/com/openrsc/server/plugins/authentic/commands/Development.java"
+
+HARNESS = r"""
+import com.openrsc.interfaces.misc.WorldEditorRegionSelection;
+
+public final class WorldEditorRegionSelectionHarness {
+    private static void require(boolean value, String message) {
+        if (!value) throw new AssertionError(message);
+    }
+    private static void refused(int[][] markers, String label) {
+        boolean refused = false;
+        try { WorldEditorRegionSelection.validateClosed(markers); }
+        catch (IllegalArgumentException expected) { refused = true; }
+        require(refused, label);
+    }
+    public static void main(String[] args) {
+        int[][] square = {{10,20},{12,20},{12,22},{10,22}};
+        int[][] reversed = {{10,22},{12,22},{12,20},{10,20}};
+        require(WorldEditorRegionSelection.ownedTiles(square, 9).length == 9,
+            "inclusive square ownership changed");
+        require(WorldEditorRegionSelection.ownedTiles(reversed, 9).length == 9,
+            "marker winding changed ownership");
+        boolean bounded = false;
+        try { WorldEditorRegionSelection.ownedTiles(square, 8); }
+        catch (IllegalArgumentException expected) { bounded = true; }
+        require(bounded, "preview inventory limit was ignored");
+        refused(new int[][] {{0,0},{2,2},{0,2},{2,0}},
+            "self-intersection was accepted");
+        refused(new int[][] {{0,0},{2,0},{0,0}},
+            "duplicate marker was accepted");
+        refused(new int[][] {{0,0},{1,1},{2,2}},
+            "degenerate polygon was accepted");
+        int[][] extreme = {{Integer.MAX_VALUE - 1,0},{Integer.MAX_VALUE,0},
+            {Integer.MAX_VALUE,1}};
+        require(WorldEditorRegionSelection.ownedTiles(extreme, 3).length == 3,
+            "extreme coordinate iteration overflowed");
+    }
+}
+"""
+
+with tempfile.TemporaryDirectory(prefix="world-editor-region-copy-") as temp:
+    harness = Path(temp) / "WorldEditorRegionSelectionHarness.java"
+    harness.write_text(HARNESS, encoding="utf-8")
+    subprocess.run(["javac", "-d", temp, str(GEOMETRY), str(harness)], check=True)
+    completed = subprocess.run(
+        ["java", "-cp", temp, "WorldEditorRegionSelectionHarness"],
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        raise AssertionError(completed.stdout + completed.stderr)
+
+ui = UI.read_text(encoding="utf-8")
+client = CLIENT.read_text(encoding="utf-8")
+bridge = BRIDGE.read_text(encoding="utf-8")
+server = SERVER.read_text(encoding="utf-8")
+commands = COMMANDS.read_text(encoding="utf-8")
+
+assert "Mode { NAVIGATE, INSPECT, TERRAIN, SCENERY, NPC, ITEMS, REGION }" in ui
+assert "addRegionMarker" in ui and "closeRegionSelection" in ui
+assert "removeLastRegionMarker" in ui and "cancelRegionSelection" in ui
+assert "requestRegionCopy" in ui and 'mc.sendCommandString("copyregion")' in ui
+assert "drawWorldEditorRegionSelectionPreview" in client
+assert "drawWorldEditorRegionMarker" in client
+assert "WORLD_EDITOR_ADD_REGION_MARKER" in client
+assert '"world-builder-region-copy-request"' in bridge
+assert "StandardOpenOption.CREATE_NEW" in bridge
+assert 'command.equalsIgnoreCase("copyregion")' in commands
+assert server.index("editor.saveAdaptivePackage(player)") < server.index("Files.move(pending, request")
+assert "ownsActiveSession(player)" in server
+assert '"world-builder-region-copy-response"' in server
+
+print("PASS: ordered Region selection and supervised save-before-Copy bridge validated")

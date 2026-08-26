@@ -31,6 +31,7 @@ public final class WorldEditorIconRegistry {
 		MODE_SCENERY("mode-scenery.png", "Obj"),
 		MODE_NPC("mode-npc.png", "NPC"),
 		MODE_ITEMS("mode-items.png", "Item"),
+		MODE_REGION(null, "Area"),
 		FIELD_ELEVATION("field-elevation.png", "Elev"),
 		FIELD_FLOOR_COLOR("field-floor-color.png", "Color"),
 		FIELD_FLOOR_TEXTURE("field-floor-texture.png", "Floor"),
@@ -117,6 +118,7 @@ public final class WorldEditorIconRegistry {
 		if (key == Key.TOOL_RECTANGLE) {
 			return rectangleIcon();
 		}
+		if (key == Key.MODE_REGION) return regionIcon();
 		BufferedImage image = read(key.filename());
 		if (image == null) {
 			return null;
@@ -166,6 +168,31 @@ public final class WorldEditorIconRegistry {
 		sprite.setRequiresShift(false);
 		sprite.setSomething(ICON_SIZE, ICON_SIZE);
 		return sprite;
+	}
+
+	private static Sprite regionIcon() {
+		int[] pixels = new int[ICON_SIZE * ICON_SIZE];
+		java.util.Arrays.fill(pixels, RendererTransparency.TRANSPARENT_SAMPLE);
+		int[][] points = {{4,5},{18,4},{20,17},{11,20},{3,14}};
+		for (int index = 0; index < points.length; index++) {
+			int[] first = points[index], second = points[(index + 1) % points.length];
+			line(pixels, first[0], first[1], second[0], second[1], 0xffffff);
+			for (int y = first[1] - 1; y <= first[1] + 1; y++) {
+				for (int x = first[0] - 1; x <= first[0] + 1; x++) {
+					if (x >= 0 && x < ICON_SIZE && y >= 0 && y < ICON_SIZE) {
+						pixels[y * ICON_SIZE + x] = 0xffffff;
+					}
+				}
+			}
+		}
+		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);
+		sprite.setShift(0, 0);sprite.setRequiresShift(false);sprite.setSomething(ICON_SIZE, ICON_SIZE);
+		return sprite;
+	}
+
+	private static void line(int[] pixels,int x0,int y0,int x1,int y1,int color){
+		int dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,error=dx+dy;
+		while(true){if(x0>=0&&x0<ICON_SIZE&&y0>=0&&y0<ICON_SIZE)pixels[y0*ICON_SIZE+x0]=color;if(x0==x1&&y0==y1)break;int doubled=error*2;if(doubled>=dy){error+=dy;x0+=sx;}if(doubled<=dx){error+=dx;y0+=sy;}}
 	}
 
 	private BufferedImage read(String filename) throws IOException {

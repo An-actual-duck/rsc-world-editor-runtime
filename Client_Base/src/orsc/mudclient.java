@@ -8848,6 +8848,7 @@ public final class mudclient implements Runnable {
 						this.getSurface().setRenderer2DPhase(Renderer2DFrame.Phase.WORLD_OVERLAY);
 						this.drawWorldEditorTerrainToolPreview(renderer3DFrame);
 						this.drawWorldEditorSceneryMovePreview(renderer3DFrame);
+						this.drawWorldEditorRegionSelectionPreview(renderer3DFrame);
 						this.drawQueuedStaticProjectiles();
 						this.drawQueuedProjectileEffectOverlays();
 						this.drawQueuedProjectileImpactOverlays();
@@ -12001,6 +12002,8 @@ public final class mudclient implements Runnable {
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PLACE_NPC,"Place "+EntityHandler.getNpcDef(worldEditorInterface.getNpcId()).getName(),localZ);
 		if(worldEditorInterface.isGroundItemPlacing())
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PLACE_GROUND_ITEM,"Place "+EntityHandler.getItemDef(worldEditorInterface.getGroundItemId()).getName(),localZ);
+		if(worldEditorInterface.isRegionSelecting()&&!worldEditorInterface.isRegionClosed())
+			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_ADD_REGION_MARKER,"Add next region marker",localZ);
 	}
 	private boolean addProjectedEditorTileFallback(){
 		boolean editorOpen=worldEditorInterface!=null&&worldEditorInterface.isEditorOpen();
@@ -19676,6 +19679,7 @@ public final class mudclient implements Runnable {
 						+tileID+" "+worldX+" "+worldY);
 					break;
 				}
+				case WORLD_EDITOR_ADD_REGION_MARKER: { worldEditorInterface.addRegionMarker(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
 				case MOD_SUMMON_PLAYER: {
 					String playerName = var9;
 					playerName = playerName.replaceAll(" ", "_");
@@ -23923,6 +23927,23 @@ public final class mudclient implements Runnable {
 		if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)return;int centerX=x*tileSize+tileSize/2,centerZ=z*tileSize+tileSize/2,centerY=-world.getElevation(centerX,centerZ)-12;int[] point=new int[2];if(!projectWorldEditorGridPoint(frame,centerX,centerY,centerZ,point))return;int color=0x45f3ff;
 		for(int dy=-8;dy<=8;dy++){int width=8-Math.abs(dy);this.getSurface().drawLineHoriz(point[0]-width-1,point[1]+dy,width*2+3,0);if(width>0)this.getSurface().drawLineHoriz(point[0]-width,point[1]+dy,width*2+1,color);}this.getSurface().drawString("MOVE",point[0]-18,point[1]-12,0xffffff,1);
 	}
+	private void drawWorldEditorRegionSelectionPreview(Renderer3DFrame frame){
+		if(worldEditorInterface==null||frame==null||world==null||!worldEditorInterface.isRegionSelecting())return;int[][] markers=worldEditorInterface.regionMarkerTiles();int[][] tiles=worldEditorInterface.regionSelectionPreviewTiles();int[] hover=worldEditorInterface.regionSelectionHoverTile();
+		if(tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,0x55e6a5);}}
+		for(int index=1;index<markers.length;index++)drawWorldEditorRegionSegment(frame,markers[index-1],markers[index],0x55e6a5);
+		if(worldEditorInterface.isRegionClosed()&&markers.length>=3)drawWorldEditorRegionSegment(frame,markers[markers.length-1],markers[0],0x55e6a5);
+		else if(hover!=null&&markers.length>0&&(hover[0]!=markers[markers.length-1][0]||hover[1]!=markers[markers.length-1][1]))drawWorldEditorRegionSegment(frame,markers[markers.length-1],hover,0xffc04d);
+		for(int index=0;index<markers.length;index++)drawWorldEditorRegionMarker(frame,markers[index][0]-midRegionBaseX,markers[index][1]-midRegionBaseZ,String.valueOf(index+1),index==0?0xff4dff:0x55e6a5);
+		if(hover!=null&&markers.length<256)drawWorldEditorRegionMarker(frame,hover[0]-midRegionBaseX,hover[1]-midRegionBaseZ,String.valueOf(markers.length+1),0xffc04d);
+	}
+	private void drawWorldEditorRegionSegment(Renderer3DFrame frame,int[] firstWorld,int[] secondWorld,int color){
+		int firstX=firstWorld[0]-midRegionBaseX,firstZ=firstWorld[1]-midRegionBaseZ,secondX=secondWorld[0]-midRegionBaseX,secondZ=secondWorld[1]-midRegionBaseZ;if(firstX<0||firstZ<0||secondX<0||secondZ<0||firstX>=World.LOCAL_TILE_COUNT||firstZ>=World.LOCAL_TILE_COUNT||secondX>=World.LOCAL_TILE_COUNT||secondZ>=World.LOCAL_TILE_COUNT)return;
+		int x1=firstX*tileSize+tileSize/2,z1=firstZ*tileSize+tileSize/2,x2=secondX*tileSize+tileSize/2,z2=secondZ*tileSize+tileSize/2,y1=-world.getElevation(x1,z1)-8,y2=-world.getElevation(x2,z2)-8;int[] first=new int[2],second=new int[2];if(projectWorldEditorGridPoint(frame,x1,y1,z1,first)&&projectWorldEditorGridPoint(frame,x2,y2,z2,second)){drawWorldEditorGridLine(first[0],first[1],second[0],second[1],0);drawWorldEditorGridLine(first[0],first[1]-1,second[0],second[1]-1,color);}
+	}
+	private void drawWorldEditorRegionMarker(Renderer3DFrame frame,int x,int z,String label,int color){
+		if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)return;int centerX=x*tileSize+tileSize/2,centerZ=z*tileSize+tileSize/2,centerY=-world.getElevation(centerX,centerZ)-14;int[] point=new int[2];if(!projectWorldEditorGridPoint(frame,centerX,centerY,centerZ,point))return;
+		this.getSurface().drawBoxAlpha(point[0]-8,point[1]-20,16,16,color,235);this.getSurface().drawBoxBorder(point[0]-8,16,point[1]-20,16,0);int width=this.getSurface().stringWidth(1,label);this.getSurface().drawString(label,point[0]-width/2,point[1]-8,0xffffff,1);this.getSurface().drawLineVert(point[0],point[1]-4,color,8);
+	}
 	private void drawWorldEditorTerrainAnchorMarker(Renderer3DFrame frame,int x,int z){
 		if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)return;int color=0xff4dff,x1=x*tileSize,z1=z*tileSize,x2=(x+1)*tileSize,z2=(z+1)*tileSize;
 		drawWorldEditorTerrainPreviewEdge(frame,x1,z1,x2,z1,color);drawWorldEditorTerrainPreviewEdge(frame,x2,z1,x2,z2,color);
@@ -23996,10 +24017,10 @@ public final class mudclient implements Runnable {
 	}
 	private boolean updateWorldEditorTerrainDrag(){
 		if(worldEditorInterface==null||!worldEditorInterface.isEditorOpen()||!isAdaptiveWorldStateReadyForEditor())return false;int worldX=-1,worldY=-1;
-		boolean picking=(worldEditorInterface.isTerrainPainting()||worldEditorInterface.isSceneryMoveArmed())&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
+		boolean picking=(worldEditorInterface.isTerrainPainting()||worldEditorInterface.isSceneryMoveArmed()||worldEditorInterface.isRegionSelecting())&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
 		if(picking&&scene!=null&&world!=null&&localPlayer!=null){int[] local=projectScreenToCurrentTerrainTile();
 			if(local!=null&&local[0]>=0&&local[0]<World.LOCAL_TILE_COUNT&&local[1]>=0&&local[1]<World.LOCAL_TILE_COUNT){worldX=midRegionBaseX+local[0];worldY=midRegionBaseZ+local[1];}}
-		boolean terrainConsumed=worldEditorInterface.updateTerrainDrag(controlPressed,currentMouseButtonDown==1,worldX,worldY);boolean moveConsumed=worldEditorInterface.updateSceneryMovePointer(currentMouseButtonDown==2,worldX,worldY);return terrainConsumed||moveConsumed;
+		boolean terrainConsumed=worldEditorInterface.updateTerrainDrag(controlPressed,currentMouseButtonDown==1,worldX,worldY);boolean moveConsumed=worldEditorInterface.updateSceneryMovePointer(currentMouseButtonDown==2,worldX,worldY);worldEditorInterface.updateRegionSelectionPointer(worldX,worldY);return terrainConsumed||moveConsumed;
 	}
 
 	public void worldEditorTeleport(int worldX, int worldY) {

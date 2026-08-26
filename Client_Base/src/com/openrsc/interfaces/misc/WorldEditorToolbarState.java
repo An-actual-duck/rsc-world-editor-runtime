@@ -9,7 +9,8 @@ public final class WorldEditorToolbarState {
 		TERRAIN,
 		SCENERY,
 		NPC,
-		ITEMS
+		ITEMS,
+		REGION
 	}
 
 	private Flyout flyout = Flyout.NAVIGATE;

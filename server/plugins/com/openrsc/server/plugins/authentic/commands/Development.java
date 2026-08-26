@@ -193,6 +193,10 @@ public final class Development implements CommandTrigger {
 		else if (command.equalsIgnoreCase("saveworldedits")) {
 			saveWorldEdits(player);
 		}
+		else if (command.equalsIgnoreCase("copyregion")) {
+			com.openrsc.server.content.worldedit
+				.AdaptiveWorldBuilderRegionCopyRequest.submit(player);
+		}
 		else if (command.equalsIgnoreCase("clearworldedits") || command.equalsIgnoreCase("discardworldedits")) {
 			clearWorldEdits(player);
 		}
@@ -307,6 +311,7 @@ public final class Development implements CommandTrigger {
 		return normalized.equals("worldeditormode")
 			||normalized.equals("buildergoto")
 			||normalized.equals("buildergrow")
+			||normalized.equals("copyregion")
 			||normalized.equals("worldedits")
 			||normalized.equals("listworldedits")
 			||isLayeredBuilderMutationCommand(normalized);

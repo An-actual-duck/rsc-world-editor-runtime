@@ -233,6 +233,15 @@ public final class WorldEditorSessionManager {
 		return nativeTerrainSceneRevision;
 	}
 
+	public synchronized boolean hasPendingAdaptiveEdits() {
+		return !nativeTerrainDirty.isEmpty()
+			|| !nativeTerrainGrowth.equals(nativeTerrainGrowthSaved)
+			|| !nativeLevelCreations.equals(nativeLevelCreationsSaved)
+			|| !nativeSceneryDirty.isEmpty()
+			|| !nativeNpcDirty.isEmpty()
+			|| !nativeGroundItemDirty.isEmpty();
+	}
+
 	public synchronized NativeTerrainStrokeResult paintNativeTerrainStroke(
 		Player player,
 		int[][] requestedTiles,
