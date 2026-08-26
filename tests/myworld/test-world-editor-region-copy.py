@@ -10,6 +10,8 @@ UI = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.ja
 CLIENT = ROOT / "Client_Base/src/orsc/mudclient.java"
 BRIDGE = ROOT / "Client_Base/src/orsc/WorldBuilderRegionCopyClientBridge.java"
 SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRegionCopyRequest.java"
+PASTE_BRIDGE = ROOT / "Client_Base/src/orsc/WorldBuilderRegionPasteClientBridge.java"
+PASTE_SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRegionPasteRequest.java"
 COMMANDS = ROOT / "server/plugins/com/openrsc/server/plugins/authentic/commands/Development.java"
 
 HARNESS = r"""
@@ -66,10 +68,12 @@ ui = UI.read_text(encoding="utf-8")
 client = CLIENT.read_text(encoding="utf-8")
 bridge = BRIDGE.read_text(encoding="utf-8")
 server = SERVER.read_text(encoding="utf-8")
+paste_bridge = PASTE_BRIDGE.read_text(encoding="utf-8")
+paste_server = PASTE_SERVER.read_text(encoding="utf-8")
 commands = COMMANDS.read_text(encoding="utf-8")
 
 assert "Mode { NAVIGATE, INSPECT, TERRAIN, SCENERY, NPC, ITEMS, REGION }" in ui
-assert '"Region Copy"' in ui
+assert '"Copy/Paste"' in ui
 assert "addRegionMarker" in ui and "closeRegionSelection" in ui
 assert "removeLastRegionMarker" in ui and "cancelRegionSelection" in ui
 assert "requestRegionCopy" in ui and 'mc.sendCommandString("copyregion")' in ui
@@ -82,5 +86,16 @@ assert 'command.equalsIgnoreCase("copyregion")' in commands
 assert server.index("editor.saveAdaptivePackage(player)") < server.index("Files.move(pending, request")
 assert "ownsActiveSession(player)" in server
 assert '"world-builder-region-copy-response"' in server
+assert "RegionTool { COPY, PASTE }" in ui
+assert "setRegionPasteDestination" in ui and "requestRegionPasteApply" in ui
+assert "regionPasteOverwriteArmed" in ui
+assert "c!='\\uffff'&&!Character.isSurrogate(c)" in ui
+assert "drawWorldEditorRegionPastePreview" in client
+assert "WORLD_EDITOR_SET_REGION_PASTE_DESTINATION" in client
+assert '"world-builder-region-paste-request"' in paste_bridge
+assert '"OVERWRITE " : "PASTE "' in paste_bridge
+assert 'command.equalsIgnoreCase("pasteregion")' in commands
+assert "editor.saveAdaptivePackage(player)" in paste_server
+assert '"world-builder-region-paste-response"' in paste_server
 
-print("PASS: ordered Region selection and supervised save-before-Copy bridge validated")
+print("PASS: ordered Region Copy and supervised exact Paste bridges validated")
