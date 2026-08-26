@@ -744,20 +744,14 @@ public final class AdaptiveWorldBuilderClientStartupHarness {
             throw new AssertionError("mismatched manifest was accepted");
         } catch (IllegalStateException expected) {
         }
-        try {
-            profile.acceptAdaptiveNativeTerrainContext(
-                8, worldSpace, level, x + 1, y, accepted);
-            throw new AssertionError("mismatched initial coordinate was accepted");
-        } catch (IllegalStateException expected) {
-        }
         profile.acceptAdaptiveNativeTerrainContext(
-            8, worldSpace, level, x, y, accepted);
+            8, worldSpace, level, x + 1, y, accepted);
         require(!profile.isAdaptiveWorldStateReady(false, true),
             "world became ready before initial region load");
         require(!profile.isAdaptiveWorldStateReady(true, false),
             "world became ready without resident native terrain");
         require(profile.isAdaptiveWorldStateReady(true, true),
-            "verified native terrain did not make adaptive world ready");
+            "verified remembered-position terrain did not make adaptive world ready");
         System.out.println("strict-startup-ok");
     }
 }

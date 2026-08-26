@@ -295,13 +295,10 @@ public final class WorldBuilderClientProfile {
 			throw new IllegalStateException(
 				"Strict adaptive terrain context does not match the bound native package");
 		}
-		if (!adaptiveNativeContextAccepted
-			&& (level != adaptiveSession.initialLevel()
-				|| x != adaptiveSession.initialX()
-				|| y != adaptiveSession.initialY())) {
-			throw new IllegalStateException(
-				"Strict adaptive initial terrain context differs from the runtime binding");
-		}
+		// The immutable binding supplies the first-run location, while the isolated
+		// Builder database may truthfully restore a later creator position. The
+		// authenticated server context is still restricted to the exact bound
+		// package, declared level, world space, and resident terrain coverage above.
 		adaptiveNativeContextAccepted = true;
 	}
 
