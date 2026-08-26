@@ -26,6 +26,7 @@ import com.openrsc.server.util.rsc.CollisionFlag;
 
 public final class WorldEditorHandler implements PayloadProcessor<WorldEditorRequestStruct, OpcodeIn> {
 	private static final int MAX_ROOF_TEXTURE=6;
+	private static final int TERRAIN_RESULT_CHUNK=64;
 	@Override public void process(WorldEditorRequestStruct request, Player player) {
 		if (!player.getConfig().ALLOW_IN_GAME_WORLD_EDITOR || !player.isAdmin()) { error(player, 0, "Editor authorization was revoked."); return; }
 		Validation validation = player.getWorld().getServer().getWorldEditorSessions().validate(player, request.sessionId, request.sequence);
@@ -37,7 +38,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 		}
 		try {
 			if (player.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE
-				&& (request.type == 5 || request.type == 6 || request.type == 7)
+				&& (request.type == 5 || request.type == 6 || request.type == 7 || request.type == 8)
 				&& !WorldBuilderMode.isLayeredAuthoringProfile(
 					player.getConfig())) {
 				error(player, validation.nextSequence,
@@ -50,6 +51,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			else if (request.type == 5) paintTerrain(request, player, validation.nextSequence);
 			else if (request.type == 6) paintTerrainStroke(request, player, validation.nextSequence);
 			else if (request.type == 7) paintWideTerrainStroke(request, player, validation.nextSequence);
+			else if (request.type == 8) paintTerrainLine(request, player, validation.nextSequence);
 			else error(player, validation.nextSequence, "Unsupported editor operation.");
 		} catch (Exception e) { error(player, validation.nextSequence, "Editor request failed: " + e.getMessage()); }
 	}
@@ -133,6 +135,54 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			||r.elevationStep<1||r.elevationStep>65535)
 			throw new IllegalArgumentException("Elevation operation capability v2 is invalid.");
 		paintNativeTerrainStroke(r,p,next);
+	}
+	private void paintTerrainLine(WorldEditorRequestStruct r,Player p,int next) throws Exception {
+		validateTerrainDefinitions(p,r);
+		if(r.elevationOperation<0||r.elevationOperation>2||r.elevationStep<1||r.elevationStep>65535)
+			throw new IllegalArgumentException("Elevation operation capability v2 is invalid.");
+		int[][] coordinates=WorldEditorTerrainStroke.lineFootprint(r.x,r.y,r.endX,r.endY,r.brushSize);
+		if(p.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE){
+			if(!WorldBuilderMode.isLayeredAuthoringProfile(p.getConfig()))
+				throw new IllegalArgumentException("Layered package review is read-only; no terrain was changed.");
+			WorldLocation current=p.getLayeredLocation();
+			if(r.plane!=current.getCoordinate().getLevel())throw new IllegalArgumentException("Paint terrain on the active signed level.");
+			for(int[] coordinate:coordinates)if(coordinate[0]<0||coordinate[0]>32767||coordinate[1]<0||coordinate[1]>32767)
+				throw new IllegalArgumentException("Terrain line leaves supported Builder coordinates.");
+			NativeTerrainStrokeResult result=p.getWorld().getServer().getWorldEditorSessions()
+				.paintNativeTerrainOperation(p,coordinates,r.plane,r.fieldMask,r.elevation,
+					r.groundTexture,r.groundOverlay,r.roofTexture,r.horizontalWall,
+					r.verticalWall,r.diagonal,r.elevationOperation,r.elevationStep);
+			java.util.List<WorldEditorStruct.TerrainTile> tiles=new java.util.ArrayList<WorldEditorStruct.TerrainTile>(result.after.size());
+			for(NativeTerrainSnapshot after:result.after)tiles.add(nativeTerrainTile(p,after));
+			NativeLayeredTerrainTile center=result.after.get(0).tile;
+			sendTerrainOperation(p,next,r.fieldMask,tiles,wallDefinitionName(p,center.getVerticalWall()-1)+"\t"
+				+wallDefinitionName(p,center.getHorizontalWall()-1)+"\t"+wallDefinitionName(p,diagonalRawWall(center.getDiagonalWall())-1));
+			return;
+		}
+		if(r.elevationOperation!=0||r.elevation>255)throw new IllegalArgumentException("Legacy terrain lines require byte elevation values.");
+		for(int[] coordinate:coordinates){
+			if(!p.getWorld().withinWorld(coordinate[0],coordinate[1])||p.getWorld().getTile(coordinate[0],coordinate[1])==null)
+				throw new IllegalArgumentException("Terrain line contains a tile outside the runtime world.");
+			if(Math.floorDiv(coordinate[1],944)!=r.plane)throw new IllegalArgumentException("Terrain line crosses a plane boundary.");
+		}
+		TerrainStrokeResult result=p.getWorld().getServer().getWorldEditorSessions().paintTerrainOperation(p,coordinates,r.plane,
+			r.fieldMask,r.elevation,r.groundTexture,r.groundOverlay,r.roofTexture,r.horizontalWall,r.verticalWall,r.diagonal);
+		java.util.List<WorldEditorStruct.TerrainTile> tiles=new java.util.ArrayList<WorldEditorStruct.TerrainTile>(result.after.size());
+		for(int i=0;i<result.after.size();i++){
+			WorldEditorTerrainArchive.Snapshot before=result.before.get(i),after=result.after.get(i);
+			applyRuntimeTerrain(p,before,after,r.fieldMask);tiles.add(terrainTile(p,after));
+		}
+		WorldEditorTerrainArchive.Snapshot center=result.after.get(0);
+		sendTerrainOperation(p,next,r.fieldMask,tiles,wallDefinitionName(p,center.verticalWall-1)+"\t"
+			+wallDefinitionName(p,center.horizontalWall-1)+"\t"+wallDefinitionName(p,center.diagonalDefinitionId()));
+	}
+	private void sendTerrainOperation(Player p,int next,int fieldMask,java.util.List<WorldEditorStruct.TerrainTile> tiles,String message){
+		int total=tiles.size();for(int offset=0;offset<total;offset+=TERRAIN_RESULT_CHUNK){
+			WorldEditorStruct out=new WorldEditorStruct();out.type=9;out.sequence=next;out.fieldMask=fieldMask;
+			out.operationTotal=total;out.operationOffset=offset;int end=Math.min(total,offset+TERRAIN_RESULT_CHUNK);
+			for(int index=offset;index<end;index++)out.terrainTiles.add(tiles.get(index));out.message=message;
+			ActionSender.sendWorldEditor(p,out);
+		}
 	}
 	private void paintNativeTerrainStroke(WorldEditorRequestStruct r,Player p,int next) {
 		validateTerrainDefinitions(p,r);

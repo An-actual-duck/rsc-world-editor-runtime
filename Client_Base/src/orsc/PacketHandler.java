@@ -1416,7 +1416,8 @@ public class PacketHandler {
 		if(mc.worldEditorInterface==null||Config.isAndroid())return;
 		if(type==1){WorldBuilderClientProfile.current().acceptAdaptiveServerBinding();mc.worldEditorInterface.open(packetsIncoming.getLong(0),sequence);return;}
 		if(type==2){mc.worldEditorInterface.closeFromServer();return;}
-		if(type==8){int fieldMask=packetsIncoming.getByte()&0xff,count=packetsIncoming.getByte()&0xff;
+		if(type==8||type==9){int total=type==9?packetsIncoming.getShort()&0xffff:0,offset=type==9?packetsIncoming.getShort()&0xffff:0;
+			int fieldMask=packetsIncoming.getByte()&0xff,count=packetsIncoming.getByte()&0xff;
 			if(count<1||count>64){mc.worldEditorInterface.showError("Server returned an invalid terrain stroke size.");return;}
 			int[][] tiles=new int[count][15];boolean[] projectiles=new boolean[count];
 			for(int i=0;i<count;i++){int[] tile=tiles[i];tile[0]=packetsIncoming.getShort();tile[1]=packetsIncoming.getShort();tile[2]=packetsIncoming.getByte();
@@ -1424,7 +1425,8 @@ public class PacketHandler {
 				tile[7]=packetsIncoming.getShort()&0xffff;tile[8]=packetsIncoming.getByte()&0xff;tile[9]=packetsIncoming.getByte()&0xff;tile[10]=packetsIncoming.getByte()&0xff;
 				tile[11]=packetsIncoming.getByte()&0xff;tile[12]=packetsIncoming.getByte()&0xff;tile[13]=packetsIncoming.get32();tile[14]=packetsIncoming.getShort()&0xffff;
 				projectiles[i]=packetsIncoming.getByte()!=0;}
-			mc.worldEditorInterface.acceptTerrainStroke(sequence,fieldMask,tiles,projectiles,packetsIncoming.readString());return;}
+			String definitions=packetsIncoming.readString();if(type==9)mc.worldEditorInterface.acceptTerrainLineChunk(sequence,fieldMask,total,offset,tiles,projectiles,definitions);
+			else mc.worldEditorInterface.acceptTerrainStroke(sequence,fieldMask,tiles,projectiles,definitions);return;}
 		if(type==3||type==7){int x=packetsIncoming.getShort(),y=packetsIncoming.getShort(),plane=packetsIncoming.getByte();
 			int sx=packetsIncoming.getShort(),sy=packetsIncoming.getShort(),lx=packetsIncoming.getByte()&0xff,ly=packetsIncoming.getByte()&0xff;
 			int elev=packetsIncoming.getShort()&0xffff,texture=packetsIncoming.getByte()&0xff,overlay=packetsIncoming.getByte()&0xff,roof=packetsIncoming.getByte()&0xff;

@@ -161,8 +161,20 @@ public final class WorldEditorSessionManager {
 	public synchronized TerrainStrokeResult paintTerrainStroke(Player player,int[][] requestedTiles,int plane,
 		int fieldMask,int elevation,int groundTexture,int groundOverlay,int roofTexture,
 		int horizontalWall,int verticalWall,int diagonal) throws IOException {
+		return paintTerrainTiles(player,requestedTiles,plane,fieldMask,elevation,groundTexture,
+			groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,false);
+	}
+	public synchronized TerrainStrokeResult paintTerrainOperation(Player player,int[][] requestedTiles,int plane,
+		int fieldMask,int elevation,int groundTexture,int groundOverlay,int roofTexture,
+		int horizontalWall,int verticalWall,int diagonal) throws IOException {
+		return paintTerrainTiles(player,requestedTiles,plane,fieldMask,elevation,groundTexture,
+			groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,true);
+	}
+	private TerrainStrokeResult paintTerrainTiles(Player player,int[][] requestedTiles,int plane,
+		int fieldMask,int elevation,int groundTexture,int groundOverlay,int roofTexture,
+		int horizontalWall,int verticalWall,int diagonal,boolean operation) throws IOException {
 		validateTerrainPaint(fieldMask,elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall);
-		int[][] coordinates=WorldEditorTerrainStroke.validateTiles(requestedTiles);
+		int[][] coordinates=operation?WorldEditorTerrainStroke.validateOperationTiles(requestedTiles):WorldEditorTerrainStroke.validateTiles(requestedTiles);
 		List<WorldEditorTerrainArchive.Snapshot> before=new ArrayList<WorldEditorTerrainArchive.Snapshot>(coordinates.length);
 		List<WorldEditorTerrainArchive.Snapshot> after=new ArrayList<WorldEditorTerrainArchive.Snapshot>(coordinates.length);
 		List<WorldEditorTerrainArchive.Snapshot> archived=new ArrayList<WorldEditorTerrainArchive.Snapshot>(coordinates.length);
@@ -175,7 +187,8 @@ public final class WorldEditorSessionManager {
 			draftedBefore[at]=terrainDraft.containsKey(key);draftedAfter[at]=!painted.sameRawTile(base);at++;
 			archived.add(base);before.add(current);after.add(painted);
 		}
-		int projectedDraftSize=WorldEditorTerrainStroke.projectedDraftSize(terrainDraft.size(),draftedBefore,draftedAfter);
+		int projectedDraftSize=operation?WorldEditorTerrainStroke.projectedOperationDraftSize(terrainDraft.size(),draftedBefore,draftedAfter)
+			:WorldEditorTerrainStroke.projectedDraftSize(terrainDraft.size(),draftedBefore,draftedAfter);
 		if(projectedDraftSize>TERRAIN_DRAFT_LIMIT)throw new IllegalStateException("Terrain draft limit reached.");
 		for(int i=0;i<coordinates.length;i++){
 			String key=terrainKey(coordinates[i][0],coordinates[i][1],plane);
@@ -230,20 +243,38 @@ public final class WorldEditorSessionManager {
 			elevation, groundTexture, groundOverlay, roofTexture, horizontalWall,
 			verticalWall, diagonal, 0, 1);
 	}
+	public synchronized NativeTerrainStrokeResult paintNativeTerrainOperation(
+		Player player, int[][] requestedTiles, int level, int fieldMask,
+		int elevation, int groundTexture, int groundOverlay, int roofTexture,
+		int horizontalWall, int verticalWall, int diagonal,
+		int elevationOperation, int elevationStep) {
+		return paintNativeTerrainTiles(player,requestedTiles,level,fieldMask,elevation,
+			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,
+			elevationOperation,elevationStep,true);
+	}
 
 	public synchronized NativeTerrainStrokeResult paintNativeTerrainStroke(
 		Player player, int[][] requestedTiles, int level, int fieldMask,
 		int elevation, int groundTexture, int groundOverlay, int roofTexture,
 		int horizontalWall, int verticalWall, int diagonal,
 		int elevationOperation, int elevationStep) {
+		return paintNativeTerrainTiles(player,requestedTiles,level,fieldMask,elevation,
+			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,
+			elevationOperation,elevationStep,false);
+	}
+	private NativeTerrainStrokeResult paintNativeTerrainTiles(
+		Player player, int[][] requestedTiles, int level, int fieldMask,
+		int elevation, int groundTexture, int groundOverlay, int roofTexture,
+		int horizontalWall, int verticalWall, int diagonal,
+		int elevationOperation, int elevationStep, boolean operation) {
 		requireNativeTerrainAuthoring(player, level);
 		validateTerrainPaint(
 			fieldMask, elevation, groundTexture, groundOverlay, roofTexture,
 			horizontalWall, verticalWall);
 		requireClientBoundaryPlacementDefinitions(
 			player, fieldMask, horizontalWall, verticalWall, diagonal);
-		int[][] coordinates = WorldEditorTerrainStroke.validateTiles(requestedTiles);
-		ensureNativePaintCoverage(player, coordinates, level);
+		int[][] coordinates = operation?WorldEditorTerrainStroke.validateOperationTiles(requestedTiles):WorldEditorTerrainStroke.validateTiles(requestedTiles);
+		if(operation)requireNativeOperationCoverage(player,coordinates,level);else ensureNativePaintCoverage(player, coordinates, level);
 		WorldSpaceId worldSpace = player.getLayeredLocation().getWorldSpace();
 		List<NativeTerrainSnapshot> before =
 			new ArrayList<NativeTerrainSnapshot>(coordinates.length);
@@ -1364,6 +1395,16 @@ public final class WorldEditorSessionManager {
 			player,owner,accepted.size(),false);
 		for(WorldMapSectorId sector:accepted)addNativeTerrainSector(sector);
 		nativeTerrainSceneRevision++;
+	}
+	private void requireNativeOperationCoverage(Player player,int[][] coordinates,int level){
+		NativeLayeredWorldPackage owner=nativeOwner(player,player.getLayeredLocation());
+		WorldSpaceId worldSpace=player.getLayeredLocation().getWorldSpace();
+		for(int[] coordinate:coordinates){
+			requireBuilderCoordinate(coordinate[0],coordinate[1]);WorldMapSectorId sector=new WorldMapSectorId(
+				worldSpace,level,Math.floorDiv(coordinate[0],NativeLayeredTerrainSector.SIZE),Math.floorDiv(coordinate[1],NativeLayeredTerrainSector.SIZE));
+			if(!findNativeTerrainSector(owner,sector).isPresent())throw new IllegalArgumentException(
+				"Atomic terrain operations must remain on allocated terrain; no sectors were created.");
+		}
 	}
 	private boolean hasAllocatedNeighbor(
 		NativeLayeredWorldPackage owner,WorldMapSectorId requested){

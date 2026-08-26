@@ -23891,13 +23891,20 @@ public final class mudclient implements Runnable {
 	}
 
 	private void drawWorldEditorTerrainToolPreview(Renderer3DFrame frame){
-		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.terrainToolPreviewTiles();if(tiles.length==0)return;
+		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.terrainToolPreviewTiles();int[] anchor=worldEditorInterface.terrainLineAnchorTile();if(tiles.length==0&&anchor==null)return;
 		Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;
 			if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;
 			toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);
 		}
 		int color=worldEditorInterface.terrainToolPreviewColor();for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL);
 			int x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,color);}
+		if(anchor!=null)drawWorldEditorTerrainAnchorMarker(frame,anchor[0]-midRegionBaseX,anchor[1]-midRegionBaseZ);
+	}
+	private void drawWorldEditorTerrainAnchorMarker(Renderer3DFrame frame,int x,int z){
+		if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)return;int color=0xff4dff,x1=x*tileSize,z1=z*tileSize,x2=(x+1)*tileSize,z2=(z+1)*tileSize;
+		drawWorldEditorTerrainPreviewEdge(frame,x1,z1,x2,z1,color);drawWorldEditorTerrainPreviewEdge(frame,x2,z1,x2,z2,color);
+		drawWorldEditorTerrainPreviewEdge(frame,x2,z2,x1,z2,color);drawWorldEditorTerrainPreviewEdge(frame,x1,z2,x1,z1,color);
+		drawWorldEditorTerrainPreviewEdge(frame,x1,z1,x2,z2,color);drawWorldEditorTerrainPreviewEdge(frame,x2,z1,x1,z2,color);
 	}
 	private static void toggleWorldEditorPreviewEdge(Set<Long> edges,int orientation,int x,int z){long key=((long)orientation<<40)|((long)x&0xfffffL)<<20|((long)z&0xfffffL);if(!edges.add(key))edges.remove(key);}
 	private void drawWorldEditorTerrainPreviewEdge(Renderer3DFrame frame,int x1,int z1,int x2,int z2,int color){

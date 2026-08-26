@@ -20,4 +20,8 @@ public final class WorldEditorPacketFraming {
 		if (subtype == 7) return length == 30 + count * 4;
 		return false;
 	}
+
+	public static boolean acceptsTerrainLine(int subtype,int length,int brushSize) {
+		return subtype==8&&length==38&&(brushSize==1||brushSize==3||brushSize==5||brushSize==7);
+	}
 }

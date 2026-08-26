@@ -269,7 +269,8 @@ public class PayloadCustomGenerator implements PayloadGenerator<OpcodeOut> {
 						builder.writeByte((byte) (editor.projectileAllowed ? 1 : 0)); builder.writeByte((byte) (editor.copy ? 1 : 0));
 						if(editor.type==7)builder.writeByte((byte)editor.fieldMask);
 						builder.writeString(editor.message == null ? "" : editor.message);
-					} else if (editor.type == 8) {
+					} else if (editor.type == 8 || editor.type == 9) {
+						if(editor.type==9){builder.writeShort(editor.operationTotal);builder.writeShort(editor.operationOffset);}
 						builder.writeByte((byte)editor.fieldMask);builder.writeByte((byte)editor.terrainTiles.size());
 						for(WorldEditorStruct.TerrainTile tile:editor.terrainTiles){
 							builder.writeShort(tile.x);builder.writeShort(tile.y);builder.writeByte((byte)tile.plane);

@@ -6,13 +6,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 BRUSH = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorTerrainBrush.java"
 FRAMING = ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/WorldEditorPacketFraming.java"
+STROKE = ROOT / "server/src/com/openrsc/server/content/worldedit/WorldEditorTerrainStroke.java"
 SERVER = ROOT / "server/src/com/openrsc/server/Server.java"
 UI = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.java"
 CLIENT = ROOT / "Client_Base/src/orsc/mudclient.java"
+CLIENT_PACKETS = ROOT / "Client_Base/src/orsc/PacketHandler.java"
+HANDLER = ROOT / "server/src/com/openrsc/server/net/rsc/handlers/WorldEditorHandler.java"
+GENERATOR = ROOT / "server/src/com/openrsc/server/net/rsc/generators/impl/PayloadCustomGenerator.java"
+MANAGER = ROOT / "server/src/com/openrsc/server/content/worldedit/WorldEditorSessionManager.java"
+PARSER = ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/PayloadCustomParser.java"
 
 HARNESS = r"""
 import com.openrsc.interfaces.misc.WorldEditorTerrainBrush;
 import com.openrsc.server.net.rsc.parsers.impl.WorldEditorPacketFraming;
+import com.openrsc.server.content.worldedit.WorldEditorTerrainStroke;
 
 public final class WorldEditorTerrainDragHarness {
     private static void require(boolean value, String message) {
@@ -69,8 +76,15 @@ public final class WorldEditorTerrainDragHarness {
 		require(lineFootprint.length == 21, "overlapping line footprints were not coalesced");
 		require(lineFootprint[0][0] == 10 && lineFootprint[0][1] == 20,
 			"line footprint did not retain its anchor first");
+		int[][] largeLine = WorldEditorTerrainBrush.lineFootprint(0, 0, 500, 0, 7, 4096);
+		require(largeLine.length == 3549, "large 7x7 line footprint changed");
+		int[][] serverLargeLine = WorldEditorTerrainStroke.lineFootprint(0, 0, 500, 0, 7);
+		require(serverLargeLine.length == largeLine.length, "client/server line size differs");
+		for (int i = 0; i < largeLine.length; i++) require(
+			largeLine[i][0] == serverLargeLine[i][0] && largeLine[i][1] == serverLargeLine[i][1],
+			"client/server line geometry differs at " + i);
 		rejected = false;
-		try { WorldEditorTerrainBrush.lineFootprint(0, 0, 100, 0, 7, 64); }
+		try { WorldEditorTerrainBrush.lineFootprint(0, 0, 600, 0, 7, 4096); }
 		catch (IllegalArgumentException expected) { rejected = true; }
 		require(rejected, "oversized line footprint was accepted");
 
@@ -86,6 +100,10 @@ public final class WorldEditorTerrainDragHarness {
             "wide stroke accepted the legacy length");
         require(!WorldEditorPacketFraming.acceptsTerrainStroke(7, 290, 65),
             "oversized wide stroke was accepted");
+		require(WorldEditorPacketFraming.acceptsTerrainLine(8, 38, 7),
+			"endpoint-based 7x7 line request was rejected");
+		require(!WorldEditorPacketFraming.acceptsTerrainLine(8, 38, 6),
+			"even line brush was accepted");
     }
 }
 """
@@ -94,7 +112,7 @@ with tempfile.TemporaryDirectory(prefix="world-editor-terrain-drag-") as temp:
     temp_path = Path(temp)
     harness = temp_path / "WorldEditorTerrainDragHarness.java"
     harness.write_text(HARNESS, encoding="utf-8")
-    subprocess.run(["javac", "-d", temp, str(BRUSH), str(FRAMING), str(harness)], check=True)
+    subprocess.run(["javac", "-d", temp, str(BRUSH), str(FRAMING), str(STROKE), str(harness)], check=True)
     subprocess.run(["java", "-cp", temp, "WorldEditorTerrainDragHarness"], check=True)
 
 server = SERVER.read_text(encoding="utf-8")
@@ -112,14 +130,31 @@ assert "} else {\n\t\t\t\t\tprocessWorldBuilderControlPlanePackets();" in server
 
 ui = UI.read_text(encoding="utf-8")
 client = CLIENT.read_text(encoding="utf-8")
+client_packets = CLIENT_PACKETS.read_text(encoding="utf-8")
+handler = HANDLER.read_text(encoding="utf-8")
+generator = GENERATOR.read_text(encoding="utf-8")
+manager = MANAGER.read_text(encoding="utf-8")
+parser = PARSER.read_text(encoding="utf-8")
 assert "TerrainTool terrainTool=TerrainTool.FREEHAND" in ui
 assert "lineFootprint(terrainLineAnchorX,terrainLineAnchorY,worldX,worldY" in ui
-assert "worldX,worldY,terrainBrushSize,TERRAIN_BATCH_LIMIT" in ui
-assert "terrainDragReleasePending=true" in ui
-assert "so it cannot partially commit" in ui
+assert "worldX,worldY,terrainBrushSize,TERRAIN_DRAG_LIMIT" in ui
+assert "sendTerrainLine(startX,startY,worldX,worldY)" in ui
+assert "Line accepted:" in ui and "4096-tile operation limit" in ui
 assert 'inspectionStatus="Line cannot cross a legacy wilderness-level boundary."' in ui
 assert "terrainLineAnchorX>=0" in ui and 'inspectionStatus="Line anchor cancelled."' in ui
+assert "terrainLineAnchorTile()" in ui
 assert "worldEditorInterface.terrainPaintActionLabel()" in client
 assert "drawWorldEditorTerrainToolPreview(renderer3DFrame)" in client
+assert "drawWorldEditorTerrainAnchorMarker" in client
+assert "acceptTerrainLineChunk" in client_packets and "type==8||type==9" in client_packets
+assert "paintNativeTerrainOperation" in handler and "paintTerrainOperation" in handler
+assert "sendTerrainOperation" in handler and "out.type=9" in handler
+assert "editor.type == 8 || editor.type == 9" in generator
+assert "acceptsTerrainLine(8,packet.getLength(),editor.brushSize)" in parser
+legacy_operation = manager[manager.index("private TerrainStrokeResult paintTerrainTiles("):manager.index("public synchronized NativeTerrainSnapshot inspectNativeTerrain")]
+assert legacy_operation.index("projectedOperationDraftSize") < legacy_operation.index("terrainDraft.remove(key)")
+native_operation = manager[manager.index("private NativeTerrainStrokeResult paintNativeTerrainTiles("):manager.index("public synchronized NativeLayeredTerrainTile resolveNativeTerrainTile")]
+assert native_operation.index("if (projected > TERRAIN_DRAFT_LIMIT)") < native_operation.index("nativeTerrainOverlay.remove(key)")
+assert "if(operation)requireNativeOperationCoverage" in native_operation
 
-print("PASS: freehand and line tools preview shared geometry and commit bounded low-latency batches")
+print("PASS: freehand and large atomic line tools share geometry, bounded results, and an anchor marker")

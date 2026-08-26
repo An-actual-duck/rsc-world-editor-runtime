@@ -46,6 +46,14 @@ public final class WorldEditorTerrainStrokeHarness {
         sixtyFour[0][0] = 999;
         require(accepted[0][0] == 0, "validated coordinates were not defensively copied");
         rejects(() -> WorldEditorTerrainStroke.validateTiles(new int[65][2]), "oversized coordinate batch was accepted");
+		int[][] operation = new int[4096][2];
+		for (int i = 0; i < operation.length; i++) { operation[i][0] = i; operation[i][1] = 700; }
+		require(WorldEditorTerrainStroke.validateOperationTiles(operation).length == 4096,
+			"4096-tile operation was rejected");
+		rejects(() -> WorldEditorTerrainStroke.validateOperationTiles(new int[4097][2]),
+			"oversized terrain operation was accepted");
+		require(WorldEditorTerrainStroke.projectedOperationDraftSize(0,new boolean[4096],new boolean[4096]) == 0,
+			"large operation draft accounting changed");
         rejects(() -> WorldEditorTerrainStroke.validateTiles(new int[][]{{1, 2}, {1, 2}}), "duplicate coordinates were accepted");
         rejects(() -> WorldEditorTerrainStroke.projectedDraftSize(0, new boolean[65], new boolean[65]), "oversized stroke accounting was accepted");
     }
