@@ -161,20 +161,26 @@ public final class WorldEditorSessionManager {
 	public synchronized TerrainStrokeResult paintTerrainStroke(Player player,int[][] requestedTiles,int plane,
 		int fieldMask,int elevation,int groundTexture,int groundOverlay,int roofTexture,
 		int horizontalWall,int verticalWall,int diagonal) throws IOException {
-		return paintTerrainTiles(player,requestedTiles,plane,fieldMask,elevation,groundTexture,
+		return paintTerrainTiles(player,requestedTiles,null,plane,fieldMask,elevation,groundTexture,
 			groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,false);
 	}
 	public synchronized TerrainStrokeResult paintTerrainOperation(Player player,int[][] requestedTiles,int plane,
 		int fieldMask,int elevation,int groundTexture,int groundOverlay,int roofTexture,
 		int horizontalWall,int verticalWall,int diagonal) throws IOException {
-		return paintTerrainTiles(player,requestedTiles,plane,fieldMask,elevation,groundTexture,
+		return paintTerrainTiles(player,requestedTiles,null,plane,fieldMask,elevation,groundTexture,
 			groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,true);
 	}
-	private TerrainStrokeResult paintTerrainTiles(Player player,int[][] requestedTiles,int plane,
+	public synchronized TerrainStrokeResult paintTerrainPlannedOperation(Player player,int[][] requestedTiles,int[] requestedFieldMasks,int plane,
+		int elevation,int groundTexture,int groundOverlay,int roofTexture,int horizontalWall,int verticalWall,int diagonal) throws IOException {
+		return paintTerrainTiles(player,requestedTiles,requestedFieldMasks,plane,0,elevation,groundTexture,
+			groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,true);
+	}
+	private TerrainStrokeResult paintTerrainTiles(Player player,int[][] requestedTiles,int[] requestedFieldMasks,int plane,
 		int fieldMask,int elevation,int groundTexture,int groundOverlay,int roofTexture,
 		int horizontalWall,int verticalWall,int diagonal,boolean operation) throws IOException {
-		validateTerrainPaint(fieldMask,elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall);
 		int[][] coordinates=operation?WorldEditorTerrainStroke.validateOperationTiles(requestedTiles):WorldEditorTerrainStroke.validateTiles(requestedTiles);
+		int[] fieldMasks=terrainFieldMasks(coordinates.length,requestedFieldMasks,fieldMask);
+		for(int mask:fieldMasks)validateTerrainPaint(mask,elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall);
 		List<WorldEditorTerrainArchive.Snapshot> before=new ArrayList<WorldEditorTerrainArchive.Snapshot>(coordinates.length);
 		List<WorldEditorTerrainArchive.Snapshot> after=new ArrayList<WorldEditorTerrainArchive.Snapshot>(coordinates.length);
 		List<WorldEditorTerrainArchive.Snapshot> archived=new ArrayList<WorldEditorTerrainArchive.Snapshot>(coordinates.length);
@@ -183,7 +189,7 @@ public final class WorldEditorSessionManager {
 			WorldEditorTerrainArchive.Snapshot base=inspectArchivedTerrain(player,coordinate[0],coordinate[1],plane);
 			String key=terrainKey(coordinate[0],coordinate[1],plane);
 			WorldEditorTerrainArchive.Snapshot current=terrainDraft.containsKey(key)?terrainDraft.get(key):base;
-			WorldEditorTerrainArchive.Snapshot painted=current.paint(fieldMask,elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal);
+			WorldEditorTerrainArchive.Snapshot painted=current.paint(fieldMasks[at],elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal);
 			draftedBefore[at]=terrainDraft.containsKey(key);draftedAfter[at]=!painted.sameRawTile(base);at++;
 			archived.add(base);before.add(current);after.add(painted);
 		}
@@ -248,7 +254,15 @@ public final class WorldEditorSessionManager {
 		int elevation, int groundTexture, int groundOverlay, int roofTexture,
 		int horizontalWall, int verticalWall, int diagonal,
 		int elevationOperation, int elevationStep) {
-		return paintNativeTerrainTiles(player,requestedTiles,level,fieldMask,elevation,
+		return paintNativeTerrainTiles(player,requestedTiles,null,level,fieldMask,elevation,
+			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,
+			elevationOperation,elevationStep,true);
+	}
+	public synchronized NativeTerrainStrokeResult paintNativeTerrainPlannedOperation(
+		Player player,int[][] requestedTiles,int[] requestedFieldMasks,int level,
+		int elevation,int groundTexture,int groundOverlay,int roofTexture,
+		int horizontalWall,int verticalWall,int diagonal,int elevationOperation,int elevationStep) {
+		return paintNativeTerrainTiles(player,requestedTiles,requestedFieldMasks,level,0,elevation,
 			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,
 			elevationOperation,elevationStep,true);
 	}
@@ -258,22 +272,20 @@ public final class WorldEditorSessionManager {
 		int elevation, int groundTexture, int groundOverlay, int roofTexture,
 		int horizontalWall, int verticalWall, int diagonal,
 		int elevationOperation, int elevationStep) {
-		return paintNativeTerrainTiles(player,requestedTiles,level,fieldMask,elevation,
+		return paintNativeTerrainTiles(player,requestedTiles,null,level,fieldMask,elevation,
 			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,
 			elevationOperation,elevationStep,false);
 	}
 	private NativeTerrainStrokeResult paintNativeTerrainTiles(
-		Player player, int[][] requestedTiles, int level, int fieldMask,
+		Player player, int[][] requestedTiles, int[] requestedFieldMasks, int level, int fieldMask,
 		int elevation, int groundTexture, int groundOverlay, int roofTexture,
 		int horizontalWall, int verticalWall, int diagonal,
 		int elevationOperation, int elevationStep, boolean operation) {
 		requireNativeTerrainAuthoring(player, level);
-		validateTerrainPaint(
-			fieldMask, elevation, groundTexture, groundOverlay, roofTexture,
-			horizontalWall, verticalWall);
-		requireClientBoundaryPlacementDefinitions(
-			player, fieldMask, horizontalWall, verticalWall, diagonal);
 		int[][] coordinates = operation?WorldEditorTerrainStroke.validateOperationTiles(requestedTiles):WorldEditorTerrainStroke.validateTiles(requestedTiles);
+		int[] fieldMasks=terrainFieldMasks(coordinates.length,requestedFieldMasks,fieldMask);
+		for(int mask:fieldMasks){validateTerrainPaint(mask,elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall);
+			requireClientBoundaryPlacementDefinitions(player,mask,horizontalWall,verticalWall,diagonal);}
 		if(operation)requireNativeOperationCoverage(player,coordinates,level);else ensureNativePaintCoverage(player, coordinates, level);
 		WorldSpaceId worldSpace = player.getLayeredLocation().getWorldSpace();
 		List<NativeTerrainSnapshot> before =
@@ -285,7 +297,7 @@ public final class WorldEditorSessionManager {
 		List<NativeLayeredTerrainTile> bases =
 			new ArrayList<NativeLayeredTerrainTile>(coordinates.length);
 		int projected = nativeTerrainOverlay.size();
-		for (int[] coordinate : coordinates) {
+		int fieldIndex=0;for (int[] coordinate : coordinates) {
 			WorldLocation location = new WorldLocation(
 				worldSpace,
 				new WorldCoordinate(coordinate[0], coordinate[1], level));
@@ -294,7 +306,8 @@ public final class WorldEditorSessionManager {
 			NativeLayeredTerrainTile current = nativeTerrainOverlay.get(key);
 			if (current == null) current = base;
 			int targetElevation = elevation;
-			if ((fieldMask & 1) != 0 && elevationOperation != 0) {
+			int tileFieldMask=fieldMasks[fieldIndex++];
+			if ((tileFieldMask & 1) != 0 && elevationOperation != 0) {
 				if (elevationOperation < 1 || elevationOperation > 2
 					|| elevationStep < 1 || elevationStep > 65535) {
 					throw new IllegalArgumentException("Elevation operation capability v2 is invalid.");
@@ -308,7 +321,7 @@ public final class WorldEditorSessionManager {
 				targetElevation = (int)candidate;
 			}
 			NativeLayeredTerrainTile painted = paintNativeTile(
-				current, fieldMask, targetElevation, groundTexture, groundOverlay,
+				current, tileFieldMask, targetElevation, groundTexture, groundOverlay,
 				roofTexture, horizontalWall, verticalWall, diagonal);
 			boolean existed = nativeTerrainOverlay.containsKey(key);
 			boolean remains = !painted.equals(base);
@@ -1935,6 +1948,12 @@ public final class WorldEditorSessionManager {
 			for(byte item:hash)value.append(String.format("%02x",item&0xff));
 			return value.toString();
 		}catch(NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+	}
+	private static int[] terrainFieldMasks(int count,int[] requested,int uniform){
+		if(count<1)throw new IllegalArgumentException("Terrain operation is empty.");
+		if(requested==null){int[] masks=new int[count];java.util.Arrays.fill(masks,uniform);return masks;}
+		if(requested.length!=count)throw new IllegalArgumentException("Terrain operation field plan is malformed.");
+		return requested.clone();
 	}
 	private static void validateTerrainPaint(int fieldMask,int elevation,int groundTexture,int groundOverlay,int roofTexture,int horizontalWall,int verticalWall){
 		if(fieldMask<=0||(fieldMask&~127)!=0)throw new IllegalArgumentException("Select at least one supported terrain field.");

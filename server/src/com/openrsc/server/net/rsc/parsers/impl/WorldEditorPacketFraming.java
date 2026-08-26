@@ -2,7 +2,7 @@ package com.openrsc.server.net.rsc.parsers.impl;
 
 /** Exact length rules for the private World Builder protocol envelope. */
 public final class WorldEditorPacketFraming {
-	private static final int[] FIXED_LENGTHS = {13, 15, 19, 22, 29};
+	private static final int[] FIXED_LENGTHS = {13, 15, 19, 22, 29, 39};
 	private static final int MAX_TERRAIN_TILES = 64;
 
 	private WorldEditorPacketFraming() {}
@@ -23,5 +23,9 @@ public final class WorldEditorPacketFraming {
 
 	public static boolean acceptsTerrainLine(int subtype,int length,int brushSize) {
 		return subtype==8&&length==38&&(brushSize==1||brushSize==3||brushSize==5||brushSize==7);
+	}
+
+	public static boolean acceptsTerrainRectangle(int subtype,int length,int flags) {
+		return subtype==9&&length==39&&(flags&~7)==0&&((flags&4)==0||(flags&2)!=0);
 	}
 }

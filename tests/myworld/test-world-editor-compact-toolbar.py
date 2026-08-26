@@ -127,9 +127,10 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
                         public static void main(String[] args) {
                             WorldEditorIconRegistry registry = new WorldEditorIconRegistry();
                             registry.initialize();
-                            require(registry.loadedCount() == 1);
+							require(registry.loadedCount() == 2);
                             require(registry.missingKeys().size() == 21);
                             require(registry.isLoaded(WorldEditorIconRegistry.Key.MODE_NAVIGATE));
+							require(registry.isLoaded(WorldEditorIconRegistry.Key.TOOL_RECTANGLE));
                             require(!registry.isLoaded(WorldEditorIconRegistry.Key.MODE_INSPECT));
                             Sprite first = registry.get(WorldEditorIconRegistry.Key.MODE_NAVIGATE);
                             require(first == registry.get(WorldEditorIconRegistry.Key.MODE_NAVIGATE));
@@ -235,6 +236,7 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         self.assertIn("TOOL_BRUSH_3X3", ui)
         self.assertIn("TOOL_FREEHAND", ui)
         self.assertIn("TOOL_LINE", ui)
+        self.assertIn("TOOL_RECTANGLE", ui)
         self.assertIn("selected?0x6b3f82", ui)
         self.assertIn("terrainToolAtDock", ui)
         self.assertIn("drawWorldEditorTerrainToolPreview(renderer3DFrame)", client)
@@ -252,8 +254,11 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
             "paintDiagonalWall?64:0",
         ):
             self.assertIn(mask, paint_mask.group("body"))
-        for field in range(6, 13):
+        for field in range(6, 10):
             self.assertIn(f"return {field}", ui)
+        self.assertIn("?18:10", ui)
+        self.assertIn("return 11", ui)
+        self.assertIn("return 12", ui)
 
     def test_primary_tools_and_context_actions_have_separate_columns(self):
         ui = UI.read_text()

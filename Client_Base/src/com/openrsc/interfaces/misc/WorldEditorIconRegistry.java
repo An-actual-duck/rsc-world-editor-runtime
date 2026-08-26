@@ -42,6 +42,7 @@ public final class WorldEditorIconRegistry {
 		TOOL_BRUSH_3X3("tool-brush-3x3.png", "3x3"),
 		TOOL_FREEHAND("tool-freehand.png", "Hand"),
 		TOOL_LINE("tool-line.png", "Line"),
+		TOOL_RECTANGLE(null, "Box"),
 		PROFILE_BUILD("profile-build.png", "Build"),
 		ACTION_SAVE("action-save.png", "Save"),
 		ACTION_PIN("action-pin.png", "Pin"),
@@ -113,6 +114,9 @@ public final class WorldEditorIconRegistry {
 	}
 
 	private Sprite load(Key key) throws IOException {
+		if (key == Key.TOOL_RECTANGLE) {
+			return rectangleIcon();
+		}
 		BufferedImage image = read(key.filename());
 		if (image == null) {
 			return null;
@@ -134,6 +138,28 @@ public final class WorldEditorIconRegistry {
 				pixels[i] = rgb == RendererTransparency.TRANSPARENT_SAMPLE
 					? RendererTransparency.OPAQUE_BLACK_REPLACEMENT : rgb;
 			}
+		}
+		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);
+		sprite.setShift(0, 0);
+		sprite.setRequiresShift(false);
+		sprite.setSomething(ICON_SIZE, ICON_SIZE);
+		return sprite;
+	}
+
+	private static Sprite rectangleIcon() {
+		int[] pixels = new int[ICON_SIZE * ICON_SIZE];
+		java.util.Arrays.fill(pixels, RendererTransparency.TRANSPARENT_SAMPLE);
+		for (int x = 4; x <= 19; x++) {
+			pixels[4 * ICON_SIZE + x] = 0xffffff;
+			pixels[5 * ICON_SIZE + x] = 0xffffff;
+			pixels[18 * ICON_SIZE + x] = 0xffffff;
+			pixels[19 * ICON_SIZE + x] = 0xffffff;
+		}
+		for (int y = 4; y <= 19; y++) {
+			pixels[y * ICON_SIZE + 4] = 0xffffff;
+			pixels[y * ICON_SIZE + 5] = 0xffffff;
+			pixels[y * ICON_SIZE + 18] = 0xffffff;
+			pixels[y * ICON_SIZE + 19] = 0xffffff;
 		}
 		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);
 		sprite.setShift(0, 0);
@@ -170,7 +196,7 @@ public final class WorldEditorIconRegistry {
 			if (text.length() > 0) {
 				text.append(", ");
 			}
-			text.append(key.filename()).append(" (").append(failure).append(')');
+			text.append(key.filename() == null ? key.name() : key.filename()).append(" (").append(failure).append(')');
 		}
 		return text.toString();
 	}

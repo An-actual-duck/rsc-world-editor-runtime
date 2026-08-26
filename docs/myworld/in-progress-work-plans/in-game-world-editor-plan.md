@@ -372,8 +372,12 @@ The client implements a real editor stroke:
 7. Send bounded batches under one stroke ID and sequence.
 8. End the transaction on mouse-up, cancellation, or loss of editor focus.
 
-Start with a square footprint. A circle, line, rectangle, fill, and selection
-tool are later enhancements.
+The implemented desktop terrain tools now include centered 1x1 through 7x7
+freehand brushes, bounded atomic lines, and a two-corner rectangle with outline
+or fill. Rectangle Smart Walls is enabled by default: one selected boundary
+definition is assigned to the correct north/east archive owners around the
+perimeter. Turning Smart Walls off restores the raw north, east, and diagonal
+field behavior. Circle and selection tools remain later enhancements.
 
 The server enforces maximum radius, tile count, packet count, coordinate
 bounds, plane, session ID, sequence ordering, capability, and rate limits. A
@@ -626,8 +630,11 @@ This is the initial `feat/in-game-world-editor-foundation` branch scope.
 
 - [ ] Implement deterministic boundary upserts/removals and then enable its
   exclusive UI mode.
-- [ ] Add circle/line/rectangle/fill/selection tools only after stamp and brush
-  safety is proven.
+- [x] Add bounded atomic line and rectangle outline/fill tools after stamp and
+  brush safety is proven, including default-on Smart Walls and a raw-wall
+  fallback.
+- [ ] Add circle and selection tools after the current line/rectangle owner
+  validation and user-facing workflow are accepted.
 - [ ] Add definition search, favorites, richer thumbnails, prefab support, and
   optional keyboard shortcuts.
 - [ ] Consider region locks and multiple editors only with conflict-aware

@@ -6,6 +6,11 @@ public final class WorldEditorTerrainStroke {
 	public static final int MAX_OPERATION_TILES = 4096;
 	private static final int BRUSH_TILES = 9;
 	private WorldEditorTerrainStroke() {}
+	public static final class RectanglePlan {
+		public final int[][] coordinates;
+		public final int[] fieldMasks;
+		private RectanglePlan(int[][] coordinates,int[] fieldMasks){this.coordinates=coordinates;this.fieldMasks=fieldMasks;}
+	}
 
 	public static int[][] coordinates(int centerX,int centerY,int brushSize,int fieldMask) {
 		if(brushSize!=1&&brushSize!=3)throw new IllegalArgumentException("Terrain brush must be 1x1 or 3x3.");
@@ -52,6 +57,40 @@ public final class WorldEditorTerrainStroke {
 		long key=((long)x<<32)^(y&0xffffffffL);if(unique.containsKey(key))return;
 		if(unique.size()>=MAX_OPERATION_TILES)throw new IllegalArgumentException("Terrain line exceeds 4096 unique tiles.");
 		unique.put(key,new int[]{x,y});
+	}
+	public static RectanglePlan rectanglePlan(int startX,int startY,int endX,int endY,boolean fill,
+		int baseFieldMask,boolean smartWalls,boolean paintSmartWall){
+		if(baseFieldMask<0||(baseFieldMask&~127)!=0)throw new IllegalArgumentException("Terrain rectangle capability is invalid.");
+		if(smartWalls&&(baseFieldMask&112)!=0)throw new IllegalArgumentException("Smart Walls cannot include raw wall fields.");
+		if(!smartWalls&&paintSmartWall)throw new IllegalArgumentException("Smart wall placement requires Smart Walls.");
+		if(baseFieldMask==0&&!paintSmartWall)throw new IllegalArgumentException("Terrain rectangle has no selected fields.");
+		int minX=Math.min(startX,endX),maxX=Math.max(startX,endX),minY=Math.min(startY,endY),maxY=Math.max(startY,endY);
+		long width=(long)maxX-minX+1L,height=(long)maxY-minY+1L;
+		long footprint=fill?width*height:width==1L||height==1L?width*height:width*2L+height*2L-4L;
+		long possible=footprint+(paintSmartWall?width*2L+height*2L:0L);
+		if(footprint<1L||possible>MAX_OPERATION_TILES*2L+4L)throw new IllegalArgumentException("Terrain rectangle exceeds 4096 unique tiles.");
+		java.util.LinkedHashMap<Long,int[]> tiles=new java.util.LinkedHashMap<Long,int[]>();
+		java.util.LinkedHashMap<Long,Integer> masks=new java.util.LinkedHashMap<Long,Integer>();
+		if(baseFieldMask!=0){
+			if(fill){for(int x=minX;;x++){for(int y=minY;;y++){addRectangleTile(tiles,masks,x,y,baseFieldMask);if(y==maxY)break;}if(x==maxX)break;}}
+			else{
+				for(int x=minX;;x++){addRectangleTile(tiles,masks,x,minY,baseFieldMask);if(maxY!=minY)addRectangleTile(tiles,masks,x,maxY,baseFieldMask);if(x==maxX)break;}
+				if(height>2L)for(int y=minY+1;y<maxY;y++){addRectangleTile(tiles,masks,minX,y,baseFieldMask);if(maxX!=minX)addRectangleTile(tiles,masks,maxX,y,baseFieldMask);}
+			}
+		}
+		if(paintSmartWall){
+			int southY=Math.addExact(maxY,1),eastX=Math.addExact(maxX,1);
+			for(int x=minX;;x++){addRectangleTile(tiles,masks,x,minY,32);addRectangleTile(tiles,masks,x,southY,32);if(x==maxX)break;}
+			for(int y=minY;;y++){addRectangleTile(tiles,masks,minX,y,16);addRectangleTile(tiles,masks,eastX,y,16);if(y==maxY)break;}
+		}
+		int[][] coordinates=tiles.values().toArray(new int[tiles.size()][]);int[] fieldMasks=new int[coordinates.length];int at=0;
+		for(Integer mask:masks.values())fieldMasks[at++]=mask.intValue();return new RectanglePlan(coordinates,fieldMasks);
+	}
+	private static void addRectangleTile(java.util.LinkedHashMap<Long,int[]> tiles,java.util.LinkedHashMap<Long,Integer> masks,int x,int y,int fieldMask){
+		long key=((long)x<<32)^(y&0xffffffffL);Integer previous=masks.get(key);
+		if(previous!=null){masks.put(key,Integer.valueOf(previous.intValue()|fieldMask));return;}
+		if(tiles.size()>=MAX_OPERATION_TILES)throw new IllegalArgumentException("Terrain rectangle exceeds 4096 unique tiles.");
+		tiles.put(key,new int[]{x,y});masks.put(key,Integer.valueOf(fieldMask));
 	}
 
 	public static int projectedDraftSize(int currentSize,boolean[] draftedBefore,boolean[] draftedAfter) {

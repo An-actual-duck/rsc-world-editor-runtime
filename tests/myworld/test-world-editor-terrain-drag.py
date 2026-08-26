@@ -53,6 +53,31 @@ public final class WorldEditorTerrainDragHarness {
         require(seen.contains((centerX + radius) + "," + (centerY + radius)),
             "footprint missed upper corner");
     }
+	private static int maskAt(int[][] tiles,int[] masks,int x,int y) {
+		for(int i=0;i<tiles.length;i++)if(tiles[i][0]==x&&tiles[i][1]==y)return masks[i];
+		throw new AssertionError("missing rectangle tile "+x+","+y);
+	}
+	private static void verifyRectangle() {
+		int[][] outline=WorldEditorTerrainBrush.rectangleFootprint(10,20,12,22,false,4096);
+		require(outline.length==8,"3x3 outline size changed");
+		int[][] fill=WorldEditorTerrainBrush.rectangleFootprint(12,22,10,20,true,4096);
+		require(fill.length==9,"3x3 fill size changed");
+		WorldEditorTerrainBrush.RectanglePlan client=WorldEditorTerrainBrush.rectanglePlan(10,20,12,22,true,4,true,true,4096);
+		WorldEditorTerrainStroke.RectanglePlan server=WorldEditorTerrainStroke.rectanglePlan(12,22,10,20,true,4,true,true);
+		int[][] clientTiles=client.tiles();int[] clientMasks=client.fieldMasks();
+		require(clientTiles.length==15,"smart rectangle unique size changed");
+		require(server.coordinates.length==clientTiles.length,"client/server rectangle size differs");
+		for(int i=0;i<clientTiles.length;i++)require(clientTiles[i][0]==server.coordinates[i][0]
+			&&clientTiles[i][1]==server.coordinates[i][1]&&clientMasks[i]==server.fieldMasks[i],
+			"client/server rectangle plan differs at "+i);
+		require(maskAt(clientTiles,clientMasks,10,20)==52,"north/east corner ownership changed");
+		require(maskAt(clientTiles,clientMasks,11,20)==36,"north edge ownership changed");
+		require(maskAt(clientTiles,clientMasks,10,21)==20,"east edge ownership changed");
+		require(maskAt(clientTiles,clientMasks,13,21)==16,"far east owner tile changed");
+		require(maskAt(clientTiles,clientMasks,11,23)==32,"far north owner tile changed");
+		boolean rejected=false;try{WorldEditorTerrainBrush.rectangleFootprint(0,0,64,64,true,4096);}
+		catch(IllegalArgumentException expected){rejected=true;}require(rejected,"oversized rectangle was accepted");
+	}
     public static void main(String[] args) {
         verifyLine(10, 20, 10, 20);
         verifyLine(10, 20, 18, 20);
@@ -64,6 +89,7 @@ public final class WorldEditorTerrainDragHarness {
 		verifyFootprint(3);
 		verifyFootprint(5);
 		verifyFootprint(7);
+		verifyRectangle();
 		require(WorldEditorTerrainBrush.nextSize(1) == 3, "1x1 cycle failed");
 		require(WorldEditorTerrainBrush.nextSize(3) == 5, "3x3 cycle failed");
 		require(WorldEditorTerrainBrush.nextSize(5) == 7, "5x5 cycle failed");
@@ -104,6 +130,11 @@ public final class WorldEditorTerrainDragHarness {
 			"endpoint-based 7x7 line request was rejected");
 		require(!WorldEditorPacketFraming.acceptsTerrainLine(8, 38, 6),
 			"even line brush was accepted");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,2),"smart rectangle framing was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,7),"filled smart-wall rectangle framing was rejected");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,4),"wall flag without Smart Walls was accepted");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,8),"unknown rectangle flag was accepted");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,38,2),"short rectangle frame was accepted");
     }
 }
 """
@@ -139,9 +170,10 @@ assert "TerrainTool terrainTool=TerrainTool.FREEHAND" in ui
 assert "lineFootprint(terrainLineAnchorX,terrainLineAnchorY,worldX,worldY" in ui
 assert "worldX,worldY,terrainBrushSize,TERRAIN_DRAG_LIMIT" in ui
 assert "sendTerrainLine(startX,startY,worldX,worldY)" in ui
-assert "Line accepted:" in ui and "4096-tile operation limit" in ui
+assert "sendTerrainRectangle(startX,startY,worldX,worldY)" in ui
+assert 'terrainGestureLabel="Rectangle"' in ui and "4096-tile operation limit" in ui
 assert 'inspectionStatus="Line cannot cross a legacy wilderness-level boundary."' in ui
-assert "terrainLineAnchorX>=0" in ui and 'inspectionStatus="Line anchor cancelled."' in ui
+assert "terrainLineAnchorX>=0" in ui and '"Rectangle corner":"Line anchor"' in ui
 assert "terrainLineAnchorTile()" in ui
 assert "worldEditorInterface.terrainPaintActionLabel()" in client
 assert "drawWorldEditorTerrainToolPreview(renderer3DFrame)" in client
@@ -153,10 +185,13 @@ assert "paintNativeTerrainOperation" in handler and "paintTerrainOperation" in h
 assert "sendTerrainOperation" in handler and "out.type=9" in handler
 assert "editor.type == 8 || editor.type == 9" in generator
 assert "acceptsTerrainLine(8,packet.getLength(),editor.brushSize)" in parser
+assert "acceptsTerrainRectangle(9,packet.getLength(),editor.rectangleFlags)" in parser
+assert "WorldEditorTerrainStroke.rectanglePlan" in handler
+assert "paintNativeTerrainPlannedOperation" in handler and "paintTerrainPlannedOperation" in handler
 legacy_operation = manager[manager.index("private TerrainStrokeResult paintTerrainTiles("):manager.index("public synchronized NativeTerrainSnapshot inspectNativeTerrain")]
 assert legacy_operation.index("projectedOperationDraftSize") < legacy_operation.index("terrainDraft.remove(key)")
 native_operation = manager[manager.index("private NativeTerrainStrokeResult paintNativeTerrainTiles("):manager.index("public synchronized NativeLayeredTerrainTile resolveNativeTerrainTile")]
 assert native_operation.index("if (projected > TERRAIN_DRAFT_LIMIT)") < native_operation.index("nativeTerrainOverlay.remove(key)")
 assert "if(operation)requireNativeOperationCoverage" in native_operation
 
-print("PASS: freehand and large atomic line tools share geometry, bounded results, and an anchor marker")
+print("PASS: freehand, line, and smart rectangle tools share bounded authoritative geometry")
