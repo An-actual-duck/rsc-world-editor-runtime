@@ -15,6 +15,7 @@ import com.openrsc.server.io.NativeLayeredWorldPackage;
 import com.openrsc.server.io.NativeLayeredWorldRuntimeProfile;
 import com.openrsc.server.model.Point;
 import com.openrsc.server.model.entity.GameObject;
+import com.openrsc.server.model.entity.GameObjectType;
 import com.openrsc.server.model.entity.GroundItem;
 import com.openrsc.server.model.entity.npc.Npc;
 import com.openrsc.server.model.world.region.RegionManager;
@@ -100,6 +101,7 @@ public final class WorldEditorSessionManager {
 		new HashSet<NativeGroundItemKey>();
 	private String nativeTerrainBaseManifestSha256;
 	private String nativeWorkingInventorySha256;
+	private NativeLayeredWorldPackage nativeAdoptedPackage;
 	private long nativeTerrainSceneRevision;
 	public WorldEditorSessionManager() { this(null, new SecureRandom()); }
 	public WorldEditorSessionManager(WorldEditStorageContext storage) { this(storage, new SecureRandom()); }
@@ -224,6 +226,7 @@ public final class WorldEditorSessionManager {
 		if (owner == null || identity == null) {
 			return Optional.empty();
 		}
+		owner = effectiveNativeOwner(owner);
 		Optional<NativeLayeredTerrainSector> source = owner.findSector(identity);
 		if (source.isPresent()) return source;
 		return Optional.ofNullable(nativeTerrainLiveSectors.get(identity));
@@ -359,6 +362,11 @@ public final class WorldEditorSessionManager {
 		NativeLayeredTerrainTile drafted =
 			nativeTerrainOverlay.get(new NativeTileKey(location));
 		if (drafted != null) return drafted;
+		if (nativeAdoptedPackage != null) {
+			NativeLayeredTerrainTile adopted =
+				nativeAdoptedPackage.findTile(location).orElse(null);
+			if (adopted != null) return adopted;
+		}
 		if (source != null) return source;
 		NativeLayeredTerrainSector live =
 			nativeTerrainLiveSectors.get(WorldMapSectorId.from(location));
@@ -1071,6 +1079,146 @@ public final class WorldEditorSessionManager {
 		return saved;
 	}
 
+	/**
+	 * Makes an Editor-published Region Paste the running Builder session's new
+	 * logical base without weakening the immutable startup/runtime binding.
+	 */
+	public synchronized void adoptPublishedAdaptivePackage(
+		Player player, NativeLayeredWorldPackage published,
+		String inventorySha256) throws IOException {
+		requireNativeDraftSession(player);
+		if (!isAdaptive(player)) {
+			throw new IllegalStateException(
+				"Live Region Paste requires isolated adaptive Builder mode.");
+		}
+		if (hasUnsavedNativeChanges()) {
+			throw new IllegalStateException(
+				"Live Region Paste cannot cross pending in-memory edits.");
+		}
+		NativeLayeredWorldPackage startup = player.getWorld().getRegionManager()
+			.getNativeLayeredWorldPackage();
+		NativeLayeredWorldPackage current = effectiveNativeOwner(startup);
+		if (startup == null || published == null
+			|| !current.getPackageId().equals(published.getPackageId())
+			|| !current.getPackageVersion().equals(published.getPackageVersion())
+			|| !current.getTerrainSectors().keySet().equals(
+				published.getTerrainSectors().keySet())
+			|| !current.getPlacementSets().keySet().equals(
+				published.getPlacementSets().keySet())) {
+			throw new IOException(
+				"Published Region Paste changed the bounded package layout.");
+		}
+		if (inventorySha256 == null
+			|| !inventorySha256.matches("[0-9a-f]{64}")) {
+			throw new IOException(
+				"Published Region Paste inventory identity is invalid.");
+		}
+
+		// The package was fully parsed and definition-validated before this point.
+		// Replace package-owned runtime entities in one server command boundary;
+		// terrain switches only after the old entity set is retired.
+		retireNativePackagePlacements(player);
+		nativeAdoptedPackage = published;
+		resetNativeDraftAgainstAdoptedPackage(inventorySha256);
+		populateNativePackagePlacements(player, published);
+		nativeTerrainSceneRevision++;
+	}
+
+	private void retireNativePackagePlacements(Player player) {
+		RegionManager regions = player.getWorld().getRegionManager();
+		for (GameObject object : new ArrayList<GameObject>(
+			regions.snapshotNativeLayeredGameObjects())) {
+			player.getWorld().unregisterGameObject(object);
+		}
+		for (Npc npc : new ArrayList<Npc>(player.getWorld().getNpcs())) {
+			if (regions.isNativeLayeredPlacement(
+				npc, RegionManager.NATIVE_LAYERED_NPC_KIND)) {
+				player.getWorld().unregisterNpc(npc);
+			}
+		}
+		for (GroundItem item : new ArrayList<GroundItem>(
+			player.getWorld().snapshotNativeLayeredGroundItems())) {
+			item.retireNativeLayeredPlacement();
+		}
+	}
+
+	private void resetNativeDraftAgainstAdoptedPackage(String inventorySha256) {
+		nativeTerrainBase.clear();
+		nativeTerrainOverlay.clear();
+		nativeTerrainSaved.clear();
+		nativeTerrainDirty.clear();
+		nativeTerrainGrowth.clear();
+		nativeTerrainGrowthSaved.clear();
+		nativeTerrainLiveSectors.clear();
+		nativeLevelCreations.clear();
+		nativeLevelCreationsSaved.clear();
+		nativeSceneryBase.clear();
+		nativeSceneryOverlay.clear();
+		nativeScenerySaved.clear();
+		nativeSceneryDirty.clear();
+		nativeNpcBase.clear();
+		nativeNpcOverlay.clear();
+		nativeNpcSaved.clear();
+		nativeNpcDirty.clear();
+		nativeGroundItemBase.clear();
+		nativeGroundItemOverlay.clear();
+		nativeGroundItemSaved.clear();
+		nativeGroundItemDirty.clear();
+		nativeTerrainBaseManifestSha256 = nativeAdoptedPackage.getManifestSha256();
+		nativeWorkingInventorySha256 = inventorySha256;
+	}
+
+	private void populateNativePackagePlacements(
+		Player player, NativeLayeredWorldPackage worldPackage) {
+		RegionManager regions = player.getWorld().getRegionManager();
+		for (NativeLayeredPlacementSet set : worldPackage.getPlacementSets().values()) {
+			for (NativeLayeredNpcPlacement placement : set.getNpcs()) {
+				Npc npc = new Npc(player.getWorld(), placement.getNpcId(),
+					placement.getStart().getCoordinate().getX(),
+					placement.getStart().getCoordinate().getY(),
+					placement.getMinX(), placement.getMaxX(),
+					placement.getMinY(), placement.getMaxY());
+				npc.setWorldLocation(placement.getStart(), true);
+				regions.markNativeLayeredPlacement(npc, worldPackage.getPackageId(),
+					placement.getPlacementId(), RegionManager.NATIVE_LAYERED_NPC_KIND);
+				player.getWorld().registerNpc(npc);
+			}
+			for (NativeLayeredGroundItemPlacement placement : set.getGroundItems()) {
+				GroundItem item = player.getWorld()
+					.registerNativeLayeredGroundItem(placement);
+				if (item == null) throw new IllegalStateException(
+					"Published Region Paste ground item was refused: "
+						+ placement.getPlacementId());
+			}
+			for (NativeLayeredSceneryPlacement placement : set.getScenery()) {
+				registerPublishedGameObject(player, worldPackage.getPackageId(),
+					placement.getPlacementId(), placement.getLocation(),
+					placement.getSceneryId(), placement.getDirection(),
+					GameObjectType.SCENERY,
+					RegionManager.NATIVE_LAYERED_SCENERY_KIND);
+			}
+			for (NativeLayeredBoundaryPlacement placement : set.getBoundaries()) {
+				registerPublishedGameObject(player, worldPackage.getPackageId(),
+					placement.getPlacementId(), placement.getLocation(),
+					placement.getBoundaryId(), placement.getDirection(),
+					GameObjectType.BOUNDARY,
+					RegionManager.NATIVE_LAYERED_BOUNDARY_KIND);
+			}
+		}
+	}
+
+	private void registerPublishedGameObject(Player player, String packageId,
+		String placementId, WorldLocation location, int objectId, int direction,
+		GameObjectType type, String kind) {
+		WorldCoordinate coordinate = location.getCoordinate();
+		GameObject object = new GameObject(player.getWorld(), new GameObjectLoc(
+			objectId, coordinate.getX(), coordinate.getY(), direction, type.getId()));
+		object.setInitialWorldLocation(location);
+		player.getWorld().getRegionManager().markNativeLayeredPlacement(
+			object, packageId, placementId, kind);
+		player.getWorld().registerGameObject(object);
+	}
+
 	private boolean hasUnsavedNativeChanges() {
 		return !nativeTerrainDirty.isEmpty()
 			|| !nativeTerrainGrowth.equals(nativeTerrainGrowthSaved)
@@ -1101,6 +1249,7 @@ public final class WorldEditorSessionManager {
 
 	private AdaptiveWorldBuilderPackagePublisher.Draft adaptiveDraft(
 		NativeLayeredWorldPackage owner) {
+		owner = effectiveNativeOwner(owner);
 		List<AdaptiveWorldBuilderPackagePublisher.Level> levels =
 			new ArrayList<AdaptiveWorldBuilderPackagePublisher.Level>();
 		Set<Integer> declaredLevels = new HashSet<Integer>();
@@ -1972,11 +2121,18 @@ public final class WorldEditorSessionManager {
 			.findNativeLayeredWorldPackage(location)
 			.orElseThrow(()->new IllegalArgumentException(
 				"Terrain tile is not allocated in the layered working package."));
+		owner=effectiveNativeOwner(owner);
 		String manifest=owner.getManifestSha256();
 		if(nativeTerrainBaseManifestSha256==null)nativeTerrainBaseManifestSha256=manifest;
 		else if(!nativeTerrainBaseManifestSha256.equals(manifest))throw new IllegalStateException(
 			"Layered terrain draft crossed a package-manifest boundary.");
 		return owner;
+	}
+	private NativeLayeredWorldPackage effectiveNativeOwner(
+		NativeLayeredWorldPackage owner){
+		if(owner==null||nativeAdoptedPackage==null)return owner;
+		return owner.getPackageId().equals(nativeAdoptedPackage.getPackageId())
+			?nativeAdoptedPackage:owner;
 	}
 	private NativeLayeredTerrainTile nativeBaseTile(Player player,WorldLocation location){
 		return nativeBaseTile(nativeOwner(player,location),location);

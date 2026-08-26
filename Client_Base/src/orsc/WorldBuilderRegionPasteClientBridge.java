@@ -134,15 +134,19 @@ public final class WorldBuilderRegionPasteClientBridge {
 				else if ("preview".equals(responseOperation)) result = previewResult(value);
 				else if ("apply".equals(responseOperation)) result = Result.applied(
 					requestId, value.getString("snapshotId"),
-					value.getString("planFingerprintSha256"));
+					value.getString("planFingerprintSha256"),
+					value.getString("packageManifestSha256"),
+					value.getString("packageInventorySha256"));
 				else throw new IOException("Region Paste response operation is unsupported.");
 			} else {
 				result = Result.refused(requestId, responseOperation,
 					root.getString("errorCode"), root.getString("message"),
 					root.getString("nextStep"));
 			}
-			Files.delete(response);
-			forceDirectory(response.getParent());
+			if (!(result.accepted && "apply".equals(result.operation))) {
+				Files.delete(response);
+				forceDirectory(response.getParent());
+			}
 			reset();
 			return result;
 		} catch (Exception failure) {
@@ -260,6 +264,8 @@ public final class WorldBuilderRegionPasteClientBridge {
 		public final int tileCount;
 		public final int placementCount;
 		public final String planHash;
+		public final String packageManifestSha256;
+		public final String packageInventorySha256;
 		public final boolean blocked;
 		public final boolean overwrite;
 		public final int[][] markers;
@@ -270,19 +276,22 @@ public final class WorldBuilderRegionPasteClientBridge {
 
 		private Result(boolean accepted, String operation, String requestId,
 			List<Snapshot> snapshots, String snapshotId, String name, int tileCount,
-			int placementCount, String planHash, boolean blocked, boolean overwrite,
+			int placementCount, String planHash, String packageManifestSha256,
+			String packageInventorySha256, boolean blocked, boolean overwrite,
 			int[][] markers, int[][] collisions, String errorCode, String message,
 			String nextStep) {
 			this.accepted = accepted; this.operation = operation; this.requestId = requestId;
 			this.snapshots = snapshots; this.snapshotId = snapshotId; this.name = name;
 			this.tileCount = tileCount; this.placementCount = placementCount;
 			this.planHash = planHash; this.blocked = blocked; this.overwrite = overwrite;
+			this.packageManifestSha256 = packageManifestSha256;
+			this.packageInventorySha256 = packageInventorySha256;
 			this.markers = markers; this.collisions = collisions;
 			this.errorCode = errorCode; this.message = message; this.nextStep = nextStep;
 		}
 
 		static Result library(String id, List<Snapshot> snapshots) {
-			return new Result(true, "library", id, snapshots, "", "", 0, 0, "",
+			return new Result(true, "library", id, snapshots, "", "", 0, 0, "", "", "",
 				false, false, new int[0][2], new int[0][3], "", "", "");
 		}
 
@@ -290,19 +299,23 @@ public final class WorldBuilderRegionPasteClientBridge {
 			int placements, String plan, boolean blocked, boolean overwrite,
 			int[][] markers, int[][] collisions) {
 			return new Result(true, "preview", id, new ArrayList<Snapshot>(), snapshotId,
-				name, tiles, placements, plan, blocked, overwrite, markers, collisions,
+				name, tiles, placements, plan, "", "", blocked, overwrite, markers, collisions,
 				"", "", "");
 		}
 
-		static Result applied(String id, String snapshotId, String plan) {
+		static Result applied(String id, String snapshotId, String plan,
+			String manifestSha256, String inventorySha256) throws IOException {
+			requireHash(manifestSha256, "published manifest hash");
+			requireHash(inventorySha256, "published inventory hash");
 			return new Result(true, "apply", id, new ArrayList<Snapshot>(), snapshotId,
-				"", 0, 0, plan, false, false, new int[0][2], new int[0][3], "", "", "");
+				"", 0, 0, plan, manifestSha256, inventorySha256, false, false,
+				new int[0][2], new int[0][3], "", "", "");
 		}
 
 		static Result refused(String id, String operation, String code,
 			String message, String nextStep) {
 			return new Result(false, operation, id, new ArrayList<Snapshot>(), "", "",
-				0, 0, "", false, false, new int[0][2], new int[0][3], code,
+				0, 0, "", "", "", false, false, new int[0][2], new int[0][3], code,
 				message, nextStep);
 		}
 	}

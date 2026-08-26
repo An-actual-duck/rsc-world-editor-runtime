@@ -95,7 +95,12 @@ assert "WORLD_EDITOR_SET_REGION_PASTE_DESTINATION" in client
 assert '"world-builder-region-paste-request"' in paste_bridge
 assert '"OVERWRITE " : "PASTE "' in paste_bridge
 assert 'command.equalsIgnoreCase("pasteregion")' in commands
+assert 'command.equalsIgnoreCase("activateregionpaste")' in commands
 assert "editor.saveAdaptivePackage(player)" in paste_server
 assert '"world-builder-region-paste-response"' in paste_server
+assert "adoptPublishedAdaptivePackage" in paste_server
+assert 'mc.sendCommandString("activateregionpaste "+result.requestId)' in ui
+assert "restartWorldBuilderAfterRegionPaste" not in client
+assert "activates live without restarting" in ui
 
 print("PASS: ordered Region Copy and supervised exact Paste bridges validated")

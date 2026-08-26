@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.function.Supplier;
 
 /**
@@ -96,6 +98,12 @@ public final class AuthoredLayeredGroundItemRegistry<T> {
 		final WorldLocation location) {
 		return authoredLocations.contains(
 			Objects.requireNonNull(location, "location"));
+	}
+
+	/** Returns a stable snapshot for one bounded Builder live-package refresh. */
+	public synchronized Collection<T> snapshotItems() {
+		return Collections.unmodifiableCollection(
+			new java.util.ArrayList<T>(activeItems.values()));
 	}
 
 	public synchronized void reset() {

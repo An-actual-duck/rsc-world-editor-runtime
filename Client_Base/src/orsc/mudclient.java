@@ -1542,16 +1542,6 @@ public final class mudclient implements Runnable {
 			? ADAPTIVE_RUNTIME_FATAL_EXIT_STATUS : 0;
 	}
 
-	/** Ends only the isolated client so its supervisor can reload an atomic Paste. */
-	public void restartWorldBuilderAfterRegionPaste() {
-		if (!WorldBuilderClientProfile.current().isAdaptive()) return;
-		try {
-			closeConnection(true);
-		} finally {
-			System.exit(0);
-		}
-	}
-
 	private void closeProgram() {
 		try {
 			new Throwable().printStackTrace();

@@ -901,6 +901,11 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 		return nativeLayeredGroundItems.containsPlacement(location);
 	}
 
+	/** Stable package-owned ground-item snapshot for isolated Builder refresh. */
+	public java.util.Collection<GroundItem> snapshotNativeLayeredGroundItems() {
+		return nativeLayeredGroundItems.snapshotItems();
+	}
+
 	public void registerItem(final GroundItem i, final int delayTime) {
 		try {
 			if (Summoning.tryLootGoblinCollectGroundItem(i)) {

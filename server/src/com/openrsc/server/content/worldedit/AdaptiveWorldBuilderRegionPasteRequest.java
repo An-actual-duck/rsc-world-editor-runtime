@@ -1,6 +1,8 @@
 package com.openrsc.server.content.worldedit;
 
 import com.openrsc.server.model.entity.player.Player;
+import com.openrsc.server.io.AdaptiveWorldBuilderPackageGuard;
+import com.openrsc.server.io.NativeLayeredWorldPackage;
 import org.json.JSONObject;
 
 import java.io.IOException;
@@ -24,10 +26,16 @@ public final class AdaptiveWorldBuilderRegionPasteRequest {
 	public static final String RESPONSE_FILE = "region-paste.response.json";
 	private static final String RESPONSE_STAGE = ".region-paste.response.runtime.tmp";
 	private static final long MAX_REQUEST_BYTES = 256L * 1024L;
+	private static final long MAX_RESPONSE_BYTES = 256L * 1024L;
 	private static final Pattern REQUEST_ID = Pattern.compile("[0-9a-f]{32}");
 	private static final Set<String> REQUEST_KEYS = new HashSet<String>(Arrays.asList(
 		"schemaVersion", "manifestType", "requestId", "operation", "snapshotId",
 		"level", "x", "y", "expectedPlan", "confirmation"));
+	private static final Set<String> RESPONSE_KEYS = new HashSet<String>(Arrays.asList(
+		"schemaVersion", "manifestType", "requestId", "operation", "status", "result"));
+	private static final Set<String> APPLY_RESULT_KEYS = new HashSet<String>(Arrays.asList(
+		"operation", "snapshotId", "planFingerprintSha256", "workingSha256",
+		"packageManifestSha256", "packageInventorySha256", "worldModified"));
 
 	private AdaptiveWorldBuilderRegionPasteRequest() {
 	}
@@ -105,6 +113,87 @@ public final class AdaptiveWorldBuilderRegionPasteRequest {
 			}
 			if (player != null) player.message(
 				"[World Editor] Region Paste was refused: " + boundedMessage(failure));
+		}
+	}
+
+	/** Activates one already-published exact Paste without restarting either process. */
+	public static void activate(Player player, String expectedRequestId) {
+		Path response = null;
+		try {
+			if (player == null || !player.isAdmin()
+				|| !AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(player.getConfig())) {
+				throw new IOException(
+					"Live Region Paste is restricted to the isolated adaptive World Builder.");
+			}
+			if (expectedRequestId == null
+				|| !REQUEST_ID.matcher(expectedRequestId).matches()) {
+				throw new IOException("Live Region Paste request identity is invalid.");
+			}
+			WorldEditorSessionManager editor =
+				player.getWorld().getServer().getWorldEditorSessions();
+			if (!editor.ownsActiveSession(player)) {
+				throw new IOException("Open and own World Editor mode before live activation.");
+			}
+			WorldEditStorageContext storage =
+				player.getWorld().getServer().getWorldEditStorage();
+			Path control = WorldBuilderRuntimeControl.resolveControlDirectory(
+				player.getWorld().getServer());
+			response = checked(storage, control.resolve(RESPONSE_FILE),
+				"Region Paste response");
+			if (!Files.isRegularFile(response, LinkOption.NOFOLLOW_LINKS)
+				|| Files.isSymbolicLink(response)
+				|| Files.size(response) < 2L
+				|| Files.size(response) > MAX_RESPONSE_BYTES) {
+				throw new IOException("Live Region Paste response is missing or unsafe.");
+			}
+			JSONObject root = new JSONObject(new String(
+				Files.readAllBytes(response), StandardCharsets.UTF_8));
+			if (!root.keySet().equals(RESPONSE_KEYS)
+				|| root.getInt("schemaVersion") != 1
+				|| !"world-builder-region-paste-response".equals(
+					root.getString("manifestType"))
+				|| !expectedRequestId.equals(root.getString("requestId"))
+				|| !"apply".equals(root.getString("operation"))
+				|| !"accepted".equals(root.getString("status"))) {
+				throw new IOException("Live Region Paste response identity is invalid.");
+			}
+			JSONObject result = root.getJSONObject("result");
+			if (!result.keySet().equals(APPLY_RESULT_KEYS)
+				|| !"paste".equals(result.getString("operation"))
+				|| !result.getBoolean("worldModified")) {
+				throw new IOException("Live Region Paste result contract is invalid.");
+			}
+			String manifestSha256 = result.getString("packageManifestSha256");
+			String inventorySha256 = result.getString("packageInventorySha256");
+			Path working = storage.layeredWorkingPackage();
+			AdaptiveWorldBuilderPackageGuard.Inventory inventory =
+				AdaptiveWorldBuilderPackageGuard.requireClosedPackage(working);
+			if (!inventorySha256.equals(inventory.getFingerprint())) {
+				throw new IOException("Live Region Paste package inventory drifted.");
+			}
+			NativeLayeredWorldPackage worldPackage =
+				NativeLayeredWorldPackage.load(inventory.getRoot());
+			if (!manifestSha256.equals(worldPackage.getManifestSha256())) {
+				throw new IOException("Live Region Paste package manifest drifted.");
+			}
+			AdaptiveWorldBuilderDefinitionInventory.validate(
+				player.getWorld().getServer().getEntityHandler(), worldPackage);
+			editor.adoptPublishedAdaptivePackage(
+				player, worldPackage, inventorySha256);
+			Files.delete(response);
+			forceDirectory(control);
+			player.message(
+				"[World Editor] Region Paste activated live; no restart was required.");
+		} catch (Exception failure) {
+			try {
+				if (response != null) Files.deleteIfExists(response);
+			} catch (Exception cleanup) {
+				failure.addSuppressed(cleanup);
+			}
+			if (player != null) player.message(
+				"[World Editor] Live Region Paste activation failed: "
+					+ boundedMessage(failure)
+					+ ". Close and reopen the Builder to load the published world safely.");
 		}
 	}
 

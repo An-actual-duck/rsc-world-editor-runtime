@@ -4597,6 +4597,11 @@ public class RegionManager {
 			0);
 	}
 
+	/** Stable package-object snapshot for isolated Builder live activation. */
+	public Collection<GameObject> snapshotNativeLayeredGameObjects() {
+		return nativeLayeredGameObjects.snapshotInstances();
+	}
+
 	public void inheritNativeLayeredGameObjectIdentity(
 		final GameObject source,
 		final GameObject replacement) {
