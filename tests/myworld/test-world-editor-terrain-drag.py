@@ -146,7 +146,8 @@ assert "terrainLineAnchorTile()" in ui
 assert "worldEditorInterface.terrainPaintActionLabel()" in client
 assert "drawWorldEditorTerrainToolPreview(renderer3DFrame)" in client
 assert "drawWorldEditorTerrainAnchorMarker" in client
-assert "pinY=point[1]-22" in client and "0xffffff" in client
+assert "pinY=Math.max(9,Math.min(this.getSurface().height2-10,point[1]-24))" in client
+assert "drawBoxAlpha(point[0]-5,point[1]-5,11,11,color,224)" in client and "0xffffff" in client
 assert "acceptTerrainLineChunk" in client_packets and "type==8||type==9" in client_packets
 assert "paintNativeTerrainOperation" in handler and "paintTerrainOperation" in handler
 assert "sendTerrainOperation" in handler and "out.type=9" in handler
