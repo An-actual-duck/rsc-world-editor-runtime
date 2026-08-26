@@ -137,6 +137,47 @@ public final class NativeLayeredPlacementRegistryFixture {
                     WorldSpaceId.GLOBAL, new WorldCoordinate(446, 604, 0))),
             "NPC-blocking scenery lookup remains level isolated");
 
+        NativeLayeredGameObjectRegistry<Object> movingObjects =
+            new NativeLayeredGameObjectRegistry<Object>();
+        long movingGeneration = movingObjects.getGeneration();
+        WorldLocation movingOrigin = new WorldLocation(
+            WorldSpaceId.GLOBAL, new WorldCoordinate(480, 604, -2));
+        WorldLocation movingDestination = new WorldLocation(
+            WorldSpaceId.GLOBAL, new WorldCoordinate(481, 604, -2));
+        GameTickEventRestorationCollisionFootprintPlanner.Result movingBefore =
+            GameTickEventRestorationCollisionFootprintPlanner.plan(
+                Operation.REGISTER,
+                ConstructorState.of(3, 480, 604, 0, 0),
+                Definition.scenery(1, 1, 1, "Moving table", new String[0]),
+                false, WorldBounds.of(1000, 1000));
+        GameTickEventRestorationCollisionFootprintPlanner.Result movingAfter =
+            GameTickEventRestorationCollisionFootprintPlanner.plan(
+                Operation.REGISTER,
+                ConstructorState.of(3, 481, 604, 0, 0),
+                Definition.scenery(1, 1, 1, "Moving table", new String[0]),
+                false, WorldBounds.of(1000, 1000));
+        Object movingSource = new Object();
+        Object movingTarget = new Object();
+        movingObjects.register(
+            movingGeneration, "moving-table", movingOrigin, 0, 0,
+            movingSource, movingBefore,
+            java.util.Collections.singleton(movingOrigin));
+        check(movingObjects.replace(
+                movingGeneration, "moving-table", movingSource,
+                movingDestination, 0, 0, movingTarget, movingAfter,
+                java.util.Collections.singleton(movingDestination))
+                == movingTarget,
+            "move placement identity to another location");
+        check(movingObjects.find(movingOrigin, 0, 0) == null
+                && movingObjects.find(movingDestination, 0, 0) == movingTarget,
+            "moving replacement releases source and claims destination");
+        check(!movingObjects.hasNpcBlockingSceneryAt(movingOrigin)
+                && movingObjects.hasNpcBlockingSceneryAt(movingDestination),
+            "moving replacement transfers exact footprint");
+        check(movingObjects.snapshotInstances().contains(movingTarget)
+                && movingObjects.snapshotInstances().size() == 1,
+            "moving registry snapshot exposes only the active instance");
+
         NativeLayeredGameObjectRegistry<Object> directionalObjects =
             new NativeLayeredGameObjectRegistry<Object>();
         long directionalGeneration = directionalObjects.getGeneration();

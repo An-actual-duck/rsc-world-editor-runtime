@@ -22,7 +22,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private static final int BROWSER_CARD_WIDTH=178,BROWSER_CARD_HEIGHT=42,BROWSER_CARD_STEP_Y=45,BROWSER_GRID_Y=100;
 	private static final int DOCK_LEFT=6,DOCK_RIGHT=36,DOCK_TOP=4,DOCK_STEP=30;
 	public enum Mode { NAVIGATE, INSPECT, TERRAIN, SCENERY, NPC, ITEMS }
-	public enum SceneryTool { PLACE, ROTATE, REMOVE }
+	public enum SceneryTool { PLACE, MOVE, ROTATE, REMOVE }
 	public enum NpcTool { PLACE, REMOVE }
 	public enum GroundItemTool { PLACE, REMOVE }
 	public enum TerrainTool { FREEHAND, LINE, RECTANGLE }
@@ -48,6 +48,9 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private boolean replaceFocusedText=false;
 	private boolean clickTeleportPreferred=false;
 	private SceneryTool sceneryTool=SceneryTool.PLACE;
+	private int sceneryMoveSourceX=-1,sceneryMoveSourceY=-1;
+	private int sceneryMoveSourceId=-1,sceneryMoveSourceDirection=0;
+	private int sceneryMoveHoverX=-1,sceneryMoveHoverY=-1;
 	private NpcTool npcTool=NpcTool.PLACE;
 	private GroundItemTool groundItemTool=GroundItemTool.PLACE;
 	private int sceneryId=0,npcId=0,npcRadius=0;
@@ -102,14 +105,14 @@ public final class WorldEditorInterface extends NCustomComponent {
 
 	public void open(long id,int sequence){
 		if(Config.isAndroid())return;
-		sessionId=id;nextSequence=sequence;mode=Mode.NAVIGATE;terrainTool=TerrainTool.FREEHAND;clearTerrainLine();toolbar.reset();definitionBrowser.close();icons.initialize();
+		sessionId=id;nextSequence=sequence;mode=Mode.NAVIGATE;terrainTool=TerrainTool.FREEHAND;clearTerrainLine();clearSceneryMove();toolbar.reset();definitionBrowser.close();icons.initialize();
 		normalizeProjectBoundSelections();
 		int x=mc.getEditorPlayerWorldX(),y=mc.getEditorPlayerWorldY(),level=mc.getEditorPlayerWorldLevel();
 		brushX=x;brushY=y;brushLevel=level;teleportX=String.valueOf(x);teleportY=String.valueOf(y);teleportLevel=String.valueOf(level);
 		clickTeleportPreferred=false;keyboardShortcutsEnabled=true;unsavedChanges=false;saveRequested=false;closeArmed=false;pendingEntityActions=0;
 		setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);clearTerrainDrag();updatePresentationBounds();setVisible(true);
 	}
-	public void closeFromServer(){setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);setVisible(false);sessionId=0;coordinateFocus=0;clearTerrainLine();clearTerrainDrag();definitionBrowser.close();toolbar.reset();}
+	public void closeFromServer(){setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);setVisible(false);sessionId=0;coordinateFocus=0;clearTerrainLine();clearTerrainDrag();clearSceneryMove();definitionBrowser.close();toolbar.reset();}
 	public boolean isEditorOpen(){return isVisible()&&sessionId!=0;}
 	public boolean isKeyboardCaptureActive(){return isEditorOpen()&&(keyboardShortcutsEnabled||coordinateFocus!=0||definitionBrowser.isOpen());}
 	public boolean isKeyboardShortcutMode(){return isEditorOpen()&&keyboardShortcutsEnabled;}
@@ -132,6 +135,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	public int[] terrainLineAnchorTile(){return terrainTool!=TerrainTool.FREEHAND&&terrainLineAnchorX>=0?new int[]{terrainLineAnchorX,terrainLineAnchorY}:null;}
 	public boolean isSceneryPlacing(){return isEditorOpen()&&definitionAllowed("scenery",sceneryId)&&(!isLayeredReview()||isLayeredSceneryDraftLevel())&&mode==Mode.SCENERY&&sceneryTool==SceneryTool.PLACE;}
+	public boolean isSceneryMoving(){return isEditorOpen()&&(!isLayeredReview()||isLayeredSceneryDraftLevel())&&mode==Mode.SCENERY&&sceneryTool==SceneryTool.MOVE;}
+	public boolean isSceneryMoveArmed(){return isSceneryMoving()&&sceneryMoveSourceX>=0&&sceneryMoveSourceY>=0;}
 	public boolean isSceneryRotating(){return isEditorOpen()&&(!isLayeredReview()||isLayeredSceneryDraftLevel())&&mode==Mode.SCENERY&&sceneryTool==SceneryTool.ROTATE;}
 	public boolean isSceneryRemoving(){return isEditorOpen()&&(!isLayeredReview()||isLayeredSceneryDraftLevel())&&mode==Mode.SCENERY&&sceneryTool==SceneryTool.REMOVE;}
 	public boolean isNpcPlacing(){return isEditorOpen()&&definitionAllowed("npc",npcId)&&(!isLayeredReview()||isLayeredPlacementDraftLevel())&&mode==Mode.NPC&&npcTool==NpcTool.PLACE;}
@@ -148,6 +153,31 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public boolean canPlaceSelectedNpc(){return definitionAllowed("npc",npcId);}
 	public boolean canPlaceSelectedGroundItem(){return definitionAllowed("item",groundItemId);}
 	public void selectScenery(int id){setSceneryId(id);}
+	public void selectSceneryMoveSource(int worldX,int worldY,int id,int direction){
+		if(!isSceneryMoving())return;sceneryMoveSourceX=worldX;sceneryMoveSourceY=worldY;sceneryMoveSourceId=id;sceneryMoveSourceDirection=direction;sceneryMoveHoverX=sceneryMoveHoverY=-1;
+		recordWorldClick(worldX,worldY);inspectionStatus="Move selected: "+WorldEditorDefinitionCatalog.sceneryReference(id)+" at "+worldX+","+worldY+". Hover terrain and click its destination; Escape or right-click cancels.";closeArmed=false;
+	}
+	public boolean updateSceneryMovePointer(boolean secondaryDown,int worldX,int worldY){
+		if(!isSceneryMoving())return false;if(secondaryDown&&isSceneryMoveArmed()){clearSceneryMove();inspectionStatus="Scenery move cancelled; the source was not changed.";return true;}
+		if(!isSceneryMoveArmed())return false;sceneryMoveHoverX=worldX;sceneryMoveHoverY=worldY;return false;
+	}
+	public void commitSceneryMove(int destinationX,int destinationY){
+		if(!isSceneryMoveArmed())return;if(pendingEntityActions>0){inspectionStatus="Wait for the authoritative scenery response before choosing another destination.";return;}if(destinationX==sceneryMoveSourceX&&destinationY==sceneryMoveSourceY){inspectionStatus="Choose a different destination; the source was not changed.";return;}
+		sceneryMoveHoverX=destinationX;sceneryMoveHoverY=destinationY;markPotentialEntityEdit();inspectionStatus="Moving scenery atomically; the source remains intact unless the destination is accepted.";
+		mc.sendCommandString("moveobject "+sceneryMoveSourceX+" "+sceneryMoveSourceY+" "+destinationX+" "+destinationY);
+	}
+	public int[][] sceneryMovePreviewTiles(){
+		if(!isSceneryMoveArmed()||sceneryMoveHoverX<0||sceneryMoveHoverY<0)return new int[0][2];
+		try{com.openrsc.client.entityhandling.defs.GameObjectDef definition=EntityHandler.getObjectDef(sceneryMoveSourceId);int width,height;
+			if(sceneryMoveSourceDirection!=0&&sceneryMoveSourceDirection!=4){width=definition.getHeight();height=definition.getWidth();}else{width=definition.getWidth();height=definition.getHeight();}
+			int minX=sceneryMoveHoverX,minY=sceneryMoveHoverY,maxX=minX+width-1,maxY=minY+height-1;
+			if(definition.getType()==2||definition.getType()==3){if(sceneryMoveSourceDirection==0){width++;minX--;}if(sceneryMoveSourceDirection==2)height++;if(sceneryMoveSourceDirection==6){minY--;height++;}if(sceneryMoveSourceDirection==4)width++;maxX=sceneryMoveHoverX+width-1;maxY=sceneryMoveHoverY+height-1;}
+			long tileCount=(long)(maxX-minX+1)*(maxY-minY+1);if(tileCount<1||tileCount>4096)return new int[][]{{sceneryMoveHoverX,sceneryMoveHoverY}};int[][] tiles=new int[(int)tileCount][2];int index=0;for(int x=minX;x<=maxX;x++)for(int y=minY;y<=maxY;y++){tiles[index][0]=x;tiles[index++][1]=y;}return tiles;
+		}catch(Exception ignored){return new int[][]{{sceneryMoveHoverX,sceneryMoveHoverY}};}
+	}
+	public int[] sceneryMoveSourceTile(){return isSceneryMoveArmed()?new int[]{sceneryMoveSourceX,sceneryMoveSourceY}:null;}
+	public int[] sceneryMoveDestinationTile(){return isSceneryMoveArmed()&&sceneryMoveHoverX>=0?new int[]{sceneryMoveHoverX,sceneryMoveHoverY}:null;}
+	private void clearSceneryMove(){sceneryMoveSourceX=sceneryMoveSourceY=sceneryMoveSourceId=sceneryMoveHoverX=sceneryMoveHoverY=-1;sceneryMoveSourceDirection=0;}
 	public void selectNpc(int id,int radius){setNpcId(id);setNpcRadius(radius);}
 	public void setSequence(int sequence){nextSequence=sequence;}
 	public void recordWorldClick(int x,int y){
@@ -161,16 +191,18 @@ public final class WorldEditorInterface extends NCustomComponent {
 		mc.observeAutomatedBuilderPlacementMessage(message);
 		boolean accepted=message.contains("Added layered ")
 			||message.contains("Removed layered ")
-			||message.contains("Rotated layered ");
+			||message.contains("Rotated layered ")
+			||message.contains("Moved layered scenery:");
 		boolean refused=message.contains("placement refused:")
 			||message.contains("removal refused:")
 			||message.contains("rotation refused:")
+			||message.contains("move refused:")
 			||message.contains("Invalid coordinates")
 			||message.contains("Invalid npc")
 			||message.contains("There is already scenery")
 			||message.contains("There is no scenery");
 		if(accepted&&pendingEntityActions>0){
-			pendingEntityActions--;unsavedChanges=true;saveRequested=false;closeArmed=false;inspectionStatus=message;
+			pendingEntityActions--;unsavedChanges=true;saveRequested=false;closeArmed=false;inspectionStatus=message;if(message.contains("Moved layered scenery:"))clearSceneryMove();
 		}else if(refused&&pendingEntityActions>0){
 			pendingEntityActions--;inspectionStatus=message;
 		}
@@ -440,6 +472,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			coordinateFocus=0;toolbar.open(WorldEditorToolbarState.Flyout.NAVIGATE);updatePresentationBounds();return;
 		}
 		if(mode==Mode.TERRAIN&&selected!=Mode.TERRAIN){if(terrainDragActive)releaseTerrainDrag();clearTerrainLine();}
+		if(mode==Mode.SCENERY&&selected!=Mode.SCENERY)clearSceneryMove();
 		boolean same=mode==selected;mode=selected;coordinateFocus=0;replaceFocusedText=false;closeArmed=false;
 		WorldEditorToolbarState.Flyout flyout=flyoutFor(selected);if(same)toolbar.selectMode(flyout);else toolbar.open(flyout);
 		mc.setWorldEditorNavigateClickTeleport(mode==Mode.NAVIGATE&&clickTeleportPreferred);updatePresentationBounds();
@@ -534,6 +567,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			coordinateFocus=0;replaceFocusedText=false;
 			if(terrainLineCommitTiles!=null){inspectionStatus="The terrain operation is already committing; wait for the authoritative result.";return true;}
 			if(terrainLineAnchorX>=0){terrainLineAnchorX=terrainLineAnchorY=-1;inspectionStatus=(terrainTool==TerrainTool.RECTANGLE?"Rectangle corner":"Line anchor")+" cancelled.";return true;}
+			if(isSceneryMoveArmed()){clearSceneryMove();inspectionStatus="Scenery move cancelled; the source was not changed.";return true;}
 			if(toolbar.isExpandedFallback()){toolbar.setExpandedFallback(false);updatePresentationBounds();return true;}
 			if(toolbar.closeFlyout()){updatePresentationBounds();return true;}
 			requestEditorClose();return true;
@@ -635,7 +669,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void requestEditorClose(){
 		if(terrainLineCommitTiles!=null){inspectionStatus="Wait for the authoritative terrain response before closing.";return;}
 		if(unsavedChanges&&!closeArmed){closeArmed=true;inspectionStatus="Unsaved edits remain. Select Close again to exit without saving.";return;}
-		setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);clearTerrainLine();definitionBrowser.close();send(1,0,0,0,0,0,0);setVisible(false);
+		setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);clearTerrainLine();clearSceneryMove();definitionBrowser.close();send(1,0,0,0,0,0,0);setVisible(false);
 	}
 	private static WorldEditorToolbarState.Flyout flyoutFor(Mode selected){
 		switch(selected){case INSPECT:return WorldEditorToolbarState.Flyout.INSPECT;case TERRAIN:return WorldEditorToolbarState.Flyout.TERRAIN;
@@ -698,12 +732,12 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private static boolean dockHit(int x,int y,int column,int row){int startX=column==0?DOCK_LEFT:DOCK_RIGHT;return x>=startX&&x<startX+28&&hitRow(y,DOCK_TOP+row*DOCK_STEP);}
 	private Mode dockModeAt(int x,int y){if(dockHit(x,y,0,1))return Mode.NAVIGATE;if(dockHit(x,y,0,2))return Mode.INSPECT;if(dockHit(x,y,0,3))return Mode.SCENERY;if(dockHit(x,y,0,4))return Mode.NPC;if(dockHit(x,y,0,5))return Mode.ITEMS;return null;}
 	private int contextActionAtDock(int x,int y){
-		if(mode==Mode.SCENERY){if(dockHit(x,y,1,0))return 0;if(dockHit(x,y,1,1))return 1;if(dockHit(x,y,1,2))return 2;}
+		if(mode==Mode.SCENERY){if(dockHit(x,y,1,0))return 0;if(dockHit(x,y,1,1))return 1;if(dockHit(x,y,1,2))return 2;if(dockHit(x,y,1,3))return 3;}
 		else if(mode==Mode.NPC||mode==Mode.ITEMS){if(dockHit(x,y,1,0))return 0;if(dockHit(x,y,1,1))return 1;}
 		return -1;
 	}
 	private void selectContextAction(int action){
-		if(mode==Mode.SCENERY)sceneryTool=action==0?SceneryTool.PLACE:action==1?SceneryTool.ROTATE:SceneryTool.REMOVE;
+		if(mode==Mode.SCENERY){clearSceneryMove();sceneryTool=action==0?SceneryTool.PLACE:action==1?SceneryTool.MOVE:action==2?SceneryTool.ROTATE:SceneryTool.REMOVE;}
 		else if(mode==Mode.NPC)npcTool=action==0?NpcTool.PLACE:NpcTool.REMOVE;
 		else if(mode==Mode.ITEMS)groundItemTool=action==0?GroundItemTool.PLACE:GroundItemTool.REMOVE;
 		closeArmed=false;
@@ -809,7 +843,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 				if(ry>=86&&ry<110&&rx>=45&&rx<125){focusNumber(3);return true;}
 				if(ry>=86&&ry<110&&rx>=132&&rx<160){setSceneryId(steppedProjectId("scenery",sceneryId,1));return true;}
 				if(ry>=112&&ry<136&&rx>=175&&rx<309){openSceneryBrowser();return true;}
-				if(ry>=145&&ry<169){if(rx>=10&&rx<105)sceneryTool=SceneryTool.PLACE;else if(rx>=112&&rx<207)sceneryTool=SceneryTool.ROTATE;else if(rx>=214&&rx<309)sceneryTool=SceneryTool.REMOVE;return true;}
+				if(ry>=145&&ry<169){clearSceneryMove();if(rx>=10&&rx<98)sceneryTool=SceneryTool.PLACE;else if(rx>=104&&rx<192)sceneryTool=SceneryTool.MOVE;else if(rx>=198&&rx<286)sceneryTool=SceneryTool.ROTATE;else if(rx>=292&&rx<380)sceneryTool=SceneryTool.REMOVE;return true;}
 				if(ry>=276&&ry<300&&rx>=10&&rx<175){requestWorldEditSave();return true;}
 			}
 			if(mode==Mode.NPC){
@@ -888,8 +922,9 @@ public final class WorldEditorInterface extends NCustomComponent {
 			drawTerrainToolIcon(WorldEditorIconRegistry.Key.TOOL_RECTANGLE,x+DOCK_RIGHT,y+dockRowY(9),terrainTool==TerrainTool.RECTANGLE);
 		}else if(mode==Mode.SCENERY){
 			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"+",x+DOCK_RIGHT,y+dockRowY(0),sceneryTool==SceneryTool.PLACE);
-			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"R",x+DOCK_RIGHT,y+dockRowY(1),sceneryTool==SceneryTool.ROTATE);
-			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"-",x+DOCK_RIGHT,y+dockRowY(2),sceneryTool==SceneryTool.REMOVE);
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"M",x+DOCK_RIGHT,y+dockRowY(1),sceneryTool==SceneryTool.MOVE);
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"R",x+DOCK_RIGHT,y+dockRowY(2),sceneryTool==SceneryTool.ROTATE);
+			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"-",x+DOCK_RIGHT,y+dockRowY(3),sceneryTool==SceneryTool.REMOVE);
 		}else if(mode==Mode.NPC){
 			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_NPC,"+",x+DOCK_RIGHT,y+dockRowY(0),npcTool==NpcTool.PLACE);
 			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_NPC,"-",x+DOCK_RIGHT,y+dockRowY(1),npcTool==NpcTool.REMOVE);
@@ -1000,7 +1035,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(dockHit(x,y,0,8))return "Save | "+(unsavedChanges?"unsaved changes":"clean")+(saveRequested?" | requested":"");if(dockHit(x,y,0,9))return closeArmed?"Close without saving: confirm":"Close editor";return "";
 	}
 	private String contextActionTooltip(int action){
-		if(mode==Mode.SCENERY)return "Scenery: "+(action==0?"Add":action==1?"Rotate":"Remove");
+		if(mode==Mode.SCENERY)return "Scenery: "+(action==0?"Add":action==1?"Move":action==2?"Rotate":"Remove");
 		if(mode==Mode.NPC)return "NPCs: "+(action==0?"Add":"Remove");
 		return "Items: "+(action==0?"Add":"Remove");
 	}
@@ -1085,8 +1120,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 		button(x+10,y+86,28,"-");textField(x+45,y+86,80,sceneryIdText,coordinateFocus==3);button(x+132,y+86,28,"+");
 		graphics().drawString(sceneryName(),x+175,y+103,0xffffff,2);
 		button(x+175,y+112,134,"Browse scenery...");
-		toolButton(x+10,y+145,95,"Place",sceneryTool==SceneryTool.PLACE);toolButton(x+112,y+145,95,"Rotate",sceneryTool==SceneryTool.ROTATE);toolButton(x+214,y+145,95,"Remove",sceneryTool==SceneryTool.REMOVE);
-		graphics().drawString(sceneryTool==SceneryTool.PLACE?"Click terrain to place one object.":"Click an existing scenery object to "+sceneryTool.name().toLowerCase()+" it.",x+10,y+190,0xffffff,2);
+		toolButton(x+10,y+145,88,"Place",sceneryTool==SceneryTool.PLACE);toolButton(x+104,y+145,88,"Move",sceneryTool==SceneryTool.MOVE);toolButton(x+198,y+145,88,"Rotate",sceneryTool==SceneryTool.ROTATE);toolButton(x+292,y+145,88,"Remove",sceneryTool==SceneryTool.REMOVE);
+		String guidance=sceneryTool==SceneryTool.PLACE?"Click terrain to place one object.":sceneryTool==SceneryTool.MOVE?(isSceneryMoveArmed()?"Preview the ghost, then click its destination.":"Click scenery to select it for an atomic move."):"Click an existing scenery object to "+sceneryTool.name().toLowerCase()+" it.";graphics().drawString(guidance,x+10,y+190,0xffffff,2);
 		graphics().drawString("Copying scenery selects its ID. Boundaries remain inspection-only.",x+10,y+218,0xff981f,1);
 		button(x+10,y+276,165,"Save queued edits");
 	}

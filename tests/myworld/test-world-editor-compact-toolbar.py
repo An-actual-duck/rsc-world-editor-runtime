@@ -294,7 +294,7 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         self.assertIn("middleMouseOrbit.begin(var1.getButton(), clientMouseX, clientMouseY)", applet)
         self.assertRegex(applet, r"(?s)middleMouseOrbit\.update\(.*?currentMouseButtonDown = 0;.*?var1\.consume\(\);.*?return;")
         self.assertIn("boolean gesture=controlDown&&primaryDown&&isTerrainPainting()", ui)
-        self.assertIn("boolean picking=worldEditorInterface.isTerrainPainting()", client)
+        self.assertIn("boolean picking=(worldEditorInterface.isTerrainPainting()||worldEditorInterface.isSceneryMoveArmed())", client)
         self.assertIn("updateTerrainDrag(controlPressed,currentMouseButtonDown==1", client)
         self.assertIn("toggleBrushSize()", ui)
         self.assertIn("TOOL_BRUSH_1X1", ui)
@@ -348,7 +348,7 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         self.assertIn("if(mode!=Mode.TERRAIN)return -1", ui)
         self.assertIn("renderDockContextActions(x,y)", ui)
         self.assertIn('MODE_SCENERY,"R"', ui)
-        self.assertIn('return "Scenery: "+(action==0?"Add":action==1?"Rotate":"Remove")', ui)
+        self.assertIn('return "Scenery: "+(action==0?"Add":action==1?"Move":action==2?"Rotate":"Remove")', ui)
 
         compact_scenery = re.search(r"private void renderCompactScenery\(.*?\{(?P<body>.*?)\n\t\}", ui, re.S)
         compact_npc = re.search(r"private void renderCompactNpc\(.*?\{(?P<body>.*?)\n\t\}", ui, re.S)

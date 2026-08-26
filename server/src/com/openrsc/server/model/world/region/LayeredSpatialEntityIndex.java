@@ -134,6 +134,51 @@ public final class LayeredSpatialEntityIndex {
 		}
 	}
 
+	/** Atomically replaces an entity while moving it to another logical region. */
+	public void replace(
+		final Entity expected,
+		final Entity replacement,
+		final WorldLocation expectedLocation,
+		final WorldLocation targetLocation) {
+		Entity checkedExpected = Objects.requireNonNull(expected, "expected");
+		Entity checkedReplacement = Objects.requireNonNull(
+			replacement, "replacement");
+		WorldLocation checkedExpectedLocation = Objects.requireNonNull(
+			expectedLocation, "expectedLocation");
+		WorldLocation checkedTargetLocation = Objects.requireNonNull(
+			targetLocation, "targetLocation");
+		if (checkedExpectedLocation.equals(checkedTargetLocation)) {
+			replace(
+				checkedExpected, checkedReplacement, checkedExpectedLocation);
+			return;
+		}
+		if (checkedExpected == checkedReplacement) {
+			throw new IllegalArgumentException(
+				"Layered moving replacement must use distinct instances");
+		}
+		synchronized (lock) {
+			if (!checkedExpectedLocation.equals(memberships.get(checkedExpected))
+				|| memberships.containsKey(checkedReplacement)) {
+				throw new IllegalStateException(
+					"Layered moving replacement membership differs");
+			}
+			removeFromRegion(checkedExpected, checkedExpectedLocation);
+			try {
+				addToRegion(checkedReplacement, checkedTargetLocation);
+			} catch (RuntimeException failure) {
+				addToRegion(checkedExpected, checkedExpectedLocation);
+				throw failure;
+			}
+			memberships.remove(checkedExpected);
+			memberships.put(checkedReplacement, checkedTargetLocation);
+			version++;
+			if (checkedExpected instanceof GameObject
+				|| checkedReplacement instanceof GameObject) {
+				objectVersion++;
+			}
+		}
+	}
+
 	public void requireMembership(
 		final Entity entity,
 		final WorldLocation expectedLocation) {

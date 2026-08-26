@@ -658,6 +658,57 @@ public final class WorldEditorSessionManager {
 		return replacement;
 	}
 
+	public synchronized GameObject moveNativeScenery(
+		Player player, int sourceX, int sourceY, int destinationX, int destinationY) {
+		WorldLocation sourceLocation = activeNativeSceneryLocation(
+			player, sourceX, sourceY);
+		WorldLocation destinationLocation = activeNativeSceneryLocation(
+			player, destinationX, destinationY);
+		if (sourceLocation.equals(destinationLocation)) {
+			throw new IllegalArgumentException(
+				"Scenery is already at that destination.");
+		}
+		GameObject source = player.getWorld().getRegionManager()
+			.findInteractionScenery(Point.location(sourceX, sourceY), player);
+		NativeSceneryState current =
+			requireEditableNativeScenery(player, sourceLocation, source);
+		if (player.getWorld().getRegionManager()
+				.findNativeLayeredScenery(destinationLocation) != null) {
+			throw new IllegalArgumentException(
+				"There is already scenery in that spot.");
+		}
+		NativeSceneryKey sourceKey = new NativeSceneryKey(sourceLocation);
+		NativeSceneryKey destinationKey = new NativeSceneryKey(destinationLocation);
+		NativeSceneryState movedState = new NativeSceneryState(
+			current.placementId, current.sceneryId, current.direction);
+		requireAdaptiveSceneryMoveDraftCapacity(
+			player, sourceKey, current, destinationKey, movedState);
+
+		NativeLayeredWorldPackage sourceOwner = nativeOwner(player, sourceLocation);
+		NativeLayeredWorldPackage destinationOwner =
+			nativeOwner(player, destinationLocation);
+		if (!sourceOwner.getPackageId().equals(destinationOwner.getPackageId())) {
+			throw new IllegalArgumentException(
+				"Scenery move cannot cross a package boundary.");
+		}
+		GameObject moved = new GameObject(
+			player.getWorld(),
+			new GameObjectLoc(
+				current.sceneryId, destinationX, destinationY,
+				current.direction, 0));
+		moved.setInitialWorldLocation(destinationLocation);
+		player.getWorld().getRegionManager().markNativeLayeredPlacement(
+			moved, sourceOwner.getPackageId(), current.placementId,
+			RegionManager.NATIVE_LAYERED_SCENERY_KIND);
+		player.getWorld().moveNativeLayeredGameObject(source, moved);
+
+		captureNativeSceneryBase(sourceKey, current);
+		captureNativeSceneryBase(destinationKey, null);
+		recordNativeScenery(sourceKey, null);
+		recordNativeScenery(destinationKey, movedState);
+		return moved;
+	}
+
 	public synchronized Npc placeNativeNpc(
 		Player player, int npcId, int radius, int x, int y) {
 		requireClientPlacementDefinition(
@@ -1313,6 +1364,34 @@ public final class WorldEditorSessionManager {
 				&&captured>=ADAPTIVE_PLACEMENT_DRAFT_LIMIT)
 			||(!overlay.containsKey(key)
 				&&changed>=ADAPTIVE_PLACEMENT_DRAFT_LIMIT)){
+			throw new IllegalStateException(
+				"Adaptive placement draft limit reached.");
+		}
+	}
+	private void requireAdaptiveSceneryMoveDraftCapacity(
+		Player player,
+		NativeSceneryKey sourceKey,
+		NativeSceneryState current,
+		NativeSceneryKey destinationKey,
+		NativeSceneryState moved) {
+		if (!isAdaptive(player)) return;
+		long captured = (long) nativeSceneryBase.size() + nativeNpcBase.size()
+			+ nativeGroundItemBase.size();
+		if (!nativeSceneryBase.containsKey(sourceKey)) captured++;
+		if (!nativeSceneryBase.containsKey(destinationKey)) captured++;
+		long changed = (long) nativeSceneryOverlay.size() + nativeNpcOverlay.size()
+			+ nativeGroundItemOverlay.size();
+		if (nativeSceneryOverlay.containsKey(sourceKey)) changed--;
+		if (nativeSceneryOverlay.containsKey(destinationKey)) changed--;
+		NativeSceneryState sourceBase = nativeSceneryBase.containsKey(sourceKey)
+			? nativeSceneryBase.get(sourceKey) : current;
+		NativeSceneryState destinationBase =
+			nativeSceneryBase.containsKey(destinationKey)
+				? nativeSceneryBase.get(destinationKey) : null;
+		if (sourceBase != null) changed++;
+		if (!java.util.Objects.equals(destinationBase, moved)) changed++;
+		if (captured > ADAPTIVE_PLACEMENT_DRAFT_LIMIT
+			|| changed > ADAPTIVE_PLACEMENT_DRAFT_LIMIT) {
 			throw new IllegalStateException(
 				"Adaptive placement draft limit reached.");
 		}

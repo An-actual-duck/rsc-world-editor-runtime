@@ -8847,6 +8847,7 @@ public final class mudclient implements Runnable {
 						}
 						this.getSurface().setRenderer2DPhase(Renderer2DFrame.Phase.WORLD_OVERLAY);
 						this.drawWorldEditorTerrainToolPreview(renderer3DFrame);
+						this.drawWorldEditorSceneryMovePreview(renderer3DFrame);
 						this.drawQueuedStaticProjectiles();
 						this.drawQueuedProjectileEffectOverlays();
 						this.drawQueuedProjectileImpactOverlays();
@@ -11994,6 +11995,8 @@ public final class mudclient implements Runnable {
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PAINT_TERRAIN,worldEditorInterface.terrainPaintActionLabel(),localZ);
 		if(worldEditorInterface.isSceneryPlacing())
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PLACE_SCENERY,"Place "+WorldEditorDefinitionCatalog.sceneryReference(worldEditorInterface.getSceneryId()),localZ);
+		if(worldEditorInterface.isSceneryMoveArmed())
+			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_MOVE_SCENERY,"Move selected scenery here",localZ);
 		if(worldEditorInterface.isNpcPlacing())
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PLACE_NPC,"Place "+EntityHandler.getNpcDef(worldEditorInterface.getNpcId()).getName(),localZ);
 		if(worldEditorInterface.isGroundItemPlacing())
@@ -12335,6 +12338,8 @@ public final class mudclient implements Runnable {
 									}
 									if (worldEditorInterface != null && worldEditorInterface.isSceneryRotating())
 										this.menuCommon.addTileItem_WithID(MenuItemAction.WORLD_EDITOR_ROTATE_SCENERY,this.getGameObjectInstanceZ(var9),this.getGameObjectInstanceDir(var9),this.getGameObjectInstanceX(var9),id,"@cya@"+WorldEditorDefinitionCatalog.sceneryReference(id),"Rotate scenery");
+									if (worldEditorInterface != null && worldEditorInterface.isSceneryMoving())
+										this.menuCommon.addTileItem_WithID(MenuItemAction.WORLD_EDITOR_SELECT_SCENERY_MOVE,this.getGameObjectInstanceZ(var9),this.getGameObjectInstanceDir(var9),this.getGameObjectInstanceX(var9),id,"@cya@"+WorldEditorDefinitionCatalog.sceneryReference(id),"Select scenery to move");
 									if (worldEditorInterface != null && worldEditorInterface.isSceneryRemoving())
 										this.menuCommon.addTileItem_WithID(MenuItemAction.WORLD_EDITOR_REMOVE_SCENERY,this.getGameObjectInstanceZ(var9),this.getGameObjectInstanceDir(var9),this.getGameObjectInstanceX(var9),id,"@cya@"+WorldEditorDefinitionCatalog.sceneryReference(id),"Remove scenery");
 
@@ -19645,6 +19650,8 @@ public final class mudclient implements Runnable {
 					worldEditorInterface.inspectNpc(indexOrX,true);break;
 				}
 				case WORLD_EDITOR_PLACE_SCENERY: { if(!worldEditorInterface.canPlaceSelectedScenery()){worldEditorInterface.showError("Selected scenery is not permitted by this project.");break;}worldEditorInterface.markPotentialEntityEdit();sendCommandString("aobject "+worldEditorInterface.getSceneryId()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
+				case WORLD_EDITOR_SELECT_SCENERY_MOVE: { worldEditorInterface.selectSceneryMoveSource(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ,tileID,dir); break; }
+				case WORLD_EDITOR_MOVE_SCENERY: { worldEditorInterface.commitSceneryMove(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
 				case WORLD_EDITOR_ROTATE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("rotateobject "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
 				case WORLD_EDITOR_REMOVE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("robject "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
 				case WORLD_EDITOR_PLACE_NPC: { if(!worldEditorInterface.canPlaceSelectedNpc()){worldEditorInterface.showError("Selected NPC is not permitted by this project.");break;}worldEditorInterface.markPotentialEntityEdit();sendCommandString("cnpc "+worldEditorInterface.getNpcId()+" "+worldEditorInterface.getNpcRadius()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
@@ -23900,6 +23907,22 @@ public final class mudclient implements Runnable {
 			int x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,color);}
 		if(anchor!=null)drawWorldEditorTerrainAnchorMarker(frame,anchor[0]-midRegionBaseX,anchor[1]-midRegionBaseZ);
 	}
+	private void drawWorldEditorSceneryMovePreview(Renderer3DFrame frame){
+		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.sceneryMovePreviewTiles();int[] source=worldEditorInterface.sceneryMoveSourceTile(),destination=worldEditorInterface.sceneryMoveDestinationTile();if(source==null)return;
+		if(destination!=null&&tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}
+			int ghostColor=0x45f3ff;for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorSceneryGhostEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,ghostColor);}}
+		drawWorldEditorTerrainAnchorMarker(frame,source[0]-midRegionBaseX,source[1]-midRegionBaseZ);if(destination!=null)drawWorldEditorSceneryDestinationMarker(frame,destination[0]-midRegionBaseX,destination[1]-midRegionBaseZ);
+	}
+	private void drawWorldEditorSceneryGhostEdge(Renderer3DFrame frame,int x1,int z1,int x2,int z2,int color){
+		int groundY1=-world.getElevation(x1,z1)-5,groundY2=-world.getElevation(x2,z2)-5,topY1=groundY1-tileSize,topY2=groundY2-tileSize;int[] first=new int[2],second=new int[2];
+		if(projectWorldEditorGridPoint(frame,x1,groundY1,z1,first)&&projectWorldEditorGridPoint(frame,x2,groundY2,z2,second))drawWorldEditorGridLine(first[0],first[1],second[0],second[1],color);
+		if(projectWorldEditorGridPoint(frame,x1,topY1,z1,first)&&projectWorldEditorGridPoint(frame,x2,topY2,z2,second))drawWorldEditorGridLine(first[0],first[1],second[0],second[1],color);
+		if(projectWorldEditorGridPoint(frame,x1,groundY1,z1,first)&&projectWorldEditorGridPoint(frame,x1,topY1,z1,second))drawWorldEditorGridLine(first[0],first[1],second[0],second[1],color);
+	}
+	private void drawWorldEditorSceneryDestinationMarker(Renderer3DFrame frame,int x,int z){
+		if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)return;int centerX=x*tileSize+tileSize/2,centerZ=z*tileSize+tileSize/2,centerY=-world.getElevation(centerX,centerZ)-12;int[] point=new int[2];if(!projectWorldEditorGridPoint(frame,centerX,centerY,centerZ,point))return;int color=0x45f3ff;
+		for(int dy=-8;dy<=8;dy++){int width=8-Math.abs(dy);this.getSurface().drawLineHoriz(point[0]-width-1,point[1]+dy,width*2+3,0);if(width>0)this.getSurface().drawLineHoriz(point[0]-width,point[1]+dy,width*2+1,color);}this.getSurface().drawString("MOVE",point[0]-18,point[1]-12,0xffffff,1);
+	}
 	private void drawWorldEditorTerrainAnchorMarker(Renderer3DFrame frame,int x,int z){
 		if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)return;int color=0xff4dff,x1=x*tileSize,z1=z*tileSize,x2=(x+1)*tileSize,z2=(z+1)*tileSize;
 		drawWorldEditorTerrainPreviewEdge(frame,x1,z1,x2,z1,color);drawWorldEditorTerrainPreviewEdge(frame,x2,z1,x2,z2,color);
@@ -23973,10 +23996,10 @@ public final class mudclient implements Runnable {
 	}
 	private boolean updateWorldEditorTerrainDrag(){
 		if(worldEditorInterface==null||!worldEditorInterface.isEditorOpen()||!isAdaptiveWorldStateReadyForEditor())return false;int worldX=-1,worldY=-1;
-		boolean picking=worldEditorInterface.isTerrainPainting()&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
+		boolean picking=(worldEditorInterface.isTerrainPainting()||worldEditorInterface.isSceneryMoveArmed())&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
 		if(picking&&scene!=null&&world!=null&&localPlayer!=null){int[] local=projectScreenToCurrentTerrainTile();
 			if(local!=null&&local[0]>=0&&local[0]<World.LOCAL_TILE_COUNT&&local[1]>=0&&local[1]<World.LOCAL_TILE_COUNT){worldX=midRegionBaseX+local[0];worldY=midRegionBaseZ+local[1];}}
-		return worldEditorInterface.updateTerrainDrag(controlPressed,currentMouseButtonDown==1,worldX,worldY);
+		boolean terrainConsumed=worldEditorInterface.updateTerrainDrag(controlPressed,currentMouseButtonDown==1,worldX,worldY);boolean moveConsumed=worldEditorInterface.updateSceneryMovePointer(currentMouseButtonDown==2,worldX,worldY);return terrainConsumed||moveConsumed;
 	}
 
 	public void worldEditorTeleport(int worldX, int worldY) {

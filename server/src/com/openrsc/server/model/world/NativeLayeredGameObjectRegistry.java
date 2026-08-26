@@ -235,6 +235,17 @@ public final class NativeLayeredGameObjectRegistry<T> {
 		}
 	}
 
+	/** Returns a stable identity-preserving snapshot for bounded editor checks. */
+	public Collection<T> snapshotInstances() {
+		synchronized (lock) {
+			Collection<T> result = new java.util.ArrayList<T>(placements.size());
+			for (Entry<T> entry : placements.values()) {
+				result.add(entry.instance);
+			}
+			return Collections.unmodifiableCollection(result);
+		}
+	}
+
 	public void reset() {
 		synchronized (lock) {
 			placements.clear();

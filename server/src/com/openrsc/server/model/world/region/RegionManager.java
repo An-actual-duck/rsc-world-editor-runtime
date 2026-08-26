@@ -4781,6 +4781,144 @@ public class RegionManager {
 		}
 	}
 
+	/**
+	 * Atomically moves one native layered object between exact same-level
+	 * locations while retaining its package and placement identity.
+	 */
+	public void applyNativeLayeredGameObjectMoveTransaction(
+		final GameObject oldObject,
+		final GameTickEventRestorationCollisionFootprintPlanner.Result
+			oldUnregisterFootprint,
+		final GameTickEventRestorationCollisionFootprintPlanner.Result
+			oldRollbackRegisterFootprint,
+		final GameObject movedObject,
+		final GameTickEventRestorationCollisionFootprintPlanner.Result
+			movedRegisterFootprint) {
+		GameObject checkedOld = Objects.requireNonNull(oldObject, "oldObject");
+		GameObject checkedMoved = Objects.requireNonNull(
+			movedObject, "movedObject");
+		NativeLayeredGameObjectIdentity oldIdentity =
+			checkedOld.getLoc().getNativeLayeredGameObjectIdentity();
+		NativeLayeredGameObjectIdentity movedIdentity =
+			checkedMoved.getLoc().getNativeLayeredGameObjectIdentity();
+		if (oldIdentity == null || movedIdentity == null
+			|| !isNativeLayeredGameObject(checkedOld)
+			|| oldIdentity.getGeneration() != movedIdentity.getGeneration()
+			|| !oldIdentity.getPackageId().equals(movedIdentity.getPackageId())
+			|| !oldIdentity.getPlacementId().equals(movedIdentity.getPlacementId())
+			|| !oldIdentity.getKind().equals(movedIdentity.getKind())
+			|| !oldIdentity.getLocation().getWorldSpace().equals(
+				movedIdentity.getLocation().getWorldSpace())
+			|| oldIdentity.getLocation().getCoordinate().getLevel()
+				!= movedIdentity.getLocation().getCoordinate().getLevel()
+			|| oldIdentity.getLocation().equals(movedIdentity.getLocation())) {
+			throw new IllegalStateException(
+				"Native layered object move identity differs");
+		}
+		if (oldUnregisterFootprint == null
+			|| oldUnregisterFootprint.getOperation() != Operation.UNREGISTER
+			|| oldRollbackRegisterFootprint == null
+			|| oldRollbackRegisterFootprint.getOperation() != Operation.REGISTER
+			|| movedRegisterFootprint == null
+			|| movedRegisterFootprint.getOperation() != Operation.REGISTER) {
+			throw new IllegalArgumentException(
+				"Native layered object move footprints are invalid");
+		}
+		if (checkedOld.getRegion() != null || checkedOld.getLocation() == null
+			|| checkedOld.isRemoved() || checkedMoved.getRegion() != null
+			|| checkedMoved.getLocation() == null || checkedMoved.isRemoved()
+			|| checkedMoved.getCollisionRegistrationState() != null) {
+			throw new IllegalStateException(
+				"Native layered object move state is invalid");
+		}
+		layeredSpatialEntityIndex.requireMembership(
+			checkedOld, oldIdentity.getLocation());
+		requireNativeLayeredCollisionTerrain(
+			oldIdentity.getLocation(), oldIdentity.getPlacementId(),
+			oldRollbackRegisterFootprint);
+		requireNativeLayeredCollisionTerrain(
+			movedIdentity.getLocation(), movedIdentity.getPlacementId(),
+			movedRegisterFootprint);
+		requireNativeLayeredSceneryMoveDestination(
+			checkedOld, checkedMoved, movedIdentity);
+
+		GameObjectCollisionRegistrationState movedCollision =
+			GameObjectCollisionRegistrationState.capture(
+				checkedMoved, movedRegisterFootprint);
+		List<WorldLocation> oldNpcBlocking =
+			nativeLayeredNpcBlockingSceneryFootprint(
+				checkedOld, oldIdentity.getLocation(), oldIdentity.getPlacementId());
+		List<WorldLocation> movedNpcBlocking =
+			nativeLayeredNpcBlockingSceneryFootprint(
+				checkedMoved, movedIdentity.getLocation(), movedIdentity.getPlacementId());
+		long generation = oldIdentity.getGeneration();
+		String placementKey = nativePlacementKey(oldIdentity);
+		if (nativeLayeredGameObjects.replace(
+				generation, placementKey, checkedOld,
+				movedIdentity.getLocation(), checkedMoved.getType(),
+				checkedMoved.getDirection(), checkedMoved,
+				movedRegisterFootprint, movedNpcBlocking) == null) {
+			throw new IllegalStateException(
+				"Native layered object move generation became stale");
+		}
+		try {
+			layeredSpatialEntityIndex.replace(
+				checkedOld, checkedMoved, oldIdentity.getLocation(),
+				movedIdentity.getLocation());
+		} catch (RuntimeException failure) {
+			nativeLayeredGameObjects.replace(
+				generation, placementKey, checkedMoved,
+				oldIdentity.getLocation(), checkedOld.getType(),
+				checkedOld.getDirection(), checkedOld,
+				oldRollbackRegisterFootprint, oldNpcBlocking);
+			throw failure;
+		}
+		checkedOld.removeNativeLayeredTransactionState();
+		checkedOld.clearOrderedCollisionRegistrationState();
+		checkedMoved.attachNativeLayeredCollisionRegistrationState(
+			movedCollision);
+	}
+
+	private void requireNativeLayeredSceneryMoveDestination(
+		final GameObject source,
+		final GameObject proposed,
+		final NativeLayeredGameObjectIdentity proposedIdentity) {
+		Point[] proposedBounds = proposed.getObjectBoundary();
+		NativeLayeredWorldPackage proposedOwner = findNativeLayeredWorldPackage(
+			proposedIdentity.getLocation()).orElse(null);
+		for (int x = proposedBounds[0].getX(); x <= proposedBounds[1].getX(); x++) {
+			for (int y = proposedBounds[0].getY(); y <= proposedBounds[1].getY(); y++) {
+				WorldLocation tile = new WorldLocation(
+					proposedIdentity.getLocation().getWorldSpace(),
+					new WorldCoordinate(
+						x, y, proposedIdentity.getLocation().getCoordinate().getLevel()));
+				NativeLayeredWorldPackage tileOwner =
+					findNativeLayeredWorldPackage(tile).orElse(null);
+				NativeLayeredWorldPackageCatalog.requireExactTerrainOwner(
+					proposedOwner, tileOwner,
+					"Scenery move footprint leaves allocated package terrain: " + tile);
+			}
+		}
+		for (GameObject active : nativeLayeredGameObjects.snapshotInstances()) {
+			if (active == source || !active.isScenery()) continue;
+			NativeLayeredGameObjectIdentity activeIdentity =
+				active.getLoc().getNativeLayeredGameObjectIdentity();
+			if (activeIdentity == null
+				|| !activeIdentity.getLocation().getWorldSpace().equals(
+					proposedIdentity.getLocation().getWorldSpace())
+				|| activeIdentity.getLocation().getCoordinate().getLevel()
+					!= proposedIdentity.getLocation().getCoordinate().getLevel()) continue;
+			Point[] activeBounds = active.getObjectBoundary();
+			if (proposedBounds[0].getX() <= activeBounds[1].getX()
+				&& proposedBounds[1].getX() >= activeBounds[0].getX()
+				&& proposedBounds[0].getY() <= activeBounds[1].getY()
+				&& proposedBounds[1].getY() >= activeBounds[0].getY()) {
+				throw new IllegalArgumentException(
+					"Scenery move destination overlaps another scenery footprint.");
+			}
+		}
+	}
+
 	public int getNativeLayeredSceneryCount() {
 		return nativeLayeredGameObjects.countType(
 			GameObjectType.SCENERY.getId());

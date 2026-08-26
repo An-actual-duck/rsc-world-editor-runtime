@@ -396,6 +396,16 @@ paths, time, randomness, package identity, and Spoiled Milk identity never
 enter them. Existing arbitrary placement and placement-set IDs are retained
 across edit/save.
 
+The scenery Move tool preserves that exact placement ID, definition, direction,
+level, and package owner while changing only its coordinates. The server stages
+the source removal, destination membership, complete collision footprint, NPC
+blocking footprint, and draft records as one transaction. A destination outside
+allocated terrain, across a package or level boundary, or overlapping any other
+scenery footprint is refused before the source is changed. The client presents
+an explicit source marker and live wireframe destination ghost; Escape,
+right-click, a tool/mode change, or closing the editor cancels selection without
+issuing a mutation.
+
 ## Verified save and recovery
 
 `::saveworldedits` materializes the complete effective package, including all

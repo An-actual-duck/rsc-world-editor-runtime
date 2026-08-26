@@ -184,6 +184,9 @@ public final class Development implements CommandTrigger {
 		else if (command.equalsIgnoreCase("rotateobject") || command.equalsIgnoreCase("rotatescenery")) {
 			rotateObject(player, command, args);
 		}
+		else if (command.equalsIgnoreCase("moveobject") || command.equalsIgnoreCase("movescenery")) {
+			moveObject(player, command, args);
+		}
 		else if (command.equalsIgnoreCase("worldedits") || command.equalsIgnoreCase("listworldedits")) {
 			listWorldEdits(player);
 		}
@@ -327,6 +330,7 @@ public final class Development implements CommandTrigger {
 			||normalized.equals("createboundary")||normalized.equals("cboundary")
 			||normalized.equals("addboundary")||normalized.equals("aboundary")
 			||normalized.equals("rotateobject")||normalized.equals("rotatescenery")
+			||normalized.equals("moveobject")||normalized.equals("movescenery")
 			||normalized.equals("buildergrounditem")
 			||normalized.equals("removebuildergrounditem")
 			||normalized.equals("saveworldedits")
@@ -357,6 +361,8 @@ public final class Development implements CommandTrigger {
 			||normalized.equals("ascenery")
 			||normalized.equals("rotateobject")
 			||normalized.equals("rotatescenery")
+			||normalized.equals("moveobject")
+			||normalized.equals("movescenery")
 			||normalized.equals("buildergrounditem")
 			||normalized.equals("removebuildergrounditem");
 	}
@@ -1498,6 +1504,52 @@ public final class Development implements CommandTrigger {
 		queueWorldSceneryUpsert(player, newObject);
 
 		player.message(messagePrefix + "Rotated object: " + newObject.getGameObjectDef().getName() + " to rotation " + newObject.getDirection() + " with instance ID " + newObject.getID() + " at " + newObject.getLocation());
+	}
+
+	private void moveObject(Player player, String command, String[] args) {
+		if (args.length != 4) {
+			player.message(badSyntaxPrefix + command.toUpperCase()
+				+ " [source_x] [source_y] [destination_x] [destination_y]");
+			return;
+		}
+		try {
+			int sourceX = Integer.parseInt(args[0]);
+			int sourceY = Integer.parseInt(args[1]);
+			int destinationX = Integer.parseInt(args[2]);
+			int destinationY = Integer.parseInt(args[3]);
+			if (!player.getWorld().withinWorld(sourceX, sourceY)
+				|| !player.getWorld().withinWorld(destinationX, destinationY)) {
+				player.message(messagePrefix + "Invalid coordinates");
+				return;
+			}
+			if (!player.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE) {
+				player.message(messagePrefix
+					+ "Atomic scenery move is available only in the layered Builder.");
+				return;
+			}
+			GameObject moved = player.getWorld().getServer()
+				.getWorldEditorSessions().moveNativeScenery(
+					player, sourceX, sourceY, destinationX, destinationY);
+			LOGGER.info(
+				"WORLD_BUILDER_MOVE_ACCEPTED family=scenery id={} sourceX={} sourceY={} destinationX={} destinationY={} level={} direction={}",
+				moved.getID(), sourceX, sourceY, destinationX, destinationY,
+				moved.getWorldLocation().getCoordinate().getLevel(),
+				moved.getDirection());
+			player.message(messagePrefix + "Moved layered scenery: "
+				+ moved.getGameObjectDef().getName() + " from "
+				+ sourceX + "," + sourceY + " to "
+				+ destinationX + "," + destinationY
+				+ ". Save and close/reopen the Builder to commit.");
+		} catch (NumberFormatException failure) {
+			player.message(badSyntaxPrefix + command.toUpperCase()
+				+ " [source_x] [source_y] [destination_x] [destination_y]");
+		} catch (Exception failure) {
+			LOGGER.warn(
+				"WORLD_BUILDER_MOVE_REFUSED family=scenery command={} reason={}",
+				command, failure.getMessage());
+			player.message(messagePrefix
+				+ "Layered scenery move refused: " + failure.getMessage());
+		}
 	}
 
 	private void queueWorldSceneryUpsert(Player player, GameObject object) {

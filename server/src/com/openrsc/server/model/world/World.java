@@ -1011,6 +1011,28 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 		applyGameObjectTransaction(old, _new, false);
 	}
 
+	/** Moves one package-owned layered object without exposing a remove gap. */
+	public void moveNativeLayeredGameObject(
+		final GameObject oldObject, final GameObject movedObject) {
+		if (!getRegionManager().isNativeLayeredGameObject(oldObject)
+			|| !getRegionManager().hasNativeLayeredGameObjectIdentity(movedObject)) {
+			throw new IllegalArgumentException(
+				"Layered object move requires exact package-owned identities");
+		}
+		GameTickEventRestorationCollisionFootprintPlanner.Result oldUnregister =
+			planGameObjectCollision(
+				oldObject, Operation.UNREGISTER, false, true);
+		GameTickEventRestorationCollisionFootprintPlanner.Result oldRollback =
+			planGameObjectCollision(
+				oldObject, Operation.REGISTER, false, true);
+		GameTickEventRestorationCollisionFootprintPlanner.Result movedRegister =
+			planGameObjectCollision(
+				movedObject, Operation.REGISTER, false, true);
+		getRegionManager().applyNativeLayeredGameObjectMoveTransaction(
+			oldObject, oldUnregister, oldRollback,
+			movedObject, movedRegister);
+	}
+
 	public void sendKilledUpdate(final long killedHash, final long killerHash, final int type) {
 		for (final Player player : getPlayers()) {
 			ActionSender.sendKillUpdate(player, killedHash, killerHash, type);
