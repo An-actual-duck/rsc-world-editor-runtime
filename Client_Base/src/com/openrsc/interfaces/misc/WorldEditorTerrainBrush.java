@@ -7,6 +7,34 @@ import java.util.List;
 public final class WorldEditorTerrainBrush {
 	private WorldEditorTerrainBrush() {}
 
+	public static int[][] centeredFootprint(int centerX, int centerY, int size) {
+		if (size < 1 || size > 7 || (size & 1) == 0) {
+			throw new IllegalArgumentException("Terrain brush size must be one of 1, 3, 5, or 7");
+		}
+		int[][] tiles = new int[size * size][2];
+		tiles[0][0] = centerX;
+		tiles[0][1] = centerY;
+		int radius = size / 2;
+		int at = 1;
+		for (int dx = -radius; dx <= radius; dx++) {
+			for (int dy = -radius; dy <= radius; dy++) {
+				if (dx == 0 && dy == 0) continue;
+				tiles[at][0] = centerX + dx;
+				tiles[at++][1] = centerY + dy;
+			}
+		}
+		return tiles;
+	}
+
+	public static int nextSize(int size) {
+		switch (size) {
+			case 1: return 3;
+			case 3: return 5;
+			case 5: return 7;
+			default: return 1;
+		}
+	}
+
 	public static int[][] lineCenters(int startX, int startY, int endX, int endY) {
 		List<int[]> centers = new ArrayList<int[]>();
 		int x = startX, y = startY;

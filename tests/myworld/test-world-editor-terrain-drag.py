@@ -27,6 +27,23 @@ public final class WorldEditorTerrainDragHarness {
             require(dx <= 1 && dy <= 1 && dx + dy > 0, "line contains a gap or duplicate");
         }
     }
+    private static void verifyFootprint(int size) {
+        int centerX = 100, centerY = 200, radius = size / 2;
+        int[][] tiles = WorldEditorTerrainBrush.centeredFootprint(centerX, centerY, size);
+        require(tiles.length == size * size, "wrong footprint tile count for " + size);
+        require(tiles[0][0] == centerX && tiles[0][1] == centerY,
+            "footprint center was not first for " + size);
+        java.util.HashSet<String> seen = new java.util.HashSet<String>();
+        for (int[] tile : tiles) {
+            require(Math.abs(tile[0] - centerX) <= radius, "footprint x exceeded radius");
+            require(Math.abs(tile[1] - centerY) <= radius, "footprint y exceeded radius");
+            require(seen.add(tile[0] + "," + tile[1]), "footprint contained a duplicate");
+        }
+        require(seen.contains((centerX - radius) + "," + (centerY - radius)),
+            "footprint missed lower corner");
+        require(seen.contains((centerX + radius) + "," + (centerY + radius)),
+            "footprint missed upper corner");
+    }
     public static void main(String[] args) {
         verifyLine(10, 20, 10, 20);
         verifyLine(10, 20, 18, 20);
@@ -34,6 +51,18 @@ public final class WorldEditorTerrainDragHarness {
         verifyLine(10, 20, 10, 29);
         verifyLine(10, 20, 18, 29);
         verifyLine(18, 29, 10, 20);
+		verifyFootprint(1);
+		verifyFootprint(3);
+		verifyFootprint(5);
+		verifyFootprint(7);
+		require(WorldEditorTerrainBrush.nextSize(1) == 3, "1x1 cycle failed");
+		require(WorldEditorTerrainBrush.nextSize(3) == 5, "3x3 cycle failed");
+		require(WorldEditorTerrainBrush.nextSize(5) == 7, "5x5 cycle failed");
+		require(WorldEditorTerrainBrush.nextSize(7) == 1, "7x7 cycle failed");
+		boolean rejected = false;
+		try { WorldEditorTerrainBrush.centeredFootprint(0, 0, 2); }
+		catch (IllegalArgumentException expected) { rejected = true; }
+		require(rejected, "even footprint size was accepted");
 
         require(WorldEditorPacketFraming.acceptsTerrainStroke(6, 282, 64),
             "maximum legacy stroke was rejected");
