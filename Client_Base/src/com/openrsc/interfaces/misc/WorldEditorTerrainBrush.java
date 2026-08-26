@@ -94,13 +94,14 @@ public final class WorldEditorTerrainBrush {
 
 	public static int[][] rectangleFootprint(
 		int startX, int startY, int endX, int endY, boolean fill, int maximumTiles) {
-		return rectanglePlan(startX, startY, endX, endY, fill, 1, false, false,
+		return rectanglePlan(startX, startY, endX, endY, fill, 1, false, false, false,
 			maximumTiles).tiles();
 	}
 
 	public static RectanglePlan rectanglePlan(
 		int startX, int startY, int endX, int endY, boolean fill,
-		int baseFieldMask, boolean smartWalls, boolean paintSmartWall,
+		int baseFieldMask, boolean smartWalls, boolean paintSmartNorthWall,
+		boolean paintSmartEastWall,
 		int maximumTiles) {
 		if (maximumTiles < 1 || baseFieldMask < 0 || (baseFieldMask & ~127) != 0) {
 			throw new IllegalArgumentException("Terrain rectangle capability is invalid");
@@ -108,10 +109,10 @@ public final class WorldEditorTerrainBrush {
 		if (smartWalls && (baseFieldMask & 112) != 0) {
 			throw new IllegalArgumentException("Smart Walls cannot include raw wall fields");
 		}
-		if (!smartWalls && paintSmartWall) {
+		if (!smartWalls && (paintSmartNorthWall || paintSmartEastWall)) {
 			throw new IllegalArgumentException("Smart wall placement requires Smart Walls");
 		}
-		if (baseFieldMask == 0 && !paintSmartWall) {
+		if (baseFieldMask == 0 && !paintSmartNorthWall && !paintSmartEastWall) {
 			throw new IllegalArgumentException("Terrain rectangle has no selected fields");
 		}
 		int minX = Math.min(startX, endX), maxX = Math.max(startX, endX);
@@ -119,7 +120,8 @@ public final class WorldEditorTerrainBrush {
 		long width = (long) maxX - minX + 1L, height = (long) maxY - minY + 1L;
 		long footprint = fill ? width * height
 			: width == 1L || height == 1L ? width * height : width * 2L + height * 2L - 4L;
-		long possible = footprint + (paintSmartWall ? width * 2L + height * 2L : 0L);
+		long possible = footprint + (paintSmartNorthWall ? width * 2L : 0L)
+			+ (paintSmartEastWall ? height * 2L : 0L);
 		if (footprint < 1L || possible > maximumTiles * 2L + 4L) {
 			throw new IllegalArgumentException("Terrain rectangle exceeds the tile limit");
 		}
@@ -148,14 +150,14 @@ public final class WorldEditorTerrainBrush {
 				}
 			}
 		}
-		if (paintSmartWall) {
+		if (paintSmartNorthWall || paintSmartEastWall) {
 			int southY = Math.addExact(maxY, 1), eastX = Math.addExact(maxX, 1);
-			for (int x = minX;; x++) {
+			if (paintSmartNorthWall) for (int x = minX;; x++) {
 				addRectangleTile(tiles, masks, x, minY, 32, maximumTiles);
 				addRectangleTile(tiles, masks, x, southY, 32, maximumTiles);
 				if (x == maxX) break;
 			}
-			for (int y = minY;; y++) {
+			if (paintSmartEastWall) for (int y = minY;; y++) {
 				addRectangleTile(tiles, masks, minX, y, 16, maximumTiles);
 				addRectangleTile(tiles, masks, eastX, y, 16, maximumTiles);
 				if (y == maxY) break;

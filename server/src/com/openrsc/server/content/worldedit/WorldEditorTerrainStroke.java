@@ -59,15 +59,15 @@ public final class WorldEditorTerrainStroke {
 		unique.put(key,new int[]{x,y});
 	}
 	public static RectanglePlan rectanglePlan(int startX,int startY,int endX,int endY,boolean fill,
-		int baseFieldMask,boolean smartWalls,boolean paintSmartWall){
+		int baseFieldMask,boolean smartWalls,boolean paintSmartNorthWall,boolean paintSmartEastWall){
 		if(baseFieldMask<0||(baseFieldMask&~127)!=0)throw new IllegalArgumentException("Terrain rectangle capability is invalid.");
 		if(smartWalls&&(baseFieldMask&112)!=0)throw new IllegalArgumentException("Smart Walls cannot include raw wall fields.");
-		if(!smartWalls&&paintSmartWall)throw new IllegalArgumentException("Smart wall placement requires Smart Walls.");
-		if(baseFieldMask==0&&!paintSmartWall)throw new IllegalArgumentException("Terrain rectangle has no selected fields.");
+		if(!smartWalls&&(paintSmartNorthWall||paintSmartEastWall))throw new IllegalArgumentException("Smart wall placement requires Smart Walls.");
+		if(baseFieldMask==0&&!paintSmartNorthWall&&!paintSmartEastWall)throw new IllegalArgumentException("Terrain rectangle has no selected fields.");
 		int minX=Math.min(startX,endX),maxX=Math.max(startX,endX),minY=Math.min(startY,endY),maxY=Math.max(startY,endY);
 		long width=(long)maxX-minX+1L,height=(long)maxY-minY+1L;
 		long footprint=fill?width*height:width==1L||height==1L?width*height:width*2L+height*2L-4L;
-		long possible=footprint+(paintSmartWall?width*2L+height*2L:0L);
+		long possible=footprint+(paintSmartNorthWall?width*2L:0L)+(paintSmartEastWall?height*2L:0L);
 		if(footprint<1L||possible>MAX_OPERATION_TILES*2L+4L)throw new IllegalArgumentException("Terrain rectangle exceeds 4096 unique tiles.");
 		java.util.LinkedHashMap<Long,int[]> tiles=new java.util.LinkedHashMap<Long,int[]>();
 		java.util.LinkedHashMap<Long,Integer> masks=new java.util.LinkedHashMap<Long,Integer>();
@@ -78,10 +78,10 @@ public final class WorldEditorTerrainStroke {
 				if(height>2L)for(int y=minY+1;y<maxY;y++){addRectangleTile(tiles,masks,minX,y,baseFieldMask);if(maxX!=minX)addRectangleTile(tiles,masks,maxX,y,baseFieldMask);}
 			}
 		}
-		if(paintSmartWall){
+		if(paintSmartNorthWall||paintSmartEastWall){
 			int southY=Math.addExact(maxY,1),eastX=Math.addExact(maxX,1);
-			for(int x=minX;;x++){addRectangleTile(tiles,masks,x,minY,32);addRectangleTile(tiles,masks,x,southY,32);if(x==maxX)break;}
-			for(int y=minY;;y++){addRectangleTile(tiles,masks,minX,y,16);addRectangleTile(tiles,masks,eastX,y,16);if(y==maxY)break;}
+			if(paintSmartNorthWall)for(int x=minX;;x++){addRectangleTile(tiles,masks,x,minY,32);addRectangleTile(tiles,masks,x,southY,32);if(x==maxX)break;}
+			if(paintSmartEastWall)for(int y=minY;;y++){addRectangleTile(tiles,masks,minX,y,16);addRectangleTile(tiles,masks,eastX,y,16);if(y==maxY)break;}
 		}
 		int[][] coordinates=tiles.values().toArray(new int[tiles.size()][]);int[] fieldMasks=new int[coordinates.length];int at=0;
 		for(Integer mask:masks.values())fieldMasks[at++]=mask.intValue();return new RectanglePlan(coordinates,fieldMasks);

@@ -62,8 +62,8 @@ public final class WorldEditorTerrainDragHarness {
 		require(outline.length==8,"3x3 outline size changed");
 		int[][] fill=WorldEditorTerrainBrush.rectangleFootprint(12,22,10,20,true,4096);
 		require(fill.length==9,"3x3 fill size changed");
-		WorldEditorTerrainBrush.RectanglePlan client=WorldEditorTerrainBrush.rectanglePlan(10,20,12,22,true,4,true,true,4096);
-		WorldEditorTerrainStroke.RectanglePlan server=WorldEditorTerrainStroke.rectanglePlan(12,22,10,20,true,4,true,true);
+		WorldEditorTerrainBrush.RectanglePlan client=WorldEditorTerrainBrush.rectanglePlan(10,20,12,22,true,4,true,true,true,4096);
+		WorldEditorTerrainStroke.RectanglePlan server=WorldEditorTerrainStroke.rectanglePlan(12,22,10,20,true,4,true,true,true);
 		int[][] clientTiles=client.tiles();int[] clientMasks=client.fieldMasks();
 		require(clientTiles.length==15,"smart rectangle unique size changed");
 		require(server.coordinates.length==clientTiles.length,"client/server rectangle size differs");
@@ -75,6 +75,16 @@ public final class WorldEditorTerrainDragHarness {
 		require(maskAt(clientTiles,clientMasks,10,21)==20,"east edge ownership changed");
 		require(maskAt(clientTiles,clientMasks,13,21)==16,"far east owner tile changed");
 		require(maskAt(clientTiles,clientMasks,11,23)==32,"far north owner tile changed");
+		WorldEditorTerrainBrush.RectanglePlan northOnly=WorldEditorTerrainBrush.rectanglePlan(10,20,12,22,false,0,true,true,false,4096);
+		require(northOnly.tiles().length==6,"north-only Smart Wall size changed");
+		for(int mask:northOnly.fieldMasks())require(mask==32,"north-only Smart Wall leaked another direction");
+		WorldEditorTerrainBrush.RectanglePlan eastOnly=WorldEditorTerrainBrush.rectanglePlan(10,20,12,22,false,0,true,false,true,4096);
+		require(eastOnly.tiles().length==6,"east-only Smart Wall size changed");
+		for(int mask:eastOnly.fieldMasks())require(mask==16,"east-only Smart Wall leaked another direction");
+		WorldEditorTerrainStroke.RectanglePlan serverNorth=WorldEditorTerrainStroke.rectanglePlan(10,20,12,22,false,0,true,true,false);
+		WorldEditorTerrainStroke.RectanglePlan serverEast=WorldEditorTerrainStroke.rectanglePlan(10,20,12,22,false,0,true,false,true);
+		require(serverNorth.coordinates.length==northOnly.tiles().length,"server north-only geometry differs");
+		require(serverEast.coordinates.length==eastOnly.tiles().length,"server east-only geometry differs");
 		boolean rejected=false;try{WorldEditorTerrainBrush.rectangleFootprint(0,0,64,64,true,4096);}
 		catch(IllegalArgumentException expected){rejected=true;}require(rejected,"oversized rectangle was accepted");
 	}
@@ -130,10 +140,14 @@ public final class WorldEditorTerrainDragHarness {
 			"endpoint-based 7x7 line request was rejected");
 		require(!WorldEditorPacketFraming.acceptsTerrainLine(8, 38, 6),
 			"even line brush was accepted");
-		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,2),"smart rectangle framing was rejected");
-		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,7),"filled smart-wall rectangle framing was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,2),"smart rectangle without walls was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,6),"north-only smart rectangle framing was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,10),"east-only smart rectangle framing was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,14),"both-direction smart rectangle framing was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,15),"filled both-direction smart rectangle framing was rejected");
 		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,4),"wall flag without Smart Walls was accepted");
-		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,8),"unknown rectangle flag was accepted");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,8),"east flag without Smart Walls was accepted");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,16),"unknown rectangle flag was accepted");
 		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,38,2),"short rectangle frame was accepted");
     }
 }

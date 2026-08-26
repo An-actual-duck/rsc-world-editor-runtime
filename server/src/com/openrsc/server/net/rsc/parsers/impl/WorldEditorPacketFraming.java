@@ -26,6 +26,6 @@ public final class WorldEditorPacketFraming {
 	}
 
 	public static boolean acceptsTerrainRectangle(int subtype,int length,int flags) {
-		return subtype==9&&length==39&&(flags&~7)==0&&((flags&4)==0||(flags&2)!=0);
+		return subtype==9&&length==39&&(flags&~15)==0&&((flags&12)==0||(flags&2)!=0);
 	}
 }
