@@ -7,6 +7,8 @@ ROOT = Path(__file__).resolve().parents[2]
 BRUSH = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorTerrainBrush.java"
 FRAMING = ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/WorldEditorPacketFraming.java"
 SERVER = ROOT / "server/src/com/openrsc/server/Server.java"
+UI = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.java"
+CLIENT = ROOT / "Client_Base/src/orsc/mudclient.java"
 
 HARNESS = r"""
 import com.openrsc.interfaces.misc.WorldEditorTerrainBrush;
@@ -63,6 +65,14 @@ public final class WorldEditorTerrainDragHarness {
 		try { WorldEditorTerrainBrush.centeredFootprint(0, 0, 2); }
 		catch (IllegalArgumentException expected) { rejected = true; }
 		require(rejected, "even footprint size was accepted");
+		int[][] lineFootprint = WorldEditorTerrainBrush.lineFootprint(10, 20, 14, 20, 3, 64);
+		require(lineFootprint.length == 21, "overlapping line footprints were not coalesced");
+		require(lineFootprint[0][0] == 10 && lineFootprint[0][1] == 20,
+			"line footprint did not retain its anchor first");
+		rejected = false;
+		try { WorldEditorTerrainBrush.lineFootprint(0, 0, 100, 0, 7, 64); }
+		catch (IllegalArgumentException expected) { rejected = true; }
+		require(rejected, "oversized line footprint was accepted");
 
         require(WorldEditorPacketFraming.acceptsTerrainStroke(6, 282, 64),
             "maximum legacy stroke was rejected");
@@ -100,4 +110,14 @@ assert "player.processOutgoingPackets()" in control_plane
 assert server.count("processWorldBuilderControlPlanePackets();") == 1
 assert "} else {\n\t\t\t\t\tprocessWorldBuilderControlPlanePackets();" in server
 
-print("PASS: terrain drags interpolate, accept wide batches, and use Builder-only low-latency control")
+ui = UI.read_text(encoding="utf-8")
+client = CLIENT.read_text(encoding="utf-8")
+assert "TerrainTool terrainTool=TerrainTool.FREEHAND" in ui
+assert "lineFootprint(terrainLineAnchorX,terrainLineAnchorY,worldX,worldY" in ui
+assert "terrainDragReleasePending=true" in ui
+assert 'inspectionStatus="Line cannot cross a legacy wilderness-level boundary."' in ui
+assert "terrainLineAnchorX>=0" in ui and 'inspectionStatus="Line anchor cancelled."' in ui
+assert "worldEditorInterface.terrainPaintActionLabel()" in client
+assert "drawWorldEditorTerrainToolPreview(renderer3DFrame)" in client
+
+print("PASS: freehand and line tools preview shared geometry and commit bounded low-latency batches")

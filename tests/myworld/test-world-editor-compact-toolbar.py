@@ -128,7 +128,7 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
                             WorldEditorIconRegistry registry = new WorldEditorIconRegistry();
                             registry.initialize();
                             require(registry.loadedCount() == 1);
-                            require(registry.missingKeys().size() == 19);
+                            require(registry.missingKeys().size() == 21);
                             require(registry.isLoaded(WorldEditorIconRegistry.Key.MODE_NAVIGATE));
                             require(!registry.isLoaded(WorldEditorIconRegistry.Key.MODE_INSPECT));
                             Sprite first = registry.get(WorldEditorIconRegistry.Key.MODE_NAVIGATE);
@@ -144,7 +144,7 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
                 cwd=working,
             )
         self.assertEqual(1, output.count("[world-editor icons]"))
-        self.assertIn("19 unavailable", output)
+        self.assertIn("21 unavailable", output)
         self.assertIn("mode-inspect.png (expected 24x24, got 12x12)", output)
         self.assertTrue(output.rstrip().endswith("icon-registry-ok"))
 
@@ -158,7 +158,8 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
             "field-floor-texture.png", "field-roof.png",
             "field-wall-north.png", "field-wall-east.png",
             "field-wall-diagonal.png", "tool-brush-1x1.png",
-            "tool-brush-3x3.png", "profile-build.png", "action-save.png",
+            "tool-brush-3x3.png", "tool-freehand.png", "tool-line.png",
+            "profile-build.png", "action-save.png",
             "action-pin.png", "action-close.png",
         }
         self.assertEqual(expected, set(re.findall(r'\("([a-z0-9-]+\.png)"', source)))
@@ -226,11 +227,17 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         self.assertIn("Config.isAndroid()", ui)
         self.assertIn("middleMouseOrbit.begin(var1.getButton(), clientMouseX, clientMouseY)", applet)
         self.assertRegex(applet, r"(?s)middleMouseOrbit\.update\(.*?currentMouseButtonDown = 0;.*?var1\.consume\(\);.*?return;")
-        self.assertIn("controlPressed&&currentMouseButtonDown==1", client)
+        self.assertIn("boolean gesture=controlDown&&primaryDown&&isTerrainPainting()", ui)
+        self.assertIn("boolean picking=worldEditorInterface.isTerrainPainting()", client)
         self.assertIn("updateTerrainDrag(controlPressed,currentMouseButtonDown==1", client)
         self.assertIn("toggleBrushSize()", ui)
         self.assertIn("TOOL_BRUSH_1X1", ui)
         self.assertIn("TOOL_BRUSH_3X3", ui)
+        self.assertIn("TOOL_FREEHAND", ui)
+        self.assertIn("TOOL_LINE", ui)
+        self.assertIn("selected?0x6b3f82", ui)
+        self.assertIn("terrainToolAtDock", ui)
+        self.assertIn("drawWorldEditorTerrainToolPreview(renderer3DFrame)", client)
         self.assertIn("toolbar.isCollapsed()?WorldEditorIconRegistry.Key.TOOLBAR_EXPAND", ui)
         self.assertNotIn('return "Raw value "+activeTerrainText()', ui)
 

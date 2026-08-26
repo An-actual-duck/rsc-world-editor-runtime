@@ -8846,6 +8846,7 @@ public final class mudclient implements Runnable {
 						this.drawWorldEditorBuildGridLegacy(renderer3DFrame);
 						}
 						this.getSurface().setRenderer2DPhase(Renderer2DFrame.Phase.WORLD_OVERLAY);
+						this.drawWorldEditorTerrainToolPreview(renderer3DFrame);
 						this.drawQueuedStaticProjectiles();
 						this.drawQueuedProjectileEffectOverlays();
 						this.drawQueuedProjectileImpactOverlays();
@@ -11990,7 +11991,7 @@ public final class mudclient implements Runnable {
 		if(worldEditorInterface.isInspecting()||worldEditorInterface.isTerrainPainting())
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_COPY_TERRAIN,"Copy terrain data",localZ);
 		if(worldEditorInterface.isTerrainPainting())
-			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PAINT_TERRAIN,"Paint terrain",localZ);
+			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PAINT_TERRAIN,worldEditorInterface.terrainPaintActionLabel(),localZ);
 		if(worldEditorInterface.isSceneryPlacing())
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PLACE_SCENERY,"Place "+WorldEditorDefinitionCatalog.sceneryReference(worldEditorInterface.getSceneryId()),localZ);
 		if(worldEditorInterface.isNpcPlacing())
@@ -23889,6 +23890,21 @@ public final class mudclient implements Runnable {
 		}
 	}
 
+	private void drawWorldEditorTerrainToolPreview(Renderer3DFrame frame){
+		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.terrainToolPreviewTiles();if(tiles.length==0)return;
+		Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;
+			if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;
+			toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);
+		}
+		int color=worldEditorInterface.terrainToolPreviewColor();for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL);
+			int x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,color);}
+	}
+	private static void toggleWorldEditorPreviewEdge(Set<Long> edges,int orientation,int x,int z){long key=((long)orientation<<40)|((long)x&0xfffffL)<<20|((long)z&0xfffffL);if(!edges.add(key))edges.remove(key);}
+	private void drawWorldEditorTerrainPreviewEdge(Renderer3DFrame frame,int x1,int z1,int x2,int z2,int color){
+		int[] first=new int[2],second=new int[2];int y1=-world.getElevation(x1,z1)-4,y2=-world.getElevation(x2,z2)-4;
+		if(projectWorldEditorGridPoint(frame,x1,y1,z1,first)&&projectWorldEditorGridPoint(frame,x2,y2,z2,second))drawWorldEditorGridLine(first[0],first[1],second[0],second[1],color);
+	}
+
 	private static boolean projectWorldEditorGridPoint(Renderer3DFrame frame,int x,int y,int z,int[] destination){
 		int cameraX=x-frame.getCameraOffsetX(),cameraY=y-frame.getCameraOffsetY(),cameraZ=z-frame.getCameraOffsetZ(),temporary,rotation=frame.getCameraRotationZ();
 		if(rotation!=0){int sin=FastMath.trigTable1024[rotation],cos=FastMath.trigTable1024[rotation+1024];temporary=cameraY*sin+cos*cameraX>>15;cameraY=cameraY*cos-cameraX*sin>>15;cameraX=temporary;}
@@ -23940,7 +23956,7 @@ public final class mudclient implements Runnable {
 	}
 	private boolean updateWorldEditorTerrainDrag(){
 		if(worldEditorInterface==null||!worldEditorInterface.isEditorOpen()||!isAdaptiveWorldStateReadyForEditor())return false;int worldX=-1,worldY=-1;
-		boolean picking=controlPressed&&currentMouseButtonDown==1&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
+		boolean picking=worldEditorInterface.isTerrainPainting()&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
 		if(picking&&scene!=null&&world!=null&&localPlayer!=null){int[] local=projectScreenToCurrentTerrainTile();
 			if(local!=null&&local[0]>=0&&local[0]<World.LOCAL_TILE_COUNT&&local[1]>=0&&local[1]<World.LOCAL_TILE_COUNT){worldX=midRegionBaseX+local[0];worldY=midRegionBaseZ+local[1];}}
 		return worldEditorInterface.updateTerrainDrag(controlPressed,currentMouseButtonDown==1,worldX,worldY);

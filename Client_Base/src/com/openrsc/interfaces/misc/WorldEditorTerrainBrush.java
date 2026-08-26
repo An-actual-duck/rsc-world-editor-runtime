@@ -1,7 +1,9 @@
 package com.openrsc.interfaces.misc;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Deterministic tile-center interpolation for continuous editor brush drags. */
 public final class WorldEditorTerrainBrush {
@@ -33,6 +35,25 @@ public final class WorldEditorTerrainBrush {
 			case 5: return 7;
 			default: return 1;
 		}
+	}
+
+	public static int[][] lineFootprint(
+		int startX, int startY, int endX, int endY, int size, int maximumTiles) {
+		if (maximumTiles < 1) {
+			throw new IllegalArgumentException("Terrain line tile limit must be positive");
+		}
+		Map<Long, int[]> unique = new LinkedHashMap<Long, int[]>();
+		for (int[] center : lineCenters(startX, startY, endX, endY)) {
+			for (int[] tile : centeredFootprint(center[0], center[1], size)) {
+				long key = ((long) tile[0] << 32) ^ (tile[1] & 0xffffffffL);
+				if (unique.containsKey(key)) continue;
+				if (unique.size() >= maximumTiles) {
+					throw new IllegalArgumentException("Terrain line exceeds the tile limit");
+				}
+				unique.put(key, tile);
+			}
+		}
+		return unique.values().toArray(new int[unique.size()][]);
 	}
 
 	public static int[][] lineCenters(int startX, int startY, int endX, int endY) {
