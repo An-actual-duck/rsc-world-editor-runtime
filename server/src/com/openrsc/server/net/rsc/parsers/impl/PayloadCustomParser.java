@@ -19,13 +19,8 @@ import org.apache.logging.log4j.Logger;
 public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 
 	private static final Logger LOGGER = LogManager.getLogger();
-	private static final int[] WORLD_EDITOR_PACKET_LENGTHS = {13, 15, 19, 22, 29};
-
 	private static boolean isWorldEditorPacketLength(int length) {
-		for (int accepted : WORLD_EDITOR_PACKET_LENGTHS) {
-			if (length == accepted) return true;
-		}
-		return length>=30&&length<=282&&(length-26)%4==0;
+		return WorldEditorPacketFraming.acceptsEnvelopeLength(length);
 	}
 
 	@Override
@@ -560,14 +555,14 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 					editor.plane=packet.readByte();editor.fieldMask=packet.readByte()&0xff;editor.elevation=packet.readByte()&0xff;
 					editor.groundTexture=packet.readByte()&0xff;editor.groundOverlay=packet.readByte()&0xff;editor.roofTexture=packet.readByte()&0xff;
 					editor.horizontalWall=packet.readByte()&0xff;editor.verticalWall=packet.readByte()&0xff;editor.diagonal=packet.readInt();
-					int count=packet.readByte()&0xff;if(count<1||count>64||packet.getLength()!=26+count*4)return null;
+					int count=packet.readByte()&0xff;if(!WorldEditorPacketFraming.acceptsTerrainStroke(6,packet.getLength(),count))return null;
 					editor.terrainTiles=new int[count][2];for(int i=0;i<count;i++){editor.terrainTiles[i][0]=packet.readShort();editor.terrainTiles[i][1]=packet.readShort();}
 				} else if(editor.type==7){
 					editor.plane=packet.readByte();editor.fieldMask=packet.readByte()&0xff;editor.elevationOperation=packet.readByte()&0xff;
 					editor.elevation=packet.readShort()&0xffff;editor.elevationStep=packet.readShort()&0xffff;
 					editor.groundTexture=packet.readByte()&0xff;editor.groundOverlay=packet.readByte()&0xff;editor.roofTexture=packet.readByte()&0xff;
 					editor.horizontalWall=packet.readByte()&0xff;editor.verticalWall=packet.readByte()&0xff;editor.diagonal=packet.readInt();
-					int count=packet.readByte()&0xff;if(count<1||count>64||packet.getLength()!=30+count*4)return null;
+					int count=packet.readByte()&0xff;if(!WorldEditorPacketFraming.acceptsTerrainStroke(7,packet.getLength(),count))return null;
 					editor.terrainTiles=new int[count][2];for(int i=0;i<count;i++){editor.terrainTiles[i][0]=packet.readShort();editor.terrainTiles[i][1]=packet.readShort();}
 				}
 				result = editor;

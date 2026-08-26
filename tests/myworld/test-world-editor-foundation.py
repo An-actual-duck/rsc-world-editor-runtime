@@ -236,12 +236,14 @@ class WorldEditorFoundationTest(unittest.TestCase):
 
     def test_world_editor_dispatcher_accepts_only_supported_envelope_lengths(self):
         parser = (ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/PayloadCustomParser.java").read_text()
-        match = re.search(r"WORLD_EDITOR_PACKET_LENGTHS\s*=\s*\{([^}]+)\}", parser)
+        framing = (ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/WorldEditorPacketFraming.java").read_text()
+        match = re.search(r"FIXED_LENGTHS\s*=\s*\{([^}]+)\}", framing)
         self.assertIsNotNone(match)
         accepted = {int(value) for value in re.findall(r"\d+", match.group(1))}
         self.assertEqual({13, 15, 19, 22, 29}, accepted)
         self.assertTrue(accepted.isdisjoint({12, 14, 16, 18, 20, 21, 23, 28, 31}))
         self.assertIn("return isWorldEditorPacketLength(packet.getLength());", parser)
+        self.assertIn("WorldEditorPacketFraming.acceptsEnvelopeLength(length)", parser)
 
     def test_terrain_stroke_uses_one_bounded_authoritative_round_trip(self):
         parser = (ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/PayloadCustomParser.java").read_text()
@@ -251,8 +253,10 @@ class WorldEditorFoundationTest(unittest.TestCase):
         client_handler = (ROOT / "Client_Base/src/orsc/PacketHandler.java").read_text()
         ui = (ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.java").read_text()
 
-        self.assertIn("length>=30&&length<=282&&(length-26)%4==0", parser)
-        self.assertIn("packet.getLength()!=26+count*4", parser)
+        framing = (ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/WorldEditorPacketFraming.java").read_text()
+        self.assertIn("length <= 286", framing)
+        self.assertIn("length == 26 + count * 4", framing)
+        self.assertIn("length == 30 + count * 4", framing)
         self.assertIn("paintTerrainStroke(request", handler)
         self.assertLess(sessions.index("for(int[] coordinate:coordinates)"), sessions.index("terrainDraft.put(key,after.get(i))"))
         self.assertIn("projectedDraftSize>TERRAIN_DRAFT_LIMIT", sessions)
@@ -264,6 +268,9 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertIn("updateTerrainDrag", ui)
         self.assertIn("terrainDragSeen.add(key)", ui)
         self.assertIn("TERRAIN_BATCH_LIMIT=64", ui)
+        self.assertIn("TERRAIN_DRAG_FLUSH_NANOS=75000000L", ui)
+        self.assertIn("recoverTerrainStrokeTimeout", ui)
+        self.assertIn("WorldEditorTerrainBrush.lineCenters", ui)
         client = (ROOT / "Client_Base/src/orsc/mudclient.java").read_text()
         build_mode = re.search(r"public void setWorldEditorBuildMode\(boolean enabled\)\{(?P<body>.*?)\n\t\}", client, re.S)
         self.assertIsNotNone(build_mode)

@@ -15,6 +15,7 @@ import java.util.Map;
 /** Desktop-only world editor shell and the first command-backed entity tools. */
 public final class WorldEditorInterface extends NCustomComponent {
 	private static final int TERRAIN_BATCH_LIMIT=64,TERRAIN_DRAG_LIMIT=4096;
+	private static final long TERRAIN_DRAG_FLUSH_NANOS=75000000L,TERRAIN_STROKE_TIMEOUT_NANOS=10000000000L;
 	private static final int MAX_GROUND_ITEM_AMOUNT=99999;
 	private static final int DOCK_WIDTH=70,DOCK_HEIGHT=306,FLYOUT_WIDTH=180,FLYOUT_GAP=4;
 	private static final int BROWSER_WIDTH=390,BROWSER_HEIGHT=330,BROWSER_GAP=4;
@@ -67,8 +68,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private int terrainStrokeRoof=0,terrainStrokeEastWall=0,terrainStrokeNorthWall=0,terrainStrokeDiagonal=0;
 	private int[][] terrainStrokeTiles=null;
 	private boolean terrainBuildMode=false,terrainDragActive=false,terrainDragReleasePending=false;
-	private int terrainDragHoverX=-1,terrainDragHoverY=-1,terrainDragAccepted=0;
-	private long terrainDragAckMillis=0L,terrainDragRebuildMillis=0L;
+	private int terrainDragHoverX=-1,terrainDragHoverY=-1,terrainDragCenterX=-1,terrainDragCenterY=-1,terrainDragAccepted=0;
+	private long terrainDragAckMillis=0L,terrainDragRebuildMillis=0L,terrainDragPendingSinceNanos=0L;
 	private final LinkedHashMap<Long,int[]> terrainDragPending=new LinkedHashMap<Long,int[]>();
 	private final HashSet<Long> terrainDragSeen=new HashSet<Long>();
 	private int dragX=-1,dragY=-1;
@@ -203,7 +204,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		boolean dragStroke=terrainDragActive||terrainDragReleasePending||!terrainDragSeen.isEmpty();
 		if(!dragStroke){inspectionStatus="Paint accepted: "+tiles.length+" tile"+(tiles.length==1?"":"s")+" | ack "+ackMs+"ms, rebuild "+rebuildMs+"ms";return;}
 		terrainDragAccepted+=tiles.length;terrainDragAckMillis+=ackMs;terrainDragRebuildMillis+=rebuildMs;
-		if(terrainDragPending.size()>=TERRAIN_BATCH_LIMIT||terrainDragReleasePending)sendNextTerrainDragBatch();
+		if(!terrainDragPending.isEmpty())sendNextTerrainDragBatch();
 		if(terrainDragReleasePending&&terrainStrokeTiles==null&&terrainDragPending.isEmpty())completeTerrainDrag();
 		else inspectionStatus=terrainDragStatus();
 	}
@@ -241,33 +242,48 @@ public final class WorldEditorInterface extends NCustomComponent {
 		terrainStrokeStartedNanos=System.nanoTime();sendTerrainStroke();return true;
 	}
 	public boolean updateTerrainDrag(boolean controlDown,boolean primaryDown,int worldX,int worldY){
+		long now=System.nanoTime();if(recoverTerrainStrokeTimeout(now))return true;
 		boolean gesture=controlDown&&primaryDown&&isTerrainPainting();
 		if(!terrainDragActive){
 			if(!gesture||worldX<0||worldY<0||terrainStrokeTiles!=null||terrainDragReleasePending)return false;
 			int mask=terrainPaintMask();if(mask==0){showError("Select at least one terrain field to paint.");return true;}
-			clearTerrainDrag();terrainDragActive=true;snapshotTerrainPaint(mask);addTerrainDragCenter(worldX,worldY);inspectionStatus=terrainDragStatus();return true;
+			clearTerrainDrag();terrainDragActive=true;snapshotTerrainPaint(mask);addTerrainDragCenter(worldX,worldY,now);inspectionStatus=terrainDragStatus();return true;
 		}
 		if(!gesture){releaseTerrainDrag();return true;}
-		if(worldX>=0&&worldY>=0)addTerrainDragCenter(worldX,worldY);inspectionStatus=terrainDragStatus();return true;
+		if(worldX>=0&&worldY>=0)addTerrainDragCenter(worldX,worldY,now);maybeFlushTerrainDrag(now,false);inspectionStatus=terrainDragStatus();return true;
 	}
 	private int terrainPaintMask(){return (paintElevation?1:0)|(paintFloorColor?2:0)|(paintFloorTexture?4:0)|(paintRoof?8:0)|(paintEastWall?16:0)|(paintNorthWall?32:0)|(paintDiagonalWall?64:0);}
 	private void snapshotTerrainPaint(int mask){terrainStrokeMask=mask;terrainStrokeElevation=terrainElevation;terrainStrokeElevationOperation=terrainElevationOperation;terrainStrokeElevationStep=terrainElevationStep;terrainStrokeColor=terrainFloorColor;terrainStrokeTexture=terrainFloorTexture;terrainStrokeRoof=terrainRoof;terrainStrokeEastWall=terrainEastWall;terrainStrokeNorthWall=terrainNorthWall;terrainStrokeDiagonal=encodedDiagonalWall();}
-	private void addTerrainDragCenter(int worldX,int worldY){
-		terrainDragHoverX=worldX;terrainDragHoverY=worldY;recordWorldClick(worldX,worldY);int strokeSize=terrainBrushSize;
-		int[][] footprint=strokeSize==1?new int[][]{{worldX,worldY}}:centeredThreeByThree(worldX,worldY);int plane=editorLevel(worldY);
-		for(int[] tile:footprint){if(!isLayeredReview()&&Math.floorDiv(tile[1],944)!=plane)continue;long key=terrainTileKey(tile[0],tile[1]);
-			if(terrainDragSeen.size()>=TERRAIN_DRAG_LIMIT&&!terrainDragSeen.contains(key))continue;
-			if(terrainDragSeen.add(key))terrainDragPending.put(key,new int[]{tile[0],tile[1]});}
-		if(terrainDragPending.size()>=TERRAIN_BATCH_LIMIT&&terrainStrokeTiles==null)sendNextTerrainDragBatch();
+	private void addTerrainDragCenter(int worldX,int worldY,long now){
+		terrainDragHoverX=worldX;terrainDragHoverY=worldY;
+		if(worldX==terrainDragCenterX&&worldY==terrainDragCenterY)return;
+		int[][] centers=terrainDragCenterX<0?new int[][]{{worldX,worldY}}
+			:WorldEditorTerrainBrush.lineCenters(terrainDragCenterX,terrainDragCenterY,worldX,worldY);
+		terrainDragCenterX=worldX;terrainDragCenterY=worldY;recordWorldClick(worldX,worldY);int strokeSize=terrainBrushSize;
+		for(int[] center:centers){int[][] footprint=strokeSize==1?new int[][]{{center[0],center[1]}}:centeredThreeByThree(center[0],center[1]);int plane=editorLevel(center[1]);
+			for(int[] tile:footprint){if(!isLayeredReview()&&Math.floorDiv(tile[1],944)!=plane)continue;long key=terrainTileKey(tile[0],tile[1]);
+				if(terrainDragSeen.size()>=TERRAIN_DRAG_LIMIT&&!terrainDragSeen.contains(key))continue;
+				if(terrainDragSeen.add(key)){if(terrainDragPending.isEmpty())terrainDragPendingSinceNanos=now;terrainDragPending.put(key,new int[]{tile[0],tile[1]});}}
+		}
+		maybeFlushTerrainDrag(now,false);
 	}
 	private void releaseTerrainDrag(){terrainDragActive=false;terrainDragReleasePending=true;terrainDragHoverX=terrainDragHoverY=-1;if(terrainStrokeTiles==null)sendNextTerrainDragBatch();if(terrainStrokeTiles==null&&terrainDragPending.isEmpty())completeTerrainDrag();}
+	private void maybeFlushTerrainDrag(long now,boolean force){
+		if(terrainStrokeTiles!=null||terrainDragPending.isEmpty())return;
+		if(force||terrainDragPending.size()>=TERRAIN_BATCH_LIMIT||now-terrainDragPendingSinceNanos>=TERRAIN_DRAG_FLUSH_NANOS)sendNextTerrainDragBatch();
+	}
 	private void sendNextTerrainDragBatch(){
 		if(terrainStrokeTiles!=null||terrainDragPending.isEmpty())return;int count=Math.min(TERRAIN_BATCH_LIMIT,terrainDragPending.size());terrainStrokeTiles=new int[count][2];
 		Iterator<Map.Entry<Long,int[]>> iterator=terrainDragPending.entrySet().iterator();for(int i=0;i<count;i++){terrainStrokeTiles[i]=iterator.next().getValue();iterator.remove();}
+		if(terrainDragPending.isEmpty())terrainDragPendingSinceNanos=0L;else terrainDragPendingSinceNanos=System.nanoTime();
 		terrainStrokeStartedNanos=System.nanoTime();inspectionStatus=terrainDragStatus();sendTerrainStroke();
 	}
+	private boolean recoverTerrainStrokeTimeout(long now){
+		if(terrainStrokeTiles==null||terrainStrokeStartedNanos==0L||now-terrainStrokeStartedNanos<TERRAIN_STROKE_TIMEOUT_NANOS)return false;
+		showError("Terrain brush response timed out. The brush was reset; retry the stroke.");return true;
+	}
 	private void completeTerrainDrag(){int accepted=terrainDragAccepted;long ack=terrainDragAckMillis,rebuild=terrainDragRebuildMillis;clearTerrainDrag();inspectionStatus="Brush accepted: "+accepted+" unique tile"+(accepted==1?"":"s")+" | ack "+ack+"ms, rebuild "+rebuild+"ms";}
-	private void clearTerrainDrag(){terrainDragActive=false;terrainDragReleasePending=false;terrainDragHoverX=terrainDragHoverY=-1;terrainDragAccepted=0;terrainDragAckMillis=terrainDragRebuildMillis=0L;terrainStrokeTiles=null;terrainStrokeStartedNanos=0L;terrainDragPending.clear();terrainDragSeen.clear();}
+	private void clearTerrainDrag(){terrainDragActive=false;terrainDragReleasePending=false;terrainDragHoverX=terrainDragHoverY=terrainDragCenterX=terrainDragCenterY=-1;terrainDragAccepted=0;terrainDragAckMillis=terrainDragRebuildMillis=terrainDragPendingSinceNanos=0L;terrainStrokeTiles=null;terrainStrokeStartedNanos=0L;terrainDragPending.clear();terrainDragSeen.clear();}
 	private String terrainDragStatus(){return "Brush "+(terrainDragActive?"dragging":"committing")+": "+terrainDragSeen.size()+" unique | pending "+terrainDragPending.size()+" | accepted "+terrainDragAccepted+(terrainDragHoverX>=0?" | hover "+terrainDragHoverX+","+terrainDragHoverY:"");}
 	private static long terrainTileKey(int x,int y){return ((long)x<<32)^(y&0xffffffffL);}
 	private void sendTerrainStroke(){
