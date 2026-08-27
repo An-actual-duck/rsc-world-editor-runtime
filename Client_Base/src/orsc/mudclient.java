@@ -24065,6 +24065,9 @@ public final class mudclient implements Runnable {
 		rematerializeLoadedTerrainSceneryAfterWorldReload();
 		world.playerAlive=true;
 	}
+	public void clearWorldEditorTerrainPatchesForAuthoritativeReload(){
+		if(world!=null)world.clearWorldEditorTerrainPatchesForAuthoritativeReload();
+	}
 
 	private void handleDevClickTeleportCommand(String commandText) {
 		String[] parts = commandText.trim().split("\\s+");

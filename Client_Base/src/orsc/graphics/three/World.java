@@ -5751,6 +5751,18 @@ public final class World {
 			worldEditorTerrainRevision.incrementAndGet();
 		}
 	}
+	/**
+	 * Drops client-side edit echoes after the server has supplied a complete new
+	 * authoritative terrain snapshot. Keeping them would replay pre-publication
+	 * elevations over a live Region Cut/Paste reload.
+	 */
+	public void clearWorldEditorTerrainPatchesForAuthoritativeReload(){
+		synchronized(worldEditorTerrainPatchLock){
+			if(worldEditorTerrainPatches.isEmpty())return;
+			worldEditorTerrainPatches.clear();
+			worldEditorTerrainRevision.incrementAndGet();
+		}
+	}
 	public int[] getWorldEditorTerrainTileState(int localX,int localZ){
 		Sector sector=sectorForLocalTile(localX,localZ);if(sector==null)return null;
 		com.openrsc.client.model.Tile tile=sector.getTile(tileInSector(localX),tileInSector(localZ));
