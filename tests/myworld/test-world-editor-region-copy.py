@@ -82,7 +82,15 @@ commands = COMMANDS.read_text(encoding="utf-8")
 
 assert "Mode { NAVIGATE, INSPECT, TERRAIN, SCENERY, NPC, ITEMS, REGION }" in ui
 assert '"Regions"' in ui
-assert "MODE_REGION_COPY" in ui and "MODE_REGION_PASTE" in ui
+assert "MODE_REGION" in ui and "MODE_REGION_COPY" in ui and "MODE_REGION_PASTE" in ui
+assert "drawModeIcon(WorldEditorIconRegistry.Key.MODE_REGION" in ui
+assert "drawRegionToolIcon(WorldEditorIconRegistry.Key.MODE_REGION_COPY" in ui
+assert "drawRegionToolIcon(WorldEditorIconRegistry.Key.MODE_REGION_PASTE" in ui
+assert "mode==Mode.REGION&&dockHit(rx,ry,1,0)" in ui
+assert "mode==Mode.REGION&&dockHit(rx,ry,1,1)" in ui
+assert "drawRegionModeIcon" not in ui
+assert "drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_REGION_COPY" not in ui
+assert "drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_REGION_PASTE" not in ui
 assert "addRegionMarker" in ui and "closeRegionSelection" in ui
 assert "removeLastRegionMarker" in ui and "cancelRegionSelection" in ui
 assert "advanceRegionSelectionState" in ui and '"Start":"Stop"' in ui

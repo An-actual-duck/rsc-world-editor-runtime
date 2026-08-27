@@ -31,6 +31,7 @@ public final class WorldEditorIconRegistry {
 		MODE_SCENERY("mode-scenery.png", "Obj"),
 		MODE_NPC("mode-npc.png", "NPC"),
 		MODE_ITEMS("mode-items.png", "Item"),
+		MODE_REGION(null, "Region"),
 		MODE_REGION_COPY(null, "Copy"),
 		MODE_REGION_PASTE(null, "Paste"),
 		FIELD_ELEVATION("field-elevation.png", "Elev"),
@@ -119,7 +120,8 @@ public final class WorldEditorIconRegistry {
 		if (key == Key.TOOL_RECTANGLE) {
 			return rectangleIcon();
 		}
-		if (key == Key.MODE_REGION_COPY) return regionIcon(false);
+		if (key == Key.MODE_REGION) return regionIcon(false);
+		if (key == Key.MODE_REGION_COPY) return regionCopyIcon();
 		if (key == Key.MODE_REGION_PASTE) return regionIcon(true);
 		BufferedImage image = read(key.filename());
 		if (image == null) {
@@ -196,6 +198,26 @@ public final class WorldEditorIconRegistry {
 				pixels[(7 + offset) * ICON_SIZE + x] = 0xffffff;
 				pixels[(15 - offset) * ICON_SIZE + x] = 0xffffff;
 			}
+		}
+		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);
+		sprite.setShift(0, 0);sprite.setRequiresShift(false);sprite.setSomething(ICON_SIZE, ICON_SIZE);
+		return sprite;
+	}
+
+	private static Sprite regionCopyIcon() {
+		int[] pixels = new int[ICON_SIZE * ICON_SIZE];
+		java.util.Arrays.fill(pixels, RendererTransparency.TRANSPARENT_SAMPLE);
+		for (int x = 4; x <= 15; x++) {
+			pixels[4 * ICON_SIZE + x] = 0xffffff;
+			pixels[15 * ICON_SIZE + x] = 0xffffff;
+			pixels[8 * ICON_SIZE + x + 4] = 0xffffff;
+			pixels[19 * ICON_SIZE + x + 4] = 0xffffff;
+		}
+		for (int y = 4; y <= 15; y++) {
+			pixels[y * ICON_SIZE + 4] = 0xffffff;
+			pixels[y * ICON_SIZE + 15] = 0xffffff;
+			pixels[(y + 4) * ICON_SIZE + 8] = 0xffffff;
+			pixels[(y + 4) * ICON_SIZE + 19] = 0xffffff;
 		}
 		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);
 		sprite.setShift(0, 0);sprite.setRequiresShift(false);sprite.setSomething(ICON_SIZE, ICON_SIZE);
