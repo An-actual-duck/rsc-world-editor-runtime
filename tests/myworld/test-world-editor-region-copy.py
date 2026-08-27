@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GEOMETRY = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorRegionSelection.java"
 UI = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.java"
 CLIENT = ROOT / "Client_Base/src/orsc/mudclient.java"
+PACKET_HANDLER = ROOT / "Client_Base/src/orsc/PacketHandler.java"
 BRIDGE = ROOT / "Client_Base/src/orsc/WorldBuilderRegionCopyClientBridge.java"
 SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRegionCopyRequest.java"
 PASTE_BRIDGE = ROOT / "Client_Base/src/orsc/WorldBuilderRegionPasteClientBridge.java"
@@ -66,6 +67,7 @@ with tempfile.TemporaryDirectory(prefix="world-editor-region-copy-") as temp:
 
 ui = UI.read_text(encoding="utf-8")
 client = CLIENT.read_text(encoding="utf-8")
+packet_handler = PACKET_HANDLER.read_text(encoding="utf-8")
 bridge = BRIDGE.read_text(encoding="utf-8")
 server = SERVER.read_text(encoding="utf-8")
 paste_bridge = PASTE_BRIDGE.read_text(encoding="utf-8")
@@ -102,5 +104,10 @@ assert "adoptPublishedAdaptivePackage" in paste_server
 assert 'mc.sendCommandString("activateregionpaste "+result.requestId)' in ui
 assert "restartWorldBuilderAfterRegionPaste" not in client
 assert "activates live without restarting" in ui
+assert "sameCenterTerrainContentRefresh" in packet_handler
+assert "mc.reloadWorldEditorTerrain()" in packet_handler
+assert packet_handler.index("mc.beginLayeredSceneActivation(") < packet_handler.index(
+    "mc.reloadWorldEditorTerrain()"
+)
 
 print("PASS: ordered Region Copy and supervised exact Paste bridges validated")

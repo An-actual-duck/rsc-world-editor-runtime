@@ -761,6 +761,10 @@ public class PacketHandler {
 		phaseStartedNanos = BoundaryLoadingDiagnostics.now();
 		final boolean hadLayeredSceneContext =
 			layeredSceneContextState.hasContext();
+		final NativeLayeredTerrainSnapshot previousNativeTerrain =
+			hadLayeredSceneContext
+				? layeredSceneContextState.getNativeTerrainSnapshot()
+				: null;
 		LayeredSceneContextState.ApplyResult result = nativeTerrain == null
 			? layeredSceneContextState.accept(
 				protocolVersion,
@@ -795,6 +799,19 @@ public class PacketHandler {
 		final boolean atomicActivation = protocolVersion
 			== LayeredSceneContextState
 				.ATOMIC_NATIVE_LAYERED_PROTOCOL_VERSION;
+		final boolean sameCenterTerrainContentRefresh =
+			atomicActivation
+				&& previousNativeTerrain != null
+				&& nativeTerrain != null
+				&& previousNativeTerrain.getWorldSpace().equals(
+					nativeTerrain.getWorldSpace())
+				&& previousNativeTerrain.getLevel()
+					== nativeTerrain.getLevel()
+				&& previousNativeTerrain.getCurrentChunkX()
+					== nativeTerrain.getCurrentChunkX()
+				&& previousNativeTerrain.getCurrentChunkY()
+					== nativeTerrain.getCurrentChunkY()
+				&& !previousNativeTerrain.equals(nativeTerrain);
 		if (result.isScopeChanged() || atomicActivation) {
 			sceneBaselineState.resetForScopeChange(
 				layeredSceneContextState.scopeIdentity());
@@ -828,12 +845,27 @@ public class PacketHandler {
 		boolean predictedPublished = false;
 		if (atomicActivation) {
 			cancelPendingLayeredTerrainPrebuild();
-			predictedPublished =
-				publishReadyPredictedLayeredTerrainHalo(nativeTerrain);
+			if (sameCenterTerrainContentRefresh) {
+				clearReadyPredictedLayeredTerrainHalo();
+			}
 			layeredSceneActivationState.begin(sequence);
 			mc.beginLayeredSceneActivation(
 				hadLayeredSceneContext && !result.isScopeChanged());
 			refreshLayeredSceneActivationCover();
+			if (sameCenterTerrainContentRefresh) {
+				/*
+				 * A live Editor publication changes the payload identity without
+				 * moving the player or changing the package identity. Updating the
+				 * packet snapshot alone leaves the already-built radius-one window
+				 * on its previous terrain. Rebuild that active window under the
+				 * atomic presentation cover; the following staged packets replace
+				 * its radius-two presentation halo.
+				 */
+				mc.reloadWorldEditorTerrain();
+			} else {
+				predictedPublished =
+					publishReadyPredictedLayeredTerrainHalo(nativeTerrain);
+			}
 		} else {
 			clearReadyPredictedLayeredTerrainHalo();
 		}
