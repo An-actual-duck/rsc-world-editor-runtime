@@ -437,12 +437,17 @@ public final class Development implements CommandTrigger {
 					+level+" with "+result.allocatedSectorCount
 					+" void-backed sector"
 					+(result.allocatedSectorCount==1?"":"s")
-					+" around "+x+","+y+".");
+					+" around "+x+","+y+". Save and reopen the Builder "
+					+"before navigating there.");
 			} catch (Exception failure) {
 				player.message(messagePrefix
 					+"Builder navigation refused: "+failure.getMessage());
 				return;
 			}
+			// The login-bound client profile cannot safely render a level or
+			// sector created after login. Publish it first, then let the next
+			// validated launch negotiate the expanded package identity.
+			return;
 		}
 		player.teleportLayered(destination,false);
 		player.message(messagePrefix+"Builder location: "
@@ -1691,13 +1696,19 @@ public final class Development implements CommandTrigger {
 					com.openrsc.server.content.worldedit
 						.AdaptiveWorldBuilderPackagePublisher.SaveResult saved =
 							editor.saveAdaptivePackage(player);
-					player.message(messagePrefix + "Saved the complete isolated "
-						+ "working package: " + saved.levelCount + " levels, "
-						+ saved.sectorCount + " terrain sectors, "
-						+ saved.boundaryCount + " boundaries, "
-						+ saved.sceneryCount + " scenery, " + saved.npcCount
-						+ " NPCs, and " + saved.groundItemCount
-						+ " ground-item spawns.");
+					player.message(messagePrefix + "Saved pending edits to the "
+						+ "isolated working package: " + levelCreations
+						+ " new level" + (levelCreations == 1 ? "" : "s")
+						+ ", " + terrainEdits + " terrain tile"
+						+ (terrainEdits == 1 ? "" : "s") + ", "
+						+ terrainGrowth + " new sector"
+						+ (terrainGrowth == 1 ? "" : "s") + ", "
+						+ nativeScenery + " scenery edit"
+						+ (nativeScenery == 1 ? "" : "s") + ", "
+						+ nativeNpcs + " NPC edit"
+						+ (nativeNpcs == 1 ? "" : "s") + ", and "
+						+ nativeGroundItems + " ground-item edit"
+						+ (nativeGroundItems == 1 ? "" : "s") + ".");
 					player.message(messagePrefix + "Package manifest: "
 						+ saved.manifestSha256.substring(0, 12)
 						+ ". Reopen the Builder to load the published revision.");
