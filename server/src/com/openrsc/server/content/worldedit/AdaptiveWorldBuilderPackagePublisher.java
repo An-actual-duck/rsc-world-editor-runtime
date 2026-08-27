@@ -123,55 +123,33 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 			newInventorySha256 = staged.inventory.getFingerprint();
 			newManifestSha256 = staged.worldPackage.getManifestSha256();
 			observer.at(Stage.PACKAGE_VALIDATED, stage);
-			staged = validateExact(stage, expectedFiles, verifier);
-			if (!newInventorySha256.equals(staged.inventory.getFingerprint())
-				|| !newManifestSha256.equals(
-					staged.worldPackage.getManifestSha256())) {
-				throw new IOException(
-					"Adaptive staged package changed across validation");
-			}
-			requireFingerprint(
+			requireInventoryFingerprint(
+				"adaptive staged package", newInventorySha256, stage);
+			requireInventoryFingerprint(
 				"immutable source baseline", expectedBaselineInventorySha256,
-				AdaptiveWorldBuilderPackageGuard.requireClosedPackage(
-					immutable).getFingerprint());
+				immutable);
 			observer.at(Stage.BEFORE_PUBLICATION, stage);
-			staged = validateExact(stage, expectedFiles, verifier);
-			if (!newInventorySha256.equals(staged.inventory.getFingerprint())
-				|| !newManifestSha256.equals(
-					staged.worldPackage.getManifestSha256())) {
-				throw new IOException(
-					"Adaptive staged package changed before publication");
-			}
-			requireFingerprint(
-				"working package", expectedWorkingInventorySha256,
-				AdaptiveWorldBuilderPackageGuard.requireClosedPackage(
-					working).getFingerprint());
-			requireFingerprint(
+			requireInventoryFingerprint(
+				"adaptive staged package", newInventorySha256, stage);
+			requireInventoryFingerprint(
+				"working package", expectedWorkingInventorySha256, working);
+			requireInventoryFingerprint(
 				"immutable source baseline", expectedBaselineInventorySha256,
-				AdaptiveWorldBuilderPackageGuard.requireClosedPackage(
-					immutable).getFingerprint());
+				immutable);
 			writeTransaction(
 				transaction, current.getFingerprint(), newInventorySha256);
-			requireFingerprint(
-				"working package", expectedWorkingInventorySha256,
-				AdaptiveWorldBuilderPackageGuard.requireClosedPackage(
-					working).getFingerprint());
+			requireInventoryFingerprint(
+				"working package", expectedWorkingInventorySha256, working);
 			moveAtomic(working, previous);
 			previousMoved = true;
 			observer.at(Stage.PREVIOUS_MOVED, stage);
 			moveAtomic(stage, working);
 			observer.at(Stage.PACKAGE_PUBLISHED, working);
-			Validated published = validateExact(working, expectedFiles, verifier);
-			if (!newInventorySha256.equals(published.inventory.getFingerprint())
-				|| !newManifestSha256.equals(
-					published.worldPackage.getManifestSha256())) {
-				throw new IOException(
-					"Published adaptive package differs from the verified stage");
-			}
-			requireFingerprint(
+			requireInventoryFingerprint(
+				"published adaptive package", newInventorySha256, working);
+			requireInventoryFingerprint(
 				"immutable source baseline", expectedBaselineInventorySha256,
-				AdaptiveWorldBuilderPackageGuard.requireClosedPackage(
-					immutable).getFingerprint());
+				immutable);
 			try {
 				deleteTree(previous);
 				Files.delete(transaction);
@@ -367,6 +345,20 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 			|| !expected.equals(actual)) {
 			throw new IOException(label + " inventory changed");
 		}
+	}
+
+	/**
+	 * Complete semantic validation is performed once on the staged package.
+	 * Later publication barriers only need to prove that those exact bytes did
+	 * not change. Re-loading and definition-validating the complete world at
+	 * every barrier made interactive save time scale with the whole map several
+	 * times over; the closed inventory fingerprint still binds every path,
+	 * size, byte hash, and case-folded identity.
+	 */
+	private static void requireInventoryFingerprint(
+		String label, String expected, Path packageRoot) throws IOException {
+		requireFingerprint(label, expected,
+			AdaptiveWorldBuilderPackageGuard.inventory(packageRoot).getFingerprint());
 	}
 
 	private static Path safeExistingDirectory(Path requested, String label)
