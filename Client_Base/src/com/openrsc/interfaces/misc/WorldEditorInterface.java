@@ -6,9 +6,14 @@ import com.openrsc.client.entityhandling.EntityHandler;
 import com.openrsc.client.model.Sprite;
 import orsc.Config;
 import orsc.WorldBuilderClientProfile;
+import orsc.WorldBuilderRegionBundleClientBridge;
+import orsc.WorldBuilderRegionBundleFileDialog;
 import orsc.WorldBuilderRegionCopyClientBridge;
 import orsc.WorldBuilderRegionPasteClientBridge;
 import orsc.mudclient;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -102,6 +107,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 		new WorldBuilderRegionCopyClientBridge();
 	private final WorldBuilderRegionPasteClientBridge regionPasteBridge=
 		new WorldBuilderRegionPasteClientBridge();
+	private final WorldBuilderRegionBundleClientBridge regionBundleBridge=
+		new WorldBuilderRegionBundleClientBridge();
 	private RegionTool regionTool=RegionTool.COPY;
 	private final List<WorldBuilderRegionPasteClientBridge.Snapshot> regionLibrary=
 		new ArrayList<WorldBuilderRegionPasteClientBridge.Snapshot>();
@@ -119,6 +126,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private String lastRegionSnapshotId="",lastRegionSnapshotName="";
 	private int lastRegionTileCount=0,lastRegionPlacementCount=0,lastRegionCrossingCount=0;
 	private int[][] regionPreviewTiles=new int[0][2];
+	private String regionLibraryRefreshStatus="";
+	private String regionLibraryPreferredSnapshotId="";
 
 	public WorldEditorInterface(mudclient client) {
 		super(client);mc=client;setLocation(8,8);setSize(DOCK_WIDTH+FLYOUT_GAP+FLYOUT_WIDTH,DOCK_HEIGHT);setVisible(false);setIsOverlay(true);
@@ -131,14 +140,14 @@ public final class WorldEditorInterface extends NCustomComponent {
 
 	public void open(long id,int sequence){
 		if(Config.isAndroid())return;
-		sessionId=id;nextSequence=sequence;mode=Mode.NAVIGATE;terrainTool=TerrainTool.FREEHAND;clearTerrainLine();clearSceneryMove();clearRegionSelection();resetRegionPaste();regionCopyBridge.reset();regionPasteBridge.reset();toolbar.reset();definitionBrowser.close();icons.initialize();
+		sessionId=id;nextSequence=sequence;mode=Mode.NAVIGATE;terrainTool=TerrainTool.FREEHAND;clearTerrainLine();clearSceneryMove();clearRegionSelection();resetRegionPaste();regionCopyBridge.reset();regionPasteBridge.reset();regionBundleBridge.reset();toolbar.reset();definitionBrowser.close();icons.initialize();
 		normalizeProjectBoundSelections();
 		int x=mc.getEditorPlayerWorldX(),y=mc.getEditorPlayerWorldY(),level=mc.getEditorPlayerWorldLevel();
 		brushX=x;brushY=y;brushLevel=level;teleportX=String.valueOf(x);teleportY=String.valueOf(y);teleportLevel=String.valueOf(level);
 		clickTeleportPreferred=false;keyboardShortcutsEnabled=true;unsavedChanges=false;saveRequested=false;closeArmed=false;pendingEntityActions=0;
 		setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);clearTerrainDrag();updatePresentationBounds();setVisible(true);
 	}
-	public void closeFromServer(){setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);setVisible(false);sessionId=0;coordinateFocus=0;clearTerrainLine();clearTerrainDrag();clearSceneryMove();clearRegionSelection();resetRegionPaste();regionCopyBridge.reset();regionPasteBridge.reset();definitionBrowser.close();toolbar.reset();}
+	public void closeFromServer(){setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);setVisible(false);sessionId=0;coordinateFocus=0;clearTerrainLine();clearTerrainDrag();clearSceneryMove();clearRegionSelection();resetRegionPaste();regionCopyBridge.reset();regionPasteBridge.reset();regionBundleBridge.reset();definitionBrowser.close();toolbar.reset();}
 	public boolean isEditorOpen(){return isVisible()&&sessionId!=0;}
 	public boolean isKeyboardCaptureActive(){return isEditorOpen()&&(keyboardShortcutsEnabled||coordinateFocus!=0||definitionBrowser.isOpen());}
 	public boolean isKeyboardShortcutMode(){return isEditorOpen()&&keyboardShortcutsEnabled;}
@@ -170,7 +179,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public boolean isGroundItemPlacing(){return isEditorOpen()&&definitionAllowed("item",groundItemId)&&isLayeredPlacementDraftLevel()&&mode==Mode.ITEMS&&groundItemTool==GroundItemTool.PLACE;}
 	public boolean isGroundItemRemoving(){return isEditorOpen()&&isLayeredPlacementDraftLevel()&&mode==Mode.ITEMS&&groundItemTool==GroundItemTool.REMOVE;}
 	public boolean isRegionSelecting(){return isEditorOpen()&&mode==Mode.REGION&&regionTool==RegionTool.COPY;}
-	public boolean isRegionPasteSelectingDestination(){return isEditorOpen()&&mode==Mode.REGION&&regionTool==RegionTool.PASTE&&!regionPasteBridge.isPending()&&!regionLibrary.isEmpty();}
+	public boolean isRegionPasteSelectingDestination(){return isEditorOpen()&&mode==Mode.REGION&&regionTool==RegionTool.PASTE&&!regionPasteBridge.isPending()&&!regionBundleBridge.isPending()&&!regionLibrary.isEmpty();}
 	public boolean isRegionClosed(){return isRegionSelecting()&&regionClosed;}
 	public boolean isRegionCopyPending(){return regionCopyBridge.isPending();}
 	public int getSceneryId(){return sceneryId;}
@@ -243,18 +252,28 @@ public final class WorldEditorInterface extends NCustomComponent {
 		else inspectionStatus="Region Copy refused ["+result.errorCode+"]: "+result.message+" Next: "+result.nextStep;
 	}
 	private void selectRegionTool(RegionTool selected){
-		if(regionCopyBridge.isPending()||regionPasteBridge.isPending()){inspectionStatus="Wait for the active region operation before changing Copy/Paste tools.";return;}
+		if(regionCopyBridge.isPending()||regionPasteBridge.isPending()||regionBundleBridge.isPending()){inspectionStatus="Wait for the active region operation before changing Copy/Paste tools.";return;}
 		regionTool=selected;coordinateFocus=0;regionPasteOverwriteArmed=false;
 		if(selected==RegionTool.PASTE){clearRegionSelection();requestRegionLibrary();}
 		else{clearPastePreview();inspectionStatus="Region Copy selected: trace an ordered polygon, close it, then copy it to the project library.";}
 	}
 	private void requestRegionLibrary(){
-		if(regionPasteBridge.isPending())return;
+		if(regionPasteBridge.isPending()||regionBundleBridge.isPending())return;
 		try{regionPasteBridge.requestLibrary();mc.sendCommandString("pasteregion");inspectionStatus="Loading the verified project snapshot library...";}
 		catch(Exception failure){inspectionStatus="Snapshot library could not open: "+failure.getMessage();}
 	}
+	private void requestRegionImport(){
+		if(regionPasteBridge.isPending()||regionBundleBridge.isPending())return;
+		try{Path bundle=WorldBuilderRegionBundleFileDialog.chooseImport();if(bundle==null){inspectionStatus="Region Import cancelled; the library and world were unchanged.";return;}if(!Files.isRegularFile(bundle,LinkOption.NOFOLLOW_LINKS)||Files.isSymbolicLink(bundle)){inspectionStatus="Choose an existing regular .wbr file to import.";return;}regionBundleBridge.requestImport(bundle);mc.sendCommandString("pasteregion");inspectionStatus="Validating and importing the portable Region bundle...";}
+		catch(Exception failure){inspectionStatus="Region Import could not start: "+failure.getMessage();}
+	}
+	private void requestRegionExport(){
+		if(regionPasteBridge.isPending()||regionBundleBridge.isPending())return;WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();if(snapshot==null){inspectionStatus="Select a snapshot before exporting it.";return;}
+		try{Path output=WorldBuilderRegionBundleFileDialog.chooseExport(snapshot.name);if(output==null){inspectionStatus="Region Export cancelled; no file was created.";return;}if(Files.exists(output,LinkOption.NOFOLLOW_LINKS)){inspectionStatus="That export file already exists. Choose a new .wbr filename; exports never overwrite.";return;}regionBundleBridge.requestExport(snapshot.id,output);mc.sendCommandString("pasteregion");inspectionStatus="Exporting the selected snapshot as a portable .wbr file...";}
+		catch(Exception failure){inspectionStatus="Region Export could not start: "+failure.getMessage();}
+	}
 	private void cycleRegionSnapshot(int amount){
-		if(regionPasteBridge.isPending()||regionLibrary.isEmpty())return;
+		if(regionPasteBridge.isPending()||regionBundleBridge.isPending()||regionLibrary.isEmpty())return;
 		regionLibraryIndex=Math.floorMod(regionLibraryIndex+amount,regionLibrary.size());clearPastePreview();
 		inspectionStatus="Selected snapshot '"+selectedRegionSnapshot().name+"'. Click terrain to place its marker-1 anchor.";
 	}
@@ -266,7 +285,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		catch(Exception failure){inspectionStatus="Region Paste preview could not start: "+failure.getMessage();}
 	}
 	private void requestRegionPasteApply(){
-		if(regionPasteBridge.isPending())return;if(regionPastePlanHash.isEmpty()){inspectionStatus="Choose a destination and wait for its exact Paste preview first.";return;}if(regionPasteBlocked){inspectionStatus="This Paste plan is blocked; choose another destination or compatible snapshot.";return;}
+		if(regionPasteBridge.isPending()||regionBundleBridge.isPending())return;if(regionPastePlanHash.isEmpty()){inspectionStatus="Choose a destination and wait for its exact Paste preview first.";return;}if(regionPasteBlocked){inspectionStatus="This Paste plan is blocked; choose another destination or compatible snapshot.";return;}
 		if(regionPasteOverwrite&&!regionPasteOverwriteArmed){regionPasteOverwriteArmed=true;inspectionStatus="Overwrite warning: the highlighted destination is not empty. Select Apply Overwrite again to confirm this exact plan.";return;}
 		WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();if(snapshot==null)return;
 		try{regionPasteBridge.requestApply(snapshot.id,regionPasteLevel,regionPasteX,regionPasteY,regionPastePlanHash,regionPasteOverwrite);mc.sendCommandString("pasteregion");inspectionStatus="Applying the exact atomic Paste plan...";}
@@ -275,12 +294,18 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void pollRegionPaste(){
 		WorldBuilderRegionPasteClientBridge.Result result=regionPasteBridge.poll();if(result==null)return;
 		if(!result.accepted){regionPasteOverwriteArmed=false;inspectionStatus="Region Paste refused ["+result.errorCode+"]: "+result.message+" Next: "+result.nextStep;return;}
-		if("library".equals(result.operation)){String selected=selectedRegionSnapshot()==null?"":selectedRegionSnapshot().id;regionLibrary.clear();regionLibrary.addAll(result.snapshots);regionLibraryIndex=0;for(int i=0;i<regionLibrary.size();i++)if(regionLibrary.get(i).id.equals(selected)){regionLibraryIndex=i;break;}clearPastePreview();inspectionStatus=regionLibrary.isEmpty()?"The project snapshot library is empty. Use Copy first or import a .wbr snapshot.":"Loaded "+regionLibrary.size()+" verified snapshot"+(regionLibrary.size()==1?"":"s")+". Select one, then click terrain to place marker 1.";return;}
+		if("library".equals(result.operation)){String selected=regionLibraryPreferredSnapshotId.isEmpty()?(selectedRegionSnapshot()==null?"":selectedRegionSnapshot().id):regionLibraryPreferredSnapshotId;regionLibrary.clear();regionLibrary.addAll(result.snapshots);regionLibraryIndex=0;for(int i=0;i<regionLibrary.size();i++)if(regionLibrary.get(i).id.equals(selected)){regionLibraryIndex=i;break;}clearPastePreview();inspectionStatus=regionLibraryRefreshStatus.isEmpty()?(regionLibrary.isEmpty()?"The project snapshot library is empty. Use Copy first or import a .wbr snapshot.":"Loaded "+regionLibrary.size()+" verified snapshot"+(regionLibrary.size()==1?"":"s")+". Select one, then click terrain to place marker 1."):regionLibraryRefreshStatus;regionLibraryRefreshStatus="";regionLibraryPreferredSnapshotId="";return;}
 		if("preview".equals(result.operation)){regionPastePlanHash=result.planHash;regionPasteBlocked=result.blocked;regionPasteOverwrite=result.overwrite;regionPasteOverwriteArmed=false;try{regionPastePreviewTiles=WorldEditorRegionSelection.ownedTiles(result.markers,65536);}catch(Exception invalid){regionPastePreviewTiles=new int[0][2];regionPasteBlocked=true;}List<int[]> collisions=new ArrayList<int[]>();for(int[] collision:result.collisions)if(collision[0]==mc.getEditorPlayerWorldLevel())collisions.add(new int[]{collision[1],collision[2]});regionPasteCollisionTiles=collisions.toArray(new int[collisions.size()][2]);inspectionStatus=result.blocked?"Paste preview is blocked with "+result.collisions.length+" collision/compatibility issue(s).":result.overwrite?"Paste preview ready: "+result.tileCount+" tiles and "+result.placementCount+" placements; overwrite confirmation is required.":"Paste preview ready: "+result.tileCount+" tiles and "+result.placementCount+" placements. Review the ghost, then Apply Paste.";return;}
 		if("apply".equals(result.operation)){saveRequested=false;unsavedChanges=false;inspectionStatus="Region pasted atomically. Activating the published region live...";mc.sendCommandString("activateregionpaste "+result.requestId);}
 	}
+	private void pollRegionBundle(){
+		WorldBuilderRegionBundleClientBridge.Result result=regionBundleBridge.poll();if(result==null)return;
+		if(!result.accepted){inspectionStatus="Region "+("import".equals(result.operation)?"Import":"Export")+" refused ["+result.errorCode+"]: "+result.message+" Next: "+result.nextStep;return;}
+		if("import".equals(result.operation)){regionLibraryPreferredSnapshotId=result.snapshotId;regionLibraryRefreshStatus=result.compatible?"Imported and selected shared snapshot "+shortHash(result.snapshotId)+". Click terrain to preview its Paste destination.":"Imported snapshot "+shortHash(result.snapshotId)+", but "+result.issueCount+" compatibility issue(s) must be resolved before Paste.";requestRegionLibrary();}
+		else inspectionStatus="Exported the selected snapshot to "+result.outputPath+". Share that .wbr file with another creator.";
+	}
 	private void clearPastePreview(){regionPastePreviewTiles=new int[0][2];regionPasteCollisionTiles=new int[0][2];regionPastePlanHash="";regionPasteBlocked=false;regionPasteOverwrite=false;regionPasteOverwriteArmed=false;}
-	private void resetRegionPaste(){regionTool=RegionTool.COPY;regionLibrary.clear();regionLibraryIndex=-1;regionPasteX=regionPasteY=-1;regionPasteLevel=0;clearPastePreview();}
+	private void resetRegionPaste(){regionTool=RegionTool.COPY;regionLibrary.clear();regionLibraryIndex=-1;regionPasteX=regionPasteY=-1;regionPasteLevel=0;regionLibraryRefreshStatus="";regionLibraryPreferredSnapshotId="";clearPastePreview();}
 	public int[][] regionMarkerTiles(){int[][] result=new int[regionMarkers.size()][2];for(int index=0;index<regionMarkers.size();index++){result[index][0]=regionMarkers.get(index)[0];result[index][1]=regionMarkers.get(index)[1];}return result;}
 	public int[][] regionSelectionPreviewTiles(){return regionClosed?regionPreviewTiles:new int[0][2];}
 	public int[] regionSelectionHoverTile(){return isRegionSelecting()&&!regionClosed&&regionHoverX>=0?new int[]{regionHoverX,regionHoverY}:null;}
@@ -919,7 +944,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void handleCompactRegionMouse(int x,int y){
 		if(y>=44&&y<68){selectRegionTool(x<88?RegionTool.COPY:RegionTool.PASTE);return;}
 		if(regionTool==RegionTool.COPY){if(y>=76&&y<100){coordinateFocus=19;replaceFocusedText=true;return;}if(y>=108&&y<132){if(x<88){if(regionClosed)reopenRegionSelection();else closeRegionSelection();}else removeLastRegionMarker();return;}if(y>=140&&y<164){if(x<88)requestRegionCopy();else cancelRegionSelection();}}
-		else{if(y>=92&&y<116){if(x<88)cycleRegionSnapshot(-1);else cycleRegionSnapshot(1);return;}if(y>=140&&y<164){if(x<88)requestRegionLibrary();else requestRegionPasteApply();}}
+		else{if(y>=82&&y<106){if(x<88)cycleRegionSnapshot(-1);else cycleRegionSnapshot(1);return;}if(y>=112&&y<136){if(x<88)requestRegionImport();else requestRegionExport();return;}if(y>=152&&y<176){if(x<88)requestRegionLibrary();else requestRegionPasteApply();}}
 	}
 	private boolean handleDefinitionBrowserMouse(int x,int y,int click){
 		if(click==0)return true;if(click!=1)return true;
@@ -1001,7 +1026,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			if(mode==Mode.REGION){
 				if(ry>=56&&ry<80){if(rx>=10&&rx<120)selectRegionTool(RegionTool.COPY);else if(rx>=128&&rx<238)selectRegionTool(RegionTool.PASTE);return true;}
 				if(regionTool==RegionTool.COPY){if(ry>=104&&ry<128&&rx>=118&&rx<378){coordinateFocus=19;replaceFocusedText=true;return true;}if(ry>=145&&ry<169){if(rx>=10&&rx<110){if(regionClosed)reopenRegionSelection();else closeRegionSelection();}else if(rx>=118&&rx<218)removeLastRegionMarker();else if(rx>=226&&rx<326)cancelRegionSelection();return true;}if(ry>=188&&ry<212&&rx>=10&&rx<175){requestRegionCopy();return true;}}
-				else{if(ry>=112&&ry<136){if(rx>=10&&rx<110)cycleRegionSnapshot(-1);else if(rx>=118&&rx<218)cycleRegionSnapshot(1);else if(rx>=226&&rx<326)requestRegionLibrary();return true;}if(ry>=188&&ry<212&&rx>=10&&rx<175){requestRegionPasteApply();return true;}}
+				else{if(ry>=112&&ry<136){if(rx>=10&&rx<110)cycleRegionSnapshot(-1);else if(rx>=118&&rx<218)cycleRegionSnapshot(1);else if(rx>=226&&rx<326)requestRegionLibrary();return true;}if(ry>=143&&ry<167){if(rx>=10&&rx<110)requestRegionImport();else if(rx>=118&&rx<258)requestRegionExport();return true;}if(ry>=212&&ry<236&&rx>=10&&rx<175){requestRegionPasteApply();return true;}}
 			}
 			coordinateFocus=0;
 		}
@@ -1012,6 +1037,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(!isVisible()||Config.isAndroid())return;
 		pollRegionCopy();
 		pollRegionPaste();
+		pollRegionBundle();
 		if(toolbar.isExpandedFallback())renderExpanded();else renderCompact();
 		if(definitionBrowser.isOpen())renderDefinitionBrowser(getX()+definitionBrowserOffsetX(),getY());
 	}
@@ -1154,7 +1180,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void renderCompactRegion(int x,int y){
 		toolButton(x+8,y+44,78,"Copy",regionTool==RegionTool.COPY);toolButton(x+94,y+44,78,"Paste",regionTool==RegionTool.PASTE);
 		if(regionTool==RegionTool.COPY){graphics().drawString("Snapshot name",x+8,y+75,0xffff00,1);textField(x+8,y+76,164,regionName,coordinateFocus==19);toolButton(x+8,y+108,78,regionClosed?"Reopen":"Close",regionClosed);button(x+94,y+108,78,"Undo last");button(x+8,y+140,78,regionCopyBridge.isPending()?"Copying...":"Copy");button(x+94,y+140,78,"Clear");graphics().drawString("Markers: "+regionMarkers.size()+(regionClosed?" | closed":" | open"),x+8,y+179,regionClosed?0x80c080:0xffffff,1);}
-		else{WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();graphics().drawString(compactLine(snapshot==null?"No snapshots":snapshot.name,28),x+8,y+83,snapshot==null?0xff981f:0xffff00,1);button(x+8,y+92,78,"Previous");button(x+94,y+92,78,"Next");graphics().drawString(regionPasteX<0?"Click terrain for marker 1.":"Anchor: "+regionPasteX+","+regionPasteY+",L"+regionPasteLevel,x+8,y+132,0xffffff,1);button(x+8,y+140,78,regionPasteBridge.isPending()?"Working...":"Refresh");button(x+94,y+140,78,regionPasteBlocked?"Blocked":regionPasteOverwrite?(regionPasteOverwriteArmed?"Confirm":"Overwrite"):"Apply");graphics().drawString(regionPastePlanHash.isEmpty()?"Preview appears after destination click.":regionPastePreviewTiles.length+" tiles | "+regionPasteCollisionTiles.length+" collision markers",x+8,y+179,regionPasteBlocked?0xff4040:regionPasteOverwrite?0xff981f:0x80c080,1);}
+		else{WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();boolean sharing=regionBundleBridge.isPending();graphics().drawString(compactLine(snapshot==null?"No snapshots":snapshot.name,28),x+8,y+75,snapshot==null?0xff981f:0xffff00,1);button(x+8,y+82,78,"Previous");button(x+94,y+82,78,"Next");button(x+8,y+112,78,sharing?"Working...":"Import");button(x+94,y+112,78,sharing?"Working...":"Export");graphics().drawString(regionPasteX<0?"Click terrain for marker 1.":"Anchor: "+regionPasteX+","+regionPasteY+",L"+regionPasteLevel,x+8,y+144,0xffffff,1);button(x+8,y+152,78,regionPasteBridge.isPending()?"Working...":"Refresh");button(x+94,y+152,78,regionPasteBlocked?"Blocked":regionPasteOverwrite?(regionPasteOverwriteArmed?"Confirm":"Overwrite"):"Apply");graphics().drawString(regionPastePlanHash.isEmpty()?"Import/export portable .wbr files.":regionPastePreviewTiles.length+" tiles | "+regionPasteCollisionTiles.length+" collision markers",x+8,y+181,regionPasteBlocked?0xff4040:regionPasteOverwrite?0xff981f:0x80c080,1);}
 	}
 	private void renderCompactStatus(int x,int y){
 		int px=mc.getEditorPlayerWorldX(),py=mc.getEditorPlayerWorldY(),level=mc.getEditorPlayerWorldLevel(),queued=terrainDragPending.size()+(terrainStrokeTiles==null?0:terrainStrokeTiles.length)
@@ -1323,7 +1349,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void renderRegion(int x,int y){
 		toolButton(x+10,y+56,110,"Region Copy",regionTool==RegionTool.COPY);toolButton(x+128,y+56,110,"Region Paste",regionTool==RegionTool.PASTE);
 		if(regionTool==RegionTool.COPY){graphics().drawString("Click terrain to place marker 1, 2, 3... in boundary order.",x+10,y+91,0xffffff,2);graphics().drawString("Snapshot name",x+10,y+121,0xffff00,2);textField(x+118,y+104,260,regionName,coordinateFocus==19);toolButton(x+10,y+145,100,regionClosed?"Reopen":"Close shape",regionClosed);button(x+118,y+145,100,"Undo last");button(x+226,y+145,100,"Clear");button(x+10,y+188,165,regionCopyBridge.isPending()?"Copying...":"Copy to library");graphics().drawString("Markers: "+regionMarkers.size()+" | "+(regionClosed?regionPreviewTiles.length+" selected tiles":"shape open"),x+190,y+205,regionClosed?0x80c080:0xffffff,2);graphics().drawString("Copy publishes pending edits first, then captures that exact revision.",x+10,y+235,0xff981f,1);if(!lastRegionSnapshotId.isEmpty()){graphics().drawString("Latest library entry: "+lastRegionSnapshotName+" ["+shortHash(lastRegionSnapshotId)+"]",x+10,y+264,0xffff00,1);graphics().drawString(lastRegionTileCount+" tiles, "+lastRegionPlacementCount+" placements, "+lastRegionCrossingCount+" crossing reports",x+10,y+282,0xbdbdbd,1);}}
-		else{WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();graphics().drawString(snapshot==null?"No verified snapshots are in this project library.":"Selected: "+snapshot.name+" ["+shortHash(snapshot.id)+"]",x+10,y+101,snapshot==null?0xff981f:0xffff00,2);button(x+10,y+112,100,"Previous");button(x+118,y+112,100,"Next");button(x+226,y+112,100,regionPasteBridge.isPending()?"Working...":"Refresh library");if(snapshot!=null)graphics().drawString(snapshot.tileCount+" tiles, "+snapshot.placementCount+" placements, "+snapshot.levelCount+" level(s)",x+10,y+160,0xbdbdbd,2);graphics().drawString(regionPasteX<0?"Click a destination tile; marker 1 will anchor there.":"Destination marker 1: "+regionPasteX+", "+regionPasteY+", level "+regionPasteLevel,x+10,y+180,0xffffff,2);button(x+10,y+188,165,regionPasteBridge.isPending()?"Working...":regionPasteBlocked?"Paste blocked":regionPasteOverwrite?(regionPasteOverwriteArmed?"Confirm overwrite":"Apply overwrite"):"Apply Paste");graphics().drawString(regionPastePlanHash.isEmpty()?"A visible exact ghost appears after the destination preview.":regionPastePreviewTiles.length+" preview tiles | "+regionPasteCollisionTiles.length+" visible collision marker(s)",x+190,y+205,regionPasteBlocked?0xff4040:regionPasteOverwrite?0xff981f:0x80c080,2);graphics().drawString(regionPasteOverwrite?"Overwrite requires a second explicit click bound to this exact plan.":"Paste is atomic and activates live without restarting the Builder.",x+10,y+235,0xff981f,1);graphics().drawString(inspectionStatus,x+10,y+264,0xbdbdbd,1);}
+		else{WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();boolean sharing=regionBundleBridge.isPending();graphics().drawString(snapshot==null?"No verified snapshots are in this project library.":"Selected: "+snapshot.name+" ["+shortHash(snapshot.id)+"]",x+10,y+101,snapshot==null?0xff981f:0xffff00,2);button(x+10,y+112,100,"Previous");button(x+118,y+112,100,"Next");button(x+226,y+112,100,regionPasteBridge.isPending()?"Working...":"Refresh library");button(x+10,y+143,100,sharing?"Working...":"Import .wbr");button(x+118,y+143,140,sharing?"Working...":"Export selected");if(snapshot!=null)graphics().drawString(snapshot.tileCount+" tiles, "+snapshot.placementCount+" placements, "+snapshot.levelCount+" level(s)",x+270,y+160,0xbdbdbd,1);graphics().drawString(regionPasteX<0?"Click a destination tile; marker 1 will anchor there.":"Destination marker 1: "+regionPasteX+", "+regionPasteY+", level "+regionPasteLevel,x+10,y+204,0xffffff,2);button(x+10,y+212,165,regionPasteBridge.isPending()?"Working...":regionPasteBlocked?"Paste blocked":regionPasteOverwrite?(regionPasteOverwriteArmed?"Confirm overwrite":"Apply overwrite"):"Apply Paste");graphics().drawString(regionPastePlanHash.isEmpty()?"Import adds to this library; Export creates one portable, shareable .wbr file.":regionPastePreviewTiles.length+" preview tiles | "+regionPasteCollisionTiles.length+" visible collision marker(s)",x+190,y+229,regionPasteBlocked?0xff4040:regionPasteOverwrite?0xff981f:0x80c080,1);graphics().drawString(regionPasteOverwrite?"Overwrite requires a second explicit click bound to this exact plan.":"Paste is atomic and activates live without restarting the Builder.",x+10,y+254,0xff981f,1);graphics().drawString(compactLine(inspectionStatus,62),x+10,y+282,0xbdbdbd,1);}
 	}
 	private void toolButton(int x,int y,int w,String text,boolean active){graphics().drawBoxAlpha(x,y,w,24,active?0x365b82:0x333333,220);graphics().drawBoxBorder(x,w,y,24,active?0x66b3ff:0);graphics().drawString(text,x+6,y+17,0xffffff,2);}
 	private String sceneryName(){try{return WorldEditorDefinitionCatalog.sceneryLabel(sceneryId);}catch(Exception e){return "Unknown scenery";}}
