@@ -354,7 +354,7 @@ encodings ending in `-v2-u16`; raw v2 records are 11 bytes in network order:
 two elevation bytes, the five unchanged byte fields, then all four diagonal
 wall bytes. No non-elevation field is translated during promotion or save.
 
-The editor envelope is capability version 2 and carries elevation as an
+The editor envelope is capability version 3 and carries elevation as an
 unsigned short. Absolute sets and configurable-step Raise/Lower operations
 are accepted only by native layered authoring. Every tile in a stroke is
 calculated and bounds-checked before the draft changes, so any overflow or
@@ -365,6 +365,29 @@ there is no clamp, byte truncation, fallback save, or silent downgrade.
 Frozen legacy landscape archives remain 10-byte records and readable. They
 cannot store elevations above 255, and the legacy pack/save path refuses such
 a value instead of narrowing it.
+
+## Session terrain Undo and Redo
+
+Editor envelope v3 adds a positive operation token to terrain requests and
+bounded authoritative Undo/Redo requests. A click, Line, or Rectangle uses one
+token. Every acknowledged batch in one continuous freehand drag shares a token,
+so the complete gesture is one history operation rather than a stack of network
+chunks.
+
+The server retains at most 64 operations and 65,536 referenced tile states for
+the active Editor session. It stores the first before-state and final
+after-state for each tile. Undo and Redo compare every current authoritative
+tile against the expected side before changing any draft state; drift refuses
+the complete operation. A new edit clears Redo. History never changes the
+target server and is cleared when the Editor session closes or an Editor-owned
+package publication replaces the running package.
+
+This first increment covers layered terrain clicks, freehand gestures, Lines,
+and Rectangles. An operation that allocates new terrain establishes a safe
+history boundary because sector allocation is not yet reversible. Placement
+families and Editor-owned Region transactions will join the same user-facing
+history in later increments; the existing exact last-Paste Undo remains a
+separate durable package transaction meanwhile.
 
 ## Empty and existing-level authoring
 

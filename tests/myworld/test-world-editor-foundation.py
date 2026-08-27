@@ -248,7 +248,7 @@ class WorldEditorFoundationTest(unittest.TestCase):
         match = re.search(r"FIXED_LENGTHS\s*=\s*\{([^}]+)\}", framing)
         self.assertIsNotNone(match)
         accepted = {int(value) for value in re.findall(r"\d+", match.group(1))}
-        self.assertEqual({13, 15, 19, 22, 29, 39}, accepted)
+        self.assertEqual({13, 15, 19, 22, 29, 42, 43}, accepted)
         self.assertTrue(accepted.isdisjoint({12, 14, 16, 18, 20, 21, 23, 28, 31}))
         self.assertIn("return isWorldEditorPacketLength(packet.getLength());", parser)
         self.assertIn("WorldEditorPacketFraming.acceptsEnvelopeLength(length)", parser)
@@ -262,9 +262,9 @@ class WorldEditorFoundationTest(unittest.TestCase):
         ui = (ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.java").read_text()
 
         framing = (ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/WorldEditorPacketFraming.java").read_text()
-        self.assertIn("length <= 286", framing)
-        self.assertIn("length == 26 + count * 4", framing)
+        self.assertIn("length <= 290", framing)
         self.assertIn("length == 30 + count * 4", framing)
+        self.assertIn("length == 34 + count * 4", framing)
         self.assertIn("paintTerrainStroke(request", handler)
         self.assertLess(sessions.index("for(int[] coordinate:coordinates)"), sessions.index("terrainDraft.put(key,after.get(i))"))
         self.assertIn("projectedDraftSize>TERRAIN_DRAFT_LIMIT", sessions)

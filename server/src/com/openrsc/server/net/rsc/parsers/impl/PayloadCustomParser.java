@@ -534,7 +534,7 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 			case WORLD_EDITOR_REQUEST:
 				WorldEditorRequestStruct editor = new WorldEditorRequestStruct();
 				editor.type = packet.readByte() & 0xff;
-				int expectedEditorLength = editor.type == 1 ? 13 : editor.type == 2 ? 19 : editor.type == 3 ? 22 : editor.type == 4 ? 15 : editor.type == 5 ? 29 : -1;
+				int expectedEditorLength = editor.type == 1 ? 13 : editor.type == 2 ? 19 : editor.type == 3 ? 22 : editor.type == 4 ? 15 : editor.type == 5 ? 29 : editor.type == 10 || editor.type == 11 ? 13 : -1;
 				if (editor.type!=6&&editor.type!=7&&editor.type!=8&&editor.type!=9&&packet.getLength()!=expectedEditorLength) return null;
 				editor.sessionId = packet.readLong();
 				editor.sequence = packet.readInt();
@@ -555,6 +555,7 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 					editor.plane=packet.readByte();editor.fieldMask=packet.readByte()&0xff;editor.elevation=packet.readByte()&0xff;
 					editor.groundTexture=packet.readByte()&0xff;editor.groundOverlay=packet.readByte()&0xff;editor.roofTexture=packet.readByte()&0xff;
 					editor.horizontalWall=packet.readByte()&0xff;editor.verticalWall=packet.readByte()&0xff;editor.diagonal=packet.readInt();
+					editor.historyToken=packet.readInt();
 					int count=packet.readByte()&0xff;if(!WorldEditorPacketFraming.acceptsTerrainStroke(6,packet.getLength(),count))return null;
 					editor.terrainTiles=new int[count][2];for(int i=0;i<count;i++){editor.terrainTiles[i][0]=packet.readShort();editor.terrainTiles[i][1]=packet.readShort();}
 				} else if(editor.type==7){
@@ -562,6 +563,7 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 					editor.elevation=packet.readShort()&0xffff;editor.elevationStep=packet.readShort()&0xffff;
 					editor.groundTexture=packet.readByte()&0xff;editor.groundOverlay=packet.readByte()&0xff;editor.roofTexture=packet.readByte()&0xff;
 					editor.horizontalWall=packet.readByte()&0xff;editor.verticalWall=packet.readByte()&0xff;editor.diagonal=packet.readInt();
+					editor.historyToken=packet.readInt();
 					int count=packet.readByte()&0xff;if(!WorldEditorPacketFraming.acceptsTerrainStroke(7,packet.getLength(),count))return null;
 					editor.terrainTiles=new int[count][2];for(int i=0;i<count;i++){editor.terrainTiles[i][0]=packet.readShort();editor.terrainTiles[i][1]=packet.readShort();}
 				} else if(editor.type==8){
@@ -569,6 +571,7 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 					editor.elevation=packet.readShort()&0xffff;editor.elevationStep=packet.readShort()&0xffff;
 					editor.groundTexture=packet.readByte()&0xff;editor.groundOverlay=packet.readByte()&0xff;editor.roofTexture=packet.readByte()&0xff;
 					editor.horizontalWall=packet.readByte()&0xff;editor.verticalWall=packet.readByte()&0xff;editor.diagonal=packet.readInt();
+					editor.historyToken=packet.readInt();
 					editor.brushSize=packet.readByte()&0xff;if(!WorldEditorPacketFraming.acceptsTerrainLine(8,packet.getLength(),editor.brushSize))return null;
 					editor.x=packet.readShort();editor.y=packet.readShort();editor.endX=packet.readShort();editor.endY=packet.readShort();
 				} else if(editor.type==9){
@@ -576,6 +579,7 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 					editor.elevation=packet.readShort()&0xffff;editor.elevationStep=packet.readShort()&0xffff;
 					editor.groundTexture=packet.readByte()&0xff;editor.groundOverlay=packet.readByte()&0xff;editor.roofTexture=packet.readByte()&0xff;
 					editor.horizontalWall=packet.readByte()&0xff;editor.verticalWall=packet.readByte()&0xff;editor.diagonal=packet.readInt();
+					editor.historyToken=packet.readInt();
 					editor.rectangleFlags=packet.readByte()&0xff;editor.smartWall=packet.readByte()&0xff;
 					if(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,packet.getLength(),editor.rectangleFlags))return null;
 					editor.x=packet.readShort();editor.y=packet.readShort();editor.endX=packet.readShort();editor.endY=packet.readShort();

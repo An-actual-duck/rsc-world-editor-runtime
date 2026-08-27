@@ -48,6 +48,8 @@ public final class WorldEditorIconRegistry {
 		TOOL_LINE("tool-line.png", "Line"),
 		TOOL_RECTANGLE(null, "Box"),
 		PROFILE_BUILD("profile-build.png", "Build"),
+		ACTION_UNDO(null, "Undo"),
+		ACTION_REDO(null, "Redo"),
 		ACTION_SAVE("action-save.png", "Save"),
 		ACTION_PIN("action-pin.png", "Pin"),
 		ACTION_CLOSE("action-close.png", "Close");
@@ -125,6 +127,8 @@ public final class WorldEditorIconRegistry {
 		if (key == Key.MODE_REGION_COPY) return regionCopyIcon();
 		if (key == Key.MODE_REGION_CUT) return regionCutIcon();
 		if (key == Key.MODE_REGION_PASTE) return regionIcon(true);
+		if (key == Key.ACTION_UNDO) return historyIcon(false);
+		if (key == Key.ACTION_REDO) return historyIcon(true);
 		BufferedImage image = read(key.filename());
 		if (image == null) {
 			return null;
@@ -174,6 +178,30 @@ public final class WorldEditorIconRegistry {
 		sprite.setRequiresShift(false);
 		sprite.setSomething(ICON_SIZE, ICON_SIZE);
 		return sprite;
+	}
+
+	private static Sprite historyIcon(boolean redo) {
+		int[] pixels = new int[ICON_SIZE * ICON_SIZE];
+		java.util.Arrays.fill(pixels, RendererTransparency.TRANSPARENT_SAMPLE);
+		int color = 0xffffff;
+		for (int x = 6; x <= 17; x++) {
+			int y = 6 + Math.abs(12 - x) / 3;
+			pixels[y * ICON_SIZE + x] = color;
+			if (y + 1 < ICON_SIZE) pixels[(y + 1) * ICON_SIZE + x] = color;
+		}
+		for (int y = 8; y <= 16; y++) {
+			int x = redo ? 18 : 5;
+			pixels[y * ICON_SIZE + x] = color;
+			pixels[y * ICON_SIZE + (redo ? x - 1 : x + 1)] = color;
+		}
+		for (int offset = 0; offset < 5; offset++) {
+			int x = redo ? 18 - offset : 5 + offset;
+			pixels[(5 + offset) * ICON_SIZE + x] = color;
+			pixels[(11 - offset) * ICON_SIZE + x] = color;
+		}
+		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);
+		sprite.setShift(0, 0);sprite.setRequiresShift(false);
+		sprite.setSomething(ICON_SIZE, ICON_SIZE);return sprite;
 	}
 
 	private static Sprite regionIcon(boolean paste) {

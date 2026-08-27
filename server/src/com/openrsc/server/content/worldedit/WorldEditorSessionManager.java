@@ -103,6 +103,9 @@ public final class WorldEditorSessionManager {
 	private String nativeWorkingInventorySha256;
 	private NativeLayeredWorldPackage nativeAdoptedPackage;
 	private long nativeTerrainSceneRevision;
+	private final WorldEditorOperationHistory<NativeTileKey,NativeLayeredTerrainTile>
+		nativeTerrainHistory =
+			new WorldEditorOperationHistory<NativeTileKey,NativeLayeredTerrainTile>();
 	public WorldEditorSessionManager() { this(null, new SecureRandom()); }
 	public WorldEditorSessionManager(WorldEditStorageContext storage) { this(storage, new SecureRandom()); }
 	WorldEditorSessionManager(SecureRandom random) { this(null, random); }
@@ -113,6 +116,7 @@ public final class WorldEditorSessionManager {
 		if (player == null || !player.isAdmin()) return OpenResult.denied("Administrator authorization is required.");
 		if (active != null && active.ownerHash != player.getUsernameHash()) return OpenResult.denied("Another administrator owns the active editor session.");
 		if (active == null) {
+			nativeTerrainHistory.clear();
 			long id;
 			do { id = random.nextLong(); } while (id == 0L);
 			active = new Session(id, player.getUsernameHash());
@@ -131,10 +135,14 @@ public final class WorldEditorSessionManager {
 	public synchronized boolean close(Player player, long id, int sequence) {
 		if (!validate(player, id, sequence).accepted) return false;
 		active = null;
+		nativeTerrainHistory.clear();
 		return true;
 	}
 	public synchronized void closeFor(Player player) {
-		if (player != null && active != null && active.ownerHash == player.getUsernameHash()) active = null;
+		if (player != null && active != null && active.ownerHash == player.getUsernameHash()) {
+			active = null;
+			nativeTerrainHistory.clear();
+		}
 	}
 	public synchronized boolean hasActiveSession() { return active != null; }
 	public synchronized boolean ownsActiveSession(Player player){return player!=null&&player.isAdmin()&&active!=null&&active.ownerHash==player.getUsernameHash();}
@@ -244,6 +252,8 @@ public final class WorldEditorSessionManager {
 			|| !nativeNpcDirty.isEmpty()
 			|| !nativeGroundItemDirty.isEmpty();
 	}
+	public synchronized boolean canUndoNativeTerrain(){return nativeTerrainHistory.canUndo();}
+	public synchronized boolean canRedoNativeTerrain(){return nativeTerrainHistory.canRedo();}
 
 	public synchronized NativeTerrainStrokeResult paintNativeTerrainStroke(
 		Player player,
@@ -266,17 +276,35 @@ public final class WorldEditorSessionManager {
 		int elevation, int groundTexture, int groundOverlay, int roofTexture,
 		int horizontalWall, int verticalWall, int diagonal,
 		int elevationOperation, int elevationStep) {
+		return paintNativeTerrainOperation(player,requestedTiles,level,fieldMask,
+			elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,
+			verticalWall,diagonal,elevationOperation,elevationStep,0,"Line");
+	}
+	public synchronized NativeTerrainStrokeResult paintNativeTerrainOperation(
+		Player player, int[][] requestedTiles, int level, int fieldMask,
+		int elevation, int groundTexture, int groundOverlay, int roofTexture,
+		int horizontalWall, int verticalWall, int diagonal,
+		int elevationOperation, int elevationStep, int historyToken, String historyLabel) {
 		return paintNativeTerrainTiles(player,requestedTiles,null,level,fieldMask,elevation,
 			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,
-			elevationOperation,elevationStep,true);
+			elevationOperation,elevationStep,true,historyToken,historyLabel);
 	}
 	public synchronized NativeTerrainStrokeResult paintNativeTerrainPlannedOperation(
 		Player player,int[][] requestedTiles,int[] requestedFieldMasks,int level,
 		int elevation,int groundTexture,int groundOverlay,int roofTexture,
 		int horizontalWall,int verticalWall,int diagonal,int elevationOperation,int elevationStep) {
+		return paintNativeTerrainPlannedOperation(player,requestedTiles,requestedFieldMasks,
+			level,elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,
+			verticalWall,diagonal,elevationOperation,elevationStep,0,"Rectangle");
+	}
+	public synchronized NativeTerrainStrokeResult paintNativeTerrainPlannedOperation(
+		Player player,int[][] requestedTiles,int[] requestedFieldMasks,int level,
+		int elevation,int groundTexture,int groundOverlay,int roofTexture,
+		int horizontalWall,int verticalWall,int diagonal,int elevationOperation,int elevationStep,
+		int historyToken,String historyLabel) {
 		return paintNativeTerrainTiles(player,requestedTiles,requestedFieldMasks,level,0,elevation,
 			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,
-			elevationOperation,elevationStep,true);
+			elevationOperation,elevationStep,true,historyToken,historyLabel);
 	}
 
 	public synchronized NativeTerrainStrokeResult paintNativeTerrainStroke(
@@ -284,16 +312,30 @@ public final class WorldEditorSessionManager {
 		int elevation, int groundTexture, int groundOverlay, int roofTexture,
 		int horizontalWall, int verticalWall, int diagonal,
 		int elevationOperation, int elevationStep) {
+		return paintNativeTerrainStroke(player,requestedTiles,level,fieldMask,elevation,
+			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,
+			diagonal,elevationOperation,elevationStep,0,"Brush");
+	}
+	public synchronized NativeTerrainStrokeResult paintNativeTerrainStroke(
+		Player player, int[][] requestedTiles, int level, int fieldMask,
+		int elevation, int groundTexture, int groundOverlay, int roofTexture,
+		int horizontalWall, int verticalWall, int diagonal,
+		int elevationOperation, int elevationStep, int historyToken, String historyLabel) {
 		return paintNativeTerrainTiles(player,requestedTiles,null,level,fieldMask,elevation,
 			groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall,diagonal,
-			elevationOperation,elevationStep,false);
+			elevationOperation,elevationStep,false,historyToken,historyLabel);
 	}
 	private NativeTerrainStrokeResult paintNativeTerrainTiles(
 		Player player, int[][] requestedTiles, int[] requestedFieldMasks, int level, int fieldMask,
 		int elevation, int groundTexture, int groundOverlay, int roofTexture,
 		int horizontalWall, int verticalWall, int diagonal,
-		int elevationOperation, int elevationStep, boolean operation) {
+		int elevationOperation, int elevationStep, boolean operation,
+		int historyToken, String historyLabel) {
 		requireNativeTerrainAuthoring(player, level);
+		if (historyToken < 0) throw new IllegalArgumentException(
+			"Editor history token is invalid.");
+		Set<WorldMapSectorId> growthBefore =
+			new java.util.LinkedHashSet<WorldMapSectorId>(nativeTerrainGrowth);
 		int[][] coordinates = operation?WorldEditorTerrainStroke.validateOperationTiles(requestedTiles):WorldEditorTerrainStroke.validateTiles(requestedTiles);
 		int[] fieldMasks=terrainFieldMasks(coordinates.length,requestedFieldMasks,fieldMask);
 		for(int mask:fieldMasks){validateTerrainPaint(mask,elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall);
@@ -347,6 +389,20 @@ public final class WorldEditorSessionManager {
 		if (projected > TERRAIN_DRAFT_LIMIT) {
 			throw new IllegalStateException("Terrain draft limit reached.");
 		}
+		if (historyToken > 0) {
+			if (!growthBefore.equals(nativeTerrainGrowth)) {
+				nativeTerrainHistory.clear();
+			} else {
+				List<WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>>
+					changes = new ArrayList<WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>>(keys.size());
+				for (int index = 0; index < keys.size(); index++) {
+					changes.add(WorldEditorOperationHistory.Change.of(
+						keys.get(index), before.get(index).tile, after.get(index).tile));
+				}
+				nativeTerrainHistory.record(historyToken,
+					historyLabel == null ? "Terrain" : historyLabel, changes);
+			}
+		}
 		for (int index = 0; index < keys.size(); index++) {
 			NativeTileKey key = keys.get(index);
 			NativeLayeredTerrainTile painted = after.get(index).tile;
@@ -355,6 +411,56 @@ public final class WorldEditorSessionManager {
 			refreshNativeDirty(key);
 		}
 		return new NativeTerrainStrokeResult(before, after);
+	}
+
+	public synchronized NativeTerrainHistoryResult undoNativeTerrain(Player player) {
+		return applyNativeTerrainHistory(player, false);
+	}
+
+	public synchronized NativeTerrainHistoryResult redoNativeTerrain(Player player) {
+		return applyNativeTerrainHistory(player, true);
+	}
+
+	private NativeTerrainHistoryResult applyNativeTerrainHistory(
+		Player player, boolean redo) {
+		requireNativeDraftSession(player);
+		List<WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>>
+			pending = redo ? nativeTerrainHistory.nextRedoChanges()
+				: nativeTerrainHistory.nextUndoChanges();
+		if (pending.isEmpty()) throw new IllegalStateException(
+			redo ? "There is nothing to redo." : "There is nothing to undo.");
+		int activeLevel = player.getLayeredLocation().getCoordinate().getLevel();
+		Map<NativeTileKey,NativeLayeredTerrainTile> current =
+			new LinkedHashMap<NativeTileKey,NativeLayeredTerrainTile>();
+		for (WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>
+			change : pending) {
+			if (change.key.level != activeLevel) throw new IllegalStateException(
+				"Return to level " + change.key.level + " before "
+					+ (redo ? "redoing" : "undoing") + " that terrain operation.");
+			NativeLayeredTerrainTile value = nativeTerrainOverlay.get(change.key);
+			if (value == null) value = nativeBaseTile(player, change.key.location());
+			current.put(change.key, value);
+		}
+		WorldEditorOperationHistory.Action<NativeTileKey,NativeLayeredTerrainTile>
+			action = redo ? nativeTerrainHistory.redo(current)
+				: nativeTerrainHistory.undo(current);
+		List<NativeTerrainSnapshot> before =
+			new ArrayList<NativeTerrainSnapshot>(action.changes.size());
+		List<NativeTerrainSnapshot> after =
+			new ArrayList<NativeTerrainSnapshot>(action.changes.size());
+		for (WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>
+			change : action.changes) {
+			WorldLocation location = change.key.location();
+			NativeLayeredTerrainTile base = nativeBaseTile(player, location);
+			if (change.after.equals(base)) nativeTerrainOverlay.remove(change.key);
+			else nativeTerrainOverlay.put(change.key, change.after);
+			refreshNativeDirty(change.key);
+			before.add(new NativeTerrainSnapshot(location, change.before));
+			after.add(new NativeTerrainSnapshot(location, change.after));
+		}
+		nativeTerrainSceneRevision++;
+		return new NativeTerrainHistoryResult(action.label, before, after,
+			action.canUndo, action.canRedo, redo);
 	}
 
 	public synchronized NativeLayeredTerrainTile resolveNativeTerrainTile(
@@ -1143,6 +1249,7 @@ public final class WorldEditorSessionManager {
 	}
 
 	private void resetNativeDraftAgainstAdoptedPackage(String inventorySha256) {
+		nativeTerrainHistory.clear();
 		nativeTerrainBase.clear();
 		nativeTerrainOverlay.clear();
 		nativeTerrainSaved.clear();
@@ -2223,6 +2330,7 @@ public final class WorldEditorSessionManager {
 	private static final class NativeTileKey {
 		final WorldSpaceId worldSpace;final int level,x,y;
 		NativeTileKey(WorldLocation location){worldSpace=location.getWorldSpace();WorldCoordinate coordinate=location.getCoordinate();level=coordinate.getLevel();x=coordinate.getX();y=coordinate.getY();}
+		WorldLocation location(){return new WorldLocation(worldSpace,new WorldCoordinate(x,y,level));}
 		@Override public boolean equals(Object other){if(this==other)return true;if(!(other instanceof NativeTileKey))return false;NativeTileKey key=(NativeTileKey)other;return level==key.level&&x==key.x&&y==key.y&&worldSpace.equals(key.worldSpace);}
 		@Override public int hashCode(){int result=worldSpace.hashCode();result=31*result+level;result=31*result+x;return 31*result+y;}
 	}
@@ -2409,6 +2517,18 @@ public final class WorldEditorSessionManager {
 	public static final class NativeTerrainStrokeResult {
 		public final List<NativeTerrainSnapshot> before,after;
 		private NativeTerrainStrokeResult(List<NativeTerrainSnapshot> before,List<NativeTerrainSnapshot> after){this.before=before;this.after=after;}
+	}
+	public static final class NativeTerrainHistoryResult {
+		public final String label;
+		public final List<NativeTerrainSnapshot> before,after;
+		public final boolean canUndo,canRedo,redo;
+		private NativeTerrainHistoryResult(
+			String label,List<NativeTerrainSnapshot> before,
+			List<NativeTerrainSnapshot> after,boolean canUndo,
+			boolean canRedo,boolean redo){
+			this.label=label;this.before=before;this.after=after;
+			this.canUndo=canUndo;this.canRedo=canRedo;this.redo=redo;
+		}
 	}
 	public static final class TerrainStrokeResult {
 		public final List<WorldEditorTerrainArchive.Snapshot> before,after;

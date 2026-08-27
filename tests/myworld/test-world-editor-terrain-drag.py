@@ -124,31 +124,31 @@ public final class WorldEditorTerrainDragHarness {
 		catch (IllegalArgumentException expected) { rejected = true; }
 		require(rejected, "oversized line footprint was accepted");
 
-        require(WorldEditorPacketFraming.acceptsTerrainStroke(6, 282, 64),
+        require(WorldEditorPacketFraming.acceptsTerrainStroke(6, 286, 64),
             "maximum legacy stroke was rejected");
-        require(WorldEditorPacketFraming.acceptsTerrainStroke(7, 286, 64),
+        require(WorldEditorPacketFraming.acceptsTerrainStroke(7, 290, 64),
             "maximum wide stroke was rejected");
-        require(WorldEditorPacketFraming.acceptsEnvelopeLength(286),
+        require(WorldEditorPacketFraming.acceptsEnvelopeLength(290),
             "maximum wide envelope was rejected before parsing");
-        require(!WorldEditorPacketFraming.acceptsEnvelopeLength(283),
+        require(!WorldEditorPacketFraming.acceptsEnvelopeLength(287),
             "misaligned envelope was accepted");
-        require(!WorldEditorPacketFraming.acceptsTerrainStroke(7, 282, 64),
+        require(!WorldEditorPacketFraming.acceptsTerrainStroke(7, 286, 64),
             "wide stroke accepted the legacy length");
-        require(!WorldEditorPacketFraming.acceptsTerrainStroke(7, 290, 65),
+        require(!WorldEditorPacketFraming.acceptsTerrainStroke(7, 294, 65),
             "oversized wide stroke was accepted");
-		require(WorldEditorPacketFraming.acceptsTerrainLine(8, 38, 7),
+		require(WorldEditorPacketFraming.acceptsTerrainLine(8, 42, 7),
 			"endpoint-based 7x7 line request was rejected");
-		require(!WorldEditorPacketFraming.acceptsTerrainLine(8, 38, 6),
+		require(!WorldEditorPacketFraming.acceptsTerrainLine(8, 42, 6),
 			"even line brush was accepted");
-		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,2),"smart rectangle without walls was rejected");
-		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,6),"north-only smart rectangle framing was rejected");
-		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,10),"east-only smart rectangle framing was rejected");
-		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,14),"both-direction smart rectangle framing was rejected");
-		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,15),"filled both-direction smart rectangle framing was rejected");
-		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,4),"wall flag without Smart Walls was accepted");
-		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,8),"east flag without Smart Walls was accepted");
-		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,39,16),"unknown rectangle flag was accepted");
-		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,38,2),"short rectangle frame was accepted");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,43,2),"smart rectangle without walls was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,43,6),"north-only smart rectangle framing was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,43,10),"east-only smart rectangle framing was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,43,14),"both-direction smart rectangle framing was rejected");
+		require(WorldEditorPacketFraming.acceptsTerrainRectangle(9,43,15),"filled both-direction smart rectangle framing was rejected");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,43,4),"wall flag without Smart Walls was accepted");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,43,8),"east flag without Smart Walls was accepted");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,43,16),"unknown rectangle flag was accepted");
+		require(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,42,2),"short rectangle frame was accepted");
     }
 }
 """
@@ -197,7 +197,7 @@ assert "drawBoxAlpha(point[0]-5,point[1]-5,11,11,color,224)" in client and "0xff
 assert "acceptTerrainLineChunk" in client_packets and "type==8||type==9" in client_packets
 assert "paintNativeTerrainOperation" in handler and "paintTerrainOperation" in handler
 assert "sendTerrainOperation" in handler and "out.type=9" in handler
-assert "editor.type == 8 || editor.type == 9" in generator
+assert "editor.type == 8 || editor.type == 9 || editor.type == 10" in generator
 assert "acceptsTerrainLine(8,packet.getLength(),editor.brushSize)" in parser
 assert "acceptsTerrainRectangle(9,packet.getLength(),editor.rectangleFlags)" in parser
 assert "WorldEditorTerrainStroke.rectanglePlan" in handler

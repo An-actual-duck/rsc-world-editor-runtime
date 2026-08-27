@@ -4,6 +4,7 @@ import com.openrsc.server.content.worldedit.WorldEditorSessionManager.Validation
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.TerrainStrokeResult;
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeTerrainSnapshot;
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeTerrainStrokeResult;
+import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeTerrainHistoryResult;
 import com.openrsc.server.content.worldedit.WorldEditorTerrainStroke;
 import com.openrsc.server.content.worldedit.WorldBuilderMode;
 import com.openrsc.server.content.worldedit.WorldBuilderPlayerSession;
@@ -37,8 +38,12 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			ActionSender.sendWorldEditor(player, out); return;
 		}
 		try {
+			if (request.type >= 6 && request.type <= 9 && request.historyToken <= 0) {
+				throw new IllegalArgumentException("Editor history token is required.");
+			}
 			if (player.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE
-				&& (request.type == 5 || request.type == 6 || request.type == 7 || request.type == 8 || request.type == 9)
+				&& (request.type == 5 || request.type == 6 || request.type == 7 || request.type == 8 || request.type == 9
+					|| request.type == 10 || request.type == 11)
 				&& !WorldBuilderMode.isLayeredAuthoringProfile(
 					player.getConfig())) {
 				error(player, validation.nextSequence,
@@ -53,6 +58,8 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			else if (request.type == 7) paintWideTerrainStroke(request, player, validation.nextSequence);
 			else if (request.type == 8) paintTerrainLine(request, player, validation.nextSequence);
 			else if (request.type == 9) paintTerrainRectangle(request, player, validation.nextSequence);
+			else if (request.type == 10) applyTerrainHistory(player, validation.nextSequence, false);
+			else if (request.type == 11) applyTerrainHistory(player, validation.nextSequence, true);
 			else error(player, validation.nextSequence, "Unsupported editor operation.");
 		} catch (Exception e) { error(player, validation.nextSequence, "Editor request failed: " + e.getMessage()); }
 	}
@@ -152,7 +159,8 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			NativeTerrainStrokeResult result=p.getWorld().getServer().getWorldEditorSessions()
 				.paintNativeTerrainOperation(p,coordinates,r.plane,r.fieldMask,r.elevation,
 					r.groundTexture,r.groundOverlay,r.roofTexture,r.horizontalWall,
-					r.verticalWall,r.diagonal,r.elevationOperation,r.elevationStep);
+					r.verticalWall,r.diagonal,r.elevationOperation,r.elevationStep,
+					r.historyToken,"Line");
 			java.util.List<WorldEditorStruct.TerrainTile> tiles=new java.util.ArrayList<WorldEditorStruct.TerrainTile>(result.after.size());
 			for(NativeTerrainSnapshot after:result.after)tiles.add(nativeTerrainTile(p,after));
 			NativeLayeredTerrainTile center=result.after.get(0).tile;
@@ -197,7 +205,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			NativeTerrainStrokeResult result=p.getWorld().getServer().getWorldEditorSessions()
 				.paintNativeTerrainPlannedOperation(p,plan.coordinates,plan.fieldMasks,r.plane,r.elevation,
 					r.groundTexture,r.groundOverlay,r.roofTexture,horizontalWall,verticalWall,diagonal,
-					r.elevationOperation,r.elevationStep);
+					r.elevationOperation,r.elevationStep,r.historyToken,"Rectangle");
 			java.util.List<WorldEditorStruct.TerrainTile> tiles=new java.util.ArrayList<WorldEditorStruct.TerrainTile>(result.after.size());
 			for(NativeTerrainSnapshot after:result.after)tiles.add(nativeTerrainTile(p,after));
 			NativeLayeredTerrainTile center=result.after.get(0).tile;
@@ -226,6 +234,8 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 	private void sendTerrainOperation(Player p,int next,int fieldMask,java.util.List<WorldEditorStruct.TerrainTile> tiles,String message){
 		int total=tiles.size();for(int offset=0;offset<total;offset+=TERRAIN_RESULT_CHUNK){
 			WorldEditorStruct out=new WorldEditorStruct();out.type=9;out.sequence=next;out.fieldMask=fieldMask;
+			out.historyCanUndo=p.getWorld().getServer().getWorldEditorSessions().canUndoNativeTerrain();
+			out.historyCanRedo=p.getWorld().getServer().getWorldEditorSessions().canRedoNativeTerrain();
 			out.operationTotal=total;out.operationOffset=offset;int end=Math.min(total,offset+TERRAIN_RESULT_CHUNK);
 			for(int index=offset;index<end;index++)out.terrainTiles.add(tiles.get(index));out.message=message;
 			ActionSender.sendWorldEditor(p,out);
@@ -244,14 +254,35 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 		NativeTerrainStrokeResult result=p.getWorld().getServer().getWorldEditorSessions()
 			.paintNativeTerrainStroke(p,coordinates,r.plane,r.fieldMask,r.elevation,
 				r.groundTexture,r.groundOverlay,r.roofTexture,r.horizontalWall,
-				r.verticalWall,r.diagonal,r.elevationOperation,r.elevationStep==0?1:r.elevationStep);
+				r.verticalWall,r.diagonal,r.elevationOperation,r.elevationStep==0?1:r.elevationStep,
+				r.historyToken,"Brush");
 		WorldEditorStruct out=new WorldEditorStruct();out.type=8;out.sequence=next;out.fieldMask=r.fieldMask;
+		out.historyCanUndo=p.getWorld().getServer().getWorldEditorSessions().canUndoNativeTerrain();
+		out.historyCanRedo=p.getWorld().getServer().getWorldEditorSessions().canRedoNativeTerrain();
 		for(NativeTerrainSnapshot after:result.after)out.terrainTiles.add(nativeTerrainTile(p,after));
 		NativeLayeredTerrainTile center=result.after.get(0).tile;
 		out.message=wallDefinitionName(p,center.getVerticalWall()-1)+"\t"
 			+wallDefinitionName(p,center.getHorizontalWall()-1)+"\t"
 			+wallDefinitionName(p,diagonalRawWall(center.getDiagonalWall())-1);
 		ActionSender.sendWorldEditor(p,out);
+	}
+	private void applyTerrainHistory(Player p,int next,boolean redo){
+		NativeTerrainHistoryResult result=redo
+			?p.getWorld().getServer().getWorldEditorSessions().redoNativeTerrain(p)
+			:p.getWorld().getServer().getWorldEditorSessions().undoNativeTerrain(p);
+		java.util.List<WorldEditorStruct.TerrainTile> tiles=
+			new java.util.ArrayList<WorldEditorStruct.TerrainTile>(result.after.size());
+		for(NativeTerrainSnapshot after:result.after)tiles.add(nativeTerrainTile(p,after));
+		int total=tiles.size();for(int offset=0;offset<total;offset+=TERRAIN_RESULT_CHUNK){
+			WorldEditorStruct out=new WorldEditorStruct();out.type=10;out.sequence=next;
+			out.fieldMask=127;out.operationTotal=total;out.operationOffset=offset;
+			out.historyCanUndo=result.canUndo;out.historyCanRedo=result.canRedo;
+			int end=Math.min(total,offset+TERRAIN_RESULT_CHUNK);
+			for(int index=offset;index<end;index++)out.terrainTiles.add(tiles.get(index));
+			out.message=(redo?"Redid ":"Undid ")+result.label+" ("+total+" tile"
+				+(total==1?"":"s")+").";
+			ActionSender.sendWorldEditor(p,out);
+		}
 	}
 	private WorldEditorStruct.TerrainTile nativeTerrainTile(Player p,NativeTerrainSnapshot snapshot){
 		WorldCoordinate coordinate=snapshot.location.getCoordinate();

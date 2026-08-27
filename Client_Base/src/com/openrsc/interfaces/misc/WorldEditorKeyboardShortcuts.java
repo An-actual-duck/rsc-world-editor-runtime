@@ -5,6 +5,8 @@ final class WorldEditorKeyboardShortcuts {
 	enum Action {
 		NONE,
 		TOGGLE_CHAT,
+		UNDO,
+		REDO,
 		SAVE,
 		BRUSH,
 		NAVIGATE,
@@ -47,9 +49,12 @@ final class WorldEditorKeyboardShortcuts {
 
 		char letter = physicalKey>='A'&&physicalKey<='Z'?(char)('a'+physicalKey-'A'):normalizeLetter(typed);
 		if (control && shift) {
+			if(letter=='z')return Action.REDO;
 			return letter == 's' ? Action.SAVE : Action.NONE;
 		}
 		if (control) {
+			if(letter=='z')return Action.UNDO;
+			if(letter=='y')return Action.REDO;
 			if (!terrainMode) {
 				return Action.NONE;
 			}

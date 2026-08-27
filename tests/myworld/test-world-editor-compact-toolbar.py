@@ -192,10 +192,10 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
                         public static void main(String[] args) {
                             WorldEditorIconRegistry registry = new WorldEditorIconRegistry();
                             registry.initialize();
-							require(registry.loadedCount() == 2);
+                            require(registry.loadedCount() == 8);
                             require(registry.missingKeys().size() == 21);
                             require(registry.isLoaded(WorldEditorIconRegistry.Key.MODE_NAVIGATE));
-							require(registry.isLoaded(WorldEditorIconRegistry.Key.TOOL_RECTANGLE));
+                            require(registry.isLoaded(WorldEditorIconRegistry.Key.TOOL_RECTANGLE));
                             require(!registry.isLoaded(WorldEditorIconRegistry.Key.MODE_INSPECT));
                             Sprite first = registry.get(WorldEditorIconRegistry.Key.MODE_NAVIGATE);
                             require(first == registry.get(WorldEditorIconRegistry.Key.MODE_NAVIGATE));
@@ -287,14 +287,14 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         self.assertNotIn("mask&112", ui)
         self.assertIn("if(click==2)return true", ui)
         self.assertIn("closeUnpinnedAfterWorldAction", ui)
-        self.assertIn('button(x+278,y,82,"Compact")', ui)
+        self.assertIn('button(x+343,y,82,"Compact")', ui)
         self.assertIn("toolbar.setExpandedFallback(false)", ui)
         self.assertIn("toolbar.closeFlyout()", ui)
         self.assertIn("Config.isAndroid()", ui)
         self.assertIn("middleMouseOrbit.begin(var1.getButton(), clientMouseX, clientMouseY)", applet)
         self.assertRegex(applet, r"(?s)middleMouseOrbit\.update\(.*?currentMouseButtonDown = 0;.*?var1\.consume\(\);.*?return;")
         self.assertIn("boolean gesture=controlDown&&primaryDown&&isTerrainPainting()", ui)
-        self.assertIn("boolean picking=(worldEditorInterface.isTerrainPainting()||worldEditorInterface.isSceneryMoveArmed())", client)
+        self.assertIn("boolean picking=(worldEditorInterface.isTerrainPainting()||worldEditorInterface.isSceneryMoveArmed()||worldEditorInterface.isRegionSelecting())", client)
         self.assertIn("updateTerrainDrag(controlPressed,currentMouseButtonDown==1", client)
         self.assertIn("toggleBrushSize()", ui)
         self.assertIn("TOOL_BRUSH_1X1", ui)
@@ -327,7 +327,7 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
 
     def test_primary_tools_and_context_actions_have_separate_columns(self):
         ui = UI.read_text()
-        self.assertIn("DOCK_WIDTH=70,DOCK_HEIGHT=306", ui)
+        self.assertIn("DOCK_WIDTH=70,DOCK_HEIGHT=396", ui)
 
         primary = re.search(r"private Mode dockModeAt\(.*?\{(?P<body>.*?)\}", ui, re.S)
         self.assertIsNotNone(primary)
@@ -359,10 +359,13 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
             self.assertNotIn('"Remove"', method.group("body"))
         self.assertNotIn('"Rotate"', compact_scenery.group("body"))
 
-        self.assertIn("dockHit(rx,ry,0,6)", ui)
+        self.assertIn("dockHit(x,y,0,6))return Mode.REGION", ui)
         self.assertIn("dockHit(rx,ry,0,7)", ui)
         self.assertIn("dockHit(rx,ry,0,8)", ui)
         self.assertIn("dockHit(rx,ry,0,9)", ui)
+        self.assertIn("dockHit(rx,ry,0,10)", ui)
+        self.assertIn("dockHit(rx,ry,0,11)", ui)
+        self.assertIn("dockHit(rx,ry,0,12)", ui)
 
     def test_dirty_save_and_build_profile_restoration_guards_are_visible(self):
         ui = UI.read_text()
