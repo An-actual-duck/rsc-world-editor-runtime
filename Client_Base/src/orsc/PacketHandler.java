@@ -861,6 +861,7 @@ public class PacketHandler {
 				 * atomic presentation cover; the following staged packets replace
 				 * its radius-two presentation halo.
 				 */
+				mc.clearWorldEditorTerrainPatchesForAuthoritativeReload();
 				mc.reloadWorldEditorTerrain();
 			} else {
 				predictedPublished =

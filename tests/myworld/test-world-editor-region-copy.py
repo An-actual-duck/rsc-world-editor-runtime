@@ -135,6 +135,11 @@ assert 'mc.sendCommandString("activateregionpaste "+result.requestId)' in ui
 assert "restartWorldBuilderAfterRegionPaste" not in client
 assert "activateregionpaste" in ui
 assert "sameCenterTerrainContentRefresh" in packet_handler
+assert "clearWorldEditorTerrainPatchesForAuthoritativeReload" in client
+assert "worldEditorTerrainPatches.clear()" in (ROOT / "Client_Base/src/orsc/graphics/three/World.java").read_text(encoding="utf-8")
+assert packet_handler.index("mc.clearWorldEditorTerrainPatchesForAuthoritativeReload()") < packet_handler.index(
+    "mc.reloadWorldEditorTerrain()"
+)
 assert "mc.reloadWorldEditorTerrain()" in packet_handler
 assert packet_handler.index("mc.beginLayeredSceneActivation(") < packet_handler.index(
     "mc.reloadWorldEditorTerrain()"
