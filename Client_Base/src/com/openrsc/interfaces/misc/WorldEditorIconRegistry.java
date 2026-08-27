@@ -33,6 +33,7 @@ public final class WorldEditorIconRegistry {
 		MODE_ITEMS("mode-items.png", "Item"),
 		MODE_REGION(null, "Region"),
 		MODE_REGION_COPY(null, "Copy"),
+		MODE_REGION_CUT(null, "Cut"),
 		MODE_REGION_PASTE(null, "Paste"),
 		FIELD_ELEVATION("field-elevation.png", "Elev"),
 		FIELD_FLOOR_COLOR("field-floor-color.png", "Color"),
@@ -122,6 +123,7 @@ public final class WorldEditorIconRegistry {
 		}
 		if (key == Key.MODE_REGION) return regionIcon(false);
 		if (key == Key.MODE_REGION_COPY) return regionCopyIcon();
+		if (key == Key.MODE_REGION_CUT) return regionCutIcon();
 		if (key == Key.MODE_REGION_PASTE) return regionIcon(true);
 		BufferedImage image = read(key.filename());
 		if (image == null) {
@@ -221,6 +223,32 @@ public final class WorldEditorIconRegistry {
 		}
 		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);
 		sprite.setShift(0, 0);sprite.setRequiresShift(false);sprite.setSomething(ICON_SIZE, ICON_SIZE);
+		return sprite;
+	}
+
+	private static Sprite regionCutIcon() {
+		int[] pixels = new int[ICON_SIZE * ICON_SIZE];
+		java.util.Arrays.fill(pixels, RendererTransparency.TRANSPARENT_SAMPLE);
+		for (int y = 4; y <= 9; y++) {
+			int inset = Math.abs(7 - y);
+			for (int x = 3 + inset; x <= 8 - inset; x++) {
+				pixels[y * ICON_SIZE + x] = 0xffffff;
+			}
+		}
+		for (int y = 14; y <= 19; y++) {
+			int inset = Math.abs(16 - y);
+			for (int x = 3 + inset; x <= 8 - inset; x++) {
+				pixels[y * ICON_SIZE + x] = 0xffffff;
+			}
+		}
+		line(pixels, 8, 9, 20, 19, 0xffffff);
+		line(pixels, 8, 14, 20, 4, 0xffffff);
+		line(pixels, 9, 9, 21, 19, 0xffffff);
+		line(pixels, 9, 14, 21, 4, 0xffffff);
+		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);
+		sprite.setShift(0, 0);
+		sprite.setRequiresShift(false);
+		sprite.setSomething(ICON_SIZE, ICON_SIZE);
 		return sprite;
 	}
 

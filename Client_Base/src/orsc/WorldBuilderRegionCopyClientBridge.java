@@ -15,7 +15,7 @@ import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Client half of the supervised, project-local Region Copy bridge. */
+/** Client half of the supervised, project-local Region Copy/Cut bridge. */
 public final class WorldBuilderRegionCopyClientBridge {
 	private static final String WORKSPACE_PROPERTY =
 		"openrsc.worldBuilderWorkspaceRoot";
@@ -27,6 +27,7 @@ public final class WorldBuilderRegionCopyClientBridge {
 	private static final long TIMEOUT_NANOS = 60_000_000_000L;
 	private final SecureRandom random = new SecureRandom();
 	private String requestId;
+	private String operation;
 	private long submittedNanos;
 
 	public boolean isPending() {
@@ -35,14 +36,33 @@ public final class WorldBuilderRegionCopyClientBridge {
 
 	public void reset() {
 		requestId = null;
+		operation = null;
 		submittedNanos = 0L;
 	}
 
 	public void submit(String name, int level, int[][] markers) throws IOException {
+		submitSelection("copy", name, level, markers);
+	}
+
+	public void requestCutPreview(String name, int level, int[][] markers)
+		throws IOException {
+		submitSelection("cut-preview", name, level, markers);
+	}
+
+	public void requestCutApply(String snapshotId, String planHash)
+		throws IOException {
+		requireHash(snapshotId, "snapshot ID");
+		requireHash(planHash, "plan hash");
+		submit("cut-apply", "", "", new JSONArray(), new JSONArray(), snapshotId,
+			planHash, "CUT " + planHash);
+	}
+
+	private void submitSelection(String nextOperation, String name, int level,
+		int[][] markers) throws IOException {
 		if (!WorldBuilderClientProfile.current().isAdaptive()) {
-			throw new IOException("Region Copy requires an adaptive World Builder project.");
+			throw new IOException("Region Copy/Cut requires an adaptive World Builder project.");
 		}
-		if (isPending()) throw new IOException("A Region Copy request is already active.");
+		if (isPending()) throw new IOException("A Region Copy/Cut request is already active.");
 		if (name == null || name.trim().isEmpty() || name.length() > 128) {
 			throw new IOException("Snapshot name must contain 1..128 characters.");
 		}
@@ -62,6 +82,17 @@ public final class WorldBuilderRegionCopyClientBridge {
 			marker.put("y", markers[index][1]);
 			markerArray.put(marker);
 		}
+		submit(nextOperation, name.trim(), "global", markerArray,
+			new JSONArray().put(level), "", "", "");
+	}
+
+	private void submit(String nextOperation, String name, String worldSpace,
+		JSONArray markers, JSONArray levels, String snapshotId,
+		String expectedPlan, String confirmation) throws IOException {
+		if (!WorldBuilderClientProfile.current().isAdaptive()) {
+			throw new IOException("Region Copy/Cut requires an adaptive World Builder project.");
+		}
+		if (isPending()) throw new IOException("A Region Copy/Cut request is already active.");
 		Path control = controlDirectory();
 		Path pending = control.resolve(PENDING_FILE);
 		Path request = control.resolve(REQUEST_FILE);
@@ -79,10 +110,14 @@ public final class WorldBuilderRegionCopyClientBridge {
 		root.put("schemaVersion", 1);
 		root.put("manifestType", "world-builder-region-copy-request");
 		root.put("requestId", nextRequestId);
-		root.put("name", name.trim());
-		root.put("worldSpace", "global");
-		root.put("markers", markerArray);
-		root.put("levels", new JSONArray().put(level));
+		root.put("operation", nextOperation);
+		root.put("name", name);
+		root.put("worldSpace", worldSpace);
+		root.put("markers", markers);
+		root.put("levels", levels);
+		root.put("snapshotId", snapshotId);
+		root.put("expectedPlan", expectedPlan);
+		root.put("confirmation", confirmation);
 		Files.write(pending, (root.toString(2) + "\n").getBytes(StandardCharsets.UTF_8),
 			StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
 		try (FileChannel channel = FileChannel.open(pending,
@@ -91,6 +126,7 @@ public final class WorldBuilderRegionCopyClientBridge {
 		}
 		forceDirectory(control);
 		requestId = nextRequestId;
+		operation = nextOperation;
 		submittedNanos = System.nanoTime();
 	}
 
@@ -100,10 +136,10 @@ public final class WorldBuilderRegionCopyClientBridge {
 			Path response = controlDirectory().resolve(RESPONSE_FILE);
 			if (!Files.exists(response, LinkOption.NOFOLLOW_LINKS)) {
 				if (System.nanoTime() - submittedNanos > TIMEOUT_NANOS) {
-					String timedOut = requestId;
+					String timedOut = requestId, timedOperation = operation;
 					reset();
-					return Result.refused(timedOut, "RECOVERY_REQUIRED",
-						"Region Copy did not answer within 60 seconds.",
+					return Result.refused(timedOut, timedOperation, "RECOVERY_REQUIRED",
+						"Region Copy/Cut did not answer within 60 seconds.",
 						"Close and reopen the Builder before retrying.");
 				}
 				return null;
@@ -124,29 +160,67 @@ public final class WorldBuilderRegionCopyClientBridge {
 				|| !requestId.equals(root.getString("requestId"))) {
 				throw new IOException("Region Copy response identity does not match the request.");
 			}
+			String responseOperation = root.getString("operation");
+			if (!operation.equals(responseOperation)) {
+				throw new IOException("Region Copy/Cut response operation does not match the request.");
+			}
 			Result result;
 			if ("accepted".equals(root.getString("status"))) {
 				JSONObject value = root.getJSONObject("result");
-				result = Result.accepted(requestId, value.getString("snapshotId"),
-					value.optString("name", "Region snapshot"),
-					value.getInt("tileCount"), value.getInt("placementCount"),
-					value.getJSONArray("footprintBoundaryReports").length(),
-					value.getBoolean("libraryEntryCreated"));
+				if ("copy".equals(responseOperation)) {
+					result = captureResult(responseOperation, value, "Region snapshot");
+				} else if ("cut-preview".equals(responseOperation)) {
+					JSONObject plan = value.getJSONObject("operationPlan");
+					result = Result.preview(requestId, responseOperation,
+						value.getString("snapshotId"),
+						value.optString("name", "Region cut"),
+						value.getInt("tileCount"), value.getInt("placementCount"),
+						value.getJSONArray("footprintBoundaryReports").length(),
+						value.getBoolean("libraryEntryCreated"),
+						plan.getString("planFingerprintSha256"),
+						plan.getBoolean("blocked"));
+				} else if ("cut-apply".equals(responseOperation)) {
+					result = Result.applied(requestId, responseOperation,
+						value.getString("snapshotId"),
+						value.getString("planFingerprintSha256"),
+						value.getString("packageManifestSha256"),
+						value.getString("packageInventorySha256"));
+				} else {
+					throw new IOException("Region Copy/Cut response operation is unsupported.");
+				}
 			} else {
-				result = Result.refused(requestId, root.getString("errorCode"),
+				result = Result.refused(requestId, responseOperation,
+					root.getString("errorCode"),
 					root.getString("message"), root.getString("nextStep"));
 			}
-			Files.delete(response);
-			forceDirectory(response.getParent());
+			if (!(result.accepted && "cut-apply".equals(result.operation))) {
+				Files.delete(response);
+				forceDirectory(response.getParent());
+			}
 			reset();
 			return result;
 		} catch (Exception failure) {
-			String failed = requestId;
+			String failed = requestId, failedOperation = operation;
 			reset();
 			String message = failure.getMessage();
 			if (message == null || message.isEmpty()) message = failure.getClass().getSimpleName();
-			return Result.refused(failed, "UNSUPPORTED_FORMAT", message,
-				"Close and reopen the Builder before retrying Region Copy.");
+			return Result.refused(failed, failedOperation, "UNSUPPORTED_FORMAT", message,
+				"Close and reopen the Builder before retrying Region Copy/Cut.");
+		}
+	}
+
+	private Result captureResult(String responseOperation, JSONObject value,
+		String fallbackName) {
+		return Result.captured(requestId, responseOperation,
+			value.getString("snapshotId"), value.optString("name", fallbackName),
+			value.getInt("tileCount"), value.getInt("placementCount"),
+			value.getJSONArray("footprintBoundaryReports").length(),
+			value.getBoolean("libraryEntryCreated"));
+	}
+
+	private static void requireHash(String value, String label) throws IOException {
+		if (value == null || !value.matches("[0-9a-f]{64}")) {
+			throw new IOException("Region Cut " + label + " is invalid.");
 		}
 	}
 
@@ -186,43 +260,72 @@ public final class WorldBuilderRegionCopyClientBridge {
 	public static final class Result {
 		public final boolean accepted;
 		public final String requestId;
+		public final String operation;
 		public final String snapshotId;
 		public final String name;
 		public final int tileCount;
 		public final int placementCount;
 		public final int crossingReportCount;
 		public final boolean created;
+		public final String planHash;
+		public final boolean blocked;
+		public final String packageManifestSha256;
+		public final String packageInventorySha256;
 		public final String errorCode;
 		public final String message;
 		public final String nextStep;
 
-		private Result(boolean accepted, String requestId, String snapshotId,
+		private Result(boolean accepted, String requestId, String operation,
+			String snapshotId,
 			String name, int tileCount, int placementCount, int crossingReportCount,
-			boolean created, String errorCode, String message, String nextStep) {
+			boolean created, String planHash, boolean blocked,
+			String packageManifestSha256, String packageInventorySha256,
+			String errorCode, String message, String nextStep) {
 			this.accepted = accepted;
 			this.requestId = requestId;
+			this.operation = operation;
 			this.snapshotId = snapshotId;
 			this.name = name;
 			this.tileCount = tileCount;
 			this.placementCount = placementCount;
 			this.crossingReportCount = crossingReportCount;
 			this.created = created;
+			this.planHash = planHash;
+			this.blocked = blocked;
+			this.packageManifestSha256 = packageManifestSha256;
+			this.packageInventorySha256 = packageInventorySha256;
 			this.errorCode = errorCode;
 			this.message = message;
 			this.nextStep = nextStep;
 		}
 
-		static Result accepted(String requestId, String snapshotId, String name,
+		static Result captured(String requestId, String operation,
+			String snapshotId, String name,
 			int tileCount, int placementCount, int crossingReportCount,
 			boolean created) {
-			return new Result(true, requestId, snapshotId, name, tileCount,
-				placementCount, crossingReportCount, created, "", "", "");
+			return new Result(true, requestId, operation, snapshotId, name, tileCount,
+				placementCount, crossingReportCount, created, "", false, "", "",
+				"", "", "");
 		}
 
-		static Result refused(String requestId, String code, String message,
+		static Result preview(String requestId, String operation, String snapshotId,
+			String name, int tileCount, int placementCount, int crossingReportCount,
+			boolean created, String planHash, boolean blocked) {
+			return new Result(true, requestId, operation, snapshotId, name, tileCount,
+				placementCount, crossingReportCount, created, planHash, blocked, "", "",
+				"", "", "");
+		}
+
+		static Result applied(String requestId, String operation, String snapshotId,
+			String planHash, String manifestHash, String inventoryHash) {
+			return new Result(true, requestId, operation, snapshotId, "", 0, 0, 0,
+				false, planHash, false, manifestHash, inventoryHash, "", "", "");
+		}
+
+		static Result refused(String requestId, String operation, String code, String message,
 			String nextStep) {
-			return new Result(false, requestId, "", "", 0, 0, 0, false,
-				code, message, nextStep);
+			return new Result(false, requestId, operation, "", "", 0, 0, 0, false,
+				"", false, "", "", code, message, nextStep);
 		}
 	}
 }
