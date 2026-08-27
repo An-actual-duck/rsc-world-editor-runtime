@@ -371,6 +371,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		}
 		if((message.contains("Saved ")&&message.contains(" world edits."))
 				||message.contains("Saved the complete isolated working package:")
+				||message.contains("Saved pending edits to the isolated working package:")
 				||message.contains("No pending world edits to save.")){
 			unsavedChanges=false;saveRequested=false;pendingEntityActions=0;closeArmed=false;inspectionStatus="World edits saved; no pending changes.";
 		}else if(message.contains("Failed to save world edits:")){saveRequested=false;inspectionStatus=message;}

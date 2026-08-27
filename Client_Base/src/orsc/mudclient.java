@@ -25709,7 +25709,9 @@ public final class mudclient implements Runnable {
 				"ADAPTIVE_WORLD_BUILDER_PLACEMENT_RESPONSE " + message);
 		}
 		if (automatedBuilderPlacementProbeStage != 7 || message == null
-			|| !message.contains("Saved the complete isolated working package:")) {
+			|| !message.contains("Saved the complete isolated working package:")
+				&& !message.contains(
+					"Saved pending edits to the isolated working package:")) {
 			return;
 		}
 		ClientRuntimeLogger.log(
