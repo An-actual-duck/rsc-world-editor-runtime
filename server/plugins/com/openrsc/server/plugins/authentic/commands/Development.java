@@ -197,6 +197,10 @@ public final class Development implements CommandTrigger {
 			com.openrsc.server.content.worldedit
 				.AdaptiveWorldBuilderRegionCopyRequest.submit(player);
 		}
+		else if (command.equalsIgnoreCase("cutregion")) {
+			com.openrsc.server.content.worldedit
+				.AdaptiveWorldBuilderRegionCopyRequest.submit(player);
+		}
 		else if (command.equalsIgnoreCase("pasteregion")) {
 			com.openrsc.server.content.worldedit
 				.AdaptiveWorldBuilderRegionPasteRequest.submit(player);
@@ -208,6 +212,11 @@ public final class Development implements CommandTrigger {
 		else if (command.equalsIgnoreCase("activateregionpaste")) {
 			com.openrsc.server.content.worldedit
 				.AdaptiveWorldBuilderRegionPasteRequest.activate(
+					player, args.length == 0 ? "" : args[0]);
+		}
+		else if (command.equalsIgnoreCase("activateregioncut")) {
+			com.openrsc.server.content.worldedit
+				.AdaptiveWorldBuilderRegionCopyRequest.activate(
 					player, args.length == 0 ? "" : args[0]);
 		}
 		else if (command.equalsIgnoreCase("clearworldedits") || command.equalsIgnoreCase("discardworldedits")) {
@@ -325,9 +334,11 @@ public final class Development implements CommandTrigger {
 			||normalized.equals("buildergoto")
 			||normalized.equals("buildergrow")
 			||normalized.equals("copyregion")
+			||normalized.equals("cutregion")
 			||normalized.equals("pasteregion")
 			||normalized.equals("shareregion")
 			||normalized.equals("activateregionpaste")
+			||normalized.equals("activateregioncut")
 			||normalized.equals("worldedits")
 			||normalized.equals("listworldedits")
 			||isLayeredBuilderMutationCommand(normalized);

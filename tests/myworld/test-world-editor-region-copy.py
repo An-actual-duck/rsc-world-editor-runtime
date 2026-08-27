@@ -82,12 +82,14 @@ commands = COMMANDS.read_text(encoding="utf-8")
 
 assert "Mode { NAVIGATE, INSPECT, TERRAIN, SCENERY, NPC, ITEMS, REGION }" in ui
 assert '"Regions"' in ui
-assert "MODE_REGION" in ui and "MODE_REGION_COPY" in ui and "MODE_REGION_PASTE" in ui
+assert "MODE_REGION" in ui and "MODE_REGION_COPY" in ui and "MODE_REGION_CUT" in ui and "MODE_REGION_PASTE" in ui
 assert "drawModeIcon(WorldEditorIconRegistry.Key.MODE_REGION" in ui
 assert "drawRegionToolIcon(WorldEditorIconRegistry.Key.MODE_REGION_COPY" in ui
+assert "drawRegionToolIcon(WorldEditorIconRegistry.Key.MODE_REGION_CUT" in ui
 assert "drawRegionToolIcon(WorldEditorIconRegistry.Key.MODE_REGION_PASTE" in ui
 assert "mode==Mode.REGION&&dockHit(rx,ry,1,0)" in ui
 assert "mode==Mode.REGION&&dockHit(rx,ry,1,1)" in ui
+assert "mode==Mode.REGION&&dockHit(rx,ry,1,2)" in ui
 assert "drawRegionModeIcon" not in ui
 assert "drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_REGION_COPY" not in ui
 assert "drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_REGION_PASTE" not in ui
@@ -101,10 +103,18 @@ assert "WORLD_EDITOR_ADD_REGION_MARKER" in client
 assert '"world-builder-region-copy-request"' in bridge
 assert "StandardOpenOption.CREATE_NEW" in bridge
 assert 'command.equalsIgnoreCase("copyregion")' in commands
+assert 'command.equalsIgnoreCase("cutregion")' in commands
 assert server.index("editor.saveAdaptivePackage(player)") < server.index("Files.move(pending, request")
 assert "ownsActiveSession(player)" in server
 assert '"world-builder-region-copy-response"' in server
-assert "RegionTool { COPY, PASTE }" in ui
+assert "RegionTool { COPY, CUT, PASTE }" in ui
+assert "requestRegionCut" in ui and "requestCutPreview" in ui
+assert "requestCutApply" in ui and 'mc.sendCommandString("cutregion")' in ui
+assert 'mc.sendCommandString("activateregioncut "+result.requestId)' in ui
+assert 'command.equalsIgnoreCase("activateregioncut")' in commands
+assert '"cut-preview".equals(operation)' in server
+assert '"cut-apply".equals(operation)' in server
+assert "adoptPublishedAdaptivePackage" in server
 assert "setRegionPasteDestination" in ui and "requestRegionPasteApply" in ui
 assert "regionPasteOverwritePrompted" in ui and "regionPasteOverwriteArmed" in ui
 assert 'return "Overwrite?"' in ui and 'return "Confirm"' in ui
@@ -147,4 +157,4 @@ assert "ownsActiveSession(player)" in bundle_server
 assert "Files.move(pending, request" in bundle_server
 assert "saveAdaptivePackage" not in bundle_server
 
-print("PASS: ordered Region Copy, exact Paste, and portable sharing UI bridges validated")
+print("PASS: ordered Region Copy/Cut, exact Paste, and portable sharing UI bridges validated")
