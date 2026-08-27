@@ -57,6 +57,10 @@ public final class WorldBuilderRegionPasteClientBridge {
 			(overwrite ? "OVERWRITE " : "PASTE ") + planHash);
 	}
 
+	public void requestUndo() throws IOException {
+		submit("undo", "", 0, 0, 0, "", "");
+	}
+
 	private void submit(String nextOperation, String snapshotId, int level,
 		int x, int y, String expectedPlan, String confirmation) throws IOException {
 		if (!WorldBuilderClientProfile.current().isAdaptive()) {
@@ -132,9 +136,9 @@ public final class WorldBuilderRegionPasteClientBridge {
 				JSONObject value = root.getJSONObject("result");
 				if ("library".equals(responseOperation)) result = libraryResult(value);
 				else if ("preview".equals(responseOperation)) result = previewResult(value);
-				else if ("apply".equals(responseOperation)) result = Result.applied(
-					requestId, value.getString("snapshotId"),
-					value.getString("planFingerprintSha256"),
+				else if ("apply".equals(responseOperation) || "undo".equals(responseOperation)) result = Result.applied(
+					requestId, responseOperation, value.optString("snapshotId", ""),
+					value.optString("planFingerprintSha256", ""),
 					value.getString("packageManifestSha256"),
 					value.getString("packageInventorySha256"));
 				else throw new IOException("Region Paste response operation is unsupported.");
@@ -143,7 +147,8 @@ public final class WorldBuilderRegionPasteClientBridge {
 					root.getString("errorCode"), root.getString("message"),
 					root.getString("nextStep"));
 			}
-			if (!(result.accepted && "apply".equals(result.operation))) {
+			if (!(result.accepted && ("apply".equals(result.operation)
+				|| "undo".equals(result.operation)))) {
 				Files.delete(response);
 				forceDirectory(response.getParent());
 			}
@@ -303,11 +308,11 @@ public final class WorldBuilderRegionPasteClientBridge {
 				"", "", "");
 		}
 
-		static Result applied(String id, String snapshotId, String plan,
+		static Result applied(String id, String operation, String snapshotId, String plan,
 			String manifestSha256, String inventorySha256) throws IOException {
 			requireHash(manifestSha256, "published manifest hash");
 			requireHash(inventorySha256, "published inventory hash");
-			return new Result(true, "apply", id, new ArrayList<Snapshot>(), snapshotId,
+			return new Result(true, operation, id, new ArrayList<Snapshot>(), snapshotId,
 				"", 0, 0, plan, manifestSha256, inventorySha256, false, false,
 				new int[0][2], new int[0][3], "", "", "");
 		}

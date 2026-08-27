@@ -81,9 +81,11 @@ paste_server = PASTE_SERVER.read_text(encoding="utf-8")
 commands = COMMANDS.read_text(encoding="utf-8")
 
 assert "Mode { NAVIGATE, INSPECT, TERRAIN, SCENERY, NPC, ITEMS, REGION }" in ui
-assert '"Copy/Paste"' in ui
+assert '"Regions"' in ui
+assert "MODE_REGION_COPY" in ui and "MODE_REGION_PASTE" in ui
 assert "addRegionMarker" in ui and "closeRegionSelection" in ui
 assert "removeLastRegionMarker" in ui and "cancelRegionSelection" in ui
+assert "advanceRegionSelectionState" in ui and '"Start":"Stop"' in ui
 assert "requestRegionCopy" in ui and 'mc.sendCommandString("copyregion")' in ui
 assert "drawWorldEditorRegionSelectionPreview" in client
 assert "drawWorldEditorRegionMarker" in client
@@ -96,20 +98,24 @@ assert "ownsActiveSession(player)" in server
 assert '"world-builder-region-copy-response"' in server
 assert "RegionTool { COPY, PASTE }" in ui
 assert "setRegionPasteDestination" in ui and "requestRegionPasteApply" in ui
-assert "regionPasteOverwriteArmed" in ui
+assert "regionPasteOverwritePrompted" in ui and "regionPasteOverwriteArmed" in ui
+assert 'return "Overwrite?"' in ui and 'return "Confirm"' in ui
+assert '"There is nothing copied to clipboard"' in ui
 assert "c!='\\uffff'&&!Character.isSurrogate(c)" in ui
 assert "drawWorldEditorRegionPastePreview" in client
 assert "WORLD_EDITOR_SET_REGION_PASTE_DESTINATION" in client
 assert '"world-builder-region-paste-request"' in paste_bridge
 assert '"OVERWRITE " : "PASTE "' in paste_bridge
+assert "requestUndo" in paste_bridge and 'submit("undo"' in paste_bridge
 assert 'command.equalsIgnoreCase("pasteregion")' in commands
 assert 'command.equalsIgnoreCase("activateregionpaste")' in commands
 assert "editor.saveAdaptivePackage(player)" in paste_server
 assert '"world-builder-region-paste-response"' in paste_server
+assert '"undo".equals(operation)' in paste_server
 assert "adoptPublishedAdaptivePackage" in paste_server
 assert 'mc.sendCommandString("activateregionpaste "+result.requestId)' in ui
 assert "restartWorldBuilderAfterRegionPaste" not in client
-assert "activates live without restarting" in ui
+assert "activateregionpaste" in ui
 assert "sameCenterTerrainContentRefresh" in packet_handler
 assert "mc.reloadWorldEditorTerrain()" in packet_handler
 assert packet_handler.index("mc.beginLayeredSceneActivation(") < packet_handler.index(
@@ -123,7 +129,7 @@ assert "chooser.setDaemon(true)" in bundle_dialog
 assert "dialog.setAlwaysOnTop(true)" in bundle_dialog
 assert "EventQueue.invokeLater" in bundle_dialog
 assert "windowOpened" in bundle_dialog and "dialog.toFront()" in bundle_dialog
-assert '"Import .wbr"' in ui and '"Export selected"' in ui
+assert '"Import .wbr"' in ui and '"Export"' in ui
 assert "requestRegionImport" in ui and "requestRegionExport" in ui
 assert "pollRegionBundleDialog" in ui
 assert 'mc.sendCommandString("shareregion")' in ui

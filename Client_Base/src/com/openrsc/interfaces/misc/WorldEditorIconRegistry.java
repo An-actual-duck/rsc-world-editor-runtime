@@ -31,7 +31,8 @@ public final class WorldEditorIconRegistry {
 		MODE_SCENERY("mode-scenery.png", "Obj"),
 		MODE_NPC("mode-npc.png", "NPC"),
 		MODE_ITEMS("mode-items.png", "Item"),
-		MODE_REGION(null, "Area"),
+		MODE_REGION_COPY(null, "Copy"),
+		MODE_REGION_PASTE(null, "Paste"),
 		FIELD_ELEVATION("field-elevation.png", "Elev"),
 		FIELD_FLOOR_COLOR("field-floor-color.png", "Color"),
 		FIELD_FLOOR_TEXTURE("field-floor-texture.png", "Floor"),
@@ -118,7 +119,8 @@ public final class WorldEditorIconRegistry {
 		if (key == Key.TOOL_RECTANGLE) {
 			return rectangleIcon();
 		}
-		if (key == Key.MODE_REGION) return regionIcon();
+		if (key == Key.MODE_REGION_COPY) return regionIcon(false);
+		if (key == Key.MODE_REGION_PASTE) return regionIcon(true);
 		BufferedImage image = read(key.filename());
 		if (image == null) {
 			return null;
@@ -170,10 +172,12 @@ public final class WorldEditorIconRegistry {
 		return sprite;
 	}
 
-	private static Sprite regionIcon() {
+	private static Sprite regionIcon(boolean paste) {
 		int[] pixels = new int[ICON_SIZE * ICON_SIZE];
 		java.util.Arrays.fill(pixels, RendererTransparency.TRANSPARENT_SAMPLE);
-		int[][] points = {{4,5},{18,4},{20,17},{11,20},{3,14}};
+		int[][] points = paste
+			? new int[][]{{7,5},{19,5},{19,18},{7,18}}
+			: new int[][]{{4,5},{16,4},{18,16},{10,19},{3,14}};
 		for (int index = 0; index < points.length; index++) {
 			int[] first = points[index], second = points[(index + 1) % points.length];
 			line(pixels, first[0], first[1], second[0], second[1], 0xffffff);
@@ -183,6 +187,14 @@ public final class WorldEditorIconRegistry {
 						pixels[y * ICON_SIZE + x] = 0xffffff;
 					}
 				}
+			}
+		}
+		if (paste) {
+			for (int x = 3; x <= 12; x++) pixels[11 * ICON_SIZE + x] = 0xffffff;
+			for (int x = 8; x <= 12; x++) {
+				int offset = x - 8;
+				pixels[(7 + offset) * ICON_SIZE + x] = 0xffffff;
+				pixels[(15 - offset) * ICON_SIZE + x] = 0xffffff;
 			}
 		}
 		Sprite sprite = new Sprite(pixels, ICON_SIZE, ICON_SIZE);

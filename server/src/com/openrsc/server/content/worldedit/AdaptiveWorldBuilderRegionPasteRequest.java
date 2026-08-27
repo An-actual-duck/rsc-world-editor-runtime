@@ -86,7 +86,7 @@ public final class AdaptiveWorldBuilderRegionPasteRequest {
 			}
 			String operation = document.getString("operation");
 			if (!("library".equals(operation) || "preview".equals(operation)
-				|| "apply".equals(operation))) {
+				|| "apply".equals(operation) || "undo".equals(operation))) {
 				throw new IOException("The staged Region Paste operation is unsupported.");
 			}
 			if (Files.exists(request, LinkOption.NOFOLLOW_LINKS)
@@ -153,13 +153,15 @@ public final class AdaptiveWorldBuilderRegionPasteRequest {
 				|| !"world-builder-region-paste-response".equals(
 					root.getString("manifestType"))
 				|| !expectedRequestId.equals(root.getString("requestId"))
-				|| !"apply".equals(root.getString("operation"))
+				|| !("apply".equals(root.getString("operation"))
+					|| "undo".equals(root.getString("operation")))
 				|| !"accepted".equals(root.getString("status"))) {
 				throw new IOException("Live Region Paste response identity is invalid.");
 			}
 			JSONObject result = root.getJSONObject("result");
 			if (!result.keySet().equals(APPLY_RESULT_KEYS)
-				|| !"paste".equals(result.getString("operation"))
+				|| !("paste".equals(result.getString("operation"))
+					|| "undo".equals(result.getString("operation")))
 				|| !result.getBoolean("worldModified")) {
 				throw new IOException("Live Region Paste result contract is invalid.");
 			}
@@ -182,8 +184,9 @@ public final class AdaptiveWorldBuilderRegionPasteRequest {
 				player, worldPackage, inventorySha256);
 			Files.delete(response);
 			forceDirectory(control);
-			player.message(
-				"[World Editor] Region Paste activated live; no restart was required.");
+			player.message("undo".equals(result.getString("operation"))
+				? "[World Editor] Region Paste Undo activated live; no restart was required."
+				: "[World Editor] Region Paste activated live; no restart was required.");
 		} catch (Exception failure) {
 			try {
 				if (response != null) Files.deleteIfExists(response);
