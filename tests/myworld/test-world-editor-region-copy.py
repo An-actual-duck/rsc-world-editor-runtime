@@ -14,6 +14,7 @@ SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBu
 PASTE_BRIDGE = ROOT / "Client_Base/src/orsc/WorldBuilderRegionPasteClientBridge.java"
 BUNDLE_BRIDGE = ROOT / "Client_Base/src/orsc/WorldBuilderRegionBundleClientBridge.java"
 BUNDLE_DIALOG = ROOT / "Client_Base/src/orsc/WorldBuilderRegionBundleFileDialog.java"
+BUNDLE_SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRegionBundleRequest.java"
 PASTE_SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRegionPasteRequest.java"
 COMMANDS = ROOT / "server/plugins/com/openrsc/server/plugins/authentic/commands/Development.java"
 
@@ -75,6 +76,7 @@ server = SERVER.read_text(encoding="utf-8")
 paste_bridge = PASTE_BRIDGE.read_text(encoding="utf-8")
 bundle_bridge = BUNDLE_BRIDGE.read_text(encoding="utf-8")
 bundle_dialog = BUNDLE_DIALOG.read_text(encoding="utf-8")
+bundle_server = BUNDLE_SERVER.read_text(encoding="utf-8")
 paste_server = PASTE_SERVER.read_text(encoding="utf-8")
 commands = COMMANDS.read_text(encoding="utf-8")
 
@@ -117,7 +119,18 @@ assert '"world-builder-region-bundle-request"' in bundle_bridge
 assert "requestImport" in bundle_bridge and "requestExport" in bundle_bridge
 assert "libraryEntryCreated" in bundle_bridge and "compatibilityReport" in bundle_bridge
 assert "FileDialog.LOAD" in bundle_dialog and "FileDialog.SAVE" in bundle_dialog
+assert "chooser.setDaemon(true)" in bundle_dialog
+assert "dialog.setAlwaysOnTop(true)" in bundle_dialog
+assert "EventQueue.invokeLater" in bundle_dialog
+assert "windowOpened" in bundle_dialog and "dialog.toFront()" in bundle_dialog
 assert '"Import .wbr"' in ui and '"Export selected"' in ui
 assert "requestRegionImport" in ui and "requestRegionExport" in ui
+assert "pollRegionBundleDialog" in ui
+assert 'mc.sendCommandString("shareregion")' in ui
+assert 'command.equalsIgnoreCase("shareregion")' in commands
+assert '"world-builder-region-bundle-request"' in bundle_server
+assert "ownsActiveSession(player)" in bundle_server
+assert "Files.move(pending, request" in bundle_server
+assert "saveAdaptivePackage" not in bundle_server
 
 print("PASS: ordered Region Copy, exact Paste, and portable sharing UI bridges validated")

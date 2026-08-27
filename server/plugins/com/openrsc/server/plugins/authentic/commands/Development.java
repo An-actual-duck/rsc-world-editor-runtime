@@ -201,6 +201,10 @@ public final class Development implements CommandTrigger {
 			com.openrsc.server.content.worldedit
 				.AdaptiveWorldBuilderRegionPasteRequest.submit(player);
 		}
+		else if (command.equalsIgnoreCase("shareregion")) {
+			com.openrsc.server.content.worldedit
+				.AdaptiveWorldBuilderRegionBundleRequest.submit(player);
+		}
 		else if (command.equalsIgnoreCase("activateregionpaste")) {
 			com.openrsc.server.content.worldedit
 				.AdaptiveWorldBuilderRegionPasteRequest.activate(
@@ -322,6 +326,7 @@ public final class Development implements CommandTrigger {
 			||normalized.equals("buildergrow")
 			||normalized.equals("copyregion")
 			||normalized.equals("pasteregion")
+			||normalized.equals("shareregion")
 			||normalized.equals("activateregionpaste")
 			||normalized.equals("worldedits")
 			||normalized.equals("listworldedits")
