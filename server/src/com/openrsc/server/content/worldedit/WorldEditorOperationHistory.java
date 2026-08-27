@@ -34,7 +34,7 @@ public final class WorldEditorOperationHistory<K,V> {
 	public synchronized boolean canRedo() { return !redo.isEmpty(); }
 
 	public synchronized void record(
-		int token, String label, List<Change<K,V>> changes) {
+		long token, String label, List<Change<K,V>> changes) {
 		if (token <= 0) throw new IllegalArgumentException(
 			"Editor history token must be positive.");
 		if (label == null || label.trim().isEmpty()) throw new IllegalArgumentException(
@@ -155,12 +155,12 @@ public final class WorldEditorOperationHistory<K,V> {
 	}
 
 	private static final class Entry<K,V> {
-		final int token;
+		final long token;
 		final String label;
 		final LinkedHashMap<K,Change<K,V>> changes =
 			new LinkedHashMap<K,Change<K,V>>();
 
-		Entry(int token, String label) {
+		Entry(long token, String label) {
 			this.token = token;
 			this.label = label;
 		}

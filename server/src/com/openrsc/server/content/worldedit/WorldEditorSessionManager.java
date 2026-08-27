@@ -103,9 +103,10 @@ public final class WorldEditorSessionManager {
 	private String nativeWorkingInventorySha256;
 	private NativeLayeredWorldPackage nativeAdoptedPackage;
 	private long nativeTerrainSceneRevision;
-	private final WorldEditorOperationHistory<NativeTileKey,NativeLayeredTerrainTile>
-		nativeTerrainHistory =
-			new WorldEditorOperationHistory<NativeTileKey,NativeLayeredTerrainTile>();
+	private final WorldEditorOperationHistory<Object,Optional<Object>>
+		nativeOperationHistory =
+			new WorldEditorOperationHistory<Object,Optional<Object>>();
+	private long nativePlacementHistorySequence;
 	public WorldEditorSessionManager() { this(null, new SecureRandom()); }
 	public WorldEditorSessionManager(WorldEditStorageContext storage) { this(storage, new SecureRandom()); }
 	WorldEditorSessionManager(SecureRandom random) { this(null, random); }
@@ -116,7 +117,7 @@ public final class WorldEditorSessionManager {
 		if (player == null || !player.isAdmin()) return OpenResult.denied("Administrator authorization is required.");
 		if (active != null && active.ownerHash != player.getUsernameHash()) return OpenResult.denied("Another administrator owns the active editor session.");
 		if (active == null) {
-			nativeTerrainHistory.clear();
+			clearNativeOperationHistory();
 			long id;
 			do { id = random.nextLong(); } while (id == 0L);
 			active = new Session(id, player.getUsernameHash());
@@ -135,13 +136,13 @@ public final class WorldEditorSessionManager {
 	public synchronized boolean close(Player player, long id, int sequence) {
 		if (!validate(player, id, sequence).accepted) return false;
 		active = null;
-		nativeTerrainHistory.clear();
+		clearNativeOperationHistory();
 		return true;
 	}
 	public synchronized void closeFor(Player player) {
 		if (player != null && active != null && active.ownerHash == player.getUsernameHash()) {
 			active = null;
-			nativeTerrainHistory.clear();
+			clearNativeOperationHistory();
 		}
 	}
 	public synchronized boolean hasActiveSession() { return active != null; }
@@ -252,8 +253,8 @@ public final class WorldEditorSessionManager {
 			|| !nativeNpcDirty.isEmpty()
 			|| !nativeGroundItemDirty.isEmpty();
 	}
-	public synchronized boolean canUndoNativeTerrain(){return nativeTerrainHistory.canUndo();}
-	public synchronized boolean canRedoNativeTerrain(){return nativeTerrainHistory.canRedo();}
+	public synchronized boolean canUndoNativeOperation(){return nativeOperationHistory.canUndo();}
+	public synchronized boolean canRedoNativeOperation(){return nativeOperationHistory.canRedo();}
 
 	public synchronized NativeTerrainStrokeResult paintNativeTerrainStroke(
 		Player player,
@@ -391,15 +392,17 @@ public final class WorldEditorSessionManager {
 		}
 		if (historyToken > 0) {
 			if (!growthBefore.equals(nativeTerrainGrowth)) {
-				nativeTerrainHistory.clear();
+				clearNativeOperationHistory();
 			} else {
-				List<WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>>
-					changes = new ArrayList<WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>>(keys.size());
+				List<WorldEditorOperationHistory.Change<Object,Optional<Object>>>
+					changes = new ArrayList<WorldEditorOperationHistory.Change<Object,Optional<Object>>>(keys.size());
 				for (int index = 0; index < keys.size(); index++) {
 					changes.add(WorldEditorOperationHistory.Change.of(
-						keys.get(index), before.get(index).tile, after.get(index).tile));
+						(Object)keys.get(index),
+						Optional.<Object>of(before.get(index).tile),
+						Optional.<Object>of(after.get(index).tile)));
 				}
-				nativeTerrainHistory.record(historyToken,
+				nativeOperationHistory.record(((long)historyToken)<<1,
 					historyLabel == null ? "Terrain" : historyLabel, changes);
 			}
 		}
@@ -413,54 +416,71 @@ public final class WorldEditorSessionManager {
 		return new NativeTerrainStrokeResult(before, after);
 	}
 
-	public synchronized NativeTerrainHistoryResult undoNativeTerrain(Player player) {
-		return applyNativeTerrainHistory(player, false);
+	public synchronized NativeOperationHistoryResult undoNativeOperation(Player player) {
+		return applyNativeOperationHistory(player, false);
 	}
 
-	public synchronized NativeTerrainHistoryResult redoNativeTerrain(Player player) {
-		return applyNativeTerrainHistory(player, true);
+	public synchronized NativeOperationHistoryResult redoNativeOperation(Player player) {
+		return applyNativeOperationHistory(player, true);
 	}
 
-	private NativeTerrainHistoryResult applyNativeTerrainHistory(
+	private NativeOperationHistoryResult applyNativeOperationHistory(
 		Player player, boolean redo) {
 		requireNativeDraftSession(player);
-		List<WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>>
-			pending = redo ? nativeTerrainHistory.nextRedoChanges()
-				: nativeTerrainHistory.nextUndoChanges();
+		List<WorldEditorOperationHistory.Change<Object,Optional<Object>>>
+			pending = redo ? nativeOperationHistory.nextRedoChanges()
+				: nativeOperationHistory.nextUndoChanges();
 		if (pending.isEmpty()) throw new IllegalStateException(
 			redo ? "There is nothing to redo." : "There is nothing to undo.");
 		int activeLevel = player.getLayeredLocation().getCoordinate().getLevel();
-		Map<NativeTileKey,NativeLayeredTerrainTile> current =
-			new LinkedHashMap<NativeTileKey,NativeLayeredTerrainTile>();
-		for (WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>
+		Map<Object,Optional<Object>> current =
+			new LinkedHashMap<Object,Optional<Object>>();
+		Map<Object,Optional<Object>> target =
+			new LinkedHashMap<Object,Optional<Object>>();
+		for (WorldEditorOperationHistory.Change<Object,Optional<Object>>
 			change : pending) {
-			if (change.key.level != activeLevel) throw new IllegalStateException(
-				"Return to level " + change.key.level + " before "
-					+ (redo ? "redoing" : "undoing") + " that terrain operation.");
-			NativeLayeredTerrainTile value = nativeTerrainOverlay.get(change.key);
-			if (value == null) value = nativeBaseTile(player, change.key.location());
-			current.put(change.key, value);
+			int level=nativeHistoryLevel(change.key);
+			if (level != activeLevel) throw new IllegalStateException(
+				"Return to level " + level + " before "
+					+ (redo ? "redoing" : "undoing") + " that Builder operation.");
+			Optional<Object> value=currentNativeHistoryState(player,change.key);
+			if(!value.equals(change.before))throw new IllegalStateException(
+				"Editor state changed outside this history; undo/redo was refused.");
+			current.put(change.key,value);target.put(change.key,change.after);
 		}
-		WorldEditorOperationHistory.Action<NativeTileKey,NativeLayeredTerrainTile>
-			action = redo ? nativeTerrainHistory.redo(current)
-				: nativeTerrainHistory.undo(current);
+		try{
+			applyNativeHistoryTargets(player,target);
+		}catch(RuntimeException failure){
+			try{applyNativeHistoryTargets(player,current);}
+			catch(RuntimeException rollback){failure.addSuppressed(rollback);}
+			throw failure;
+		}
+		WorldEditorOperationHistory.Action<Object,Optional<Object>> action;
+		try{
+			action = redo ? nativeOperationHistory.redo(current)
+				: nativeOperationHistory.undo(current);
+		}catch(RuntimeException failure){
+			try{applyNativeHistoryTargets(player,current);}
+			catch(RuntimeException rollback){failure.addSuppressed(rollback);}
+			throw failure;
+		}
 		List<NativeTerrainSnapshot> before =
 			new ArrayList<NativeTerrainSnapshot>(action.changes.size());
 		List<NativeTerrainSnapshot> after =
 			new ArrayList<NativeTerrainSnapshot>(action.changes.size());
-		for (WorldEditorOperationHistory.Change<NativeTileKey,NativeLayeredTerrainTile>
+		boolean placementChanged=false;
+		for (WorldEditorOperationHistory.Change<Object,Optional<Object>>
 			change : action.changes) {
-			WorldLocation location = change.key.location();
-			NativeLayeredTerrainTile base = nativeBaseTile(player, location);
-			if (change.after.equals(base)) nativeTerrainOverlay.remove(change.key);
-			else nativeTerrainOverlay.put(change.key, change.after);
-			refreshNativeDirty(change.key);
-			before.add(new NativeTerrainSnapshot(location, change.before));
-			after.add(new NativeTerrainSnapshot(location, change.after));
+			if(change.key instanceof NativeTileKey){
+				NativeTileKey key=(NativeTileKey)change.key;
+				before.add(new NativeTerrainSnapshot(
+					key.location(),(NativeLayeredTerrainTile)change.before.get()));
+				after.add(new NativeTerrainSnapshot(
+					key.location(),(NativeLayeredTerrainTile)change.after.get()));
+			}else placementChanged=true;
 		}
-		nativeTerrainSceneRevision++;
-		return new NativeTerrainHistoryResult(action.label, before, after,
-			action.canUndo, action.canRedo, redo);
+		return new NativeOperationHistoryResult(action.label,before,after,
+			action.canUndo,action.canRedo,redo,placementChanged);
 	}
 
 	public synchronized NativeLayeredTerrainTile resolveNativeTerrainTile(
@@ -719,6 +739,8 @@ public final class WorldEditorSessionManager {
 			rollbackNativeVerticalProvision(provision);
 			throw failure;
 		}
+		if(createdInverse||provision.createdLevel||!provision.added.isEmpty())
+			clearNativeOperationHistory();
 		return new NativeVerticalPairResult(
 			destination,
 			createdInverse,
@@ -737,8 +759,12 @@ public final class WorldEditorSessionManager {
 			throw new IllegalArgumentException(
 				"There is already scenery in that spot.");
 		}
-		return placeNativeSceneryAt(
+		GameObject placed=placeNativeSceneryAt(
 			player, sceneryId, 0, location);
+		recordNativePlacementHistory("Scenery Place",
+			placementHistoryChange(new NativeSceneryKey(location),null,
+				NativeSceneryState.from(placed)));
+		return placed;
 	}
 
 	public synchronized GameObject removeNativeScenery(
@@ -755,6 +781,8 @@ public final class WorldEditorSessionManager {
 		captureNativeSceneryBase(key, current);
 		player.getWorld().unregisterGameObject(object);
 		recordNativeScenery(key, null);
+		recordNativePlacementHistory("Scenery Remove",
+			placementHistoryChange(key,current,null));
 		return object;
 	}
 
@@ -777,7 +805,10 @@ public final class WorldEditorSessionManager {
 			player.getWorld(),
 			new GameObjectLoc(object.getID(), x, y, direction, 0));
 		player.getWorld().replaceGameObject(object, replacement);
-		recordNativeScenery(key, NativeSceneryState.from(replacement));
+		NativeSceneryState rotated=NativeSceneryState.from(replacement);
+		recordNativeScenery(key,rotated);
+		recordNativePlacementHistory("Scenery Rotate",
+			placementHistoryChange(key,current,rotated));
 		return replacement;
 	}
 
@@ -829,6 +860,11 @@ public final class WorldEditorSessionManager {
 		captureNativeSceneryBase(destinationKey, null);
 		recordNativeScenery(sourceKey, null);
 		recordNativeScenery(destinationKey, movedState);
+		List<WorldEditorOperationHistory.Change<Object,Optional<Object>>> changes=
+			new ArrayList<WorldEditorOperationHistory.Change<Object,Optional<Object>>>(2);
+		changes.add(placementHistoryChange(sourceKey,current,null));
+		changes.add(placementHistoryChange(destinationKey,null,movedState));
+		recordNativePlacementHistory("Scenery Move",changes);
 		return moved;
 	}
 
@@ -852,7 +888,7 @@ public final class WorldEditorSessionManager {
 		requireNativeNpcTerrainCoverage(player, location, minX, minY, maxX, maxY);
 		String placementId = availableNativeNpcPlacementId(player, location);
 		NativeNpcKey key = new NativeNpcKey(
-			location.getWorldSpace(), placementId);
+			location.getWorldSpace(),location.getCoordinate().getLevel(),placementId);
 		requireAdaptivePlacementDraftCapacity(
 			player,key,nativeNpcBase,nativeNpcOverlay);
 		captureNativeNpcBase(key, null);
@@ -865,7 +901,10 @@ public final class WorldEditorSessionManager {
 			npc, owner.getPackageId(), placementId,
 			RegionManager.NATIVE_LAYERED_NPC_KIND);
 		player.getWorld().registerNpc(npc);
-		recordNativeNpc(key, NativeNpcState.from(npc));
+		NativeNpcState placed=NativeNpcState.from(npc);
+		recordNativeNpc(key,placed);
+		recordNativePlacementHistory("NPC Place",
+			placementHistoryChange(key,null,placed));
 		return npc;
 	}
 
@@ -882,12 +921,14 @@ public final class WorldEditorSessionManager {
 		}
 		NativeNpcState current = NativeNpcState.from(npc);
 		NativeNpcKey key = new NativeNpcKey(
-			npc.getWorldLocation().getWorldSpace(), current.placementId);
+			npc.getWorldLocation().getWorldSpace(),current.level,current.placementId);
 		requireAdaptivePlacementDraftCapacity(
 			player,key,nativeNpcBase,nativeNpcOverlay);
 		captureNativeNpcBase(key, current);
 		player.getWorld().unregisterNpc(npc);
 		recordNativeNpc(key, null);
+		recordNativePlacementHistory("NPC Remove",
+			placementHistoryChange(key,current,null));
 		return npc;
 	}
 
@@ -948,8 +989,10 @@ public final class WorldEditorSessionManager {
 			throw new IllegalStateException(
 				"Ground-item spawn could not be registered.");
 		}
-		recordNativeGroundItem(
-			key, NativeGroundItemState.from(placement));
+		NativeGroundItemState placed=NativeGroundItemState.from(placement);
+		recordNativeGroundItem(key,placed);
+		recordNativePlacementHistory("Ground Item Place",
+			placementHistoryChange(key,null,placed));
 		return item;
 	}
 
@@ -978,6 +1021,8 @@ public final class WorldEditorSessionManager {
 		captureNativeGroundItemBase(key, current);
 		item.retireNativeLayeredPlacement();
 		recordNativeGroundItem(key, null);
+		recordNativePlacementHistory("Ground Item Remove",
+			placementHistoryChange(key,current,null));
 		return item;
 	}
 
@@ -1249,7 +1294,7 @@ public final class WorldEditorSessionManager {
 	}
 
 	private void resetNativeDraftAgainstAdoptedPackage(String inventorySha256) {
-		nativeTerrainHistory.clear();
+		clearNativeOperationHistory();
 		nativeTerrainBase.clear();
 		nativeTerrainOverlay.clear();
 		nativeTerrainSaved.clear();
@@ -2110,6 +2155,170 @@ public final class WorldEditorSessionManager {
 		if(java.util.Objects.equals(target,saved))nativeSceneryDirty.remove(key);
 		else nativeSceneryDirty.add(key);
 	}
+	private void clearNativeOperationHistory(){
+		nativeOperationHistory.clear();nativePlacementHistorySequence=0L;
+	}
+	private static WorldEditorOperationHistory.Change<Object,Optional<Object>>
+		placementHistoryChange(Object key,Object before,Object after){
+		return WorldEditorOperationHistory.Change.of(
+			key,Optional.ofNullable(before),Optional.ofNullable(after));
+	}
+	private void recordNativePlacementHistory(
+		String label,
+		WorldEditorOperationHistory.Change<Object,Optional<Object>> change){
+		recordNativePlacementHistory(
+			label,java.util.Collections.singletonList(change));
+	}
+	private void recordNativePlacementHistory(
+		String label,
+		List<WorldEditorOperationHistory.Change<Object,Optional<Object>>> changes){
+		if(nativePlacementHistorySequence>=(Long.MAX_VALUE>>>1))
+			clearNativeOperationHistory();
+		long token=(nativePlacementHistorySequence++<<1)|1L;
+		nativeOperationHistory.record(token,label,changes);
+	}
+	private int nativeHistoryLevel(Object key){
+		if(key instanceof NativeTileKey)return ((NativeTileKey)key).level;
+		if(key instanceof NativeSceneryKey)return ((NativeSceneryKey)key).level;
+		if(key instanceof NativeNpcKey)return ((NativeNpcKey)key).level;
+		if(key instanceof NativeGroundItemKey)return ((NativeGroundItemKey)key).level;
+		throw new IllegalStateException("Editor history contains an unsupported operation key.");
+	}
+	private Optional<Object> currentNativeHistoryState(Player player,Object key){
+		if(key instanceof NativeTileKey){
+			NativeTileKey tileKey=(NativeTileKey)key;
+			NativeLayeredTerrainTile value=nativeTerrainOverlay.get(tileKey);
+			if(value==null)value=nativeBaseTile(player,tileKey.location());
+			return Optional.<Object>of(value);
+		}
+		if(key instanceof NativeSceneryKey){
+			GameObject object=player.getWorld().getRegionManager()
+				.findNativeLayeredScenery(((NativeSceneryKey)key).location());
+			return object==null?Optional.empty()
+				:Optional.<Object>of(NativeSceneryState.from(object));
+		}
+		if(key instanceof NativeNpcKey){
+			Npc npc=findNativeHistoryNpc(player,(NativeNpcKey)key);
+			return npc==null?Optional.empty()
+				:Optional.<Object>of(NativeNpcState.from(npc));
+		}
+		if(key instanceof NativeGroundItemKey){
+			GroundItem item=player.getWorld().findNativeLayeredGroundItem(
+				((NativeGroundItemKey)key).location());
+			return item==null?Optional.empty():Optional.<Object>of(
+				NativeGroundItemState.from(item.getNativeLayeredPlacement()));
+		}
+		throw new IllegalStateException("Editor history contains an unsupported operation key.");
+	}
+	private Npc findNativeHistoryNpc(Player player,NativeNpcKey key){
+		Npc found=null;
+		for(Npc npc:player.getWorld().getNpcs()){
+			if(!player.getWorld().getRegionManager().isNativeLayeredPlacement(
+				npc,RegionManager.NATIVE_LAYERED_NPC_KIND))continue;
+			WorldLocation location=npc.getWorldLocation();
+			if(location==null||location.getCoordinate().getLevel()!=key.level
+				||!location.getWorldSpace().equals(key.worldSpace)
+				||!key.placementId.equals(npc.getAttribute(
+					RegionManager.NATIVE_LAYERED_PLACEMENT_ID_ATTRIBUTE,"")))continue;
+			if(found!=null)throw new IllegalStateException(
+				"Editor history found duplicate package-owned NPC placement identity.");
+			found=npc;
+		}
+		return found;
+	}
+	private void applyNativeHistoryTargets(
+		Player player,Map<Object,Optional<Object>> targets){
+		for(Map.Entry<Object,Optional<Object>> entry:targets.entrySet())
+			validateNativeHistoryTarget(entry.getKey(),entry.getValue());
+		for(Object key:targets.keySet()){
+			if(key instanceof NativeSceneryKey){
+				GameObject current=player.getWorld().getRegionManager()
+					.findNativeLayeredScenery(((NativeSceneryKey)key).location());
+				if(current!=null)player.getWorld().unregisterGameObject(current);
+			}else if(key instanceof NativeNpcKey){
+				Npc current=findNativeHistoryNpc(player,(NativeNpcKey)key);
+				if(current!=null)player.getWorld().unregisterNpc(current);
+			}else if(key instanceof NativeGroundItemKey){
+				GroundItem current=player.getWorld().findNativeLayeredGroundItem(
+					((NativeGroundItemKey)key).location());
+				if(current!=null)current.retireNativeLayeredPlacement();
+			}
+		}
+		boolean terrainChanged=false;
+		for(Map.Entry<Object,Optional<Object>> entry:targets.entrySet()){
+			Object key=entry.getKey();Object value=entry.getValue().orElse(null);
+			if(key instanceof NativeTileKey){
+				NativeTileKey tileKey=(NativeTileKey)key;
+				NativeLayeredTerrainTile tile=(NativeLayeredTerrainTile)value;
+				NativeLayeredTerrainTile base=nativeBaseTile(player,tileKey.location());
+				if(tile.equals(base))nativeTerrainOverlay.remove(tileKey);
+				else nativeTerrainOverlay.put(tileKey,tile);
+				refreshNativeDirty(tileKey);terrainChanged=true;
+			}else if(key instanceof NativeSceneryKey){
+				NativeSceneryKey sceneryKey=(NativeSceneryKey)key;
+				NativeSceneryState state=(NativeSceneryState)value;
+				if(state!=null){
+					WorldCoordinate coordinate=sceneryKey.location().getCoordinate();
+					GameObject object=new GameObject(player.getWorld(),new GameObjectLoc(
+						state.sceneryId,coordinate.getX(),coordinate.getY(),state.direction,0));
+					object.setInitialWorldLocation(sceneryKey.location());
+					NativeLayeredWorldPackage owner=nativeOwner(player,sceneryKey.location());
+					player.getWorld().getRegionManager().markNativeLayeredPlacement(
+						object,owner.getPackageId(),state.placementId,
+						RegionManager.NATIVE_LAYERED_SCENERY_KIND);
+					player.getWorld().registerGameObject(object);
+				}
+				recordNativeScenery(sceneryKey,state);
+			}else if(key instanceof NativeNpcKey){
+				NativeNpcKey npcKey=(NativeNpcKey)key;
+				NativeNpcState state=(NativeNpcState)value;
+				if(state!=null){
+					WorldLocation location=new WorldLocation(npcKey.worldSpace,
+						new WorldCoordinate(state.startX,state.startY,state.level));
+					Npc npc=new Npc(player.getWorld(),state.npcId,state.startX,state.startY,
+						state.minX,state.maxX,state.minY,state.maxY);
+					npc.setWorldLocation(location,true);
+					NativeLayeredWorldPackage owner=nativeOwner(player,location);
+					player.getWorld().getRegionManager().markNativeLayeredPlacement(
+						npc,owner.getPackageId(),state.placementId,
+						RegionManager.NATIVE_LAYERED_NPC_KIND);
+					player.getWorld().registerNpc(npc);
+				}
+				recordNativeNpc(npcKey,state);
+			}else if(key instanceof NativeGroundItemKey){
+				NativeGroundItemKey itemKey=(NativeGroundItemKey)key;
+				NativeGroundItemState state=(NativeGroundItemState)value;
+				if(state!=null){
+					NativeLayeredGroundItemPlacement placement=
+						NativeLayeredGroundItemPlacement.authored(state.placementId,
+							state.itemId,itemKey.location(),state.amount,state.respawnSeconds);
+					GroundItem item=player.getWorld().registerNativeLayeredGroundItem(placement);
+					if(item==null||item.getNativeLayeredPlacement()!=placement)
+						throw new IllegalStateException(
+							"Ground-item history state could not be registered.");
+				}
+				recordNativeGroundItem(itemKey,state);
+			}
+		}
+		if(terrainChanged)nativeTerrainSceneRevision++;
+	}
+	private static void validateNativeHistoryTarget(
+		Object key,Optional<Object> state){
+		if(key instanceof NativeTileKey){
+			if(!state.isPresent()||!(state.get() instanceof NativeLayeredTerrainTile))
+				throw new IllegalStateException("Terrain history state is malformed.");
+		}else if(key instanceof NativeSceneryKey){
+			if(state.isPresent()&&!(state.get() instanceof NativeSceneryState))
+				throw new IllegalStateException("Scenery history state is malformed.");
+		}else if(key instanceof NativeNpcKey){
+			if(state.isPresent()&&!(state.get() instanceof NativeNpcState))
+				throw new IllegalStateException("NPC history state is malformed.");
+		}else if(key instanceof NativeGroundItemKey){
+			if(state.isPresent()&&!(state.get() instanceof NativeGroundItemState))
+				throw new IllegalStateException("Ground-item history state is malformed.");
+		}else throw new IllegalStateException(
+			"Editor history contains an unsupported operation key.");
+	}
 	private String availableNativePlacementId(
 		Player player,String family,WorldLocation location){
 		if(isAdaptive(player)){
@@ -2356,12 +2565,12 @@ public final class WorldEditorSessionManager {
 		@Override public int hashCode(){int result=placementId.hashCode();result=31*result+sceneryId;return 31*result+direction;}
 	}
 	private static final class NativeNpcKey {
-		final WorldSpaceId worldSpace;final String placementId;
-		NativeNpcKey(WorldSpaceId worldSpace,String placementId){
-			this.worldSpace=worldSpace;this.placementId=placementId;
+		final WorldSpaceId worldSpace;final int level;final String placementId;
+		NativeNpcKey(WorldSpaceId worldSpace,int level,String placementId){
+			this.worldSpace=worldSpace;this.level=level;this.placementId=placementId;
 		}
-		@Override public boolean equals(Object other){if(this==other)return true;if(!(other instanceof NativeNpcKey))return false;NativeNpcKey key=(NativeNpcKey)other;return worldSpace.equals(key.worldSpace)&&placementId.equals(key.placementId);}
-		@Override public int hashCode(){return 31*worldSpace.hashCode()+placementId.hashCode();}
+		@Override public boolean equals(Object other){if(this==other)return true;if(!(other instanceof NativeNpcKey))return false;NativeNpcKey key=(NativeNpcKey)other;return level==key.level&&worldSpace.equals(key.worldSpace)&&placementId.equals(key.placementId);}
+		@Override public int hashCode(){int result=worldSpace.hashCode();result=31*result+level;return 31*result+placementId.hashCode();}
 	}
 	private static final class NativeNpcState {
 		final String placementId;final int level,npcId,startX,startY,minX,minY,maxX,maxY;
@@ -2518,16 +2727,17 @@ public final class WorldEditorSessionManager {
 		public final List<NativeTerrainSnapshot> before,after;
 		private NativeTerrainStrokeResult(List<NativeTerrainSnapshot> before,List<NativeTerrainSnapshot> after){this.before=before;this.after=after;}
 	}
-	public static final class NativeTerrainHistoryResult {
+	public static final class NativeOperationHistoryResult {
 		public final String label;
 		public final List<NativeTerrainSnapshot> before,after;
-		public final boolean canUndo,canRedo,redo;
-		private NativeTerrainHistoryResult(
+		public final boolean canUndo,canRedo,redo,placementChanged;
+		private NativeOperationHistoryResult(
 			String label,List<NativeTerrainSnapshot> before,
 			List<NativeTerrainSnapshot> after,boolean canUndo,
-			boolean canRedo,boolean redo){
+			boolean canRedo,boolean redo,boolean placementChanged){
 			this.label=label;this.before=before;this.after=after;
 			this.canUndo=canUndo;this.canRedo=canRedo;this.redo=redo;
+			this.placementChanged=placementChanged;
 		}
 	}
 	public static final class TerrainStrokeResult {

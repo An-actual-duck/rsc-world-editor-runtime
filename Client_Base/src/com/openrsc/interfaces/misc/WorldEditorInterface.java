@@ -394,7 +394,9 @@ public final class WorldEditorInterface extends NCustomComponent {
 			||message.contains("There is already scenery")
 			||message.contains("There is no scenery");
 		if(accepted&&pendingEntityActions>0){
-			pendingEntityActions--;unsavedChanges=true;saveRequested=false;closeArmed=false;inspectionStatus=message;if(message.contains("Moved layered scenery:"))clearSceneryMove();
+			pendingEntityActions--;unsavedChanges=true;saveRequested=false;closeArmed=false;
+			terrainHistoryCanUndo=true;terrainHistoryCanRedo=false;inspectionStatus=message;
+			if(message.contains("Moved layered scenery:"))clearSceneryMove();
 		}else if(refused&&pendingEntityActions>0){
 			pendingEntityActions--;inspectionStatus=message;
 		}
@@ -492,6 +494,12 @@ public final class WorldEditorInterface extends NCustomComponent {
 			mc.applyWorldEditorTerrainPatch(tile[0],tile[1],tile[2],tile[7],tile[8],tile[9],tile[10],tile[11],tile[12],tile[13],true,complete&&i==tiles.length-1);}
 		terrainHistoryReceived+=tiles.length;
 		if(!complete){inspectionStatus="Applying terrain history: "+terrainHistoryReceived+" of "+total+" tiles.";return;}
+		setSequence(sequence);terrainHistoryCanUndo=canUndo;terrainHistoryCanRedo=canRedo;
+		terrainHistoryPending=false;terrainHistoryTotal=terrainHistoryReceived=0;
+		unsavedChanges=true;saveRequested=false;closeArmed=false;inspectionStatus=message;
+	}
+	public void acceptPlacementHistory(int sequence,boolean canUndo,boolean canRedo,String message){
+		if(!terrainHistoryPending){showError("Server returned an unexpected placement history result.");return;}
 		setSequence(sequence);terrainHistoryCanUndo=canUndo;terrainHistoryCanRedo=canRedo;
 		terrainHistoryPending=false;terrainHistoryTotal=terrainHistoryReceived=0;
 		unsavedChanges=true;saveRequested=false;closeArmed=false;inspectionStatus=message;
@@ -889,11 +897,11 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void rejectLayeredReviewMutation(String message){inspectionStatus=message;mc.showWorldEditorStatus(message);}
 	private void requestWorldEditSave(){if(isLayeredReview()&&!isLayeredTerrainDraft()){rejectLayeredReviewMutation("Layered package review is read-only; no files were changed.");saveRequested=false;return;}if(terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||pendingEntityActions>0){inspectionStatus="Wait for authoritative edit responses before saving.";return;}mc.sendCommandString("saveworldedits");saveRequested=true;closeArmed=false;inspectionStatus=isLayeredTerrainDraft()?"Layered draft save requested; it will commit to working/ when this Builder closes.":"World edit save requested; see game messages for verification.";}
 	private void requestTerrainHistory(boolean redo){
-		if(!isLayeredTerrainDraft()){inspectionStatus="Terrain Undo/Redo is available in an editable layered Builder project.";return;}
+		if(!isLayeredTerrainDraft()){inspectionStatus="Operation Undo/Redo is available in an editable layered Builder project.";return;}
 		if(terrainHistoryPending||terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||pendingEntityActions>0){inspectionStatus="Wait for the current authoritative edit before using Undo or Redo.";return;}
 		if(redo?!terrainHistoryCanRedo:!terrainHistoryCanUndo){inspectionStatus=redo?"There is nothing to redo in this Builder session.":"There is nothing to undo in this Builder session.";return;}
 		terrainHistoryPending=true;terrainHistoryTotal=terrainHistoryReceived=0;send(redo?11:10,0,0,0,0,0,0);
-		inspectionStatus=redo?"Redoing the next terrain operation...":"Undoing the last terrain operation...";
+		inspectionStatus=redo?"Redoing the next Builder operation...":"Undoing the last Builder operation...";
 	}
 	private void requestEditorClose(){
 		if(terrainLineCommitTiles!=null){inspectionStatus="Wait for the authoritative terrain response before closing.";return;}
@@ -1300,8 +1308,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 		int field=terrainFieldAtDock(x,y);if(field>=0)return activeTerrainLabel(field)+": "+terrainText(field)+" | "+(terrainEnabled(field)?"paint ON":"paint OFF")+" | Left: edit | Right: toggle";
 		TerrainTool terrainSelection=terrainToolAtDock(x,y);if(terrainSelection!=null)return terrainSelection==TerrainTool.FREEHAND?"Freehand | click or Ctrl-drag":terrainSelection==TerrainTool.LINE?"Line | click anchor, preview, click destination":"Rectangle | click two opposite corners";
 		if(dockHit(x,y,0,7))return "Brush "+terrainBrushSize+"x"+terrainBrushSize+" | Left: edit | Right: toggle size";if(dockHit(x,y,0,8))return "Build view: "+(terrainBuildMode?"ON":"OFF")+" | faceted terrain grid";
-		if(dockHit(x,y,0,9))return terrainHistoryCanUndo?"Undo last terrain operation | Ctrl+Z":"Undo | no terrain operation available";
-		if(dockHit(x,y,0,10))return terrainHistoryCanRedo?"Redo next terrain operation | Ctrl+Y":"Redo | no terrain operation available";
+		if(dockHit(x,y,0,9))return terrainHistoryCanUndo?"Undo last Builder operation | Ctrl+Z":"Undo | no Builder operation available";
+		if(dockHit(x,y,0,10))return terrainHistoryCanRedo?"Redo next Builder operation | Ctrl+Y":"Redo | no Builder operation available";
 		if(dockHit(x,y,0,11))return "Save | "+(unsavedChanges?"unsaved changes":"clean")+(saveRequested?" | requested":"");if(dockHit(x,y,0,12))return closeArmed?"Close without saving: confirm":"Close editor";return "";
 	}
 	private String contextActionTooltip(int action){

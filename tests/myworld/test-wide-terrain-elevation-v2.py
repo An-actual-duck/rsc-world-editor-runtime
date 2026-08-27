@@ -147,7 +147,7 @@ public final class ElevationOperationProbe {static void ok(boolean v,String m){i
         for evidence in ("groundElevation * 3", "ROOF_ELEVATION_MARKER", "collectRoofFaceInputs", "getElevation(pixelX, pixelZ)", "NATIVE_MINIMAP"):
             self.assertIn(evidence, client_world)
         handler = (ROOT / "Client_Base/src/orsc/PacketHandler.java").read_text()
-        self.assertIn("World Editor terrain capability mismatch", handler)
+        self.assertIn("World Editor operation-history capability mismatch", handler)
         server_tile = (ROOT / "server/src/com/openrsc/server/model/world/region/TileValue.java").read_text()
         self.assertIn("public int elevation", server_tile)
 

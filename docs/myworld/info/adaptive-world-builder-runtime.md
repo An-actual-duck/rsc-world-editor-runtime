@@ -354,7 +354,7 @@ encodings ending in `-v2-u16`; raw v2 records are 11 bytes in network order:
 two elevation bytes, the five unchanged byte fields, then all four diagonal
 wall bytes. No non-elevation field is translated during promotion or save.
 
-The editor envelope is capability version 3 and carries elevation as an
+The editor envelope is capability version 4 and carries elevation as an
 unsigned short. Absolute sets and configurable-step Raise/Lower operations
 are accepted only by native layered authoring. Every tile in a stroke is
 calculated and bounds-checked before the draft changes, so any overflow or
@@ -366,28 +366,32 @@ Frozen legacy landscape archives remain 10-byte records and readable. They
 cannot store elevations above 255, and the legacy pack/save path refuses such
 a value instead of narrowing it.
 
-## Session terrain Undo and Redo
+## Session operation Undo and Redo
 
-Editor envelope v3 adds a positive operation token to terrain requests and
-bounded authoritative Undo/Redo requests. A click, Line, or Rectangle uses one
-token. Every acknowledged batch in one continuous freehand drag shares a token,
-so the complete gesture is one history operation rather than a stack of network
-chunks.
+Editor envelope v4 retains positive operation tokens for terrain requests and
+adds authoritative placement-history acknowledgements. A click, Line, or
+Rectangle uses one token. Every acknowledged batch in one continuous freehand
+drag shares a token, so the complete gesture is one history operation rather
+than a stack of network chunks. Scenery Place, Move, Rotate, and Remove; NPC
+Place and Remove; and ground-item Place and Remove each enter the same ordered
+session stack. A scenery move is one atomic two-location operation.
 
-The server retains at most 64 operations and 65,536 referenced tile states for
-the active Editor session. It stores the first before-state and final
-after-state for each tile. Undo and Redo compare every current authoritative
-tile against the expected side before changing any draft state; drift refuses
-the complete operation. A new edit clears Redo. History never changes the
-target server and is cleared when the Editor session closes or an Editor-owned
-package publication replaces the running package.
+The server retains at most 64 operations and 65,536 referenced terrain or
+placement states for the active Editor session. It stores the first
+before-state and final after-state for each affected identity. Undo and Redo
+compare every current authoritative state against the expected side before
+changing any draft state; drift refuses the complete operation. A new edit
+clears Redo. Placement reversals register or retire their live runtime entity,
+so scenery, NPC, and ground-item visuals update without restarting the Builder.
+History never changes the target server and is cleared when the Editor session
+closes or an Editor-owned package publication replaces the running package.
 
-This first increment covers layered terrain clicks, freehand gestures, Lines,
-and Rectangles. An operation that allocates new terrain establishes a safe
-history boundary because sector allocation is not yet reversible. Placement
-families and Editor-owned Region transactions will join the same user-facing
-history in later increments; the existing exact last-Paste Undo remains a
-separate durable package transaction meanwhile.
+The session stack covers layered terrain clicks, freehand gestures, Lines,
+Rectangles, and the three placement families. An operation that allocates new
+terrain establishes a safe history boundary because sector allocation is not
+yet reversible. Editor-owned Region transactions remain separate durable
+package transactions; the existing exact last-Paste Undo continues to apply
+there.
 
 ## Empty and existing-level authoring
 

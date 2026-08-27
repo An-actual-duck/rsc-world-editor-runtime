@@ -1444,8 +1444,8 @@ public class PacketHandler {
 
 	private void updateWorldEditor() {
 		int type=packetsIncoming.getByte()&0xff, version=packetsIncoming.getByte()&0xff, sequence=packetsIncoming.get32();
-		if(version!=3)throw new IllegalStateException(
-			"World Editor terrain capability mismatch: required v3, server sent v"+version);
+		if(version!=4)throw new IllegalStateException(
+			"World Editor operation-history capability mismatch: required v4, server sent v"+version);
 		if(mc.worldEditorInterface==null||Config.isAndroid())return;
 		if(type==1){WorldBuilderClientProfile.current().acceptAdaptiveServerBinding();mc.worldEditorInterface.open(packetsIncoming.getLong(0),sequence);return;}
 		if(type==2){mc.worldEditorInterface.closeFromServer();return;}
@@ -1463,6 +1463,8 @@ public class PacketHandler {
 			String definitions=packetsIncoming.readString();if(type==10)mc.worldEditorInterface.acceptTerrainHistoryChunk(sequence,total,offset,tiles,projectiles,canUndo,canRedo,definitions);
 			else if(type==9)mc.worldEditorInterface.acceptTerrainLineChunk(sequence,fieldMask,total,offset,tiles,projectiles,definitions);
 			else mc.worldEditorInterface.acceptTerrainStroke(sequence,fieldMask,tiles,projectiles,definitions);return;}
+		if(type==11){boolean canUndo=packetsIncoming.getByte()!=0,canRedo=packetsIncoming.getByte()!=0;
+			mc.worldEditorInterface.acceptPlacementHistory(sequence,canUndo,canRedo,packetsIncoming.readString());return;}
 		if(type==3||type==7){int x=packetsIncoming.getShort(),y=packetsIncoming.getShort(),plane=packetsIncoming.getByte();
 			int sx=packetsIncoming.getShort(),sy=packetsIncoming.getShort(),lx=packetsIncoming.getByte()&0xff,ly=packetsIncoming.getByte()&0xff;
 			int elev=packetsIncoming.getShort()&0xffff,texture=packetsIncoming.getByte()&0xff,overlay=packetsIncoming.getByte()&0xff,roof=packetsIncoming.getByte()&0xff;

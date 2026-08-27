@@ -281,6 +281,9 @@ public class PayloadCustomGenerator implements PayloadGenerator<OpcodeOut> {
 						}
 						builder.writeByte(editor.historyCanUndo?1:0);builder.writeByte(editor.historyCanRedo?1:0);
 						builder.writeString(editor.message == null ? "" : editor.message);
+					} else if (editor.type == 11) {
+						builder.writeByte(editor.historyCanUndo?1:0);builder.writeByte(editor.historyCanRedo?1:0);
+						builder.writeString(editor.message == null ? "" : editor.message);
 					} else if (editor.type == 4 || editor.type == 5 || editor.type == 6) {
 						builder.writeString(editor.message == null ? "" : editor.message);
 					}

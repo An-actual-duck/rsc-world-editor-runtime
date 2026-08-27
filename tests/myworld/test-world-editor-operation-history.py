@@ -57,6 +57,22 @@ public final class WorldEditorOperationHistoryHarness {
 
         history.clear();
         require(!history.canUndo() && !history.canRedo(), "clear retained history");
+
+		history.record(2L, "Terrain", Arrays.asList(change("terrain:1,1", 0, 7)));
+		history.record(3L, "Scenery Place", Arrays.asList(change("scenery:2,2", 0, 42)));
+		history.record(5L, "NPC Place", Arrays.asList(change("npc:3,3", 0, 84)));
+		current.clear();current.put("terrain:1,1",7);current.put("scenery:2,2",42);current.put("npc:3,3",84);
+		undo=history.undo(current);
+		require("NPC Place".equals(undo.label),"mixed history did not undo newest placement first");
+		for(WorldEditorOperationHistory.Change<String,Integer> value:undo.changes)current.put(value.key,value.after);
+		undo=history.undo(current);
+		require("Scenery Place".equals(undo.label),"mixed history lost placement ordering");
+		for(WorldEditorOperationHistory.Change<String,Integer> value:undo.changes)current.put(value.key,value.after);
+		undo=history.undo(current);
+		require("Terrain".equals(undo.label),"mixed history did not reach terrain in edit order");
+		for(WorldEditorOperationHistory.Change<String,Integer> value:undo.changes)current.put(value.key,value.after);
+		redo=history.redo(current);
+		require("Terrain".equals(redo.label),"mixed history redo order changed");
     }
 }
 """
@@ -74,14 +90,23 @@ generator = (ROOT / "server/src/com/openrsc/server/net/rsc/generators/impl/Paylo
 client = (ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.java").read_text()
 packets = (ROOT / "Client_Base/src/orsc/PacketHandler.java").read_text()
 
-assert "nativeTerrainHistory.record" in manager
-assert "undoNativeTerrain" in manager and "redoNativeTerrain" in manager
+assert "nativeOperationHistory.record" in manager
+assert "undoNativeOperation" in manager and "redoNativeOperation" in manager
+for label in ("Scenery Place", "Scenery Remove", "Scenery Rotate", "Scenery Move",
+              "NPC Place", "NPC Remove", "Ground Item Place", "Ground Item Remove"):
+    assert f'"{label}"' in manager
+assert "changes.add(placementHistoryChange(sourceKey,current,null))" in manager
+assert "changes.add(placementHistoryChange(destinationKey,null,movedState))" in manager
 assert "Editor state changed outside this history" in HISTORY.read_text()
 assert "request.type == 10" in handler and "request.type == 11" in handler
 assert "editor.historyToken=packet.readInt()" in parser
 assert "editor.type == 8 || editor.type == 9 || editor.type == 10" in generator
+assert "editor.type == 11" in generator
 assert "acceptTerrainHistoryChunk" in client and "requestTerrainHistory" in client
+assert "acceptPlacementHistory" in client
+assert "terrainHistoryCanUndo=true;terrainHistoryCanRedo=false" in client
 assert "Ctrl+Z" in client and "Ctrl+Y" in client
 assert "type==8||type==9||type==10" in packets
+assert "type==11" in packets
 
-print("PASS: bounded authoritative terrain operation history")
+print("PASS: bounded authoritative mixed Builder operation history")
