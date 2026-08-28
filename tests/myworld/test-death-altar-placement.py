@@ -27,6 +27,13 @@ EXPECTED_OBELISKS = {
     (395, 3538),
     (390, 3538),
 }
+EXPECTED_LOGICAL_ALTAR = (392, 708)
+EXPECTED_LOGICAL_OBELISKS = {
+    (390, 711),
+    (395, 711),
+    (395, 706),
+    (390, 706),
+}
 
 
 def fail(message: str) -> None:
@@ -57,10 +64,12 @@ def main() -> None:
         fail(f"Death obelisks were {sorted(obelisk_locations)}")
 
     client = CLIENT.read_text(encoding="utf-8")
-    if "{392, 3540}" not in client:
-        fail("Client Death Altar visual anchor is not at 392,3540")
-    if "{{390, 3543}, {395, 3543}, {395, 3538}, {390, 3538}}" not in client:
-        fail("Client Death obelisk visual anchors do not match server locations")
+    logical_altar = "{%d, %d}" % EXPECTED_LOGICAL_ALTAR
+    if logical_altar not in client:
+        fail("Client Death Altar visual anchor is not at logical tile 392,708")
+    for x, y in EXPECTED_LOGICAL_OBELISKS:
+        if f"{{{x}, {y}}}" not in client:
+            fail("Client Death obelisk visual anchors do not match logical server tiles")
     for obsolete in (
         "{151, 212}", "{149, 215}", "{154, 215}", "{154, 210}", "{150, 210}",
         "{421, 3546}", "{419, 3549}", "{424, 3549}", "{424, 3544}", "{419, 3544}",

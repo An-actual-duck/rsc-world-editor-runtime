@@ -27,6 +27,8 @@ SERVER_OBELISK_IDS = {
     "life": 1322,
 }
 
+LEGACY_LEVEL_STRIDE = 944
+
 
 def fail(message: str) -> None:
     raise SystemExit(f"FAIL: {message}")
@@ -35,6 +37,11 @@ def fail(message: str) -> None:
 def expected_corners(anchor: tuple[int, int]) -> set[tuple[int, int]]:
     x, y = anchor
     return {(x - 2, y + 3), (x + 3, y + 3), (x + 3, y - 2), (x - 2, y - 2)}
+
+
+def logical_tile(x: int, packed_y: int) -> tuple[int, int]:
+    """Project legacy packed-Y evidence into the signed-layer logical tile."""
+    return x, packed_y % LEGACY_LEVEL_STRIDE
 
 
 def load_scenery(path: Path) -> list[dict]:
@@ -94,6 +101,10 @@ def main() -> None:
         expected = expected_corners(anchor)
         if actual != expected:
             fail(f"Client {element} obelisks were {sorted(actual)}, expected {sorted(expected)}")
+    if any(y >= LEGACY_LEVEL_STRIDE for _, y in anchors):
+        fail("Client altar visuals retain legacy packed-Y coordinates")
+    if any(y >= LEGACY_LEVEL_STRIDE for group in client_obelisks for _, y in group):
+        fail("Client altar orbs retain legacy packed-Y coordinates")
 
     altar_by_id = {
         1191: "air",
@@ -125,9 +136,9 @@ def main() -> None:
         element = altar_by_id.get(int(loc["id"]))
         if element is None:
             continue
-        x, y = int(loc["pos"]["X"]), int(loc["pos"]["Y"])
-        if y >= 90:
-            overworld_anchors[element] = (x, y)
+        x, packed_y = int(loc["pos"]["X"]), int(loc["pos"]["Y"])
+        if packed_y >= 90:
+            overworld_anchors[element] = logical_tile(x, packed_y)
 
     locs = load_scenery(MYWORLD_LOCS)
     for element, object_id in SERVER_OBELISK_IDS.items():
@@ -135,7 +146,7 @@ def main() -> None:
         if anchor is None:
             fail(f"Missing overworld altar anchor for {element}")
         actual = {
-            (int(loc["pos"]["X"]), int(loc["pos"]["Y"]))
+            logical_tile(int(loc["pos"]["X"]), int(loc["pos"]["Y"]))
             for loc in locs
             if int(loc["id"]) == object_id
         }
