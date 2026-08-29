@@ -3789,20 +3789,55 @@ public final class mudclient implements Runnable {
 	public void replaceStaticScenePresentation(
 		List<SceneBaselineState.Record> scenery,
 		List<SceneBaselineState.Record> walls) {
+		List<SceneBaselineState.Record> nextScenery = scenery == null
+			? Collections.<SceneBaselineState.Record>emptyList()
+			: scenery;
+		List<SceneBaselineState.Record> nextWalls = walls == null
+			? Collections.<SceneBaselineState.Record>emptyList()
+			: walls;
+		if (sameStaticScenePresentationRecords(
+				this.staticPresentationSceneryRecords,
+				nextScenery)
+			&& sameStaticScenePresentationRecords(
+				this.staticPresentationWallRecords,
+				nextWalls)) {
+			return;
+		}
 		this.staticPresentationSceneryRecords =
 			Collections.unmodifiableList(
-				new ArrayList<SceneBaselineState.Record>(
-					scenery == null
-						? Collections.<SceneBaselineState.Record>emptyList()
-						: scenery));
+				new ArrayList<SceneBaselineState.Record>(nextScenery));
 		this.staticPresentationWallRecords =
 			Collections.unmodifiableList(
-				new ArrayList<SceneBaselineState.Record>(
-					walls == null
-						? Collections.<SceneBaselineState.Record>emptyList()
-						: walls));
+				new ArrayList<SceneBaselineState.Record>(nextWalls));
 		this.staticPresentationRevision++;
 		invalidateStaticScenePresentationModels();
+	}
+
+	static boolean sameStaticScenePresentationRecords(
+		List<SceneBaselineState.Record> left,
+		List<SceneBaselineState.Record> right) {
+		if (left == right) {
+			return true;
+		}
+		if (left == null || right == null || left.size() != right.size()) {
+			return false;
+		}
+		for (int index = 0; index < left.size(); index++) {
+			SceneBaselineState.Record leftRecord = left.get(index);
+			SceneBaselineState.Record rightRecord = right.get(index);
+			if (leftRecord == rightRecord) {
+				continue;
+			}
+			if (leftRecord == null || rightRecord == null
+				|| leftRecord.id != rightRecord.id
+				|| leftRecord.x != rightRecord.x
+				|| leftRecord.y != rightRecord.y
+				|| leftRecord.direction != rightRecord.direction
+				|| leftRecord.type != rightRecord.type) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public void clearStaticScenePresentation() {
