@@ -751,6 +751,20 @@ def main() -> None:
         "private int addSceneIdentity(final int summary, final int identity)",
     ):
         require(snippet in updater, f"scene baseline identity summary missing: {snippet}")
+    legacy_static_scene_gate = extract_between(
+        updater,
+        "private boolean shouldSendLegacyStaticScenePackets",
+        "protected void sendAppearanceKeepalive",
+    )
+    require(
+        "!player.isUsingCustomClient() || !getServer().getConfig().WANT_SYNC_SCENE_BASELINE"
+        in legacy_static_scene_gate
+        and "getServer().getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE"
+        in legacy_static_scene_gate
+        and "return false;" in legacy_static_scene_gate
+        and "return !staticSceneScanSkipped;" in legacy_static_scene_gate,
+        "adaptive World Builder must consume changed static scenes only through the atomic baseline while ordinary custom clients retain legacy deltas",
+    )
     for snippet in (
         "summarizeScenePlayers(",
         "summarizeSceneNpcs(",

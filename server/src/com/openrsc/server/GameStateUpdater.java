@@ -4357,6 +4357,14 @@ public final class GameStateUpdater {
 		if (!player.isUsingCustomClient() || !getServer().getConfig().WANT_SYNC_SCENE_BASELINE) {
 			return true;
 		}
+		// The adaptive World Builder consumes complete scene baselines atomically. Sending
+		// the legacy per-object delta first exposes an intermediate renderer state where
+		// one newly placed scenery model can temporarily occupy unrelated scene instances.
+		// Keep ordinary custom clients on their compatibility path, but let the dedicated
+		// editor profile observe static-scene changes only after the exact baseline closes.
+		if (getServer().getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE) {
+			return false;
+		}
 		return !staticSceneScanSkipped;
 	}
 
