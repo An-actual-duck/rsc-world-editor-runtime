@@ -29,6 +29,7 @@ renderer_tests=(
   test-legacy-software-scaling-settings.py
   test-client-external-asset-loader.py
   test-client-scene-instance-store.py
+  test-client-static-presentation-stability.py
   test-roof-visibility.py
   test-renderer-relog-resident-world.py
   test-renderer-v2-capture-analyzer.py
