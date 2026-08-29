@@ -395,7 +395,9 @@ final class SceneBaselineState {
 	}
 
 	void pruneLegacyListsOutsideSyncRange(mudclient mc) {
-		if (mc == null || !hasStoredCompleteBaseline() || objectViewDistance <= 0) {
+		if (mc == null
+			|| !hasStoredCompleteSceneProduct()
+			|| objectViewDistance <= 0) {
 			return;
 		}
 		int legacySignature = legacySceneSignature(mc);
@@ -567,6 +569,12 @@ final class SceneBaselineState {
 				== presentationWalls;
 	}
 
+	boolean hasStoredCompleteSceneProduct() {
+		return hasStoredCompleteBaseline()
+			&& (protocolVersion < PRESENTATION_PROTOCOL_VERSION
+				|| hasStoredCompletePresentation());
+	}
+
 	boolean isBaselineOriginLoaded(mudclient mc) {
 		return World.isLocalTile(
 			localX - mc.getMidRegionBaseX(),
@@ -575,9 +583,7 @@ final class SceneBaselineState {
 
 	boolean isCompleteAndOriginLoaded(final mudclient mc) {
 		return mc != null
-			&& hasStoredCompleteBaseline()
-			&& (protocolVersion < PRESENTATION_PROTOCOL_VERSION
-				|| hasStoredCompletePresentation())
+			&& hasStoredCompleteSceneProduct()
 			&& isBaselineOriginLoaded(mc);
 	}
 

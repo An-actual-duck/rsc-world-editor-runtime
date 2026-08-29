@@ -3239,8 +3239,7 @@ public class PacketHandler {
 
 	private void applyCompleteSceneBaselineToLegacyLists(boolean force) {
 		if (mc == null
-			|| !sceneBaselineState.hasStoredCompleteBaseline()
-			|| !sceneBaselineState.isBaselineOriginLoaded(mc)) {
+			|| !sceneBaselineState.isCompleteAndOriginLoaded(mc)) {
 			return;
 		}
 		int applyKey = sceneBaselineState.legacyApplyKey(mc);
@@ -3279,7 +3278,8 @@ public class PacketHandler {
 
 	private void applyCompleteStaticPresentation(boolean force) {
 		if (mc == null
-			|| !sceneBaselineState.hasStoredCompletePresentation()) {
+			|| !sceneBaselineState.hasStoredCompletePresentation()
+			|| !sceneBaselineState.isCompleteAndOriginLoaded(mc)) {
 			return;
 		}
 		int applyKey = sceneBaselineState.presentationApplyKey(mc);

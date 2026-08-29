@@ -146,7 +146,13 @@ def main() -> None:
         "completed scene baselines must be force-replayed after a region load",
     )
     require(
-        "|| !sceneBaselineState.isBaselineOriginLoaded(mc)" in packet_handler
+        "|| !sceneBaselineState.isCompleteAndOriginLoaded(mc)" in packet_handler
+        and re.search(
+            r"boolean isCompleteAndOriginLoaded\(final mudclient mc\).*?"
+            r"isBaselineOriginLoaded\(mc\)",
+            scene_baseline_state,
+            re.DOTALL,
+        )
         and re.search(
             r"boolean isBaselineOriginLoaded\(mudclient mc\).*?World\.isLocalTile\(",
             scene_baseline_state,

@@ -973,11 +973,17 @@ def main() -> None:
         "private String baselineState()",
         "boolean hasStoredCompleteBaseline()",
         "boolean hasStoredCompletePresentation()",
+        "boolean hasStoredCompleteSceneProduct()",
         "private boolean isStaticCategory(int pageCategory)",
         "private int staticSceneKey(",
         "private String pageSummary(int pageCategory)",
     ):
         require(snippet in scene_baseline_state, f"client scene baseline state missing: {snippet}")
+    require(
+        "|| !sceneBaselineState.isCompleteAndOriginLoaded(mc)" in client_packet_handler
+        and "|| !hasStoredCompleteSceneProduct()" in scene_baseline_state,
+        "client must not expose or prune a partial protocol-v8 static scene product",
+    )
     require(
         "PacketHandler activePacketHandler = mudclient == null ? null : mudclient.packetHandler;" in client_applet
         and "activePacketHandler.getSceneBaselineDebugSummaryLines()" in client_applet

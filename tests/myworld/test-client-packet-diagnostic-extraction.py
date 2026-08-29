@@ -551,11 +551,23 @@ def verify_scene_baseline_state() -> None:
                     presentation.hasStoredCompleteBaseline(),
                     "authoritative product completes before outer product");
                 require(
+                    !presentation.hasStoredCompleteSceneProduct(),
+                    "partial v8 product must remain ineligible for presentation");
+                require(
                     !presentation.isCompleteAndOriginLoaded(new mudclient()),
                     "v8 atomic activation waits for the outer product");
                 require(
                     !presentation.hasStoredCompletePresentation(),
                     "outer product remains independently incomplete");
+                mudclient partialClient = new mudclient();
+                partialClient.setGameObjectInstanceID(0, 99);
+                partialClient.setGameObjectInstanceX(0, 500);
+                partialClient.setGameObjectInstanceZ(0, 500);
+                partialClient.setGameObjectInstanceCount(1);
+                presentation.pruneLegacyListsOutsideSyncRange(partialClient);
+                require(
+                    partialClient.getGameObjectInstanceCount() == 1,
+                    "partial v8 product must retain the last complete scene");
                 presentation.recordPacket(
                     8, 20, 7, "global@0", 120, 620,
                     1, 1, 0, 16, 101, 202, 303,
@@ -574,6 +586,13 @@ def verify_scene_baseline_state() -> None:
                 require(
                     presentation.isCompleteAndOriginLoaded(new mudclient()),
                     "v8 atomic activation opens after both products complete");
+                require(
+                    presentation.hasStoredCompleteSceneProduct(),
+                    "complete v8 product becomes eligible as one unit");
+                presentation.pruneLegacyListsOutsideSyncRange(partialClient);
+                require(
+                    partialClient.getGameObjectInstanceCount() == 0,
+                    "complete v8 product may prune superseded legacy scenery");
                 require(
                     presentation.snapshotStoredPresentationSceneryRecords()
                         .size() == 1,
