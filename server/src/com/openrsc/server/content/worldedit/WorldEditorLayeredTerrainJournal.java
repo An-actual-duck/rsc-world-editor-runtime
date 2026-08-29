@@ -26,8 +26,8 @@ public final class WorldEditorLayeredTerrainJournal {
 		"world-builder-layered-draft-v4";
 	private static final String GROUND_ITEM_HEADER =
 		"world-builder-layered-draft-v5";
-	private static final String WIDE_ELEVATION_HEADER =
-		"world-builder-layered-draft-v6-u16-elevation";
+	private static final String CURRENT_HEADER =
+		"world-builder-layered-draft-v7-npc-respawn";
 	private static final int MAX_LEVELS = 64;
 	private static final int MAX_TILES = 4096;
 	private static final int MAX_SECTORS = 64;
@@ -284,7 +284,7 @@ public final class WorldEditorLayeredTerrainJournal {
 			200 + levels.size() * 100 + sectors.size() * 40 + tiles.size() * 80
 				+ scenery.size() * 100 + npcs.size() * 140
 				+ groundItems.size() * 120);
-		output.append(groundItemAuthoring ? WIDE_ELEVATION_HEADER
+		output.append(groundItemAuthoring ? CURRENT_HEADER
 				: allocation ? ALLOCATION_HEADER
 				: authoring ? AUTHORING_HEADER
 				: combined ? COMBINED_HEADER : HEADER).append('\n')
@@ -346,7 +346,11 @@ public final class WorldEditorLayeredTerrainJournal {
 				.append(edit.placementId).append('\t')
 				.append(edit.npcId).append('\t')
 				.append(edit.minX).append('\t').append(edit.minY).append('\t')
-				.append(edit.maxX).append('\t').append(edit.maxY).append('\n');
+				.append(edit.maxX).append('\t').append(edit.maxY);
+			if (groundItemAuthoring) {
+				output.append('\t').append(edit.respawnSeconds);
+			}
+			output.append('\n');
 		}
 		for (GroundItemEdit edit : groundItems) {
 			output.append("ground-item\t")
@@ -509,6 +513,7 @@ public final class WorldEditorLayeredTerrainJournal {
 		public final int minY;
 		public final int maxX;
 		public final int maxY;
+		public final int respawnSeconds;
 
 		public NpcEdit(
 			boolean remove,
@@ -520,7 +525,8 @@ public final class WorldEditorLayeredTerrainJournal {
 			int minX,
 			int minY,
 			int maxX,
-			int maxY) {
+			int maxY,
+			int respawnSeconds) {
 			if (!coordinate(startX) || !coordinate(startY)
 				|| !coordinate(minX) || !coordinate(minY)
 				|| !coordinate(maxX) || !coordinate(maxY)
@@ -528,7 +534,8 @@ public final class WorldEditorLayeredTerrainJournal {
 				|| !SceneryEdit.ID.matcher(placementId).matches()
 				|| npcId < 0 || minX > startX || startX > maxX
 				|| minY > startY || startY > maxY
-				|| maxX - minX > 128 || maxY - minY > 128) {
+				|| maxX - minX > 128 || maxY - minY > 128
+				|| respawnSeconds < -1 || respawnSeconds > 86400) {
 				throw new IllegalArgumentException(
 					"Layered NPC journal edit is outside supported bounds.");
 			}
@@ -542,6 +549,7 @@ public final class WorldEditorLayeredTerrainJournal {
 			this.minY = minY;
 			this.maxX = maxX;
 			this.maxY = maxY;
+			this.respawnSeconds = respawnSeconds;
 		}
 	}
 

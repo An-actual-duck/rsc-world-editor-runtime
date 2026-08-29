@@ -44,6 +44,8 @@ public final class AdaptiveWorldBuilderClientSession {
 		"layered-world-package-v1";
 	public static final String COORDINATE_MODEL = "signed-layered-v1";
 	public static final String PLACEMENT_ENCODING =
+		"layered-world-placements-v4";
+	public static final String LEGACY_PLACEMENT_ENCODING =
 		"layered-world-placements-v3";
 	public static final String PROFILE_ID = "adaptive-world-builder";
 	private static final long MAX_BINDING_BYTES = 1024L * 1024L;
@@ -352,7 +354,12 @@ public final class AdaptiveWorldBuilderClientSession {
 		expect(fields, "effectiveComposition", EFFECTIVE_COMPOSITION_ID);
 		expect(fields, "loader", LOADER_ID);
 		expect(fields, "packageSchema", PACKAGE_SCHEMA_ID);
-		expect(fields, "placementEncoding", PLACEMENT_ENCODING);
+		String placementEncoding = fields.get("placementEncoding");
+		if (!PLACEMENT_ENCODING.equals(placementEncoding)
+			&& !LEGACY_PLACEMENT_ENCODING.equals(placementEncoding)) {
+			throw new IllegalArgumentException(
+				"placementEncoding is unsupported");
+		}
 		expect(fields, "profile", PROFILE_ID);
 		expect(fields, "protocol", PROTOCOL_ID);
 		expect(fields, "serverBuild", SERVER_BUILD_ID);

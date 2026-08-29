@@ -53,8 +53,10 @@ public final class NativeLayeredWorldPackage {
 		"layered-world-placements-v2";
 	public static final String WORLD_PLACEMENT_ENCODING_V3 =
 		"layered-world-placements-v3";
+	public static final String WORLD_PLACEMENT_ENCODING_V4 =
+		"layered-world-placements-v4";
 	public static final String ENTITY_PLACEMENT_ENCODING =
-		WORLD_PLACEMENT_ENCODING_V3;
+		WORLD_PLACEMENT_ENCODING_V4;
 	public static final String RUNTIME_PROJECTION_ID =
 		LayeredCompatibilityPointAdapter.NATIVE_LAYERED_PACKAGE_ID;
 
@@ -371,7 +373,8 @@ public final class NativeLayeredWorldPackage {
 			String encoding = matchedString(value, "encoding", ID);
 			if (!ENTITY_PLACEMENT_ENCODING_V1.equals(encoding)
 				&& !WORLD_PLACEMENT_ENCODING_V2.equals(encoding)
-				&& !WORLD_PLACEMENT_ENCODING_V3.equals(encoding)) {
+				&& !WORLD_PLACEMENT_ENCODING_V3.equals(encoding)
+				&& !WORLD_PLACEMENT_ENCODING_V4.equals(encoding)) {
 				throw new IOException(
 					"Placement payload encoding is unsupported by this loader: "
 						+ encoding);
@@ -423,7 +426,10 @@ public final class NativeLayeredWorldPackage {
 		boolean version3 =
 			schemaVersion == 3
 				&& WORLD_PLACEMENT_ENCODING_V3.equals(payloadEncoding);
-		if (!version1 && !version2 && !version3) {
+		boolean version4 =
+			schemaVersion == 4
+				&& WORLD_PLACEMENT_ENCODING_V4.equals(payloadEncoding);
+		if (!version1 && !version2 && !version3 && !version4) {
 			throw new IOException(
 				"Placement schemaVersion/encoding pair is unsupported");
 		}
@@ -466,7 +472,7 @@ public final class NativeLayeredWorldPackage {
 		int placementCount = Math.addExact(
 			Math.addExact(npcValues.length(), itemValues.length()),
 			Math.addExact(sceneryValues.length(), boundaryValues.length()));
-		if ((!version3 && placementCount < 1)
+		if ((!version3 && !version4 && placementCount < 1)
 			|| npcValues.length() > MAX_PLACEMENTS_PER_SET
 			|| itemValues.length() > MAX_PLACEMENTS_PER_SET
 			|| sceneryValues.length() > MAX_PLACEMENTS_PER_SET
@@ -474,14 +480,23 @@ public final class NativeLayeredWorldPackage {
 			|| placementCount > MAX_PLACEMENTS_PER_SET) {
 			throw new IOException(
 				"World placement set count must be "
-					+ (version3 ? "0.." : "1..")
+					+ (version3 || version4 ? "0.." : "1..")
 					+ MAX_PLACEMENTS_PER_SET);
 		}
 		java.util.List<NativeLayeredNpcPlacement> npcs =
 			new java.util.ArrayList<NativeLayeredNpcPlacement>();
 		for (int index = 0; index < npcValues.length(); index++) {
 			JSONObject value = object(npcValues, index, "npcs");
-			if (version3) {
+			if (version4) {
+				exactKeys(
+					value,
+					"npcs[" + index + "]",
+					"placementId",
+					"npcId",
+					"start",
+					"roamBounds",
+					"respawnSeconds");
+			} else if (version3) {
 				exactKeys(
 					value,
 					"npcs[" + index + "]",
@@ -506,7 +521,7 @@ public final class NativeLayeredWorldPackage {
 				"npcs[" + index + "].start",
 				worldSpace,
 				level);
-			if (version3) {
+			if (version3 || version4) {
 				JSONObject bounds = object(value, "roamBounds");
 				exactKeys(
 					bounds,
@@ -535,7 +550,10 @@ public final class NativeLayeredWorldPackage {
 					minimum.getCoordinate().getX(),
 					minimum.getCoordinate().getY(),
 					maximum.getCoordinate().getX(),
-					maximum.getCoordinate().getY()));
+					maximum.getCoordinate().getY(),
+					version4
+						? rangedInt(value, "respawnSeconds", -1, 86400)
+						: -1));
 			} else {
 				int roamRadius = nonNegativeInt(value, "roamRadius");
 				if (roamRadius > MAX_NPC_ROAM_RADIUS) {
@@ -1259,6 +1277,17 @@ public final class NativeLayeredWorldPackage {
 			throw new IOException(key + " must be a signed 32-bit integer");
 		}
 		return (int) result;
+	}
+
+	private static int rangedInt(
+		JSONObject value, String key, int minimum, int maximum)
+		throws IOException {
+		int result = signedInt(value, key);
+		if (result < minimum || result > maximum) {
+			throw new IOException(
+				key + " must be " + minimum + ".." + maximum);
+		}
+		return result;
 	}
 
 	private static int unsignedByte(JSONObject value, String key) throws IOException {

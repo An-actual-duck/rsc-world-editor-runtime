@@ -122,6 +122,13 @@ with a radius. A v3 payload may contain zero placements so a transaction can
 declare a valid new terrain level before any gameplay content is authored.
 Versions 1 and 2 retain their original non-empty requirement.
 
+`layered-world-placements-v4` adds one `respawnSeconds` value to every NPC
+placement. `-1` inherits the NPC definition, `0` removes the NPC permanently
+after death, and `1..86400` selects a placement-local delay in seconds. The
+exact roaming rectangle and the other placement families retain their v3
+shape. Version 3 remains readable and is interpreted as definition-default
+respawn for every NPC.
+
 The first private runtime registers these entities during world population.
 The developer entry command only changes the Player's location and verifies
 that package population already happened; it does not construct native

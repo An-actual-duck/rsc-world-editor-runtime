@@ -428,8 +428,14 @@ public final class Development implements CommandTrigger {
 		WorldLocation current=player.getLayeredLocation();
 		WorldLocation destination=new WorldLocation(
 			current.getWorldSpace(),new WorldCoordinate(x,y,level));
-		if (!player.getWorld().getRegionManager()
-			.hasNativeLayeredTerrain(destination)) {
+		WorldEditorSessionManager editor = player.getWorld().getServer()
+			.getWorldEditorSessions();
+		boolean published = player.getConfig().WORLD_BUILDER_MODE
+			&& WorldBuilderMode.isLayeredAuthoringProfile(player.getConfig())
+			? editor.hasPublishedNativeNavigationTerrain(player, destination)
+			: player.getWorld().getRegionManager()
+				.hasNativeLayeredTerrain(destination);
+		if (!published) {
 			if (!player.getConfig().WORLD_BUILDER_MODE
 				|| !WorldBuilderMode.isLayeredAuthoringProfile(
 					player.getConfig())) {
@@ -438,10 +444,16 @@ public final class Development implements CommandTrigger {
 					+x+","+y+",L"+level+".");
 				return;
 			}
+			if (editor.hasUnpublishedNativeNavigationTerrain(
+				player, destination)) {
+				player.message(messagePrefix
+					+ "Layer " + level + " is created but not published yet. "
+					+ "Save and reopen the Builder before navigating there.");
+				return;
+			}
 			try {
 				WorldEditorSessionManager.NativeTerrainProvisionResult result =
-					player.getWorld().getServer().getWorldEditorSessions()
-						.provisionNativeNavigationTarget(player,x,y,level);
+					editor.provisionNativeNavigationTarget(player,x,y,level);
 				destination=result.destination;
 				player.message(messagePrefix
 					+(result.createdLevel?"Created layer ":"Expanded layer ")
@@ -957,8 +969,9 @@ public final class Development implements CommandTrigger {
 	}
 
 	private void createNpc(Player player, String command, String[] args) {
-		if (args.length < 2 || args.length == 3) {
-			player.message(badSyntaxPrefix + command.toUpperCase() + " [id] [radius] (x) (y)");
+		if (args.length < 2 || args.length > 5) {
+			player.message(badSyntaxPrefix + command.toUpperCase()
+				+ " [id] [radius] (respawn_seconds|-1) (x) (y)");
 			return;
 		}
 
@@ -967,7 +980,8 @@ public final class Development implements CommandTrigger {
 			id = Integer.parseInt(args[0]);
 		}
 		catch(NumberFormatException ex) {
-			player.message(badSyntaxPrefix + command.toUpperCase() + " [id] [radius] (x) (y)");
+			player.message(badSyntaxPrefix + command.toUpperCase()
+				+ " [id] [radius] (respawn_seconds|-1) (x) (y)");
 			return;
 		}
 
@@ -975,22 +989,35 @@ public final class Development implements CommandTrigger {
 		try {
 			radius = Integer.parseInt(args[1]);
 		} catch (NumberFormatException ex) {
-			player.message(badSyntaxPrefix + command.toUpperCase() + " [id] [radius] (x) (y)");
+			player.message(badSyntaxPrefix + command.toUpperCase()
+				+ " [id] [radius] (respawn_seconds|-1) (x) (y)");
 			return;
 		}
 		if (radius < 0) {
 			player.message(messagePrefix + "NPC radius must be 0 or greater.");
 			return;
 		}
+		int respawnSeconds = -1;
+		if (args.length == 3 || args.length == 5) {
+			try {
+				respawnSeconds = Integer.parseInt(args[2]);
+			} catch (NumberFormatException ex) {
+				player.message(badSyntaxPrefix + command.toUpperCase()
+					+ " [id] [radius] (respawn_seconds|-1) (x) (y)");
+				return;
+			}
+		}
 
 		int x = -1;
 		int y = -1;
-		if(args.length >= 4) {
+		if(args.length == 4 || args.length == 5) {
 			try {
-				x = Integer.parseInt(args[2]);
-				y = Integer.parseInt(args[3]);
+				int coordinateOffset = args.length == 5 ? 3 : 2;
+				x = Integer.parseInt(args[coordinateOffset]);
+				y = Integer.parseInt(args[coordinateOffset + 1]);
 			} catch (NumberFormatException ex) {
-				player.message(badSyntaxPrefix + command.toUpperCase() + " [id] [radius] (x) (y)");
+				player.message(badSyntaxPrefix + command.toUpperCase()
+					+ " [id] [radius] (respawn_seconds|-1) (x) (y)");
 				return;
 			}
 		}
@@ -1012,13 +1039,16 @@ public final class Development implements CommandTrigger {
 		if(player.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE){
 			try{
 				Npc npc=player.getWorld().getServer().getWorldEditorSessions()
-					.placeNativeNpc(player,id,radius,x,y);
+					.placeNativeNpc(player,id,radius,respawnSeconds,x,y);
 				LOGGER.info("WORLD_BUILDER_PLACEMENT_ACCEPTED family=npc id={} x={} y={} level={} instance={}",
 					id,x,y,npc.getWorldLocation().getCoordinate().getLevel(),npc.getIndex());
 				player.message(messagePrefix+"Added layered NPC: "
 					+npc.getDef().getName()+" at "+npc.getWorldLocation()
 					+" with radius "+radius+" and instance ID "
-					+npc.getIndex()+". Save and close/reopen the Builder to commit.");
+					+npc.getIndex()+" (respawn "
+					+(respawnSeconds < 0 ? "definition default"
+						: respawnSeconds == 0 ? "never" : respawnSeconds+"s")
+					+"). Save and close/reopen the Builder to commit.");
 			}catch(Exception failure){
 				LOGGER.warn("WORLD_BUILDER_PLACEMENT_REFUSED family=npc id={} x={} y={} reason={}",
 					id,x,y,failure.getMessage());

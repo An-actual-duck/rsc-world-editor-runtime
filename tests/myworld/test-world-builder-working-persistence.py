@@ -171,11 +171,11 @@ public final class WorldBuilderWorkingPersistenceHarness {
                 new WorldEditorLayeredTerrainJournal.NpcEdit(
                     false, -3, 143, 640,
                     "spoiled-milk.builder.npc.lm3.xp143.yp640.s0",
-                    0, 142, 639, 144, 641),
+                    0, 142, 639, 144, 641, -1),
                 new WorldEditorLayeredTerrainJournal.NpcEdit(
                     false, -3, 141, 640,
                     "spoiled-milk.builder.npc.lm3.xp141.yp640.s0",
-                    1, 141, 640, 141, 640)));
+                    1, 141, 640, 141, 640, 0)));
         require(layered.tileCount == 1 && layered.sectorCount == 1
                 && layered.sceneryCount == 2 && layered.npcCount == 2,
             "combined layered journal counts");
@@ -223,7 +223,11 @@ public final class WorldBuilderWorkingPersistenceHarness {
             java.util.Collections.<WorldEditorLayeredTerrainJournal.SectorGrowth>emptyList(),
             java.util.Collections.<WorldEditorLayeredTerrainJournal.TileEdit>emptyList(),
             java.util.Collections.<WorldEditorLayeredTerrainJournal.SceneryEdit>emptyList(),
-            java.util.Collections.<WorldEditorLayeredTerrainJournal.NpcEdit>emptyList(),
+            Arrays.asList(
+                new WorldEditorLayeredTerrainJournal.NpcEdit(
+                    false, -3, 145, 640,
+                    "spoiled-milk.builder.npc.lm3.xp145.yp640.s0",
+                    1, 145, 640, 145, 640, 45)),
             Arrays.asList(
                 new WorldEditorLayeredTerrainJournal.GroundItemEdit(
                     false, -3, 144, 640,
@@ -233,14 +237,16 @@ public final class WorldBuilderWorkingPersistenceHarness {
                     false, -3, 143, 640,
                     "spoiled-milk.builder.ground-item.lm3.xp143.yp640",
                     20, 1, 30)));
-        require(layered.groundItemCount == 2
+        require(layered.groundItemCount == 2 && layered.npcCount == 1
                 && layered.levelCount == 0
                 && layered.tileCount == 0,
             "ground-item layered journal counts");
         journalText = new String(
             Files.readAllBytes(layeredJournal), "US-ASCII");
-        require(journalText.startsWith("world-builder-layered-draft-v5\n")
+        require(journalText.startsWith("world-builder-layered-draft-v7-npc-respawn\n")
                 && journalText.contains("ground-item-count\t2\n")
+                && journalText.contains(
+                    "npc\tupsert\t-3\t145\t640\tspoiled-milk.builder.npc.lm3.xp145.yp640.s0\t1\t145\t640\t145\t640\t45\n")
                 && journalText.indexOf(
                     "ground-item\tupsert\t-3\t143\t640")
                     < journalText.indexOf(

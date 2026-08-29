@@ -176,15 +176,22 @@ public enum NativeLayeredWorldRuntimeProfile {
 			}
 		}
 		Set<Integer> placementLevels = new HashSet<Integer>();
+		String placementEncoding = null;
 		for (NativeLayeredPlacementSet set : loaded.getPlacementSets().values()) {
+			String sourceEncoding = set.getSourceEncoding();
 			if (!WorldSpaceId.GLOBAL.equals(set.getWorldSpace())
-				|| !NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V3.equals(
-					set.getSourceEncoding())
+				|| (!NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V3.equals(
+					sourceEncoding)
+					&& !NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4.equals(
+						sourceEncoding))
+				|| (placementEncoding != null
+					&& !placementEncoding.equals(sourceEncoding))
 				|| !placementLevels.add(Integer.valueOf(set.getLevel()))) {
 				throw new IllegalStateException(
-					"The adaptive-world-builder profile requires one global v3 "
+					"The adaptive-world-builder profile requires one consistently encoded global "
 						+ "placement set per level");
 			}
+			placementEncoding = sourceEncoding;
 		}
 		if (!declaredLevels.equals(placementLevels)) {
 			throw new IllegalStateException(

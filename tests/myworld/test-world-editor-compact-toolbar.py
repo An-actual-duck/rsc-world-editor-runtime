@@ -371,7 +371,7 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         ui = UI.read_text()
         client = (CLIENT / "orsc/mudclient.java").read_text()
         self.assertIn("unsavedChanges||saveRequested", ui)
-        self.assertIn("Wait for authoritative edit responses before saving.", ui)
+        self.assertIn("Save queued; waiting for ", ui)
         self.assertIn("Unsaved edits remain. Select Close again", ui)
         self.assertIn("observeGameMessage", ui)
         self.assertIn("worldEditorBuildSnapshotValid=true", client)
@@ -390,6 +390,22 @@ class WorldEditorCompactToolbarTest(unittest.TestCase):
         self.assertGreaterEqual(client.count("setWorldEditorBuildMode(false)"), 2)
         self.assertIn("closeFromServer(){setTerrainBuildMode(false)", ui)
         self.assertIn("requestEditorClose()", ui)
+
+    def test_entity_subtools_open_and_toggle_their_mode_flyouts(self):
+        ui = UI.read_text()
+        selection = re.search(
+            r"private void selectContextAction\(int action\)\{(?P<body>.*?)\n\t\}",
+            ui,
+            re.S,
+        )
+        self.assertIsNotNone(selection)
+        body = selection.group("body")
+        for mode in ("Mode.SCENERY", "Mode.NPC", "Mode.ITEMS"):
+            self.assertIn(mode, body)
+        self.assertIn("same=", body)
+        self.assertIn("if(same)toolbar.selectMode(flyout)", body)
+        self.assertIn("else toolbar.open(flyout)", body)
+        self.assertIn("updatePresentationBounds()", body)
 
     def test_build_mode_state_and_grid_extract_square_boundaries_only(self):
         output = self.compile_and_run(

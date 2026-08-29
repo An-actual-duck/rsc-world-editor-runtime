@@ -252,7 +252,13 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 			coordinate(writer, value.getMinX(), value.getMinY());
 			writer.write(",\"maximum\":");
 			coordinate(writer, value.getMaxX(), value.getMaxY());
-			writer.write("}}");
+			writer.write('}');
+			if (NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4.equals(
+				set.getSourceEncoding())) {
+				writer.write(",\"respawnSeconds\":");
+				writer.write(Integer.toString(value.getRespawnSeconds()));
+			}
+			writer.write('}');
 		}
 		writer.write("],\"scenery\":[");
 		List<NativeLayeredSceneryPlacement> scenery =

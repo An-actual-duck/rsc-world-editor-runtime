@@ -214,6 +214,11 @@ roaming bounds. The bounds must contain the start, remain within the loader's
 parity-preserving format for legacy NPC records whose roaming rectangles are
 not necessarily square or centered on their start.
 
+`layered-world-placements-v4` preserves that exact geometry and adds an NPC
+placement-local respawn policy: `-1` uses the definition default, `0` means
+never respawn, and `1..86400` is an explicit delay in seconds. Existing v3
+packages remain valid and inherit their definitions exactly as before.
+
 The compact `uniform-layered-sector-v1` payload remains a laboratory encoding.
 The definitive `rle-layered-sector-v1` payload expands positive runs in
 `x-major-y-minor` order to exactly 2,304 independent tile values. It retains

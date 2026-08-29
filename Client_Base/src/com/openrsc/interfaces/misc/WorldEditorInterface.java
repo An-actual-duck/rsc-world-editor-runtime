@@ -64,8 +64,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private int sceneryMoveHoverX=-1,sceneryMoveHoverY=-1;
 	private NpcTool npcTool=NpcTool.PLACE;
 	private GroundItemTool groundItemTool=GroundItemTool.PLACE;
-	private int sceneryId=0,npcId=0,npcRadius=0;
-	private String sceneryIdText="0",npcIdText="0",npcRadiusText="0";
+	private int sceneryId=0,npcId=0,npcRadius=0,npcRespawnSeconds=-1;
+	private String sceneryIdText="0",npcIdText="0",npcRadiusText="0",npcRespawnText="-1";
 	private int groundItemId=10,groundItemAmount=1,groundItemRespawnSeconds=30;
 	private String groundItemIdText="10",groundItemAmountText="1",groundItemRespawnText="30";
 	private boolean paintElevation=false,paintFloorColor=true,paintFloorTexture=false;
@@ -197,6 +197,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public int getSceneryId(){return sceneryId;}
 	public int getNpcId(){return npcId;}
 	public int getNpcRadius(){return npcRadius;}
+	public int getNpcRespawnSeconds(){return npcRespawnSeconds;}
 	public int getGroundItemId(){return groundItemId;}
 	public int getGroundItemAmount(){return groundItemAmount;}
 	public int getGroundItemRespawnSeconds(){return groundItemRespawnSeconds;}
@@ -372,6 +373,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public int[] regionPasteAnchorTile(){return regionTool==RegionTool.PASTE&&regionPasteX>=0?new int[]{regionPasteX,regionPasteY}:null;}
 	private static String shortHash(String value){return value==null?"":value.substring(0,Math.min(12,value.length()));}
 	public void selectNpc(int id,int radius){setNpcId(id);setNpcRadius(radius);}
+	public void selectNpc(int id,int radius,int respawnSeconds){selectNpc(id,radius);setNpcRespawnSeconds(respawnSeconds);}
 	public void setSequence(int sequence){nextSequence=sequence;}
 	public void setTerrainHistoryAvailability(boolean canUndo,boolean canRedo){terrainHistoryCanUndo=canUndo;terrainHistoryCanRedo=canRedo;}
 	public void recordWorldClick(int x,int y){
@@ -395,12 +397,12 @@ public final class WorldEditorInterface extends NCustomComponent {
 			||message.contains("Invalid npc")
 			||message.contains("There is already scenery")
 			||message.contains("There is no scenery");
-		if(accepted&&pendingEntityActions>0){
-			pendingEntityActions--;unsavedChanges=true;closeArmed=false;noteDeferredSaveProgress(System.nanoTime());
+		if(accepted){
+			if(pendingEntityActions>0)pendingEntityActions--;unsavedChanges=true;closeArmed=false;noteDeferredSaveProgress(System.nanoTime());
 			terrainHistoryCanUndo=true;terrainHistoryCanRedo=false;inspectionStatus=message;
 			if(message.contains("Moved layered scenery:"))clearSceneryMove();
-		}else if(refused&&pendingEntityActions>0){
-			pendingEntityActions--;inspectionStatus=message;noteDeferredSaveProgress(System.nanoTime());
+		}else if(refused){
+			if(pendingEntityActions>0)pendingEntityActions--;inspectionStatus=message;noteDeferredSaveProgress(System.nanoTime());
 		}
 		maybeSubmitDeferredSave();
 		if((message.contains("Saved ")&&message.contains(" world edits."))
@@ -420,12 +422,13 @@ public final class WorldEditorInterface extends NCustomComponent {
 		inspectionKind=responseType==5?"NPC":(text!=null&&text.contains("type=boundary")?"Boundary":"Scenery");
 		inspectionStatus="Authoritative "+inspectionKind.toLowerCase()+" inspection";inspectionDetails=wrap(text,58);
 		if(responseType==4){int id=valueAfter(text,"id=");if(id>=0&&copyNextInspection)setSceneryId(id);}
-		if(responseType==5){int id=valueAfter(text,"id="),radius=valueAfter(text,"radius=");if(copyNextInspection){if(id>=0)setNpcId(id);if(radius>=0)setNpcRadius(radius);}}
+		if(responseType==5){int id=valueAfter(text,"id="),radius=valueAfter(text,"radius="),respawn=valueAfter(text,"respawn=");if(copyNextInspection){if(id>=0)setNpcId(id);if(radius>=0)setNpcRadius(radius);if(respawn>=-1)setNpcRespawnSeconds(respawn);}}
 		if(copyNextInspection)copyInspected();copyNextInspection=false;
 	}
 	public void showError(String text){
 		boolean saveAcceptedDraft=saveAfterPendingEdits&&!saveRequested;
 		int unacknowledged=saveAcceptedDraft?pendingAuthoritativeEditCount():0;
+		if(pendingEntityActions>0){pendingEntityActions--;noteDeferredSaveProgress(System.nanoTime());}
 		copyNextInspection=false;saveAfterPendingEdits=false;deferredSaveProgressNanos=0L;terrainStrokeTiles=null;terrainStrokeStartedNanos=0L;clearTerrainLine();clearTerrainDrag();
 		if(terrainHistoryPending){terrainHistoryPending=false;terrainHistoryTotal=terrainHistoryReceived=0;if(text!=null&&text.contains("nothing to undo"))terrainHistoryCanUndo=false;if(text!=null&&text.contains("nothing to redo"))terrainHistoryCanRedo=false;}
 		inspectionStatus="Server rejected request";inspectionDetails=wrap(text,58);
@@ -684,7 +687,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(inspectionKind.isEmpty())return;copiedInspectionKind=inspectionKind;copiedInspectionDetails=inspectionDetails.clone();
 		if("Terrain".equals(inspectionKind)&&inspectedTerrainFields!=null){copiedTerrainFields=inspectedTerrainFields.clone();seedTerrain(inspectedTerrainFields);}
 		if("Scenery".equals(inspectionKind)){int id=valueAfter(join(inspectionDetails),"id=");if(id>=0)setSceneryId(id);}
-		if("NPC".equals(inspectionKind)){String text=join(inspectionDetails);int id=valueAfter(text,"id="),radius=valueAfter(text,"radius=");if(id>=0)setNpcId(id);if(radius>=0)setNpcRadius(radius);}
+		if("NPC".equals(inspectionKind)){String text=join(inspectionDetails);int id=valueAfter(text,"id="),radius=valueAfter(text,"radius="),respawn=valueAfter(text,"respawn=");if(id>=0)setNpcId(id);if(radius>=0)setNpcRadius(radius);if(respawn>=-1)setNpcRespawnSeconds(respawn);}
 		inspectionStatus="Copied "+inspectionKind.toLowerCase()+" inspection into its editor selection";
 	}
 
@@ -714,6 +717,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void setSceneryId(int id){if(!acceptDefinitionInput("scenery",id,EntityHandler.objectCount()-1)){sceneryIdText=sceneryId<0?"-":String.valueOf(sceneryId);return;}sceneryId=Math.max(0,Math.min(id,EntityHandler.objectCount()-1));sceneryIdText=String.valueOf(sceneryId);}
 	private void setNpcId(int id){if(!acceptDefinitionInput("npc",id,EntityHandler.npcs.size()-1)){npcIdText=npcId<0?"-":String.valueOf(npcId);return;}npcId=Math.max(0,Math.min(id,EntityHandler.npcs.size()-1));npcIdText=String.valueOf(npcId);}
 	private void setNpcRadius(int radius){npcRadius=Math.max(0,Math.min(radius,64));npcRadiusText=String.valueOf(npcRadius);}
+	private void setNpcRespawnSeconds(int seconds){npcRespawnSeconds=Math.max(-1,Math.min(seconds,86400));npcRespawnText=String.valueOf(npcRespawnSeconds);}
+	private String npcRespawnLabel(){return npcRespawnSeconds<0?"Definition default":npcRespawnSeconds==0?"Never":npcRespawnSeconds+" seconds";}
 	private void setGroundItemId(int id){if(!acceptDefinitionInput("item",id,EntityHandler.itemCount()-1)){groundItemIdText=groundItemId<0?"-":String.valueOf(groundItemId);return;}groundItemId=Math.max(0,Math.min(id,EntityHandler.itemCount()-1));groundItemIdText=String.valueOf(groundItemId);if(!groundItemStackable())setGroundItemAmount(1);}
 	private void setGroundItemAmount(int amount){groundItemAmount=groundItemStackable()?Math.max(1,Math.min(amount,MAX_GROUND_ITEM_AMOUNT)):1;groundItemAmountText=String.valueOf(groundItemAmount);}
 	private void setGroundItemRespawnSeconds(int seconds){groundItemRespawnSeconds=Math.max(1,Math.min(seconds,86400));groundItemRespawnText=String.valueOf(groundItemRespawnSeconds);}
@@ -899,11 +904,11 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(delta!=0)definitionBrowser.scrollRows(delta>0?1:-1);return true;
 	}
 	private void applyFocusedValue(String value){
-		try{int parsed=Integer.parseInt(value);if(coordinateFocus==1||coordinateFocus==2||coordinateFocus==13){teleportToFields();return;}if(coordinateFocus==3)setSceneryId(parsed);else if(coordinateFocus==4)setNpcId(parsed);else if(coordinateFocus==5)setNpcRadius(parsed);else if(coordinateFocus==14)setGroundItemId(parsed);else if(coordinateFocus==15)setGroundItemAmount(parsed);else if(coordinateFocus==16)setGroundItemRespawnSeconds(parsed);else if(coordinateFocus==17)setTerrainElevationStep(parsed);else if(coordinateFocus==18)setTerrainSmartWall(parsed);else if(coordinateFocus==6)setTerrainElevation(parsed);else if(coordinateFocus==7)setTerrainFloorColor(parsed);else if(coordinateFocus==8)setTerrainFloorTexture(parsed);else if(coordinateFocus==9)setTerrainRoof(parsed);else if(coordinateFocus==10)setTerrainNorthWall(parsed);else if(coordinateFocus==11)setTerrainEastWall(parsed);else setTerrainDiagonalWall(parsed);}
+		try{int parsed=Integer.parseInt(value);if(coordinateFocus==1||coordinateFocus==2||coordinateFocus==13){teleportToFields();return;}if(coordinateFocus==3)setSceneryId(parsed);else if(coordinateFocus==4)setNpcId(parsed);else if(coordinateFocus==5)setNpcRadius(parsed);else if(coordinateFocus==20)setNpcRespawnSeconds(parsed);else if(coordinateFocus==14)setGroundItemId(parsed);else if(coordinateFocus==15)setGroundItemAmount(parsed);else if(coordinateFocus==16)setGroundItemRespawnSeconds(parsed);else if(coordinateFocus==17)setTerrainElevationStep(parsed);else if(coordinateFocus==18)setTerrainSmartWall(parsed);else if(coordinateFocus==6)setTerrainElevation(parsed);else if(coordinateFocus==7)setTerrainFloorColor(parsed);else if(coordinateFocus==8)setTerrainFloorTexture(parsed);else if(coordinateFocus==9)setTerrainRoof(parsed);else if(coordinateFocus==10)setTerrainNorthWall(parsed);else if(coordinateFocus==11)setTerrainEastWall(parsed);else setTerrainDiagonalWall(parsed);}
 		catch(NumberFormatException ignored){}coordinateFocus=0;
 	}
-	private String focusedText(){switch(coordinateFocus){case 1:return teleportX;case 2:return teleportY;case 13:return teleportLevel;case 3:return sceneryIdText;case 4:return npcIdText;case 5:return npcRadiusText;case 14:return groundItemIdText;case 15:return groundItemAmountText;case 16:return groundItemRespawnText;case 17:return terrainElevationStepText;case 18:return terrainSmartWallText;case 19:return regionName;case 6:return terrainElevationText;case 7:return terrainFloorColorText;case 8:return terrainFloorTextureText;case 9:return terrainRoofText;case 10:return terrainNorthWallText;case 11:return terrainEastWallText;default:return terrainDiagonalWallText;}}
-	private void setFocusedText(String value){switch(coordinateFocus){case 1:teleportX=value;break;case 2:teleportY=value;break;case 13:teleportLevel=value;break;case 3:sceneryIdText=value;break;case 4:npcIdText=value;break;case 5:npcRadiusText=value;break;case 14:groundItemIdText=value;break;case 15:groundItemAmountText=value;break;case 16:groundItemRespawnText=value;break;case 17:terrainElevationStepText=value;break;case 18:terrainSmartWallText=value;break;case 19:regionName=value;break;case 6:terrainElevationText=value;break;case 7:terrainFloorColorText=value;break;case 8:terrainFloorTextureText=value;break;case 9:terrainRoofText=value;break;case 10:terrainNorthWallText=value;break;case 11:terrainEastWallText=value;break;default:terrainDiagonalWallText=value;}}
+	private String focusedText(){switch(coordinateFocus){case 1:return teleportX;case 2:return teleportY;case 13:return teleportLevel;case 3:return sceneryIdText;case 4:return npcIdText;case 5:return npcRadiusText;case 20:return npcRespawnText;case 14:return groundItemIdText;case 15:return groundItemAmountText;case 16:return groundItemRespawnText;case 17:return terrainElevationStepText;case 18:return terrainSmartWallText;case 19:return regionName;case 6:return terrainElevationText;case 7:return terrainFloorColorText;case 8:return terrainFloorTextureText;case 9:return terrainRoofText;case 10:return terrainNorthWallText;case 11:return terrainEastWallText;default:return terrainDiagonalWallText;}}
+	private void setFocusedText(String value){switch(coordinateFocus){case 1:teleportX=value;break;case 2:teleportY=value;break;case 13:teleportLevel=value;break;case 3:sceneryIdText=value;break;case 4:npcIdText=value;break;case 5:npcRadiusText=value;break;case 20:npcRespawnText=value;break;case 14:groundItemIdText=value;break;case 15:groundItemAmountText=value;break;case 16:groundItemRespawnText=value;break;case 17:terrainElevationStepText=value;break;case 18:terrainSmartWallText=value;break;case 19:regionName=value;break;case 6:terrainElevationText=value;break;case 7:terrainFloorColorText=value;break;case 8:terrainFloorTextureText=value;break;case 9:terrainRoofText=value;break;case 10:terrainNorthWallText=value;break;case 11:terrainEastWallText=value;break;default:terrainDiagonalWallText=value;}}
 	private void focusNumber(int focus){coordinateFocus=focus;replaceFocusedText=true;}
 	private void rejectLayeredReviewMutation(String message){inspectionStatus=message;mc.showWorldEditorStatus(message);}
 	private boolean hasPendingAuthoritativeEdits(){return terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||pendingEntityActions>0;}
@@ -1007,10 +1012,13 @@ public final class WorldEditorInterface extends NCustomComponent {
 		return -1;
 	}
 	private void selectContextAction(int action){
-		if(mode==Mode.SCENERY){clearSceneryMove();sceneryTool=action==0?SceneryTool.PLACE:action==1?SceneryTool.MOVE:action==2?SceneryTool.ROTATE:SceneryTool.REMOVE;}
-		else if(mode==Mode.NPC)npcTool=action==0?NpcTool.PLACE:NpcTool.REMOVE;
-		else if(mode==Mode.ITEMS)groundItemTool=action==0?GroundItemTool.PLACE:GroundItemTool.REMOVE;
-		closeArmed=false;
+		boolean same=false;
+		if(mode==Mode.SCENERY){SceneryTool selected=action==0?SceneryTool.PLACE:action==1?SceneryTool.MOVE:action==2?SceneryTool.ROTATE:SceneryTool.REMOVE;same=sceneryTool==selected;clearSceneryMove();sceneryTool=selected;}
+		else if(mode==Mode.NPC){NpcTool selected=action==0?NpcTool.PLACE:NpcTool.REMOVE;same=npcTool==selected;npcTool=selected;}
+		else if(mode==Mode.ITEMS){GroundItemTool selected=action==0?GroundItemTool.PLACE:GroundItemTool.REMOVE;same=groundItemTool==selected;groundItemTool=selected;}
+		else return;
+		definitionBrowser.close();coordinateFocus=0;replaceFocusedText=false;closeArmed=false;
+		WorldEditorToolbarState.Flyout flyout=flyoutFor(mode);if(same)toolbar.selectMode(flyout);else toolbar.open(flyout);updatePresentationBounds();
 	}
 	private int terrainFieldAtDock(int x,int y){if(mode!=Mode.TERRAIN)return -1;if(dockHit(x,y,1,0))return 6;if(dockHit(x,y,1,1))return 7;if(dockHit(x,y,1,2))return 8;if(dockHit(x,y,1,3))return 9;if(terrainTool==TerrainTool.RECTANGLE&&rectangleOptions.isSmartWalls())return -1;if(dockHit(x,y,1,4))return 10;if(dockHit(x,y,1,5))return 11;if(dockHit(x,y,1,6))return 12;return -1;}
 	private TerrainTool terrainToolAtDock(int x,int y){if(mode!=Mode.TERRAIN)return null;if(dockHit(x,y,1,7))return TerrainTool.FREEHAND;if(dockHit(x,y,1,8))return TerrainTool.LINE;if(dockHit(x,y,1,9))return TerrainTool.RECTANGLE;return null;}
@@ -1056,7 +1064,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void handleCompactNpcMouse(int x,int y){
 		if(y>=56&&y<80){if(x>=8&&x<38)setNpcId(steppedProjectId("npc",npcId,-1));else if(x>=42&&x<130)focusNumber(4);else if(x>=134&&x<164)setNpcId(steppedProjectId("npc",npcId,1));return;}
 		if(y>=100&&y<124){if(x>=8&&x<38)setNpcRadius(npcRadius-1);else if(x>=42&&x<130)focusNumber(5);else if(x>=134&&x<164)setNpcRadius(npcRadius+1);return;}
-		if(y>=138&&y<162)openNpcBrowser();
+		if(y>=132&&y<156){if(x>=8&&x<38)setNpcRespawnSeconds(npcRespawnSeconds-1);else if(x>=42&&x<130)focusNumber(20);else if(x>=134&&x<164)setNpcRespawnSeconds(npcRespawnSeconds+1);return;}
+		if(y>=164&&y<188)openNpcBrowser();
 	}
 	private void handleCompactGroundItemMouse(int x,int y){
 		if(y>=50&&y<74){if(x>=8&&x<38)setGroundItemId(steppedProjectId("item",groundItemId,-1));else if(x>=42&&x<130)focusNumber(14);else if(x>=134&&x<164)setGroundItemId(steppedProjectId("item",groundItemId,1));return;}
@@ -1128,7 +1137,10 @@ public final class WorldEditorInterface extends NCustomComponent {
 				if(ry>=145&&ry<169&&rx>=10&&rx<38){setNpcRadius(npcRadius-1);return true;}
 				if(ry>=145&&ry<169&&rx>=45&&rx<125){focusNumber(5);return true;}
 				if(ry>=145&&ry<169&&rx>=132&&rx<160){setNpcRadius(npcRadius+1);return true;}
-				if(ry>=190&&ry<214){if(rx>=10&&rx<105)npcTool=NpcTool.PLACE;else if(rx>=112&&rx<207)npcTool=NpcTool.REMOVE;return true;}
+				if(ry>=185&&ry<209&&rx>=10&&rx<38){setNpcRespawnSeconds(npcRespawnSeconds-1);return true;}
+				if(ry>=185&&ry<209&&rx>=45&&rx<125){focusNumber(20);return true;}
+				if(ry>=185&&ry<209&&rx>=132&&rx<160){setNpcRespawnSeconds(npcRespawnSeconds+1);return true;}
+				if(ry>=220&&ry<244){if(rx>=10&&rx<105)npcTool=NpcTool.PLACE;else if(rx>=112&&rx<207)npcTool=NpcTool.REMOVE;return true;}
 				if(ry>=276&&ry<300&&rx>=10&&rx<175){requestWorldEditSave();return true;}
 			}
 			if(mode==Mode.ITEMS){
@@ -1299,7 +1311,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void renderCompactNpc(int x,int y){
 		graphics().drawString(compactLine(npcName(),28),x+8,y+47,0xffff00,1);button(x+8,y+56,30,"-");textField(x+42,y+56,88,npcIdText,coordinateFocus==4);button(x+134,y+56,30,"+");
 		graphics().drawString("Roam radius",x+8,y+95,0xffff00,1);button(x+8,y+100,30,"-");textField(x+42,y+100,88,npcRadiusText,coordinateFocus==5);button(x+134,y+100,30,"+");
-		button(x+8,y+138,164,"Browse NPCs...");
+		graphics().drawString("Respawn: "+npcRespawnLabel(),x+8,y+129,0xffff00,1);button(x+8,y+132,30,"-");textField(x+42,y+132,88,npcRespawnText,coordinateFocus==20);button(x+134,y+132,30,"+");
+		button(x+8,y+164,164,"Browse NPCs...");
 	}
 	private void renderCompactGroundItems(int x,int y){
 		graphics().drawString(compactLine(groundItemName(),28),x+8,y+43,0xffff00,1);button(x+8,y+50,30,"-");textField(x+42,y+50,88,groundItemIdText,coordinateFocus==14);button(x+134,y+50,30,"+");
@@ -1315,7 +1328,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		int px=mc.getEditorPlayerWorldX(),py=mc.getEditorPlayerWorldY(),level=mc.getEditorPlayerWorldLevel(),queued=terrainDragPending.size()+(terrainStrokeTiles==null?0:terrainStrokeTiles.length)
 			+(terrainLineCommitTiles==null?0:terrainLineCommitTiles.length-terrainLineReceived)+pendingEntityActions;
 		graphics().drawLineHoriz(x+8,y+194,FLYOUT_WIDTH-16,0x70512d);graphics().drawString("@yel@"+px+","+py+",L"+level+" @whi@| "+mode,x+8,y+211,0xffffff,1);
-		graphics().drawString(compactLine("Queued "+queued+" | ack "+lastAckMillis+" | rebuild "+lastRebuildMillis,28),x+8,y+228,0xbdbdbd,1);
+		graphics().drawString(compactLine("Awaiting "+queued+" | ack "+lastAckMillis+" | rebuild "+lastRebuildMillis,28),x+8,y+228,0xbdbdbd,1);
 		graphics().drawString(unsavedChanges?"Unsaved"+(saveRequested?" (save requested)":saveAfterPendingEdits?" (save queued)":""):"Saved/clean",x+8,y+245,unsavedChanges?0xff981f:0x80c080,1);
 		String status=isLayeredReview()?(isLayeredTerrainDraft()?"Draft ":"Review ")+WorldBuilderClientProfile.current().layeredPackageVersion()+" "+WorldBuilderClientProfile.current().layeredManifestShort():(WorldBuilderClientProfile.isEnabled()?"Source "+WorldBuilderClientProfile.current().sourceRevisionShort():inspectionStatus);
 		graphics().drawString(compactLine(status,28),x+8,y+264,0xbdbdbd,1);
@@ -1464,8 +1477,9 @@ public final class WorldEditorInterface extends NCustomComponent {
 		graphics().drawString(npcName(),x+175,y+103,0xffffff,2);
 		button(x+175,y+112,134,"Browse NPCs...");
 		graphics().drawString("Roam radius",x+10,y+137,0xffffff,2);button(x+10,y+145,28,"-");textField(x+45,y+145,80,npcRadiusText,coordinateFocus==5);button(x+132,y+145,28,"+");
-		toolButton(x+10,y+190,95,"Place",npcTool==NpcTool.PLACE);toolButton(x+112,y+190,95,"Remove",npcTool==NpcTool.REMOVE);
-		graphics().drawString(npcTool==NpcTool.PLACE?"Click terrain to place one NPC.":"Click an existing NPC to remove it.",x+10,y+235,0xffffff,2);
+		graphics().drawString("Respawn: "+npcRespawnLabel(),x+10,y+178,0xffffff,2);button(x+10,y+185,28,"-");textField(x+45,y+185,80,npcRespawnText,coordinateFocus==20);button(x+132,y+185,28,"+");
+		toolButton(x+10,y+220,95,"Place",npcTool==NpcTool.PLACE);toolButton(x+112,y+220,95,"Remove",npcTool==NpcTool.REMOVE);
+		graphics().drawString(npcTool==NpcTool.PLACE?"Click terrain to place one NPC.":"Click an existing NPC to remove it.",x+215,y+235,0xffffff,1);
 		button(x+10,y+276,165,"Save queued edits");
 	}
 	private void renderGroundItems(int x,int y){
@@ -1506,7 +1520,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private static String diagonalRotation(int v){return v>12000&&v<24000?"rotated":v>0&&v<12000?"not rotated":"none";}
 	private static String wall(int id,String name){return id<0?"none":WorldEditorDefinitionCatalog.boundaryLabel(id,name);}
 	private static String planeName(int plane){switch(plane){case 0:return "Surface";case 1:return "First floor";case 2:return "Second floor";case -1:case 3:return "Underground";default:return plane<0?"Depth "+plane:"Upper level "+plane;}}
-	private static int valueAfter(String text,String marker){if(text==null)return -1;int at=text.indexOf(marker);if(at<0)return -1;at+=marker.length();int end=at;while(end<text.length()&&Character.isDigit(text.charAt(end)))end++;try{return Integer.parseInt(text.substring(at,end));}catch(Exception e){return -1;}}
+	private static int valueAfter(String text,String marker){if(text==null)return -1;int at=text.indexOf(marker);if(at<0)return -1;at+=marker.length();int end=at;if(end<text.length()&&text.charAt(end)=='-')end++;while(end<text.length()&&Character.isDigit(text.charAt(end)))end++;try{return Integer.parseInt(text.substring(at,end));}catch(Exception e){return -1;}}
 	private static String join(String[] lines){StringBuilder b=new StringBuilder();for(String line:lines)b.append(line).append(' ');return b.toString();}
 	private static String compactLine(String text,int max){if(text==null)return "";return text.length()<=max?text:text.substring(0,Math.max(0,max-3))+"...";}
 	private static String[] wrap(String s,int width){if(s==null||s.isEmpty())return new String[0];java.util.List<String> lines=new java.util.ArrayList<String>();while(s.length()>width){int p=s.lastIndexOf(' ',width);if(p<1)p=width;lines.add(s.substring(0,p));s=s.substring(p).trim();}lines.add(s);return lines.toArray(new String[lines.size()]);}

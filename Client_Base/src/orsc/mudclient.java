@@ -19700,7 +19700,7 @@ public final class mudclient implements Runnable {
 				case WORLD_EDITOR_MOVE_SCENERY: { worldEditorInterface.commitSceneryMove(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
 				case WORLD_EDITOR_ROTATE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("rotateobject "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
 				case WORLD_EDITOR_REMOVE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("robject "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
-				case WORLD_EDITOR_PLACE_NPC: { if(!worldEditorInterface.canPlaceSelectedNpc()){worldEditorInterface.showError("Selected NPC is not permitted by this project.");break;}worldEditorInterface.markPotentialEntityEdit();sendCommandString("cnpc "+worldEditorInterface.getNpcId()+" "+worldEditorInterface.getNpcRadius()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
+				case WORLD_EDITOR_PLACE_NPC: { if(!worldEditorInterface.canPlaceSelectedNpc()){worldEditorInterface.showError("Selected NPC is not permitted by this project.");break;}worldEditorInterface.markPotentialEntityEdit();sendCommandString("cnpc "+worldEditorInterface.getNpcId()+" "+worldEditorInterface.getNpcRadius()+" "+worldEditorInterface.getNpcRespawnSeconds()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
 				case WORLD_EDITOR_REMOVE_NPC: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("rpc "+indexOrX); break; }
 				case WORLD_EDITOR_PLACE_GROUND_ITEM: {
 					if(!worldEditorInterface.canPlaceSelectedGroundItem()){worldEditorInterface.showError("Selected item is not permitted by this project.");break;}

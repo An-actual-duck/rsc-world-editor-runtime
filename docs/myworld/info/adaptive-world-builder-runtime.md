@@ -30,7 +30,7 @@ client code independently pin the same values.
 | Effective composition | `world-builder-effective-static-composition-v1` |
 | Package schema | `layered-world-package-v1` |
 | Coordinate model | `signed-layered-v1` |
-| Placement encoding | `layered-world-placements-v3` |
+| Placement encoding | `layered-world-placements-v4` for newly saved work; v3 remains readable |
 
 `scripts/write-adaptive-world-builder-runtime-evidence.py` emits canonical
 `world-builder-runtime-evidence` schema-version-1 JSON for adaptive discovery.
@@ -319,7 +319,7 @@ sector count, placement count, or Spoiled Milk content identity. Bounds are:
 
 - 1 through 64 declared levels;
 - 1 through 8,192 48-by-48 terrain sectors;
-- exactly one v3 placement set for every declared level;
+- exactly one consistently encoded v3 or v4 placement set for every declared level;
 - at most 100,000 total static placements; and
 - the closed package guard's file, directory, per-file, and total-byte limits.
 
@@ -404,7 +404,7 @@ roof=0, horizontal wall=0, vertical wall=0, diagonal wall=0
 ```
 
 The standalone-empty origin is stricter: one global level `0`, one terrain
-sector covering the configured `0..32767` client-carrier start, one empty v3
+sector covering the configured `0..32767` client-carrier start, one empty v4
 placement set, and no placements. New standalone projects require the exact
 centered 3-by-3 visibility seed emitted by the Editor: all ten raw terrain
 bytes are zero for the nine seed tiles, while the other 2,295 tiles remain
