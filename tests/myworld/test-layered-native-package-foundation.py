@@ -1303,6 +1303,12 @@ class LayeredNativePackageFoundationTest(unittest.TestCase):
                 / "schema/layered-world-placements-v3.schema.json"
             ).read_text(encoding="utf-8")
         )
+        world_placement_v4_schema = json.loads(
+            (
+                TOOL_ROOT
+                / "schema/layered-world-placements-v4.schema.json"
+            ).read_text(encoding="utf-8")
+        )
         self.assertEqual(
             "rsc-remastered-preservation-r64-v1",
             baseline_schema["properties"]["baselineId"]["const"],
@@ -1342,10 +1348,24 @@ class LayeredNativePackageFoundationTest(unittest.TestCase):
             world_placement_v3_schema["properties"]["encoding"]["const"],
         )
         self.assertEqual(
+            "layered-world-placements-v4",
+            world_placement_v4_schema["properties"]["encoding"]["const"],
+        )
+        self.assertEqual(
+            (-1, 86400),
+            (
+                world_placement_v4_schema["properties"]["npcs"]["items"]
+                ["properties"]["respawnSeconds"]["minimum"],
+                world_placement_v4_schema["properties"]["npcs"]["items"]
+                ["properties"]["respawnSeconds"]["maximum"],
+            ),
+        )
+        self.assertEqual(
             {
                 "layered-entity-placements-v1",
                 "layered-world-placements-v2",
                 "layered-world-placements-v3",
+                "layered-world-placements-v4",
             },
             set(
             package_schema["properties"]["placementSets"]["items"][

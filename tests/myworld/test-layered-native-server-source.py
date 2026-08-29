@@ -934,6 +934,71 @@ class LayeredNativeServerSourceTest(unittest.TestCase):
 
             self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_detached_server_source_decodes_v4_npc_respawn_override(self):
+        with tempfile.TemporaryDirectory(
+            prefix="native-server-placement-v4-"
+        ) as temp:
+            package = Path(temp) / "package"
+            shutil.copytree(PACKAGE, package)
+            relative_path = "placements/deep-l2-entities.json"
+            payload_path = package / relative_path
+            payload = json.loads(payload_path.read_text(encoding="utf-8"))
+            payload["schemaVersion"] = 4
+            payload["encoding"] = "layered-world-placements-v4"
+            npc = payload["npcs"][0]
+            npc.pop("roamRadius")
+            npc["roamBounds"] = {
+                "minimum": {"x": 450, "y": 599},
+                "maximum": {"x": 455, "y": 603},
+            }
+            npc["respawnSeconds"] = 45
+            payload_path.write_text(
+                json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+            )
+            manifest_path = package / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["placementSets"][0]["encoding"] = (
+                "layered-world-placements-v4"
+            )
+            manifest["placementSets"][0]["sha256"] = hashlib.sha256(
+                payload_path.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+            )
+
+            probe_source = HARNESS.replace(
+                "NativeLayeredServerSourceFixture",
+                "NativeLayeredServerV4Fixture",
+            ).replace(
+                "npc.getNpcId() == 11 && npc.getRoamRadius() == 2",
+                "npc.getNpcId() == 11"
+                " && npc.getRoamRadius() == -1"
+                " && npc.getRespawnSeconds() == 45"
+                " && npc.getMinX() == 450 && npc.getMinY() == 599"
+                " && npc.getMaxX() == 455 && npc.getMaxY() == 603",
+            )
+            probe = self.classes / "NativeLayeredServerV4Fixture.java"
+            probe.write_text(probe_source, encoding="utf-8")
+            subprocess.run(
+                [
+                    "javac", "-source", "8", "-target", "8",
+                    "-cp", str(CORE_JAR), "-d", str(self.classes), str(probe),
+                ],
+                cwd=ROOT,
+                check=True,
+            )
+            result = subprocess.run(
+                [
+                    "java", "-cp", f"{self.classes}:{CORE_JAR}",
+                    "NativeLayeredServerV4Fixture", str(package),
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+
     def test_server_loader_accepts_terrain_only_review_package(self):
         with tempfile.TemporaryDirectory(
             prefix="native-server-terrain-only-"

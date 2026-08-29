@@ -3,6 +3,7 @@ package com.openrsc.server.content.worldedit;
 import com.openrsc.server.ServerConfiguration;
 import com.openrsc.server.io.AdaptiveWorldBuilderPackageGuard;
 import com.openrsc.server.io.NativeLayeredWorldPackage;
+import com.openrsc.server.io.NativeLayeredPlacementSet;
 import com.openrsc.server.io.NativeLayeredTerrainSector;
 import com.openrsc.server.io.NativeLayeredTerrainTile;
 import com.openrsc.server.model.world.coordinate.WorldCoordinate;
@@ -58,7 +59,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 	public static final String PACKAGE_SCHEMA_ID =
 		"layered-world-package-v1";
 	public static final String PLACEMENT_ENCODING_ID =
-		NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V3;
+		NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4;
 	public static final int CLIENT_VERSION = 10048;
 	public static final String ORIGIN_ADOPTED = "target-layered";
 	public static final String ORIGIN_CONVERTED = "target-packed";
@@ -338,7 +339,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 		fields.put("packageInventorySha256", inventory.getFingerprint());
 		fields.put("packageSchema", PACKAGE_SCHEMA_ID);
 		fields.put("packageVersion", worldPackage.getPackageVersion());
-		fields.put("placementEncoding", PLACEMENT_ENCODING_ID);
+		fields.put("placementEncoding", placementEncoding(worldPackage));
 		fields.put("profile", PROFILE_ID);
 		fields.put("projectOrigin", config.WORLD_BUILDER_PROJECT_ORIGIN);
 		fields.put("protocol", PROTOCOL_ID);
@@ -376,6 +377,20 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 				"Adaptive World Builder package has no global levels");
 		}
 		return result.toString();
+	}
+
+	private static String placementEncoding(
+		NativeLayeredWorldPackage worldPackage) {
+		String result = null;
+		for (NativeLayeredPlacementSet set
+			: worldPackage.getPlacementSets().values()) {
+			if (result == null) result = set.getSourceEncoding();
+			else if (!result.equals(set.getSourceEncoding())) {
+				throw new IllegalStateException(
+					"Adaptive placement encodings are inconsistent");
+			}
+		}
+		return result == null ? PLACEMENT_ENCODING_ID : result;
 	}
 
 	public static String canonicalSession(Map<String, String> fields) {

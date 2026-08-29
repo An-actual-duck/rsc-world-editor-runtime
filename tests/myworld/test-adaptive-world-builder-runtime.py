@@ -278,7 +278,8 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             for (NativeLayeredNpcPlacement item : set.getNpcs()) {
                 npcs.add(new AdaptiveWorldBuilderPackagePublisher.Npc(
                     item.getPlacementId(), item.getNpcId(), item.getStart(),
-                    item.getMinX(), item.getMinY(), item.getMaxX(), item.getMaxY()));
+                    item.getMinX(), item.getMinY(), item.getMaxX(), item.getMaxY(),
+                    item.getRespawnSeconds()));
             }
             for (NativeLayeredGroundItemPlacement item : set.getGroundItems()) {
                 items.add(new AdaptiveWorldBuilderPackagePublisher.GroundItem(
@@ -306,7 +307,7 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
                 "zz.lower.npc", 9,
                 com.openrsc.server.model.world.coordinate.WorldLocation.global(
                     new com.openrsc.server.model.world.coordinate.WorldCoordinate(
-                        4, 4, 0)), 4, 4, 4, 4));
+                        4, 4, 0)), 4, 4, 4, 4, 45));
             items.add(new AdaptiveWorldBuilderPackagePublisher.GroundItem(
                 "zz.lower.ground-item", 10,
                 com.openrsc.server.model.world.coordinate.WorldLocation.global(

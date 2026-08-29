@@ -650,6 +650,21 @@ public final class WorldEditorSessionManager {
 			destination, createdLevel, added.size());
 	}
 
+	public synchronized boolean hasPublishedNativeNavigationTerrain(
+		Player player, WorldLocation destination) {
+		requireNativeDraftSession(player);
+		NativeLayeredWorldPackage owner = player.getWorld().getRegionManager()
+			.getNativeLayeredWorldPackage();
+		return owner != null && owner.findTile(destination).isPresent();
+	}
+
+	public synchronized boolean hasUnpublishedNativeNavigationTerrain(
+		Player player, WorldLocation destination) {
+		requireNativeDraftSession(player);
+		return nativeTerrainLiveSectors.containsKey(
+			WorldMapSectorId.from(destination));
+	}
+
 	public synchronized NativeVerticalPairResult prepareNativeVerticalPair(
 		Player player,
 		GameObject source,
@@ -871,7 +886,7 @@ public final class WorldEditorSessionManager {
 	}
 
 	public synchronized Npc placeNativeNpc(
-		Player player, int npcId, int radius, int x, int y) {
+		Player player, int npcId, int radius, int respawnSeconds, int x, int y) {
 		requireClientPlacementDefinition(
 			player, "NPC", npcId,
 			player.getClientLimitations().maxNpcId);
@@ -882,6 +897,10 @@ public final class WorldEditorSessionManager {
 		}
 		if (radius < 0 || radius > 64) {
 			throw new IllegalArgumentException("NPC radius must be from 0 to 64.");
+		}
+		if (respawnSeconds < -1 || respawnSeconds > 86400) {
+			throw new IllegalArgumentException(
+				"NPC respawn must be Definition default (-1), Never (0), or 1..86400 seconds.");
 		}
 		int minX = Math.subtractExact(x, radius);
 		int minY = Math.subtractExact(y, radius);
@@ -897,6 +916,7 @@ public final class WorldEditorSessionManager {
 		requireAdaptivePlacementCapacity(player);
 		Npc npc = new Npc(
 			player.getWorld(), npcId, x, y, minX, maxX, minY, maxY);
+		npc.setAuthoredRespawnSeconds(respawnSeconds);
 		npc.setWorldLocation(location, true);
 		NativeLayeredWorldPackage owner = nativeOwner(player, location);
 		player.getWorld().getRegionManager().markNativeLayeredPlacement(
@@ -1121,7 +1141,8 @@ public final class WorldEditorSessionManager {
 				persisted.minX,
 				persisted.minY,
 				persisted.maxX,
-				persisted.maxY));
+				persisted.maxY,
+				persisted.respawnSeconds));
 		}
 		List<WorldEditorLayeredTerrainJournal.GroundItemEdit> groundItems =
 			new ArrayList<WorldEditorLayeredTerrainJournal.GroundItemEdit>(
@@ -1407,6 +1428,7 @@ public final class WorldEditorSessionManager {
 					placement.getStart().getCoordinate().getY(),
 					placement.getMinX(), placement.getMaxX(),
 					placement.getMinY(), placement.getMaxY());
+				npc.setAuthoredRespawnSeconds(placement.getRespawnSeconds());
 				npc.setWorldLocation(placement.getStart(), true);
 				regions.markNativeLayeredPlacement(npc, worldPackage.getPackageId(),
 					placement.getPlacementId(), RegionManager.NATIVE_LAYERED_NPC_KIND);
@@ -1546,7 +1568,8 @@ public final class WorldEditorSessionManager {
 					new AdaptiveWorldBuilderPackagePublisher.Npc(
 						value.getPlacementId(), value.getNpcId(), value.getStart(),
 						value.getMinX(), value.getMinY(),
-						value.getMaxX(), value.getMaxY()));
+						value.getMaxX(), value.getMaxY(),
+						value.getRespawnSeconds()));
 			}
 			for (NativeLayeredGroundItemPlacement value : set.getGroundItems()) {
 				putPlacement(groundItems, value.getPlacementId(),
@@ -1595,7 +1618,8 @@ public final class WorldEditorSessionManager {
 					new AdaptiveWorldBuilderPackagePublisher.Npc(
 						placementId, target.npcId, start,
 						target.minX, target.minY,
-						target.maxX, target.maxY));
+						target.maxX, target.maxY,
+						target.respawnSeconds));
 			}
 		}
 		for (Map.Entry<NativeGroundItemKey,NativeGroundItemState> entry
@@ -2399,6 +2423,7 @@ public final class WorldEditorSessionManager {
 						new WorldCoordinate(state.startX,state.startY,state.level));
 					Npc npc=new Npc(player.getWorld(),state.npcId,state.startX,state.startY,
 						state.minX,state.maxX,state.minY,state.maxY);
+					npc.setAuthoredRespawnSeconds(state.respawnSeconds);
 					npc.setWorldLocation(location,true);
 					NativeLayeredWorldPackage owner=nativeOwner(player,location);
 					player.getWorld().getRegionManager().markNativeLayeredPlacement(
@@ -2695,10 +2720,10 @@ public final class WorldEditorSessionManager {
 		@Override public int hashCode(){int result=worldSpace.hashCode();result=31*result+level;return 31*result+placementId.hashCode();}
 	}
 	private static final class NativeNpcState {
-		final String placementId;final int level,npcId,startX,startY,minX,minY,maxX,maxY;
-		NativeNpcState(String placementId,int level,int npcId,int startX,int startY,int minX,int minY,int maxX,int maxY){
+		final String placementId;final int level,npcId,startX,startY,minX,minY,maxX,maxY,respawnSeconds;
+		NativeNpcState(String placementId,int level,int npcId,int startX,int startY,int minX,int minY,int maxX,int maxY,int respawnSeconds){
 			this.placementId=placementId;this.level=level;this.npcId=npcId;
-			this.startX=startX;this.startY=startY;this.minX=minX;this.minY=minY;this.maxX=maxX;this.maxY=maxY;
+			this.startX=startX;this.startY=startY;this.minX=minX;this.minY=minY;this.maxX=maxX;this.maxY=maxY;this.respawnSeconds=respawnSeconds;
 		}
 		static NativeNpcState from(Npc npc){
 			String placementId=npc.getAttribute(
@@ -2708,10 +2733,11 @@ public final class WorldEditorSessionManager {
 			NPCLoc loc=npc.getLoc();
 			return new NativeNpcState(
 				placementId,npc.getWorldLocation().getCoordinate().getLevel(),
-				npc.getID(),loc.startX,loc.startY,loc.minX,loc.minY,loc.maxX,loc.maxY);
+				npc.getID(),loc.startX,loc.startY,loc.minX,loc.minY,loc.maxX,loc.maxY,
+				npc.getAuthoredRespawnSeconds());
 		}
-		@Override public boolean equals(Object other){if(this==other)return true;if(!(other instanceof NativeNpcState))return false;NativeNpcState state=(NativeNpcState)other;return level==state.level&&npcId==state.npcId&&startX==state.startX&&startY==state.startY&&minX==state.minX&&minY==state.minY&&maxX==state.maxX&&maxY==state.maxY&&placementId.equals(state.placementId);}
-		@Override public int hashCode(){int result=placementId.hashCode();result=31*result+level;result=31*result+npcId;result=31*result+startX;result=31*result+startY;result=31*result+minX;result=31*result+minY;result=31*result+maxX;return 31*result+maxY;}
+		@Override public boolean equals(Object other){if(this==other)return true;if(!(other instanceof NativeNpcState))return false;NativeNpcState state=(NativeNpcState)other;return level==state.level&&npcId==state.npcId&&startX==state.startX&&startY==state.startY&&minX==state.minX&&minY==state.minY&&maxX==state.maxX&&maxY==state.maxY&&respawnSeconds==state.respawnSeconds&&placementId.equals(state.placementId);}
+		@Override public int hashCode(){int result=placementId.hashCode();result=31*result+level;result=31*result+npcId;result=31*result+startX;result=31*result+startY;result=31*result+minX;result=31*result+minY;result=31*result+maxX;result=31*result+maxY;return 31*result+respawnSeconds;}
 	}
 	private static final class NativeGroundItemKey {
 		final WorldSpaceId worldSpace;final int level,x,y;

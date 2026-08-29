@@ -597,8 +597,8 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 
 		private byte[] placement(PlacementGroup group) {
 			StringBuilder value = new StringBuilder();
-			value.append("{\"schemaVersion\":3,\"encoding\":");
-			json(value, NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V3);
+			value.append("{\"schemaVersion\":4,\"encoding\":");
+			json(value, NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4);
 			value.append(",\"worldSpace\":"); json(value, group.key.worldSpace);
 			value.append(",\"level\":").append(group.key.level);
 			value.append(",\"npcs\":[");
@@ -611,7 +611,9 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 				value.append(",\"roamBounds\":{\"minimum\":{\"x\":")
 					.append(item.minX).append(",\"y\":").append(item.minY)
 					.append("},\"maximum\":{\"x\":").append(item.maxX)
-					.append(",\"y\":").append(item.maxY).append("}}}");
+					.append(",\"y\":").append(item.maxY)
+					.append("}},\"respawnSeconds\":")
+					.append(item.respawnSeconds).append('}');
 			}
 			value.append("],\"groundItems\":[");
 			for (int index = 0; index < group.groundItems.size(); index++) {
@@ -693,7 +695,7 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 				value.append("{\"id\":"); json(value, level.placementSetId);
 				value.append(",\"worldSpace\":"); json(value, level.worldSpace);
 				value.append(",\"level\":").append(level.level)
-					.append(",\"encoding\":\"layered-world-placements-v3\",\"path\":");
+					.append(",\"encoding\":\"layered-world-placements-v4\",\"path\":");
 				json(value, file.path); value.append(",\"sha256\":");
 				json(value, file.sha256); value.append('}');
 			}
@@ -808,10 +810,16 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 		public final int minY;
 		public final int maxX;
 		public final int maxY;
+		public final int respawnSeconds;
 
 		public Npc(
 			String placementId, int npcId, WorldLocation start,
-			int minX, int minY, int maxX, int maxY) {
+			int minX, int minY, int maxX, int maxY,
+			int respawnSeconds) {
+			if (respawnSeconds < -1 || respawnSeconds > 86400) {
+				throw new IllegalArgumentException(
+					"NPC respawn override must be -1..86400 seconds");
+			}
 			this.placementId = placementId;
 			this.npcId = npcId;
 			this.start = start;
@@ -819,6 +827,7 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 			this.minY = minY;
 			this.maxX = maxX;
 			this.maxY = maxY;
+			this.respawnSeconds = respawnSeconds;
 		}
 	}
 
