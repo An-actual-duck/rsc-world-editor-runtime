@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.NavigableSet;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /** Explicit desktop-only connection profile for the isolated World Builder runtime. */
@@ -42,6 +44,7 @@ public final class WorldBuilderClientProfile {
 	private static final Pattern SOURCE_REVISION_PATTERN = Pattern.compile("[0-9a-f]{64}");
 	private static final Pattern PACKAGE_ID_PATTERN =
 		Pattern.compile("[a-z0-9][a-z0-9._-]{0,127}");
+	private static final int MAX_ADAPTIVE_LEVELS = 64;
 	private static WorldBuilderClientProfile current = disabled();
 
 	private final boolean enabled;
@@ -57,6 +60,8 @@ public final class WorldBuilderClientProfile {
 	private final String layeredManifestSha256;
 	private final String layeredWorldSpace;
 	private final int[] layeredLevels;
+	private final NavigableSet<Integer> activeLayeredLevels =
+		new TreeSet<Integer>();
 	private final boolean adaptive;
 	private final AdaptiveWorldBuilderClientSession adaptiveSession;
 	private boolean adaptiveServerBindingAccepted;
@@ -81,6 +86,9 @@ public final class WorldBuilderClientProfile {
 		this.layeredManifestSha256 = layeredManifestSha256;
 		this.layeredWorldSpace = layeredWorldSpace;
 		this.layeredLevels = layeredLevels.clone();
+		for (int level : this.layeredLevels) {
+			this.activeLayeredLevels.add(Integer.valueOf(level));
+		}
 		this.adaptive = adaptive;
 		this.adaptiveSession = adaptiveSession;
 	}
@@ -266,7 +274,7 @@ public final class WorldBuilderClientProfile {
 	 * Accepts one server scene scope only after the authenticated adaptive
 	 * binding and exact native layered protocol have both been established.
 	 */
-	public synchronized void acceptAdaptiveNativeTerrainContext(
+	public synchronized void validateAdaptiveNativeTerrainContext(
 		int protocolVersion,
 		String worldSpace,
 		int level,
@@ -290,15 +298,40 @@ public final class WorldBuilderClientProfile {
 			|| !adaptiveSession.packageIdentity().equals(
 				terrain.packageIdentity())
 			|| !adaptiveSession.initialWorldSpace().equals(worldSpace)
-			|| !declaresLayer(level)
+			|| (!declaresLayer(level) && !layeredTerrainDraft)
 			|| !terrain.covers(worldSpace, level, x, y)) {
 			throw new IllegalStateException(
 				"Strict adaptive terrain context does not match the bound native package");
 		}
+		if (!declaresLayer(level)
+			&& activeLayeredLevels.size() >= MAX_ADAPTIVE_LEVELS) {
+			throw new IllegalStateException(
+				"Strict adaptive terrain context exceeds the signed-level limit");
+		}
+	}
+
+	/**
+	 * Commits a previously validated server terrain context. The startup
+	 * binding remains immutable; a newly authored level lives only in this
+	 * authenticated Builder process until the normal project save publishes it.
+	 */
+	public synchronized void acceptAdaptiveNativeTerrainContext(
+		int protocolVersion,
+		String worldSpace,
+		int level,
+		int x,
+		int y,
+		NativeLayeredTerrainSnapshot terrain) {
+		if (!isStrictAdaptiveTerrain()) {
+			return;
+		}
+		validateAdaptiveNativeTerrainContext(
+			protocolVersion, worldSpace, level, x, y, terrain);
+		activeLayeredLevels.add(Integer.valueOf(level));
 		// The immutable binding supplies the first-run location, while the isolated
 		// Builder database may truthfully restore a later creator position. The
 		// authenticated server context is still restricted to the exact bound
-		// package, declared level, world space, and resident terrain coverage above.
+		// package, active level set, world space, and resident terrain coverage above.
 		adaptiveNativeContextAccepted = true;
 	}
 
@@ -376,20 +409,18 @@ public final class WorldBuilderClientProfile {
 		return layeredWorldSpace;
 	}
 
-	public String layeredLevelsLabel() {
+	public synchronized String layeredLevelsLabel() {
 		StringBuilder label = new StringBuilder();
-		for (int index = 0; index < layeredLevels.length; index++) {
-			if (index > 0) label.append(',');
-			label.append(layeredLevels[index]);
+		int index = 0;
+		for (Integer level : activeLayeredLevels) {
+			if (index++ > 0) label.append(',');
+			label.append(level.intValue());
 		}
 		return label.toString();
 	}
 
-	public boolean declaresLayer(int level) {
-		for (int declared : layeredLevels) {
-			if (declared == level) return true;
-		}
-		return false;
+	public synchronized boolean declaresLayer(int level) {
+		return activeLayeredLevels.contains(Integer.valueOf(level));
 	}
 
 	private static WorldBuilderClientProfile disabled() {

@@ -751,7 +751,7 @@ public class PacketHandler {
 			phaseStartedNanos == 0L
 				? 0L : System.nanoTime() - phaseStartedNanos);
 		WorldBuilderClientProfile.current()
-			.acceptAdaptiveNativeTerrainContext(
+			.validateAdaptiveNativeTerrainContext(
 				protocolVersion,
 				worldSpace,
 				logicalLevel,
@@ -788,6 +788,14 @@ public class PacketHandler {
 				logicalLevel,
 				legacyX,
 				legacyY,
+				nativeTerrain);
+		WorldBuilderClientProfile.current()
+			.acceptAdaptiveNativeTerrainContext(
+				protocolVersion,
+				worldSpace,
+				logicalLevel,
+				logicalX,
+				logicalY,
 				nativeTerrain);
 		BoundaryLoadingDiagnostics.recordPhase(
 			"context",

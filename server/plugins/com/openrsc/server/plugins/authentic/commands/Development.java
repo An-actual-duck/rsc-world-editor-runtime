@@ -430,25 +430,14 @@ public final class Development implements CommandTrigger {
 			current.getWorldSpace(),new WorldCoordinate(x,y,level));
 		WorldEditorSessionManager editor = player.getWorld().getServer()
 			.getWorldEditorSessions();
-		boolean published = player.getConfig().WORLD_BUILDER_MODE
-			&& WorldBuilderMode.isLayeredAuthoringProfile(player.getConfig())
-			? editor.hasPublishedNativeNavigationTerrain(player, destination)
-			: player.getWorld().getRegionManager()
-				.hasNativeLayeredTerrain(destination);
-		if (!published) {
+		if (!player.getWorld().getRegionManager()
+				.hasNativeLayeredTerrain(destination)) {
 			if (!player.getConfig().WORLD_BUILDER_MODE
 				|| !WorldBuilderMode.isLayeredAuthoringProfile(
 					player.getConfig())) {
 				player.message(messagePrefix
 					+ "The reviewed package has no terrain at "
 					+x+","+y+",L"+level+".");
-				return;
-			}
-			if (editor.hasUnpublishedNativeNavigationTerrain(
-				player, destination)) {
-				player.message(messagePrefix
-					+ "Layer " + level + " is created but not published yet. "
-					+ "Save and reopen the Builder before navigating there.");
 				return;
 			}
 			try {
@@ -460,17 +449,12 @@ public final class Development implements CommandTrigger {
 					+level+" with "+result.allocatedSectorCount
 					+" void-backed sector"
 					+(result.allocatedSectorCount==1?"":"s")
-					+" around "+x+","+y+". Save and reopen the Builder "
-					+"before navigating there.");
+					+" around "+x+","+y+" and activated it live.");
 			} catch (Exception failure) {
 				player.message(messagePrefix
 					+"Builder navigation refused: "+failure.getMessage());
 				return;
 			}
-			// The login-bound client profile cannot safely render a level or
-			// sector created after login. Publish it first, then let the next
-			// validated launch negotiate the expanded package identity.
-			return;
 		}
 		player.teleportLayered(destination,false);
 		player.message(messagePrefix+"Builder location: "

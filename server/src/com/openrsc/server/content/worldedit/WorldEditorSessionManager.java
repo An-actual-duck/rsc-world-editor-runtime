@@ -650,21 +650,6 @@ public final class WorldEditorSessionManager {
 			destination, createdLevel, added.size());
 	}
 
-	public synchronized boolean hasPublishedNativeNavigationTerrain(
-		Player player, WorldLocation destination) {
-		requireNativeDraftSession(player);
-		NativeLayeredWorldPackage owner = player.getWorld().getRegionManager()
-			.getNativeLayeredWorldPackage();
-		return owner != null && owner.findTile(destination).isPresent();
-	}
-
-	public synchronized boolean hasUnpublishedNativeNavigationTerrain(
-		Player player, WorldLocation destination) {
-		requireNativeDraftSession(player);
-		return nativeTerrainLiveSectors.containsKey(
-			WorldMapSectorId.from(destination));
-	}
-
 	public synchronized NativeVerticalPairResult prepareNativeVerticalPair(
 		Player player,
 		GameObject source,
