@@ -23,7 +23,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -102,12 +101,12 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 		requireAbsent(transaction, "adaptive save transaction");
 
 		AdaptiveWorldBuilderPackageGuard.Inventory current =
-			AdaptiveWorldBuilderPackageGuard.requireClosedPackage(working);
+			AdaptiveWorldBuilderPackageGuard.inventory(working);
 		requireFingerprint(
 			"working package", expectedWorkingInventorySha256,
 			current.getFingerprint());
 		AdaptiveWorldBuilderPackageGuard.Inventory baseline =
-			AdaptiveWorldBuilderPackageGuard.requireClosedPackage(immutable);
+			AdaptiveWorldBuilderPackageGuard.inventory(immutable);
 		requireFingerprint(
 			"immutable source baseline", expectedBaselineInventorySha256,
 			baseline.getFingerprint());
@@ -123,11 +122,6 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 			newInventorySha256 = staged.inventory.getFingerprint();
 			newManifestSha256 = staged.worldPackage.getManifestSha256();
 			observer.at(Stage.PACKAGE_VALIDATED, stage);
-			requireInventoryFingerprint(
-				"adaptive staged package", newInventorySha256, stage);
-			requireInventoryFingerprint(
-				"immutable source baseline", expectedBaselineInventorySha256,
-				immutable);
 			observer.at(Stage.BEFORE_PUBLICATION, stage);
 			requireInventoryFingerprint(
 				"adaptive staged package", newInventorySha256, stage);
@@ -138,18 +132,11 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 				immutable);
 			writeTransaction(
 				transaction, current.getFingerprint(), newInventorySha256);
-			requireInventoryFingerprint(
-				"working package", expectedWorkingInventorySha256, working);
 			moveAtomic(working, previous);
 			previousMoved = true;
 			observer.at(Stage.PREVIOUS_MOVED, stage);
 			moveAtomic(stage, working);
 			observer.at(Stage.PACKAGE_PUBLISHED, working);
-			requireInventoryFingerprint(
-				"published adaptive package", newInventorySha256, working);
-			requireInventoryFingerprint(
-				"immutable source baseline", expectedBaselineInventorySha256,
-				immutable);
 			try {
 				deleteTree(previous);
 				Files.delete(transaction);
@@ -236,14 +223,16 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 		Path packageRoot, Map<String, byte[]> expectedFiles,
 		PackageVerifier verifier) throws IOException {
 		AdaptiveWorldBuilderPackageGuard.Inventory inventory =
-			AdaptiveWorldBuilderPackageGuard.requireClosedPackage(packageRoot);
+			AdaptiveWorldBuilderPackageGuard.inventory(packageRoot);
 		if (!expectedFiles.keySet().equals(inventory.getEntries().keySet())) {
 			throw new IOException(
 				"Adaptive staged package inventory differs from its model");
 		}
 		for (Map.Entry<String, byte[]> entry : expectedFiles.entrySet()) {
-			byte[] actual = Files.readAllBytes(packageRoot.resolve(entry.getKey()));
-			if (!Arrays.equals(entry.getValue(), actual)) {
+			AdaptiveWorldBuilderPackageGuard.Entry actual =
+				inventory.getEntries().get(entry.getKey());
+			if (actual.getSize() != entry.getValue().length
+				|| !actual.getSha256().equals(sha256(entry.getValue()))) {
 				throw new IOException(
 					"Adaptive staged package bytes differ from its model: "
 						+ entry.getKey());
@@ -251,11 +240,22 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 		}
 		NativeLayeredWorldPackage loaded =
 			NativeLayeredWorldPackage.load(packageRoot);
+		if (!loaded.getExpectedRelativeFilePaths().equals(
+			inventory.getEntries().keySet())) {
+			throw new IOException(
+				"Adaptive staged package inventory is not closed");
+		}
 		NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER.validate(
 			NativeLayeredWorldPackageCatalog.of(
 				Collections.singletonList(loaded)));
 		verifier.verify(loaded);
-		return new Validated(inventory, loaded);
+		AdaptiveWorldBuilderPackageGuard.Inventory after =
+			AdaptiveWorldBuilderPackageGuard.inventory(packageRoot);
+		if (!inventory.getFingerprint().equals(after.getFingerprint())) {
+			throw new IOException(
+				"Adaptive staged package changed while it was being validated");
+		}
+		return new Validated(after, loaded);
 	}
 
 	private static void rollback(
@@ -283,6 +283,10 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 	private static void writeStage(
 		Path stage, Map<String, byte[]> files) throws IOException {
 		Files.createDirectory(stage);
+		// The complete stage is reread, hash-checked and semantically validated
+		// before a forced transaction record permits either atomic directory move.
+		// Per-file force calls made interactive saves scale with the package's file
+		// count while adding no logical recovery state beyond that transaction.
 		for (Map.Entry<String, byte[]> entry : files.entrySet()) {
 			Path destination = stage.resolve(entry.getKey()).normalize();
 			if (!destination.startsWith(stage)) {
@@ -292,7 +296,6 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 			Files.write(
 				destination, entry.getValue(), StandardOpenOption.CREATE_NEW,
 				StandardOpenOption.WRITE);
-			force(destination);
 		}
 	}
 
@@ -701,7 +704,7 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 
 	private static void putUnique(
 		Map<String, byte[]> values, String path, byte[] bytes) throws IOException {
-		if (values.put(path, bytes.clone()) != null) {
+		if (values.put(path, bytes) != null) {
 			throw new IOException("Duplicate adaptive output path: " + path);
 		}
 	}
@@ -738,7 +741,7 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 
 	public static final class Sector {
 		public final WorldMapSectorId identity;
-		public final byte[] bytes;
+		private final byte[] bytes;
 
 		public Sector(WorldMapSectorId identity, byte[] bytes) {
 			if (identity == null || bytes == null || (bytes.length

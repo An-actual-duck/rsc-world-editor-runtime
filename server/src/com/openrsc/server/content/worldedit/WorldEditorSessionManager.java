@@ -101,6 +101,7 @@ public final class WorldEditorSessionManager {
 		new HashSet<NativeGroundItemKey>();
 	private String nativeTerrainBaseManifestSha256;
 	private String nativeWorkingInventorySha256;
+	private boolean adaptiveSavePending;
 	private NativeLayeredWorldPackage nativeAdoptedPackage;
 	private long nativeTerrainSceneRevision;
 	private final WorldEditorOperationHistory<Object,Optional<Object>>
@@ -134,6 +135,7 @@ public final class WorldEditorSessionManager {
 	}
 
 	public synchronized boolean close(Player player, long id, int sequence) {
+		if (adaptiveSavePending) return false;
 		if (!validate(player, id, sequence).accepted) return false;
 		active = null;
 		clearNativeOperationHistory();
@@ -1173,6 +1175,59 @@ public final class WorldEditorSessionManager {
 
 	public synchronized AdaptiveWorldBuilderPackagePublisher.SaveResult
 		saveAdaptivePackage(final Player player) throws IOException {
+		PreparedAdaptiveSave prepared = prepareAdaptiveSave(player);
+		AdaptiveWorldBuilderPackagePublisher.SaveResult saved =
+			publishAdaptivePackage(prepared);
+		nativeWorkingInventorySha256 = saved.inventorySha256;
+		markNativeChangesSaved();
+		return saved;
+	}
+
+	public void saveAdaptivePackageAsync(
+		final Player player, final AdaptiveSaveCallback callback)
+		throws IOException {
+		if (callback == null) {
+			throw new IllegalArgumentException(
+				"Adaptive save completion callback is required.");
+		}
+		final PreparedAdaptiveSave prepared;
+		synchronized (this) {
+			prepared = prepareAdaptiveSave(player);
+			adaptiveSavePending = true;
+		}
+		Thread worker = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				AdaptiveWorldBuilderPackagePublisher.SaveResult saved = null;
+				Exception failure = null;
+				try {
+					saved = publishAdaptivePackage(prepared);
+					synchronized (WorldEditorSessionManager.this) {
+						nativeWorkingInventorySha256 = saved.inventorySha256;
+						markNativeChangesSaved();
+					}
+				} catch (Exception problem) {
+					failure = problem;
+				} finally {
+					synchronized (WorldEditorSessionManager.this) {
+						adaptiveSavePending = false;
+					}
+				}
+				callback.complete(saved, failure);
+			}
+		}, "World Builder Package Save");
+		try {
+			worker.start();
+		} catch (RuntimeException failure) {
+			synchronized (this) {
+				adaptiveSavePending = false;
+			}
+			throw failure;
+		}
+	}
+
+	private PreparedAdaptiveSave prepareAdaptiveSave(final Player player)
+		throws IOException {
 		requireNativeDraftSession(player);
 		if (!isAdaptive(player)) {
 			throw new IllegalStateException(
@@ -1199,35 +1254,39 @@ public final class WorldEditorSessionManager {
 			nativeWorkingInventorySha256 =
 				player.getConfig().LAYERED_NATIVE_TERRAIN_INVENTORY_SHA256;
 		}
-		AdaptiveWorldBuilderPackagePublisher.Draft draft =
-			adaptiveDraft(owner);
-		AdaptiveWorldBuilderPackagePublisher.SaveResult saved =
-			AdaptiveWorldBuilderPackagePublisher.publish(
-				paths.layeredWorkingPackage(),
-				paths.sourceLayeredBaselinePackage(),
-				nativeWorkingInventorySha256,
-				player.getConfig()
-					.WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256,
-				draft,
-				new AdaptiveWorldBuilderPackagePublisher.PackageVerifier() {
+		final com.openrsc.server.external.EntityHandler definitions =
+			player.getWorld().getServer().getEntityHandler();
+		return new PreparedAdaptiveSave(
+			paths.layeredWorkingPackage(),
+			paths.sourceLayeredBaselinePackage(),
+			nativeWorkingInventorySha256,
+			player.getConfig()
+				.WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256,
+			adaptiveDraft(owner),
+			new AdaptiveWorldBuilderPackagePublisher.PackageVerifier() {
 					@Override
 					public void verify(NativeLayeredWorldPackage worldPackage)
 						throws IOException {
 						try {
 							AdaptiveWorldBuilderDefinitionInventory.validate(
-								player.getWorld().getServer().getEntityHandler(),
-								worldPackage);
+								definitions, worldPackage);
 						} catch (IllegalArgumentException failure) {
 							throw new IOException(
 								"Adaptive package definition validation failed",
 								failure);
 						}
 					}
-				},
-				AdaptiveWorldBuilderPackagePublisher.NO_OBSERVER);
-		nativeWorkingInventorySha256 = saved.inventorySha256;
-		markNativeChangesSaved();
-		return saved;
+				});
+	}
+
+	private static AdaptiveWorldBuilderPackagePublisher.SaveResult
+		publishAdaptivePackage(PreparedAdaptiveSave prepared) throws IOException {
+		return AdaptiveWorldBuilderPackagePublisher.publish(
+			prepared.workingPackage, prepared.baselinePackage,
+			prepared.workingInventorySha256,
+			prepared.baselineInventorySha256, prepared.draft,
+			prepared.verifier,
+			AdaptiveWorldBuilderPackagePublisher.NO_OBSERVER);
 	}
 
 	/**
@@ -1643,6 +1702,10 @@ public final class WorldEditorSessionManager {
 		if(!ownsActiveSession(player)){
 			throw new IllegalStateException(
 				"Layered terrain authoring requires the active Builder editor session.");
+		}
+		if(adaptiveSavePending){
+			throw new IllegalStateException(
+				"World edit save is still in progress.");
 		}
 	}
 	private void requireNativeTerrainAuthoring(Player player,int level){
@@ -2743,6 +2806,32 @@ public final class WorldEditorSessionManager {
 	public static final class TerrainStrokeResult {
 		public final List<WorldEditorTerrainArchive.Snapshot> before,after;
 		private TerrainStrokeResult(List<WorldEditorTerrainArchive.Snapshot> b,List<WorldEditorTerrainArchive.Snapshot> a){before=b;after=a;}
+	}
+	public interface AdaptiveSaveCallback {
+		void complete(
+			AdaptiveWorldBuilderPackagePublisher.SaveResult result,
+			Exception failure);
+	}
+	private static final class PreparedAdaptiveSave {
+		final Path workingPackage;
+		final Path baselinePackage;
+		final String workingInventorySha256;
+		final String baselineInventorySha256;
+		final AdaptiveWorldBuilderPackagePublisher.Draft draft;
+		final AdaptiveWorldBuilderPackagePublisher.PackageVerifier verifier;
+		PreparedAdaptiveSave(
+			Path workingPackage, Path baselinePackage,
+			String workingInventorySha256,
+			String baselineInventorySha256,
+			AdaptiveWorldBuilderPackagePublisher.Draft draft,
+			AdaptiveWorldBuilderPackagePublisher.PackageVerifier verifier) {
+			this.workingPackage = workingPackage;
+			this.baselinePackage = baselinePackage;
+			this.workingInventorySha256 = workingInventorySha256;
+			this.baselineInventorySha256 = baselineInventorySha256;
+			this.draft = draft;
+			this.verifier = verifier;
+		}
 	}
 	public static final class OpenResult {
 		public final boolean opened; public final long sessionId; public final int nextSequence; public final String message;

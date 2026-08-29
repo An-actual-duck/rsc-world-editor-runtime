@@ -1704,29 +1704,48 @@ public final class Development implements CommandTrigger {
 				if (com.openrsc.server.content.worldedit
 					.AdaptiveWorldBuilderRuntimeIdentity.isAdaptive(
 						player.getConfig())) {
-					com.openrsc.server.content.worldedit
-						.AdaptiveWorldBuilderPackagePublisher.SaveResult saved =
-							editor.saveAdaptivePackage(player);
-					player.message(messagePrefix + "Saved pending edits to the "
-						+ "isolated working package: " + levelCreations
-						+ " new level" + (levelCreations == 1 ? "" : "s")
-						+ ", " + terrainEdits + " terrain tile"
-						+ (terrainEdits == 1 ? "" : "s") + ", "
-						+ terrainGrowth + " new sector"
-						+ (terrainGrowth == 1 ? "" : "s") + ", "
-						+ nativeScenery + " scenery edit"
-						+ (nativeScenery == 1 ? "" : "s") + ", "
-						+ nativeNpcs + " NPC edit"
-						+ (nativeNpcs == 1 ? "" : "s") + ", and "
-						+ nativeGroundItems + " ground-item edit"
-						+ (nativeGroundItems == 1 ? "" : "s") + ".");
-					player.message(messagePrefix + "Package manifest: "
-						+ saved.manifestSha256.substring(0, 12)
-						+ ". Reopen the Builder to load the published revision.");
-					LOGGER.info(player.getUsername()
-						+ " published adaptive layered package manifest "
-						+ saved.manifestSha256 + " inventory "
-						+ saved.inventorySha256);
+					editor.saveAdaptivePackageAsync(
+						player,
+						new com.openrsc.server.content.worldedit
+							.WorldEditorSessionManager.AdaptiveSaveCallback() {
+							@Override
+							public void complete(
+								com.openrsc.server.content.worldedit
+									.AdaptiveWorldBuilderPackagePublisher.SaveResult saved,
+								Exception failure) {
+								if (failure != null) {
+									LOGGER.error(failure);
+									player.message(messagePrefix
+										+ "Failed to save world edits: "
+										+ failure.getMessage());
+									return;
+								}
+								player.message(messagePrefix
+									+ "Saved pending edits to the isolated working package: "
+									+ levelCreations + " new level"
+									+ (levelCreations == 1 ? "" : "s") + ", "
+									+ terrainEdits + " terrain tile"
+									+ (terrainEdits == 1 ? "" : "s") + ", "
+									+ terrainGrowth + " new sector"
+									+ (terrainGrowth == 1 ? "" : "s") + ", "
+									+ nativeScenery + " scenery edit"
+									+ (nativeScenery == 1 ? "" : "s") + ", "
+									+ nativeNpcs + " NPC edit"
+									+ (nativeNpcs == 1 ? "" : "s") + ", and "
+									+ nativeGroundItems + " ground-item edit"
+									+ (nativeGroundItems == 1 ? "" : "s") + ".");
+								player.message(messagePrefix + "Package manifest: "
+									+ saved.manifestSha256.substring(0, 12)
+									+ ". Reopen the Builder to load the published revision.");
+								LOGGER.info(player.getUsername()
+									+ " published adaptive layered package manifest "
+									+ saved.manifestSha256 + " inventory "
+									+ saved.inventorySha256);
+							}
+						});
+					player.message(messagePrefix
+						+ "Saving world edits in the background; building may resume "
+						+ "after completion is reported.");
 					return;
 				}
 				com.openrsc.server.content.worldedit.WorldEditorLayeredTerrainJournal.SaveResult saved=

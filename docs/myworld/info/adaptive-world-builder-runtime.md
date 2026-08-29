@@ -437,26 +437,39 @@ issuing a mutation.
 
 `::saveworldedits` materializes the complete effective package, including all
 unchanged boundary records and all edited terrain/scenery/NPC/ground-item
-records. Publication is copy-on-write:
+records. The authenticated command snapshots the draft on the game thread,
+then performs package I/O on one dedicated save worker. Normal game updates
+remain responsive; further mutations, duplicate saves, and Editor closure are
+refused until the verified completion or failure message is delivered.
+Publication is copy-on-write:
 
-1. verify the current working and immutable baseline closed inventories;
+1. match the current working and immutable baseline inventories to their
+   startup-validated exact fingerprints;
 2. construct canonically ordered package bytes in a sibling stage;
-3. force staged file content to storage;
-4. reload and validate the exact staged bytes with the generic runtime and
+3. hash every staged file against the in-memory model;
+4. reload and validate the closed staged package with the generic runtime and
    active definition contracts;
-5. revalidate after observer boundaries and immediately before publication;
-6. write durable transaction evidence and require atomic same-filesystem
+5. prove the staged, current, and baseline inventory fingerprints again after
+   observer boundaries and immediately before publication;
+6. force durable transaction evidence and require atomic same-filesystem
    directory moves;
-7. re-read and verify the published package; and
-8. remove the prior package and transaction evidence only after success.
+7. publish the already-validated stage without rewriting its bytes; and
+8. remove the prior package and transaction evidence only after both moves
+   succeed.
+
+The stage is intentionally validated as one transaction instead of issuing a
+separate synchronous storage flush for every terrain-sector file. That keeps
+save latency from scaling with thousands of filesystem flush round trips while
+the forced transaction record, retained previous package, atomic moves, and
+startup recovery continue to distinguish every interruption point.
 
 A failed save restores and verifies the prior complete working package. A
 startup recovery marker distinguishes an old complete package, a new complete
 package, and an interrupted swap. Unowned staging state or unverifiable
 recovery state blocks startup for manual review. Source baseline and target
-server data are never save destinations. The runtime fingerprints the source
-baseline before and after publication; the standalone preparer retains target
-fingerprint responsibility because no target path enters this process.
+server data are never save destinations. The runtime rechecks the source
+baseline immediately before publication; the standalone preparer retains
+target fingerprint responsibility because no target path enters this process.
 
 ## Preservation and integration boundary
 

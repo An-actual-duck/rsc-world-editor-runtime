@@ -1239,6 +1239,10 @@ world_builder_initial_y: 648
                     )
                 self.assertNotIn("Default.onCommand", server_evidence)
                 self.assertIn(
+                    "published adaptive layered package manifest",
+                    server_evidence,
+                )
+                self.assertIn(
                     "Skipping legacy terrain archives for explicit adaptive World Builder profile",
                     server_evidence,
                 )

@@ -149,6 +149,8 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertIn("placeNativeNpc(player,id,radius,x,y)", commands)
         self.assertIn("removeNativeNpc(player,npc)", commands)
         self.assertIn('sendCommandString("saveworldedits")', ui)
+        self.assertIn("World edit save is already in progress.", ui)
+        self.assertIn("Wait for the active world edit save to finish", ui)
         potential = re.search(
             r"public void markPotentialEntityEdit\(\)\{(?P<body>.*?)\}", ui
         )
