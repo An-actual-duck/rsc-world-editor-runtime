@@ -106,6 +106,8 @@ assert "acceptTerrainHistoryChunk" in client and "requestTerrainHistory" in clie
 assert "acceptPlacementHistory" in client
 assert "terrainHistoryCanUndo=true;terrainHistoryCanRedo=false" in client
 assert "Ctrl+Z" in client and "Ctrl+Y" in client
+assert "Availability is presentation state, not authority" in client
+assert "if(redo?!terrainHistoryCanRedo:!terrainHistoryCanUndo)" not in client
 assert "type==8||type==9||type==10" in packets
 assert "type==11" in packets
 

@@ -391,6 +391,9 @@ clears Redo. Placement reversals register or retire their live runtime entity,
 so scenery, NPC, and ground-item visuals update without restarting the Builder.
 History never changes the target server and is cleared when the Editor session
 closes or an Editor-owned package publication replaces the running package.
+Client-side availability is only a presentation hint. Undo and Redo requests
+always reach the authoritative session stack once current edits are settled;
+a delayed or missed placement message cannot disable a valid operation.
 
 The session stack covers layered terrain clicks, freehand gestures, Lines,
 Rectangles, and the three placement families. An operation that allocates new
@@ -398,6 +401,14 @@ terrain establishes a safe history boundary because sector allocation is not
 yet reversible. Editor-owned Region transactions remain separate durable
 package transactions; the existing exact last-Paste Undo continues to apply
 there.
+
+The shared definition browser covers scenery, NPCs, ground items, walls, and
+floor textures. Wall results are built from the complete loaded runtime door
+inventory, with curated labels layered over custom runtime definitions, and a
+selection is converted back to the terrain archive's one-based wall byte.
+Floor results use the raw overlay value shown in the terrain controls, include
+the no-overlay value and bridge-transition alias, expose traversal metadata,
+and remain filtered to the active project's declared authoring definitions.
 
 ## Empty and existing-level authoring
 

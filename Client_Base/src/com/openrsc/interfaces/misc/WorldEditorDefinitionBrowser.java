@@ -20,6 +20,7 @@ final class WorldEditorDefinitionBrowser {
 	enum Family {
 		SCENERY,
 		BOUNDARY,
+		FLOOR,
 		NPC,
 		ITEM
 	}
@@ -141,7 +142,10 @@ final class WorldEditorDefinitionBrowser {
 		List<WorldEditorDefinitionCatalog.Entry> source;
 		switch (family) {
 			case BOUNDARY:
-				source = WorldEditorDefinitionCatalog.boundaryEntries();
+				source = WorldEditorDefinitionCatalog.wallEntries();
+				break;
+			case FLOOR:
+				source = WorldEditorDefinitionCatalog.floorEntries();
 				break;
 			case NPC:
 				source = WorldEditorDefinitionCatalog.npcEntries();
