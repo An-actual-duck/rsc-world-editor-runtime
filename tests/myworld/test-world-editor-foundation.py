@@ -161,6 +161,19 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertIn("saveAfterPendingEdits", ui)
         self.assertIn("Save queued; waiting for ", ui)
         self.assertIn("maybeSubmitDeferredSave()", ui)
+        self.assertIn("pollDeferredSave();", ui)
+        self.assertIn("DEFERRED_SAVE_TIMEOUT_NANOS", ui)
+        self.assertIn("noteDeferredSaveProgress(responseNanos)", ui)
+        self.assertIn("saving every change accepted by the server", ui)
+        self.assertIn("The final edit was rejected; saving all earlier changes", ui)
+        self.assertIn("World edits saved successfully; no pending changes.", ui)
+        stroke_accept = re.search(
+            r"public void acceptTerrainStroke\(.*?(?P<body>.*?)\n\tpublic void acceptTerrainLineChunk",
+            ui,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(stroke_accept)
+        self.assertNotIn("saveRequested=false", stroke_accept.group("body"))
         self.assertIn(
             "World edit save requested; wait for the completion message",
             ui,

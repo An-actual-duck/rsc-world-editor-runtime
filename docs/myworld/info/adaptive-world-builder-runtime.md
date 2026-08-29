@@ -447,7 +447,14 @@ Editor closure are refused until the verified completion or failure message is
 delivered. If the user selects Save while an authoritative brush, line,
 rectangle, or placement response is still arriving, the client visibly queues
 the save and submits it automatically after the last response instead of
-silently ignoring the request.
+silently ignoring the request. The queued state is polled on every rendered
+Editor frame. If no acknowledgement progress arrives for ten seconds, the
+client submits the already-requested save behind the edit packets on the same
+connection, reports the exact unacknowledged count, and tells the user to
+reopen after completion to reconcile the server-authoritative result. A late
+edit acknowledgement cannot clear the active-save guard, and an explicit edit
+refusal still saves all earlier accepted work rather than abandoning the Save
+request.
 Publication is copy-on-write:
 
 1. match the current working and immutable baseline inventories to their
