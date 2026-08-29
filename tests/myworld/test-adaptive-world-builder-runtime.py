@@ -827,6 +827,21 @@ public final class AdaptiveWorldBuilderClientStartupHarness {
         }
         profile.acceptAdaptiveNativeTerrainContext(
             8, worldSpace, level, x + 1, y, accepted);
+        int liveLevel = 37;
+        NativeLayeredTerrainSnapshot live = terrain(
+            packageId, packageVersion, manifest, worldSpace, liveLevel, x, y);
+        require(!profile.declaresLayer(liveLevel),
+            "unpublished level was present before its terrain context");
+        profile.validateAdaptiveNativeTerrainContext(
+            8, worldSpace, liveLevel, x, y, live);
+        require(!profile.declaresLayer(liveLevel),
+            "terrain validation mutated the active level set");
+        profile.acceptAdaptiveNativeTerrainContext(
+            8, worldSpace, liveLevel, x, y, live);
+        require(profile.declaresLayer(liveLevel),
+            "authenticated live draft level was not activated");
+        require(profile.layeredLevelsLabel().endsWith(",37"),
+            "live draft level is absent from the active level label");
         require(!profile.isAdaptiveWorldStateReady(false, true),
             "world became ready before initial region load");
         require(!profile.isAdaptiveWorldStateReady(true, false),
@@ -1643,9 +1658,11 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         )
         self.assertIn("adaptiveServerBindingAccepted", profile)
         self.assertIn("adaptiveNativeContextAccepted", profile)
+        context_validate = packets.index("validateAdaptiveNativeTerrainContext(")
         context_accept = packets.index("acceptAdaptiveNativeTerrainContext(")
         scene_accept = packets.index("layeredSceneContextState.accept(")
-        self.assertLess(context_accept, scene_accept)
+        self.assertLess(context_validate, scene_accept)
+        self.assertLess(scene_accept, context_accept)
         self.assertIn("acceptAdaptiveServerBinding()", packets)
         login_render = client.split(
             "private void renderLoginScreenViewports", 1

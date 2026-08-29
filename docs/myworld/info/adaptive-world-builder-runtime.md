@@ -300,8 +300,14 @@ World state is withheld on both sides until the private binding handshake is
 complete. The server does not send scene context, terrain, or scene entities
 to an adaptive player before `builderbind` succeeds. The client accepts the
 first terrain context only after the server-authored editor-open receipt and
-only when protocol, package, manifest, world space, declared level, initial
-coordinates, and native coverage match the verified binding. A malformed or
+only when protocol, package, manifest, world space, declared startup level,
+initial coordinates, and native coverage match the verified binding. After
+that handshake, the same authenticated draft may activate a newly authored
+signed level in memory when its terrain context retains the exact bound
+package/manifest/world-space identity and proves native coverage. The startup
+binding is never rewritten; the new level becomes immutable package evidence
+only through the normal verified save. Validation occurs before scene-state
+mutation, and the 64-level adaptive bound still applies. A malformed or
 mismatched context fails before it becomes the active scene scope.
 
 The game view remains on its loading frame, and all World Editor mouse,
@@ -423,6 +429,14 @@ paths, time, randomness, package identity, and Spoiled Milk identity never
 enter them. Existing arbitrary placement and placement-set IDs are retained
 across edit/save.
 
+Go/Create navigation publishes a newly allocated void-backed level or work
+area to the running authenticated client and enters it in the same session.
+The client extends only its in-memory active-level set after the exact terrain
+context passes validation; saving and reopening is recovery and persistence
+verification, not a prerequisite for navigation. Canonical automatic
+ladder/stair pairing uses this same live activation path when it creates an
+adjacent level and inverse object.
+
 The scenery Move tool preserves that exact placement ID, definition, direction,
 level, and package owner while changing only its coordinates. The server stages
 the source removal, destination membership, complete collision footprint, NPC
@@ -521,5 +535,6 @@ adaptive world-ready predicate succeeds.
 
 Before a downstream release, an owner must still visually run both an adopted
 generic project and standalone empty project. The owner—not an AI screenshot
-review—confirms rendering, navigation, existing-level edits, new void terrain,
+review—confirms rendering, navigation, existing-level edits, same-session
+Go/Create and ladder/stair level creation, new void terrain,
 placements/collision, save, close/reopen, and client reconnect.
