@@ -437,10 +437,17 @@ issuing a mutation.
 
 `::saveworldedits` materializes the complete effective package, including all
 unchanged boundary records and all edited terrain/scenery/NPC/ground-item
-records. The authenticated command snapshots the draft on the game thread,
-then performs package I/O on one dedicated save worker. Normal game updates
-remain responsive; further mutations, duplicate saves, and Editor closure are
-refused until the verified completion or failure message is delivered.
+records. The authenticated command validates and locks the active draft
+immediately, acknowledges the request, then reconstructs the immutable package
+snapshot and performs package I/O on one dedicated save worker. Terrain edits
+are indexed once by sector before reconstruction; snapshot cost therefore does
+not multiply every accumulated tile edit by every sector in a large map.
+Normal game updates remain responsive; further mutations, duplicate saves, and
+Editor closure are refused until the verified completion or failure message is
+delivered. If the user selects Save while an authoritative brush, line,
+rectangle, or placement response is still arriving, the client visibly queues
+the save and submits it automatically after the last response instead of
+silently ignoring the request.
 Publication is copy-on-write:
 
 1. match the current working and immutable baseline inventories to their

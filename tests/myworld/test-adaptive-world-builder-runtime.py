@@ -442,6 +442,86 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             System.out.println("composition-written");
             return;
         }
+        if ("snapshot-index".equals(mode)) {
+            NativeLayeredWorldPackage source = NativeLayeredWorldPackage.load(working);
+            com.openrsc.server.content.worldedit.WorldEditorSessionManager manager =
+                new com.openrsc.server.content.worldedit.WorldEditorSessionManager();
+            java.lang.reflect.Field overlayField = manager.getClass()
+                .getDeclaredField("nativeTerrainOverlay");
+            overlayField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            java.util.Map<Object,com.openrsc.server.io.NativeLayeredTerrainTile> overlay =
+                (java.util.Map<Object,com.openrsc.server.io.NativeLayeredTerrainTile>)
+                    overlayField.get(manager);
+            Class<?> keyType = Class.forName(
+                "com.openrsc.server.content.worldedit.WorldEditorSessionManager$NativeTileKey");
+            java.lang.reflect.Constructor<?> keyConstructor = keyType
+                .getDeclaredConstructor(
+                    com.openrsc.server.model.world.coordinate.WorldLocation.class);
+            keyConstructor.setAccessible(true);
+            int editCount = 0;
+            for (NativeLayeredTerrainSector sector : source.getTerrainSectors().values()) {
+                for (int localX = 0; localX < 48 && editCount < 4096; localX++) {
+                    for (int localY = 0; localY < 48 && editCount < 4096; localY++) {
+                        com.openrsc.server.model.world.coordinate.WorldMapSectorId identity =
+                            sector.getIdentity();
+                        com.openrsc.server.model.world.coordinate.WorldLocation location =
+                            new com.openrsc.server.model.world.coordinate.WorldLocation(
+                                identity.getWorldSpace(),
+                                new com.openrsc.server.model.world.coordinate.WorldCoordinate(
+                                    identity.getSectorX() * 48 + localX,
+                                    identity.getSectorY() * 48 + localY,
+                                    identity.getLevel()));
+                        overlay.put(
+                            keyConstructor.newInstance(location),
+                            new com.openrsc.server.io.NativeLayeredTerrainTile(
+                                300, 7, 9, 11, 13, 15, 17000));
+                        editCount++;
+                    }
+                }
+            }
+            if (editCount != 4096 || overlay.size() != 4096) {
+                throw new IllegalStateException("large snapshot fixture is incomplete");
+            }
+            java.lang.reflect.Method snapshot = manager.getClass()
+                .getDeclaredMethod("adaptiveDraft", NativeLayeredWorldPackage.class);
+            snapshot.setAccessible(true);
+            long started = System.nanoTime();
+            Object draft = snapshot.invoke(manager, source);
+            long elapsedMillis = (System.nanoTime() - started) / 1000000L;
+            java.lang.reflect.Field sectorsField = draft.getClass()
+                .getDeclaredField("sectors");
+            sectorsField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            java.util.List<Object> sectors =
+                (java.util.List<Object>)sectorsField.get(draft);
+            int encodedEdits = 0;
+            for (Object sector : sectors) {
+                java.lang.reflect.Field bytesField = sector.getClass()
+                    .getDeclaredField("bytes");
+                bytesField.setAccessible(true);
+                byte[] bytes = (byte[])bytesField.get(sector);
+                for (int offset = 0; offset < bytes.length; offset += 11) {
+                    if ((bytes[offset] & 255) == 1
+                        && (bytes[offset + 1] & 255) == 44
+                        && (bytes[offset + 2] & 255) == 7
+                        && (bytes[offset + 3] & 255) == 9) {
+                        encodedEdits++;
+                    }
+                }
+            }
+            if (encodedEdits != 4096) {
+                throw new IllegalStateException(
+                    "indexed snapshot lost terrain edits: " + encodedEdits);
+            }
+            if (elapsedMillis > 10000L) {
+                throw new IllegalStateException(
+                    "indexed large snapshot exceeded 10 seconds: " + elapsedMillis);
+            }
+            System.out.println("snapshot-index-ok edits=" + encodedEdits
+                + " elapsedMs=" + elapsedMillis);
+            return;
+        }
         Path baseline = Paths.get(args[2]);
         NativeLayeredWorldPackage source = NativeLayeredWorldPackage.load(working);
         String workingHash = AdaptiveWorldBuilderPackageGuard
@@ -965,6 +1045,13 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def test_large_terrain_snapshot_is_complete_and_bounded(self):
+        with tempfile.TemporaryDirectory(prefix="adaptive-large-snapshot-") as folder:
+            working, _, _ = self.fixture(Path(folder))
+            result = self.run_harness("snapshot-index", working)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            self.assertIn("snapshot-index-ok edits=4096", result.stdout)
 
     def test_generic_package_publish_is_deterministic_and_preserves_all_families(self):
         outputs = []
@@ -1684,6 +1771,17 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         )).read_text()
         self.assertIn('"world-builder.authored."+family', sessions)
         self.assertIn("legacyNativeSceneryPlacementId", sessions)
+        async_save = sessions[
+            sessions.index("public void saveAdaptivePackageAsync("):
+            sessions.index("private PreparedAdaptiveSave prepareAdaptiveSave(")
+        ]
+        self.assertIn("prepareAdaptiveSaveInputs(player)", async_save)
+        self.assertIn('"World Builder Package Save"', async_save)
+        self.assertNotIn("adaptiveDraft(owner)", async_save)
+        self.assertIn("indexNativeTerrainEditsBySector()", sessions)
+        self.assertIn(
+            "terrainEditsBySector.get(sector.getIdentity())", sessions
+        )
         player_service = (
             ROOT / "server/src/com/openrsc/server/service/PlayerService.java"
         ).read_text()

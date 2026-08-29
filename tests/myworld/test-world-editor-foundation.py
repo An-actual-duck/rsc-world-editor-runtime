@@ -158,7 +158,14 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertNotIn("unsavedChanges=true", potential.group("body"))
         self.assertIn('message.contains("Added layered ")', ui)
         self.assertIn("pendingEntityActions>0", ui)
-        self.assertIn("Wait for authoritative edit responses before saving.", ui)
+        self.assertIn("saveAfterPendingEdits", ui)
+        self.assertIn("Save queued; waiting for ", ui)
+        self.assertIn("maybeSubmitDeferredSave()", ui)
+        self.assertIn(
+            "World edit save requested; wait for the completion message",
+            ui,
+        )
+        self.assertIn("mc.showWorldEditorStatus(inspectionStatus)", ui)
         self.assertNotIn("WORLD_EDITOR_UNDO", actions)
         self.assertNotIn("WORLD_EDITOR_REDO", actions)
 

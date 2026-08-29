@@ -104,7 +104,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private int compactMouseX=-1,compactMouseY=-1,terrainActiveField=7;
 	private String toolbarTooltip="";
 	private boolean keyboardShortcutsEnabled=true;
-	private boolean unsavedChanges=false,saveRequested=false,closeArmed=false;
+	private boolean unsavedChanges=false,saveRequested=false,saveAfterPendingEdits=false,closeArmed=false;
 	private int pendingEntityActions=0;
 	private long lastAckMillis=0L,lastRebuildMillis=0L;
 	private final WorldBuilderRegionCopyClientBridge regionCopyBridge=
@@ -153,7 +153,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		normalizeProjectBoundSelections();
 		int x=mc.getEditorPlayerWorldX(),y=mc.getEditorPlayerWorldY(),level=mc.getEditorPlayerWorldLevel();
 		brushX=x;brushY=y;brushLevel=level;teleportX=String.valueOf(x);teleportY=String.valueOf(y);teleportLevel=String.valueOf(level);
-		clickTeleportPreferred=false;keyboardShortcutsEnabled=true;unsavedChanges=false;saveRequested=false;closeArmed=false;pendingEntityActions=0;
+		clickTeleportPreferred=false;keyboardShortcutsEnabled=true;unsavedChanges=false;saveRequested=false;saveAfterPendingEdits=false;closeArmed=false;pendingEntityActions=0;
 		terrainHistoryNextToken=1;terrainStrokeHistoryToken=0;terrainHistoryCanUndo=false;terrainHistoryCanRedo=false;terrainHistoryPending=false;terrainHistoryTotal=terrainHistoryReceived=0;
 		setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);clearTerrainDrag();updatePresentationBounds();setVisible(true);
 	}
@@ -400,12 +400,13 @@ public final class WorldEditorInterface extends NCustomComponent {
 		}else if(refused&&pendingEntityActions>0){
 			pendingEntityActions--;inspectionStatus=message;
 		}
+		maybeSubmitDeferredSave();
 		if((message.contains("Saved ")&&message.contains(" world edits."))
 				||message.contains("Saved the complete isolated working package:")
 				||message.contains("Saved pending edits to the isolated working package:")
 				||message.contains("No pending world edits to save.")){
-			unsavedChanges=false;saveRequested=false;pendingEntityActions=0;closeArmed=false;inspectionStatus="World edits saved; no pending changes.";
-		}else if(message.contains("Failed to save world edits:")){saveRequested=false;inspectionStatus=message;}
+			unsavedChanges=false;saveRequested=false;saveAfterPendingEdits=false;pendingEntityActions=0;closeArmed=false;inspectionStatus="World edits saved; no pending changes.";
+		}else if(message.contains("Failed to save world edits:")){saveRequested=false;saveAfterPendingEdits=false;inspectionStatus=message;}
 		if(message.contains("Region Paste activated live")||message.contains("Region Paste Undo activated live")){
 			clearPastePreview();inspectionStatus=message.contains("Paste Undo")?"Last Paste was undone and activated live; the Builder stayed open.":"Region pasted and activated live; the Builder stayed open.";
 		}else if(message.contains("Region Cut activated live")){
@@ -420,7 +421,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(copyNextInspection)copyInspected();copyNextInspection=false;
 	}
 	public void showError(String text){
-		copyNextInspection=false;terrainStrokeTiles=null;terrainStrokeStartedNanos=0L;clearTerrainLine();clearTerrainDrag();
+		copyNextInspection=false;saveAfterPendingEdits=false;terrainStrokeTiles=null;terrainStrokeStartedNanos=0L;clearTerrainLine();clearTerrainDrag();
 		if(terrainHistoryPending){terrainHistoryPending=false;terrainHistoryTotal=terrainHistoryReceived=0;if(text!=null&&text.contains("nothing to undo"))terrainHistoryCanUndo=false;if(text!=null&&text.contains("nothing to redo"))terrainHistoryCanRedo=false;}
 		inspectionStatus="Server rejected request";inspectionDetails=wrap(text,58);
 		mc.observeAutomatedBuilderEditorError(text);
@@ -461,7 +462,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		lastAckMillis=ackMs;lastRebuildMillis=rebuildMs;
 		unsavedChanges=true;saveRequested=false;closeArmed=false;
 		boolean dragStroke=terrainDragActive||terrainDragReleasePending||!terrainDragSeen.isEmpty();
-		if(!dragStroke){inspectionStatus="Paint accepted: "+tiles.length+" tile"+(tiles.length==1?"":"s")+" | ack "+ackMs+"ms, rebuild "+rebuildMs+"ms";return;}
+		if(!dragStroke){inspectionStatus="Paint accepted: "+tiles.length+" tile"+(tiles.length==1?"":"s")+" | ack "+ackMs+"ms, rebuild "+rebuildMs+"ms";maybeSubmitDeferredSave();return;}
 		terrainDragAccepted+=tiles.length;terrainDragAckMillis+=ackMs;terrainDragRebuildMillis+=rebuildMs;
 		if(!terrainDragPending.isEmpty())sendNextTerrainDragBatch();
 		if(terrainDragReleasePending&&terrainStrokeTiles==null&&terrainDragPending.isEmpty())completeTerrainDrag();
@@ -483,6 +484,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		long rebuildMs=(completedNanos-responseNanos)/1000000L;lastAckMillis=ackMs;lastRebuildMillis=rebuildMs;
 		String completedLabel=terrainGestureLabel;unsavedChanges=true;saveRequested=false;closeArmed=false;clearTerrainLine();terrainStrokeStartedNanos=0L;
 		inspectionStatus=completedLabel+" accepted: "+total+" unique tiles | ack "+ackMs+"ms, rebuild "+rebuildMs+"ms";
+		maybeSubmitDeferredSave();
 	}
 	public void acceptTerrainHistoryChunk(int sequence,int total,int offset,int[][] tiles,boolean[] projectiles,boolean canUndo,boolean canRedo,String message){
 		if(!terrainHistoryPending||total<1||total>TERRAIN_DRAG_LIMIT||offset!=terrainHistoryReceived
@@ -620,7 +622,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if((terrainStrokeTiles==null&&terrainLineCommitTiles==null)||activity==0L||now-activity<TERRAIN_STROKE_TIMEOUT_NANOS)return false;
 		showError("Terrain operation response timed out. The tool was reset; reopen the project to reconcile authoritative state before retrying.");return true;
 	}
-	private void completeTerrainDrag(){int accepted=terrainDragAccepted;long ack=terrainDragAckMillis,rebuild=terrainDragRebuildMillis;String label=terrainGestureLabel;clearTerrainDrag();inspectionStatus=label+" accepted: "+accepted+" unique tile"+(accepted==1?"":"s")+" | ack "+ack+"ms, rebuild "+rebuild+"ms";}
+	private void completeTerrainDrag(){int accepted=terrainDragAccepted;long ack=terrainDragAckMillis,rebuild=terrainDragRebuildMillis;String label=terrainGestureLabel;clearTerrainDrag();inspectionStatus=label+" accepted: "+accepted+" unique tile"+(accepted==1?"":"s")+" | ack "+ack+"ms, rebuild "+rebuild+"ms";maybeSubmitDeferredSave();}
 	private void clearTerrainDrag(){terrainDragActive=false;terrainDragReleasePending=false;terrainDragHoverX=terrainDragHoverY=terrainDragCenterX=terrainDragCenterY=-1;terrainDragAccepted=0;terrainDragAckMillis=terrainDragRebuildMillis=terrainDragPendingSinceNanos=0L;terrainStrokeTiles=null;terrainStrokeStartedNanos=0L;terrainStrokeHistoryToken=0;terrainDragPending.clear();terrainDragSeen.clear();}
 	private void clearTerrainLine(){terrainLineAnchorX=terrainLineAnchorY=-1;terrainLineCommitTiles=null;terrainLineCommitMasks=null;terrainLineReceived=0;terrainLineLastResponseNanos=0L;}
 	private String terrainDragStatus(){return terrainGestureLabel+" "+(terrainDragActive?"dragging":"committing")+": "+terrainDragSeen.size()+" unique | pending "+terrainDragPending.size()+" | accepted "+terrainDragAccepted+(terrainDragHoverX>=0?" | hover "+terrainDragHoverX+","+terrainDragHoverY:"");}
@@ -895,7 +897,11 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void setFocusedText(String value){switch(coordinateFocus){case 1:teleportX=value;break;case 2:teleportY=value;break;case 13:teleportLevel=value;break;case 3:sceneryIdText=value;break;case 4:npcIdText=value;break;case 5:npcRadiusText=value;break;case 14:groundItemIdText=value;break;case 15:groundItemAmountText=value;break;case 16:groundItemRespawnText=value;break;case 17:terrainElevationStepText=value;break;case 18:terrainSmartWallText=value;break;case 19:regionName=value;break;case 6:terrainElevationText=value;break;case 7:terrainFloorColorText=value;break;case 8:terrainFloorTextureText=value;break;case 9:terrainRoofText=value;break;case 10:terrainNorthWallText=value;break;case 11:terrainEastWallText=value;break;default:terrainDiagonalWallText=value;}}
 	private void focusNumber(int focus){coordinateFocus=focus;replaceFocusedText=true;}
 	private void rejectLayeredReviewMutation(String message){inspectionStatus=message;mc.showWorldEditorStatus(message);}
-	private void requestWorldEditSave(){if(saveRequested){inspectionStatus="World edit save is already in progress.";return;}if(isLayeredReview()&&!isLayeredTerrainDraft()){rejectLayeredReviewMutation("Layered package review is read-only; no files were changed.");saveRequested=false;return;}if(terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||pendingEntityActions>0){inspectionStatus="Wait for authoritative edit responses before saving.";return;}mc.sendCommandString("saveworldedits");saveRequested=true;closeArmed=false;inspectionStatus=isLayeredTerrainDraft()?"Layered draft save requested; it will commit to working/ when this Builder closes.":"World edit save started; building resumes when completion is reported.";}
+	private boolean hasPendingAuthoritativeEdits(){return terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||pendingEntityActions>0;}
+	private int pendingAuthoritativeEditCount(){return Math.max(1,terrainDragPending.size()+(terrainStrokeTiles==null?0:terrainStrokeTiles.length)+(terrainLineCommitTiles==null?0:terrainLineCommitTiles.length-terrainLineReceived)+pendingEntityActions);}
+	private void submitWorldEditSave(){mc.sendCommandString("saveworldedits");saveAfterPendingEdits=false;saveRequested=true;closeArmed=false;inspectionStatus=isLayeredTerrainDraft()?"Layered draft save requested; it will commit to working/ when this Builder closes.":"World edit save started; building resumes when completion is reported.";mc.showWorldEditorStatus("World edit save requested; wait for the completion message before closing.");}
+	private void maybeSubmitDeferredSave(){if(!saveAfterPendingEdits||saveRequested||hasPendingAuthoritativeEdits())return;submitWorldEditSave();}
+	private void requestWorldEditSave(){if(saveRequested){inspectionStatus="World edit save is already in progress.";mc.showWorldEditorStatus(inspectionStatus);return;}if(isLayeredReview()&&!isLayeredTerrainDraft()){rejectLayeredReviewMutation("Layered package review is read-only; no files were changed.");saveRequested=false;return;}if(recoverTerrainStrokeTimeout(System.nanoTime())){saveAfterPendingEdits=false;mc.showWorldEditorStatus("Save was not sent because an edit response timed out; reopen to reconcile the authoritative draft.");return;}if(terrainDragActive)releaseTerrainDrag();if(hasPendingAuthoritativeEdits()){saveAfterPendingEdits=true;inspectionStatus="Save queued; waiting for "+pendingAuthoritativeEditCount()+" authoritative edit response"+(pendingAuthoritativeEditCount()==1?"":"s")+".";mc.showWorldEditorStatus(inspectionStatus);return;}submitWorldEditSave();}
 	private void requestTerrainHistory(boolean redo){
 		if(!isLayeredTerrainDraft()){inspectionStatus="Operation Undo/Redo is available in an editable layered Builder project.";return;}
 		if(terrainHistoryPending||terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||pendingEntityActions>0){inspectionStatus="Wait for the current authoritative edit before using Undo or Redo.";return;}
@@ -905,7 +911,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void requestEditorClose(){
 		if(terrainLineCommitTiles!=null){inspectionStatus="Wait for the authoritative terrain response before closing.";return;}
-		if(saveRequested){inspectionStatus="Wait for the active world edit save to finish before closing.";return;}
+		if(saveRequested||saveAfterPendingEdits){inspectionStatus="Wait for the active world edit save to finish before closing.";mc.showWorldEditorStatus(inspectionStatus);return;}
 		if(unsavedChanges&&!closeArmed){closeArmed=true;inspectionStatus="Unsaved edits remain. Select Close again to exit without saving.";return;}
 		setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);clearTerrainLine();clearSceneryMove();definitionBrowser.close();send(1,0,0,0,0,0,0);setVisible(false);
 	}
@@ -1289,7 +1295,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			+(terrainLineCommitTiles==null?0:terrainLineCommitTiles.length-terrainLineReceived)+pendingEntityActions;
 		graphics().drawLineHoriz(x+8,y+194,FLYOUT_WIDTH-16,0x70512d);graphics().drawString("@yel@"+px+","+py+",L"+level+" @whi@| "+mode,x+8,y+211,0xffffff,1);
 		graphics().drawString(compactLine("Queued "+queued+" | ack "+lastAckMillis+" | rebuild "+lastRebuildMillis,28),x+8,y+228,0xbdbdbd,1);
-		graphics().drawString(unsavedChanges?"Unsaved"+(saveRequested?" (save requested)":""):"Saved/clean",x+8,y+245,unsavedChanges?0xff981f:0x80c080,1);
+		graphics().drawString(unsavedChanges?"Unsaved"+(saveRequested?" (save requested)":saveAfterPendingEdits?" (save queued)":""):"Saved/clean",x+8,y+245,unsavedChanges?0xff981f:0x80c080,1);
 		String status=isLayeredReview()?(isLayeredTerrainDraft()?"Draft ":"Review ")+WorldBuilderClientProfile.current().layeredPackageVersion()+" "+WorldBuilderClientProfile.current().layeredManifestShort():(WorldBuilderClientProfile.isEnabled()?"Source "+WorldBuilderClientProfile.current().sourceRevisionShort():inspectionStatus);
 		graphics().drawString(compactLine(status,28),x+8,y+264,0xbdbdbd,1);
 	}

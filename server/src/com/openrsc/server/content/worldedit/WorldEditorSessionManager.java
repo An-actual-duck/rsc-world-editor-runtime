@@ -1190,9 +1190,9 @@ public final class WorldEditorSessionManager {
 			throw new IllegalArgumentException(
 				"Adaptive save completion callback is required.");
 		}
-		final PreparedAdaptiveSave prepared;
+		final PreparedAdaptiveSaveInputs inputs;
 		synchronized (this) {
-			prepared = prepareAdaptiveSave(player);
+			inputs = prepareAdaptiveSaveInputs(player);
 			adaptiveSavePending = true;
 		}
 		Thread worker = new Thread(new Runnable() {
@@ -1201,6 +1201,10 @@ public final class WorldEditorSessionManager {
 				AdaptiveWorldBuilderPackagePublisher.SaveResult saved = null;
 				Exception failure = null;
 				try {
+					PreparedAdaptiveSave prepared;
+					synchronized (WorldEditorSessionManager.this) {
+						prepared = prepareAdaptiveSave(inputs);
+					}
 					saved = publishAdaptivePackage(prepared);
 					synchronized (WorldEditorSessionManager.this) {
 						nativeWorkingInventorySha256 = saved.inventorySha256;
@@ -1228,6 +1232,11 @@ public final class WorldEditorSessionManager {
 
 	private PreparedAdaptiveSave prepareAdaptiveSave(final Player player)
 		throws IOException {
+		return prepareAdaptiveSave(prepareAdaptiveSaveInputs(player));
+	}
+
+	private PreparedAdaptiveSaveInputs prepareAdaptiveSaveInputs(
+		final Player player) throws IOException {
 		requireNativeDraftSession(player);
 		if (!isAdaptive(player)) {
 			throw new IllegalStateException(
@@ -1256,13 +1265,13 @@ public final class WorldEditorSessionManager {
 		}
 		final com.openrsc.server.external.EntityHandler definitions =
 			player.getWorld().getServer().getEntityHandler();
-		return new PreparedAdaptiveSave(
+		return new PreparedAdaptiveSaveInputs(
 			paths.layeredWorkingPackage(),
 			paths.sourceLayeredBaselinePackage(),
 			nativeWorkingInventorySha256,
 			player.getConfig()
 				.WORLD_BUILDER_SOURCE_BASELINE_INVENTORY_SHA256,
-			adaptiveDraft(owner),
+			owner,
 			new AdaptiveWorldBuilderPackagePublisher.PackageVerifier() {
 					@Override
 					public void verify(NativeLayeredWorldPackage worldPackage)
@@ -1277,6 +1286,15 @@ public final class WorldEditorSessionManager {
 						}
 					}
 				});
+	}
+
+	private PreparedAdaptiveSave prepareAdaptiveSave(
+		PreparedAdaptiveSaveInputs inputs) {
+		return new PreparedAdaptiveSave(
+			inputs.workingPackage, inputs.baselinePackage,
+			inputs.workingInventorySha256,
+			inputs.baselineInventorySha256,
+			adaptiveDraft(inputs.owner), inputs.verifier);
 	}
 
 	private static AdaptiveWorldBuilderPackagePublisher.SaveResult
@@ -1494,9 +1512,12 @@ public final class WorldEditorSessionManager {
 		}
 		List<AdaptiveWorldBuilderPackagePublisher.Sector> sectors =
 			new ArrayList<AdaptiveWorldBuilderPackagePublisher.Sector>();
+		Map<WorldMapSectorId,List<Map.Entry<NativeTileKey,NativeLayeredTerrainTile>>>
+			terrainEditsBySector = indexNativeTerrainEditsBySector();
 		for (NativeLayeredTerrainSector sector : sectorModels.values()) {
 			sectors.add(new AdaptiveWorldBuilderPackagePublisher.Sector(
-				sector.getIdentity(), copyNativeTerrainSectorWireBytes(sector)));
+				sector.getIdentity(), copyNativeTerrainSectorWireBytes(
+					sector, terrainEditsBySector.get(sector.getIdentity()))));
 		}
 
 		Map<String, AdaptiveWorldBuilderPackagePublisher.Boundary> boundaries =
@@ -1607,6 +1628,44 @@ public final class WorldEditorSessionManager {
 			new ArrayList<AdaptiveWorldBuilderPackagePublisher.Npc>(npcs.values()),
 			new ArrayList<AdaptiveWorldBuilderPackagePublisher.GroundItem>(
 				groundItems.values()));
+	}
+
+	private Map<WorldMapSectorId,List<Map.Entry<NativeTileKey,NativeLayeredTerrainTile>>>
+		indexNativeTerrainEditsBySector() {
+		Map<WorldMapSectorId,List<Map.Entry<NativeTileKey,NativeLayeredTerrainTile>>>
+			result = new LinkedHashMap<WorldMapSectorId,List<Map.Entry<NativeTileKey,NativeLayeredTerrainTile>>>();
+		for (Map.Entry<NativeTileKey,NativeLayeredTerrainTile> entry
+			: nativeTerrainOverlay.entrySet()) {
+			NativeTileKey key = entry.getKey();
+			WorldMapSectorId identity = new WorldMapSectorId(
+				key.worldSpace, key.level,
+				Math.floorDiv(key.x, NativeLayeredTerrainSector.SIZE),
+				Math.floorDiv(key.y, NativeLayeredTerrainSector.SIZE));
+			List<Map.Entry<NativeTileKey,NativeLayeredTerrainTile>> edits =
+				result.get(identity);
+			if (edits == null) {
+				edits = new ArrayList<Map.Entry<NativeTileKey,NativeLayeredTerrainTile>>();
+				result.put(identity, edits);
+			}
+			edits.add(entry);
+		}
+		return result;
+	}
+
+	private byte[] copyNativeTerrainSectorWireBytes(
+		NativeLayeredTerrainSector source,
+		List<Map.Entry<NativeTileKey,NativeLayeredTerrainTile>> edits) {
+		byte[] bytes = copyWideNativeTerrainSector(source);
+		if (edits == null) return bytes;
+		for (Map.Entry<NativeTileKey,NativeLayeredTerrainTile> entry : edits) {
+			NativeTileKey key = entry.getKey();
+			int localX = Math.floorMod(key.x, NativeLayeredTerrainSector.SIZE);
+			int localY = Math.floorMod(key.y, NativeLayeredTerrainSector.SIZE);
+			int offset = (localX * NativeLayeredTerrainSector.SIZE + localY)
+				* NativeLayeredTerrainChunk.WIDE_TILE_WIRE_BYTES;
+			writeNativeTile(bytes, offset, entry.getValue());
+		}
+		return bytes;
 	}
 
 	private static String adaptivePlacementSetId(
@@ -2830,6 +2889,27 @@ public final class WorldEditorSessionManager {
 			this.workingInventorySha256 = workingInventorySha256;
 			this.baselineInventorySha256 = baselineInventorySha256;
 			this.draft = draft;
+			this.verifier = verifier;
+		}
+	}
+	private static final class PreparedAdaptiveSaveInputs {
+		final Path workingPackage;
+		final Path baselinePackage;
+		final String workingInventorySha256;
+		final String baselineInventorySha256;
+		final NativeLayeredWorldPackage owner;
+		final AdaptiveWorldBuilderPackagePublisher.PackageVerifier verifier;
+		PreparedAdaptiveSaveInputs(
+			Path workingPackage, Path baselinePackage,
+			String workingInventorySha256,
+			String baselineInventorySha256,
+			NativeLayeredWorldPackage owner,
+			AdaptiveWorldBuilderPackagePublisher.PackageVerifier verifier) {
+			this.workingPackage = workingPackage;
+			this.baselinePackage = baselinePackage;
+			this.workingInventorySha256 = workingInventorySha256;
+			this.baselineInventorySha256 = baselineInventorySha256;
+			this.owner = owner;
 			this.verifier = verifier;
 		}
 	}
