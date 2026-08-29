@@ -28,6 +28,10 @@ class WorldEditorDefinitionBrowserTest(unittest.TestCase):
         self.assertEqual(2, editor.count('"Browse scenery..."'))
         self.assertEqual(2, editor.count('"Browse NPCs..."'))
         self.assertEqual(2, editor.count('"Browse items..."'))
+        self.assertIn('"Browse floor textures..."', editor)
+        self.assertIn('"Browse textures..."', editor)
+        self.assertIn('"Browse walls..."', editor)
+        self.assertIn('"Browse walls"', editor)
         self.assertIn("renderDefinitionBrowser", editor)
         self.assertIn("handleDefinitionBrowserMouse", editor)
         self.assertIn("selectDefinitionBrowserEntry", editor)
@@ -92,6 +96,16 @@ public final class WorldEditorDefinitionBrowserFixture {
 		browser.open(WorldEditorDefinitionBrowser.Family.BOUNDARY, 8, new int[]{8});
 		require(browser.resultCount() == 1 && visibleContains(browser, 8),
 			"project-bound boundary results were not exact");
+
+		browser.open(WorldEditorDefinitionBrowser.Family.FLOOR, 11);
+		browser.setQuery("lava walkable");
+		require(visibleContains(browser, 11), "floor texture metadata was not searchable");
+		browser.setQuery("#250");
+		require(browser.resultCount() == 1 && visibleContains(browser, 250),
+			"special bridge overlay search changed");
+		browser.open(WorldEditorDefinitionBrowser.Family.FLOOR, 11, new int[]{0, 11, 250});
+		require(browser.resultCount() == 3 && visibleContains(browser, 11),
+			"project-bound floor overlays were not exact");
 
 		browser.open(WorldEditorDefinitionBrowser.Family.NPC, 0);
 		require(browser.resultCount() == WorldEditorDefinitionCatalog.npcEntries().size(),

@@ -166,6 +166,13 @@ public final class WorldEditorDefinitionCatalogFixture {
         if (WorldEditorDefinitionCatalog.boundaryEntries().size() != 214) {
             throw new AssertionError("wrong boundary catalog size");
         }
+		if (WorldEditorDefinitionCatalog.wallEntries().size() != EntityHandler.doorCount()) {
+			throw new AssertionError("runtime wall inventory is incomplete");
+		}
+		int expectedFloors = EntityHandler.tileCount() + (EntityHandler.tileCount() > 249 ? 1 : 2);
+		if (WorldEditorDefinitionCatalog.floorEntries().size() != expectedFloors) {
+			throw new AssertionError("runtime floor inventory is incomplete");
+		}
     }
 
     private static void expect(String expected, String actual) {

@@ -42,6 +42,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private final WorldEditorIconRegistry icons=new WorldEditorIconRegistry();
 	private final WorldEditorToolbarState toolbar=new WorldEditorToolbarState();
 	private final WorldEditorDefinitionBrowser definitionBrowser=new WorldEditorDefinitionBrowser();
+	private int definitionBrowserTerrainField=0;
 	private Mode mode=Mode.NAVIGATE;
 	private long sessionId;
 	private int nextSequence;
@@ -745,6 +746,14 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private boolean definitionAllowed(String family,int id){return WorldBuilderClientProfile.current().isDefinitionAllowed(family,id);}
 	private int[] projectDefinitionIds(String family){return WorldBuilderClientProfile.current().hasAuthoringDefinitionBinding()?WorldBuilderClientProfile.current().definitionIds(family):null;}
+	private int[] projectFloorOverlayIds(){
+		int[] ids=projectDefinitionIds("floor");if(ids==null)return null;
+		java.util.TreeSet<Integer> overlays=new java.util.TreeSet<Integer>();overlays.add(Integer.valueOf(0));
+		for(int id:ids){if(id>=0&&id<255&&id+1!=250)overlays.add(Integer.valueOf(id+1));if(id==1)overlays.add(Integer.valueOf(250));}
+		int[] result=new int[overlays.size()];int index=0;for(Integer overlay:overlays)result[index++]=overlay.intValue();return result;
+	}
+	private int terrainWallValue(int field){switch(field){case 10:return terrainNorthWall;case 11:return terrainEastWall;case 12:return terrainDiagonalWall;case 18:return terrainSmartWall;default:return 0;}}
+	private void setTerrainWallValue(int field,int value){switch(field){case 10:setTerrainNorthWall(value);break;case 11:setTerrainEastWall(value);break;case 12:setTerrainDiagonalWall(value);break;case 18:setTerrainSmartWall(value);break;default:break;}}
 	private void rejectDefinitionSelection(String family,int id){
 		inspectionStatus="Project-bound "+family+" definition ID "+id+" is unavailable.";
 		inspectionDetails=new String[]{"Choose an ID exposed by this project's definition browser."};
@@ -887,14 +896,27 @@ public final class WorldEditorInterface extends NCustomComponent {
 		coordinateFocus=0;replaceFocusedText=false;toolbar.open(WorldEditorToolbarState.Flyout.ITEMS);
 		definitionBrowser.open(WorldEditorDefinitionBrowser.Family.ITEM,groundItemId,projectDefinitionIds("item"));updatePresentationBounds();
 	}
-	private void closeDefinitionBrowser(){definitionBrowser.close();updatePresentationBounds();}
+	private void openWallBrowser(int field){
+		coordinateFocus=0;replaceFocusedText=false;definitionBrowserTerrainField=field;
+		toolbar.open(WorldEditorToolbarState.Flyout.TERRAIN);
+		int raw=terrainWallValue(field);int selected=raw==0?-1:raw-1;
+		definitionBrowser.open(WorldEditorDefinitionBrowser.Family.BOUNDARY,selected,projectDefinitionIds("boundary"));updatePresentationBounds();
+	}
+	private void openFloorBrowser(){
+		coordinateFocus=0;replaceFocusedText=false;definitionBrowserTerrainField=8;
+		toolbar.open(WorldEditorToolbarState.Flyout.TERRAIN);
+		definitionBrowser.open(WorldEditorDefinitionBrowser.Family.FLOOR,terrainFloorTexture,projectFloorOverlayIds());updatePresentationBounds();
+	}
+	private void closeDefinitionBrowser(){definitionBrowser.close();definitionBrowserTerrainField=0;updatePresentationBounds();}
 	private void selectDefinitionBrowserEntry(WorldEditorDefinitionCatalog.Entry entry){
 		if(entry==null)return;
 		switch(definitionBrowser.family()){
 			case NPC:setNpcId(entry.id());break;
 			case ITEM:setGroundItemId(entry.id());break;
 			case SCENERY:setSceneryId(entry.id());break;
-			case BOUNDARY:default:return;
+			case FLOOR:setTerrainFloorTexture(entry.id());break;
+			case BOUNDARY:setTerrainWallValue(definitionBrowserTerrainField,entry.id()+1);break;
+			default:return;
 		}
 		inspectionStatus="Selected "+entry.displayName()+" [#"+entry.id()+"] from search.";closeDefinitionBrowser();
 	}
@@ -930,7 +952,9 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void requestTerrainHistory(boolean redo){
 		if(!isLayeredTerrainDraft()){inspectionStatus="Operation Undo/Redo is available in an editable layered Builder project.";return;}
 		if(terrainHistoryPending||terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||pendingEntityActions>0){inspectionStatus="Wait for the current authoritative edit before using Undo or Redo.";return;}
-		if(redo?!terrainHistoryCanRedo:!terrainHistoryCanUndo){inspectionStatus=redo?"There is nothing to redo in this Builder session.":"There is nothing to undo in this Builder session.";return;}
+		// Availability is presentation state, not authority. Placements arrive on
+		// a separate message stream, so a missed/stale hint must never prevent the
+		// server from answering a legitimate Undo or Redo request.
 		terrainHistoryPending=true;terrainHistoryTotal=terrainHistoryReceived=0;send(redo?11:10,0,0,0,0,0,0);
 		inspectionStatus=redo?"Redoing the next Builder operation...":"Undoing the last Builder operation...";
 	}
@@ -1051,8 +1075,10 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(terrainActiveField==0){if(terrainTool==TerrainTool.RECTANGLE){if(y>=58&&y<82)rectangleOptions.setFill(x>=90);else if(y>=88&&y<112)rectangleOptions.toggleSmartWalls();else if(y>=118&&y<142){if(x<40)setTerrainSmartWall(steppedWallValue(terrainSmartWall,-1));else if(x<132)focusNumber(18);else setTerrainSmartWall(steppedWallValue(terrainSmartWall,1));}else if(y>=148&&y<172){if(x<88)rectangleOptions.toggleNorthWall();else rectangleOptions.toggleEastWall();}clearTerrainLine();return;}if(y>=58&&y<82)terrainBrushSize=1;else if(y>=88&&y<112)terrainBrushSize=3;else if(y>=118&&y<142)terrainBrushSize=5;else if(y>=148&&y<172)terrainBrushSize=7;return;}
 		if(y>=58&&y<82){if(x>=8&&x<38)adjustActiveTerrain(-1);else if(x>=42&&x<130)focusNumber(terrainActiveField);else if(x>=134&&x<164)adjustActiveTerrain(1);return;}
 		if(terrainActiveField==6&&isLayeredTerrainDraft()){if(y>=90&&y<114){terrainElevationOperation=x<60?0:x<114?1:2;return;}if(y>=120&&y<144){if(x<60)setTerrainElevationStep(terrainElevationStep-1);else if(x<114)focusNumber(17);else setTerrainElevationStep(terrainElevationStep+1);return;}}
-		int toggleY=terrainActiveField==6&&isLayeredTerrainDraft()?150:terrainActiveField==8?128:112;if(y>=toggleY&&y<toggleY+24){toggleTerrainField(terrainActiveField);return;}
-		if(terrainActiveField==12&&y>=144&&y<168){if(x<88)terrainDiagonalOrientation=0;else terrainDiagonalOrientation=1;}
+		boolean wall=terrainActiveField==10||terrainActiveField==11||terrainActiveField==12||terrainActiveField==18;
+		if((terrainActiveField==8||wall)&&y>=90&&y<114){if(terrainActiveField==8)openFloorBrowser();else openWallBrowser(terrainActiveField);return;}
+		int toggleY=terrainActiveField==6&&isLayeredTerrainDraft()?150:(terrainActiveField==8?150:wall?120:112);if(y>=toggleY&&y<toggleY+24){toggleTerrainField(terrainActiveField);return;}
+		if(terrainActiveField==12&&y>=150&&y<174){if(x<88)terrainDiagonalOrientation=0;else terrainDiagonalOrientation=1;}
 	}
 	private void adjustActiveTerrain(int amount){switch(terrainActiveField){case 6:setTerrainElevation(terrainElevation+amount);break;case 7:setTerrainFloorColor(terrainFloorColor+amount);break;
 		case 8:setTerrainFloorTexture(terrainFloorTexture+amount);break;case 9:setTerrainRoof(terrainRoof+amount);break;case 10:setTerrainNorthWall(steppedWallValue(terrainNorthWall,amount));break;
@@ -1109,14 +1135,14 @@ public final class WorldEditorInterface extends NCustomComponent {
 				if(!terrainStructureTab){
 					if(ry>=82&&ry<106){if(rx>=10&&rx<30)paintElevation=!paintElevation;else if(rx>=150&&rx<178)setTerrainElevation(terrainElevation-1);else if(rx>=185&&rx<265)focusNumber(6);else if(rx>=272&&rx<300)setTerrainElevation(terrainElevation+1);else if(rx>=307&&isLayeredTerrainDraft())terrainElevationOperation=(terrainElevationOperation+1)%3;return true;}
 					if(ry>=122&&ry<146){if(rx>=10&&rx<30)paintFloorColor=!paintFloorColor;else if(rx>=150&&rx<178)setTerrainFloorColor(terrainFloorColor-1);else if(rx>=185&&rx<265)focusNumber(7);else if(rx>=272&&rx<300)setTerrainFloorColor(terrainFloorColor+1);return true;}
-					if(ry>=162&&ry<186){if(rx>=10&&rx<30)paintFloorTexture=!paintFloorTexture;else if(rx>=150&&rx<178)setTerrainFloorTexture(terrainFloorTexture-1);else if(rx>=185&&rx<265)focusNumber(8);else if(rx>=272&&rx<300)setTerrainFloorTexture(terrainFloorTexture+1);return true;}
+					if(ry>=162&&ry<186){if(rx>=10&&rx<30)paintFloorTexture=!paintFloorTexture;else if(rx>=150&&rx<178)setTerrainFloorTexture(terrainFloorTexture-1);else if(rx>=185&&rx<265)focusNumber(8);else if(rx>=272&&rx<300)setTerrainFloorTexture(terrainFloorTexture+1);else if(rx>=307&&rx<435)openFloorBrowser();return true;}
 					if(ry>=194&&ry<218){if(terrainTool==TerrainTool.RECTANGLE){if(rx>=65&&rx<137)rectangleOptions.setFill(false);else if(rx>=141&&rx<196)rectangleOptions.setFill(true);else if(rx>=204&&rx<285)rectangleOptions.toggleSmartWalls();else if(rx>=290&&rx<375)requestWorldEditSave();clearTerrainLine();}else if(rx>=65&&rx<110)terrainBrushSize=1;else if(rx>=114&&rx<159)terrainBrushSize=3;else if(rx>=163&&rx<208)terrainBrushSize=5;else if(rx>=212&&rx<257)terrainBrushSize=7;else if(rx>=270&&rx<375)requestWorldEditSave();return true;}
 				}else{
 					if(ry>=82&&ry<106){if(rx>=10&&rx<30)paintRoof=!paintRoof;else if(rx>=118&&rx<142)setTerrainRoof(terrainRoof-1);else if(rx>=148&&rx<202)focusNumber(9);else if(rx>=208&&rx<232)setTerrainRoof(terrainRoof+1);return true;}
-					if(terrainTool==TerrainTool.RECTANGLE&&rectangleOptions.isSmartWalls()){if(ry>=118&&ry<142){rectangleOptions.setSmartWalls(false);clearTerrainLine();return true;}if(ry>=145&&ry<169){if(rx<105)rectangleOptions.toggleNorthWall();else if(rx<205)rectangleOptions.toggleEastWall();return true;}if(ry>=170&&ry<194){if(rx>=118&&rx<142)setTerrainSmartWall(steppedWallValue(terrainSmartWall,-1));else if(rx>=148&&rx<202)focusNumber(18);else if(rx>=208&&rx<232)setTerrainSmartWall(steppedWallValue(terrainSmartWall,1));return true;}if(ry>=194&&ry<218){if(rx>=65&&rx<137)rectangleOptions.setFill(false);else if(rx>=141&&rx<196)rectangleOptions.setFill(true);else if(rx>=270&&rx<375)requestWorldEditSave();clearTerrainLine();return true;}return true;}
-					if(ry>=118&&ry<142){if(rx>=10&&rx<30)rectangleOptions.toggleNorthWall();else if(rx>=118&&rx<142)setTerrainNorthWall(steppedWallValue(terrainNorthWall,-1));else if(rx>=148&&rx<202)focusNumber(10);else if(rx>=208&&rx<232)setTerrainNorthWall(steppedWallValue(terrainNorthWall,1));return true;}
-					if(ry>=154&&ry<178){if(rx>=10&&rx<30)rectangleOptions.toggleEastWall();else if(rx>=118&&rx<142)setTerrainEastWall(steppedWallValue(terrainEastWall,-1));else if(rx>=148&&rx<202)focusNumber(11);else if(rx>=208&&rx<232)setTerrainEastWall(steppedWallValue(terrainEastWall,1));return true;}
-					if(ry>=190&&ry<214){if(rx>=10&&rx<30)rectangleOptions.toggleDiagonalWall();else if(rx>=118&&rx<142)setTerrainDiagonalWall(steppedWallValue(terrainDiagonalWall,-1));else if(rx>=148&&rx<202)focusNumber(12);else if(rx>=208&&rx<232)setTerrainDiagonalWall(steppedWallValue(terrainDiagonalWall,1));return true;}
+					if(terrainTool==TerrainTool.RECTANGLE&&rectangleOptions.isSmartWalls()){if(ry>=118&&ry<142){rectangleOptions.setSmartWalls(false);clearTerrainLine();return true;}if(ry>=145&&ry<169){if(rx<105)rectangleOptions.toggleNorthWall();else if(rx<205)rectangleOptions.toggleEastWall();return true;}if(ry>=170&&ry<194){if(rx>=118&&rx<142)setTerrainSmartWall(steppedWallValue(terrainSmartWall,-1));else if(rx>=148&&rx<202)focusNumber(18);else if(rx>=208&&rx<232)setTerrainSmartWall(steppedWallValue(terrainSmartWall,1));else if(rx>=330&&rx<435)openWallBrowser(18);return true;}if(ry>=194&&ry<218){if(rx>=65&&rx<137)rectangleOptions.setFill(false);else if(rx>=141&&rx<196)rectangleOptions.setFill(true);else if(rx>=270&&rx<375)requestWorldEditSave();clearTerrainLine();return true;}return true;}
+					if(ry>=118&&ry<142){if(rx>=10&&rx<30)rectangleOptions.toggleNorthWall();else if(rx>=118&&rx<142)setTerrainNorthWall(steppedWallValue(terrainNorthWall,-1));else if(rx>=148&&rx<202)focusNumber(10);else if(rx>=208&&rx<232)setTerrainNorthWall(steppedWallValue(terrainNorthWall,1));else if(rx>=330&&rx<435)openWallBrowser(10);return true;}
+					if(ry>=154&&ry<178){if(rx>=10&&rx<30)rectangleOptions.toggleEastWall();else if(rx>=118&&rx<142)setTerrainEastWall(steppedWallValue(terrainEastWall,-1));else if(rx>=148&&rx<202)focusNumber(11);else if(rx>=208&&rx<232)setTerrainEastWall(steppedWallValue(terrainEastWall,1));else if(rx>=330&&rx<435)openWallBrowser(11);return true;}
+					if(ry>=190&&ry<214){if(rx>=10&&rx<30)rectangleOptions.toggleDiagonalWall();else if(rx>=118&&rx<142)setTerrainDiagonalWall(steppedWallValue(terrainDiagonalWall,-1));else if(rx>=148&&rx<202)focusNumber(12);else if(rx>=208&&rx<232)setTerrainDiagonalWall(steppedWallValue(terrainDiagonalWall,1));else if(rx>=330&&rx<435)openWallBrowser(12);return true;}
 					if(ry>=220&&ry<244){if(rx>=118&&rx<178)terrainDiagonalOrientation=0;else if(rx>=185&&rx<245)terrainDiagonalOrientation=1;else if(terrainTool==TerrainTool.RECTANGLE&&rx>=270){rectangleOptions.setSmartWalls(true);clearTerrainLine();}return true;}
 					if(ry>=248&&ry<272){if(rx>=65&&rx<110)terrainBrushSize=1;else if(rx>=114&&rx<159)terrainBrushSize=3;else if(rx>=163&&rx<208)terrainBrushSize=5;else if(rx>=212&&rx<257)terrainBrushSize=7;else if(rx>=270&&rx<375)requestWorldEditSave();return true;}
 				}
@@ -1298,11 +1324,13 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(terrainActiveField==0){if(terrainTool==TerrainTool.RECTANGLE){graphics().drawString("Rectangle settings",x+8,y+49,0xffff00,2);toolButton(x+8,y+58,80,"Outline",!rectangleOptions.isFill());toolButton(x+92,y+58,80,"Fill",rectangleOptions.isFill());toolButton(x+8,y+88,164,"Smart Walls: "+(rectangleOptions.isSmartWalls()?"ON":"OFF"),rectangleOptions.isSmartWalls());button(x+8,y+118,30,"-");textField(x+42,y+118,88,terrainSmartWallText,coordinateFocus==18);button(x+134,y+118,30,"+");toolButton(x+8,y+148,80,"North",rectangleOptions.isNorthWall());toolButton(x+92,y+148,80,"East",rectangleOptions.isEastWall());graphics().drawString("Two corners; one atomic commit.",x+8,y+184,0xff981f,1);graphics().drawString(rectangleOptions.isSmartWalls()?"Diagonal disabled; choose N, E, or both.":"Raw wall fields apply to the footprint.",x+8,y+200,0xff981f,1);return;}graphics().drawString("Footprint: "+terrainBrushSize+"x"+terrainBrushSize,x+8,y+49,0xffff00,2);toolButton(x+8,y+58,164,"1x1 single tile",terrainBrushSize==1);toolButton(x+8,y+88,164,"3x3 centered",terrainBrushSize==3);toolButton(x+8,y+118,164,"5x5 centered",terrainBrushSize==5);toolButton(x+8,y+148,164,"7x7 centered",terrainBrushSize==7);
 			graphics().drawString("Right-click cycles brush sizes.",x+8,y+184,0xff981f,1);graphics().drawString(terrainTool==TerrainTool.LINE?"Line width uses the centered brush.":"Ctrl + left-drag paints continuously.",x+8,y+200,0xff981f,1);return;}
 		graphics().drawString(activeTerrainLabel(),x+8,y+49,0xffff00,2);button(x+8,y+58,30,"-");textField(x+42,y+58,88,activeTerrainText(),coordinateFocus==terrainActiveField);button(x+134,y+58,30,"+");
-		int toggleY=112;if(terrainActiveField==6&&isLayeredTerrainDraft()){toolButton(x+8,y+90,50,"Set",terrainElevationOperation==0);toolButton(x+60,y+90,52,"Raise",terrainElevationOperation==1);toolButton(x+114,y+90,54,"Lower",terrainElevationOperation==2);button(x+8,y+120,30,"-");textField(x+42,y+120,88,terrainElevationStepText,coordinateFocus==17);button(x+134,y+120,30,"+");toggleY=150;}else if(terrainActiveField==8){graphics().drawString(compactLine(floorTextureVisualName(),28),x+8,y+99,terrainFieldInvalid(terrainActiveField)?0xff981f:0xffffff,1);
-			graphics().drawString(floorTextureTraversal(),x+8,y+113,floorTextureTraversalColor(),1);toggleY=128;
+		boolean wall=terrainActiveField==10||terrainActiveField==11||terrainActiveField==12||terrainActiveField==18;
+		int toggleY=112;if(terrainActiveField==6&&isLayeredTerrainDraft()){toolButton(x+8,y+90,50,"Set",terrainElevationOperation==0);toolButton(x+60,y+90,52,"Raise",terrainElevationOperation==1);toolButton(x+114,y+90,54,"Lower",terrainElevationOperation==2);button(x+8,y+120,30,"-");textField(x+42,y+120,88,terrainElevationStepText,coordinateFocus==17);button(x+134,y+120,30,"+");toggleY=150;}else if(terrainActiveField==8){button(x+8,y+90,164,"Browse floor textures...");graphics().drawString(compactLine(floorTextureVisualName(),28),x+8,y+126,terrainFieldInvalid(terrainActiveField)?0xff981f:0xffffff,1);
+			graphics().drawString(floorTextureTraversal(),x+8,y+140,floorTextureTraversalColor(),1);toggleY=150;
+		}else if(wall){button(x+8,y+90,164,"Browse walls...");toggleY=120;
 		}else{String name=activeTerrainCompactName();if(!name.isEmpty())graphics().drawString(compactLine(name,28),x+8,y+101,terrainFieldInvalid(terrainActiveField)?0xff981f:0xbdbdbd,1);}
 		toolButton(x+8,y+toggleY,164,activeTerrainEnabled()?"Paint: ON":"Paint: OFF",activeTerrainEnabled());
-		if(terrainActiveField==12){toolButton(x+8,y+144,76,"\\",terrainDiagonalOrientation==0);toolButton(x+92,y+144,76,"/",terrainDiagonalOrientation==1);}
+		if(terrainActiveField==12){toolButton(x+8,y+150,76,"\\",terrainDiagonalOrientation==0);toolButton(x+92,y+150,76,"/",terrainDiagonalOrientation==1);}
 	}
 	private void renderCompactScenery(int x,int y){
 		graphics().drawString(compactLine(sceneryName(),28),x+8,y+49,0xffff00,1);button(x+8,y+68,30,"-");textField(x+42,y+68,88,sceneryIdText,coordinateFocus==3);button(x+134,y+68,30,"+");
@@ -1405,6 +1433,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(isLayeredTerrainDraft())button(x+307,y+82,68,(terrainElevationOperation==0?"Set":terrainElevationOperation==1?"Raise":"Lower")+" "+terrainElevationStep);
 		terrainField(x,y+122,"Floor Color",paintFloorColor,terrainFloorColorText,coordinateFocus==7);
 		terrainField(x,y+162,"Floor Texture",paintFloorTexture,terrainFloorTextureText,coordinateFocus==8);
+		button(x+307,y+162,128,"Browse textures...");
 		if(terrainTool==TerrainTool.RECTANGLE){graphics().drawString("Shape",x+10,y+211,0xffffff,2);toolButton(x+65,y+194,72,"Outline",!rectangleOptions.isFill());toolButton(x+141,y+194,55,"Fill",rectangleOptions.isFill());checkbox(x+204,y+197,rectangleOptions.isSmartWalls(),"Smart");button(x+290,y+194,85,"Save edits");}
 		else{graphics().drawString("Brush",x+10,y+211,0xffffff,2);toolButton(x+65,y+194,45,"1x1",terrainBrushSize==1);toolButton(x+114,y+194,45,"3x3",terrainBrushSize==3);toolButton(x+163,y+194,45,"5x5",terrainBrushSize==5);toolButton(x+212,y+194,45,"7x7",terrainBrushSize==7);button(x+270,y+194,105,"Save edits");}
 		graphics().drawString(floorTextureVisualName(),x+10,y+231,terrainFieldInvalid(8)?0xff981f:0xffffff,2);
@@ -1416,17 +1445,20 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void renderTerrainStructure(int x,int y){
 		structureField(x,y+82,"Roof",paintRoof,terrainRoofText,coordinateFocus==9,roofDescription());
-		if(terrainTool==TerrainTool.RECTANGLE&&rectangleOptions.isSmartWalls()){checkbox(x+10,y+120,true,"Smart Walls");checkbox(x+10,y+145,rectangleOptions.isNorthWall(),"North");checkbox(x+110,y+145,rectangleOptions.isEastWall(),"East");graphics().drawString("Wall type",x+10,y+187,0xffffff,2);button(x+118,y+170,24,"-");textField(x+148,y+170,54,terrainSmartWallText,coordinateFocus==18);button(x+208,y+170,24,"+");graphics().drawString(wallDescription(terrainSmartWall),x+240,y+187,0xbdbdbd,1);graphics().drawString("Shape",x+10,y+211,0xffffff,2);toolButton(x+65,y+194,72,"Outline",!rectangleOptions.isFill());toolButton(x+141,y+194,55,"Fill",rectangleOptions.isFill());button(x+270,y+194,105,"Save edits");graphics().drawString("Smart Walls: choose North, East, or both; diagonal is disabled.",x+10,y+238,0xffffff,1);graphics().drawString(terrainLineCommitTiles!=null?"Rectangle committed; receiving authoritative tiles.":terrainLineAnchorX<0?"Rectangle: click first corner.":"Rectangle: preview and click opposite corner.",x+10,y+286,0xff981f,1);graphics().drawString(inspectionStatus,x+10,y+307,0xbdbdbd,1);return;}
+		if(terrainTool==TerrainTool.RECTANGLE&&rectangleOptions.isSmartWalls()){checkbox(x+10,y+120,true,"Smart Walls");checkbox(x+10,y+145,rectangleOptions.isNorthWall(),"North");checkbox(x+110,y+145,rectangleOptions.isEastWall(),"East");graphics().drawString("Wall type",x+10,y+187,0xffffff,2);button(x+118,y+170,24,"-");textField(x+148,y+170,54,terrainSmartWallText,coordinateFocus==18);button(x+208,y+170,24,"+");graphics().drawString(compactLine(wallDescription(terrainSmartWall),12),x+240,y+187,0xbdbdbd,1);button(x+330,y+170,105,"Browse walls");graphics().drawString("Shape",x+10,y+211,0xffffff,2);toolButton(x+65,y+194,72,"Outline",!rectangleOptions.isFill());toolButton(x+141,y+194,55,"Fill",rectangleOptions.isFill());button(x+270,y+194,105,"Save edits");graphics().drawString("Smart Walls: choose North, East, or both; diagonal is disabled.",x+10,y+238,0xffffff,1);graphics().drawString(terrainLineCommitTiles!=null?"Rectangle committed; receiving authoritative tiles.":terrainLineAnchorX<0?"Rectangle: click first corner.":"Rectangle: preview and click opposite corner.",x+10,y+286,0xff981f,1);graphics().drawString(inspectionStatus,x+10,y+307,0xbdbdbd,1);return;}
 		structureField(x,y+118,"North Wall",rectangleOptions.isNorthWall(),terrainNorthWallText,coordinateFocus==10,wallDescription(terrainNorthWall));
+		button(x+330,y+118,105,"Browse walls");
 		structureField(x,y+154,"East Wall",rectangleOptions.isEastWall(),terrainEastWallText,coordinateFocus==11,wallDescription(terrainEastWall));
+		button(x+330,y+154,105,"Browse walls");
 		structureField(x,y+190,"Diagonal",rectangleOptions.isDiagonalWall(),terrainDiagonalWallText,coordinateFocus==12,wallDescription(terrainDiagonalWall));
+		button(x+330,y+190,105,"Browse walls");
 		graphics().drawString("Diagonal",x+10,y+237,0xffffff,2);toolButton(x+118,y+220,60,"\\",terrainDiagonalOrientation==0);toolButton(x+185,y+220,60,"/",terrainDiagonalOrientation==1);if(terrainTool==TerrainTool.RECTANGLE)checkbox(x+270,y+223,rectangleOptions.isSmartWalls(),"Smart");
 		graphics().drawString("Brush",x+10,y+265,0xffffff,2);toolButton(x+65,y+248,45,"1x1",terrainBrushSize==1);toolButton(x+114,y+248,45,"3x3",terrainBrushSize==3);toolButton(x+163,y+248,45,"5x5",terrainBrushSize==5);toolButton(x+212,y+248,45,"7x7",terrainBrushSize==7);button(x+270,y+248,105,"Save edits");
 		graphics().drawString(terrainDragActive||terrainDragReleasePending?terrainDragStatus():terrainLineCommitTiles!=null?terrainGestureLabel+" committed; receiving authoritative tiles.":terrainTool==TerrainTool.LINE?(terrainLineAnchorX<0?"Line: click anchor; all checked fields apply.":"Line anchored; click destination to commit."):terrainTool==TerrainTool.RECTANGLE?(terrainLineAnchorX<0?"Rectangle: click first corner.":"Rectangle: click opposite corner to commit."):"Freehand uses centered 1x1 through 7x7 brushes.",x+10,y+286,0xff981f,1);
 		graphics().drawString(inspectionStatus,x+10,y+307,0xbdbdbd,1);
 	}
 	private void terrainField(int x,int y,String label,boolean enabled,String value,boolean focused){checkbox(x+10,y,enabled,label);button(x+150,y,28,"-");textField(x+185,y,80,value,focused);button(x+272,y,28,"+");}
-	private void structureField(int x,int y,String label,boolean enabled,String value,boolean focused,String description){checkbox(x+10,y,enabled,label);button(x+118,y,24,"-");textField(x+148,y,54,value,focused);button(x+208,y,24,"+");graphics().drawString(description,x+240,y+17,0xbdbdbd,1);}
+	private void structureField(int x,int y,String label,boolean enabled,String value,boolean focused,String description){checkbox(x+10,y,enabled,label);button(x+118,y,24,"-");textField(x+148,y,54,value,focused);button(x+208,y,24,"+");graphics().drawString(compactLine(description,12),x+240,y+17,0xbdbdbd,1);}
 	private String roofDescription(){return terrainRoof==0?"none":"#"+(terrainRoof-1)+" profile";}
 	private String wallDescription(int raw){try{return raw==0?"none":WorldEditorDefinitionCatalog.boundaryLabel(raw-1);}catch(Exception e){return "undefined";}}
 	private String floorTextureVisualName(){return WorldEditorDefinitionCatalog.floorTextureLabel(terrainFloorTexture);}
@@ -1464,11 +1496,11 @@ public final class WorldEditorInterface extends NCustomComponent {
 		button(x+10,y+296,70,"Previous");button(x+310,y+296,70,"Next");String range=definitionBrowser.rangeLabel();graphics().drawString(range,x+195-graphics().stringWidth(1,range)/2,y+313,0xffffff,1);
 	}
 	private String definitionBrowserFamilyLabel(){switch(definitionBrowser.family()){
-		case BOUNDARY:return "Boundary";case NPC:return "NPC";case ITEM:return "Ground Item";case SCENERY:default:return "Scenery";}}
+		case BOUNDARY:return "Wall";case FLOOR:return "Floor Texture";case NPC:return "NPC";case ITEM:return "Ground Item";case SCENERY:default:return "Scenery";}}
 	private int selectedDefinitionBrowserId(){switch(definitionBrowser.family()){
-		case NPC:return npcId;case ITEM:return groundItemId;case SCENERY:return sceneryId;case BOUNDARY:default:return -1;}}
+		case NPC:return npcId;case ITEM:return groundItemId;case SCENERY:return sceneryId;case FLOOR:return terrainFloorTexture;case BOUNDARY:int raw=terrainWallValue(definitionBrowserTerrainField);return raw==0?-1:raw-1;default:return -1;}}
 	private String definitionBrowserEntryDetail(WorldEditorDefinitionCatalog.Entry entry){
-		if(definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.NPC||definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.ITEM)return "#"+entry.id()+" | "+entry.tags();
+		if(definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.NPC||definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.ITEM||definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.FLOOR)return "#"+entry.id()+" | "+entry.tags();
 		return "#"+entry.id()+" | "+entry.canonicalName();
 	}
 	private void renderNpc(int x,int y){

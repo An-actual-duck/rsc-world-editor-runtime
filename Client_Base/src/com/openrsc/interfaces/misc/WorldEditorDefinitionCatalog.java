@@ -1,8 +1,10 @@
 package com.openrsc.interfaces.misc;
 
 import com.openrsc.client.entityhandling.EntityHandler;
+import com.openrsc.client.entityhandling.defs.DoorDef;
 import com.openrsc.client.entityhandling.defs.ItemDef;
 import com.openrsc.client.entityhandling.defs.NPCDef;
+import com.openrsc.client.entityhandling.defs.TileDef;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -116,6 +118,14 @@ public final class WorldEditorDefinitionCatalog {
 		private static final List<Entry> ITEMS = runtimeItems();
 	}
 
+	private static final class WallHolder {
+		private static final List<Entry> WALLS = runtimeWalls();
+	}
+
+	private static final class FloorHolder {
+		private static final List<Entry> FLOORS = runtimeFloors();
+	}
+
 	private WorldEditorDefinitionCatalog() {
 	}
 
@@ -152,10 +162,18 @@ public final class WorldEditorDefinitionCatalog {
 		if (overlay == 250) {
 			return "Bridge Transition";
 		}
-		if (overlay < 0 || overlay >= FLOOR_TEXTURE_LABELS.length) {
+		if (overlay < 0) {
 			return "Undefined Texture";
 		}
-		return FLOOR_TEXTURE_LABELS[overlay];
+		if (overlay < FLOOR_TEXTURE_LABELS.length) {
+			return FLOOR_TEXTURE_LABELS[overlay];
+		}
+		try {
+			return overlay > 0 && overlay <= EntityHandler.tileCount()
+				? "Floor Texture " + overlay : "Undefined Texture";
+		} catch (RuntimeException failure) {
+			return "Undefined Texture";
+		}
 	}
 
 	public static List<Entry> sceneryEntries() {
@@ -164,6 +182,16 @@ public final class WorldEditorDefinitionCatalog {
 
 	public static List<Entry> boundaryEntries() {
 		return Holder.INSTANCE.boundaryEntries;
+	}
+
+	/** Complete runtime wall inventory, including project-provided definitions. */
+	public static List<Entry> wallEntries() {
+		return WallHolder.WALLS;
+	}
+
+	/** Author-facing raw overlay values, including no-overlay and bridge alias. */
+	public static List<Entry> floorEntries() {
+		return FloorHolder.FLOORS;
 	}
 
 	public static List<Entry> npcEntries() {
@@ -233,6 +261,70 @@ public final class WorldEditorDefinitionCatalog {
 				+ commandTerms(definition.getCommand()) + " " + traits
 				+ " item ground spawn respawn");
 			entries.add(new Entry("item", id, name, name, "runtime", tags, search));
+		}
+		return Collections.unmodifiableList(entries);
+	}
+
+	private static List<Entry> runtimeWalls() {
+		List<Entry> entries = new ArrayList<Entry>();
+		for (int id = 0; id < EntityHandler.doorCount(); id++) {
+			DoorDef definition;
+			try {
+				definition = EntityHandler.getDoorDef(id);
+			} catch (RuntimeException failure) {
+				continue;
+			}
+			if (definition == null || definition.id != id) {
+				continue;
+			}
+			String canonical = normalized(definition.getName());
+			if (canonical.isEmpty()) {
+				continue;
+			}
+			String display = boundaryLabel(id, canonical);
+			String tags = definition.getDoorType() == 0 ? "Passable" : "Blocking";
+			String search = normalized(display + " " + canonical + " "
+				+ safe(definition.getDescription()) + " "
+				+ safe(definition.getCommand1()) + " "
+				+ safe(definition.getCommand2()) + " wall boundary door " + tags);
+			entries.add(new Entry("boundary", id, canonical, display,
+				"runtime", tags, search));
+		}
+		return Collections.unmodifiableList(entries);
+	}
+
+	private static List<Entry> runtimeFloors() {
+		List<Entry> entries = new ArrayList<Entry>();
+		entries.add(new Entry("floor", 0, "base floor color", "Base Floor Color",
+			"editor", "No overlay", "base floor color none no overlay clear"));
+		for (int id = 0; id < EntityHandler.tileCount(); id++) {
+			TileDef definition;
+			try {
+				definition = EntityHandler.getTileDef(id);
+			} catch (RuntimeException failure) {
+				continue;
+			}
+			if (definition == null) {
+				continue;
+			}
+			int overlay = id + 1;
+			if (overlay == 250) {
+				continue;
+			}
+			String display = overlay < FLOOR_TEXTURE_LABELS.length
+				? FLOOR_TEXTURE_LABELS[overlay] : "Floor Texture " + overlay;
+			String tags = definition.getObjectType() == 0 ? "Walkable" : "Not Walkable";
+			String search = normalized(display + " floor texture overlay tile " + tags
+				+ " colour color " + definition.getColour()
+				+ " tile-value " + definition.getTileValue());
+			entries.add(new Entry("floor", overlay, display, display,
+				"runtime", tags, search));
+		}
+		if (EntityHandler.tileCount() > 1) {
+			TileDef bridge = EntityHandler.getTileDef(1);
+			String tags = bridge.getObjectType() == 0 ? "Walkable" : "Not Walkable";
+			entries.add(new Entry("floor", 250, "bridge transition", "Bridge Transition",
+				"editor", tags, "bridge transition floor texture overlay alias " + tags));
 		}
 		return Collections.unmodifiableList(entries);
 	}
