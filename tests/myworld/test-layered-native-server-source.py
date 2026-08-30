@@ -1607,6 +1607,8 @@ class LayeredNativeServerSourceTest(unittest.TestCase):
             "loaded.getPrimaryPackage().getManifestSha256()", region_manager
         )
         self.assertIn("spoiled-milk-world-builder-export", runtime_profile)
+        self.assertIn("world-builder-installed", runtime_profile)
+        self.assertIn("skipsLegacyTerrainArchive()", region_manager)
         self.assertIn(
             "PRESERVATION_R64_REPLACEMENT", runtime_profile
         )

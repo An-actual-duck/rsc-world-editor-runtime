@@ -24,6 +24,7 @@ public enum NativeLayeredWorldRuntimeProfile {
 	SPOILED_MILK_BUILDER_DRAFT("spoiled-milk-builder-draft", true),
 	SPOILED_MILK_WORLD_BUILDER_EXPORT(
 		"spoiled-milk-world-builder-export", true),
+	WORLD_BUILDER_INSTALLED("world-builder-installed", true),
 	ADAPTIVE_WORLD_BUILDER("adaptive-world-builder", true);
 
 	public static final int ADAPTIVE_MAX_LEVELS = 64;
@@ -79,6 +80,12 @@ public enum NativeLayeredWorldRuntimeProfile {
 
 	public boolean requiresConfiguredManifestSha256() {
 		return this == SPOILED_MILK_WORLD_BUILDER_EXPORT
+			|| this == WORLD_BUILDER_INSTALLED
+			|| this == ADAPTIVE_WORLD_BUILDER;
+	}
+
+	public boolean skipsLegacyTerrainArchive() {
+		return this == WORLD_BUILDER_INSTALLED
 			|| this == ADAPTIVE_WORLD_BUILDER;
 	}
 
@@ -113,8 +120,11 @@ public enum NativeLayeredWorldRuntimeProfile {
 			case SPOILED_MILK_WORLD_BUILDER_EXPORT:
 				validateSpoiledMilkBuilderDraft(catalog);
 				return;
+			case WORLD_BUILDER_INSTALLED:
+				validateGenericWorldBuilderPackage(catalog, getId());
+				return;
 			case ADAPTIVE_WORLD_BUILDER:
-				validateAdaptiveWorldBuilder(catalog);
+				validateGenericWorldBuilderPackage(catalog, getId());
 				return;
 			default:
 				throw new IllegalStateException(
@@ -122,17 +132,18 @@ public enum NativeLayeredWorldRuntimeProfile {
 		}
 	}
 
-	private static void validateAdaptiveWorldBuilder(
-		final NativeLayeredWorldPackageCatalog catalog) {
+	private static void validateGenericWorldBuilderPackage(
+		final NativeLayeredWorldPackageCatalog catalog,
+		final String profileId) {
 		if (catalog.size() != 1) {
 			throw new IllegalStateException(
-				"The adaptive-world-builder profile requires exactly one package");
+				"The " + profileId + " profile requires exactly one package");
 		}
 		final NativeLayeredWorldPackage loaded = catalog.getPrimaryPackage();
 		if (loaded.getWorldSpaceCount() != 1
 			|| !"static".equals(loaded.getWorldSpaceKinds().get("global"))) {
 			throw new IllegalStateException(
-				"The adaptive-world-builder profile requires one static global world space");
+				"The " + profileId + " profile requires one static global world space");
 		}
 		if (loaded.getLevelCount() < 1
 			|| loaded.getLevelCount() > ADAPTIVE_MAX_LEVELS
@@ -140,7 +151,7 @@ public enum NativeLayeredWorldRuntimeProfile {
 			|| loaded.getTerrainSectorCount() > ADAPTIVE_MAX_TERRAIN_SECTORS
 			|| loaded.getPlacementSetCount() != loaded.getLevelCount()) {
 			throw new IllegalStateException(
-				"The adaptive-world-builder package exceeds its bounded level, "
+				"The " + profileId + " package exceeds its bounded level, "
 					+ "terrain, or placement-set contract");
 		}
 		long placementCount = (long) loaded.getNpcPlacementCount()
@@ -149,7 +160,7 @@ public enum NativeLayeredWorldRuntimeProfile {
 			+ loaded.getBoundaryPlacementCount();
 		if (placementCount > ADAPTIVE_MAX_PLACEMENTS) {
 			throw new IllegalStateException(
-				"The adaptive-world-builder package exceeds "
+				"The " + profileId + " package exceeds "
 					+ ADAPTIVE_MAX_PLACEMENTS + " placements");
 		}
 		Set<Integer> declaredLevels = new HashSet<Integer>();
@@ -158,7 +169,7 @@ public enum NativeLayeredWorldRuntimeProfile {
 			if (!WorldSpaceId.GLOBAL.equals(level.getWorldSpace())
 				|| !declaredLevels.add(Integer.valueOf(level.getLevel()))) {
 				throw new IllegalStateException(
-					"The adaptive-world-builder package has ambiguous level ownership");
+					"The " + profileId + " package has ambiguous level ownership");
 			}
 			boolean hasTerrain = false;
 			for (com.openrsc.server.model.world.coordinate.WorldMapSectorId sector
@@ -171,7 +182,7 @@ public enum NativeLayeredWorldRuntimeProfile {
 			}
 			if (!hasTerrain) {
 				throw new IllegalStateException(
-					"The adaptive-world-builder package has a level without terrain: "
+					"The " + profileId + " package has a level without terrain: "
 						+ level.getLevel());
 			}
 		}
@@ -188,14 +199,14 @@ public enum NativeLayeredWorldRuntimeProfile {
 					&& !placementEncoding.equals(sourceEncoding))
 				|| !placementLevels.add(Integer.valueOf(set.getLevel()))) {
 				throw new IllegalStateException(
-					"The adaptive-world-builder profile requires one consistently encoded global "
+					"The " + profileId + " profile requires one consistently encoded global "
 						+ "placement set per level");
 			}
 			placementEncoding = sourceEncoding;
 		}
 		if (!declaredLevels.equals(placementLevels)) {
 			throw new IllegalStateException(
-				"The adaptive-world-builder placement levels are incomplete");
+				"The " + profileId + " placement levels are incomplete");
 		}
 	}
 

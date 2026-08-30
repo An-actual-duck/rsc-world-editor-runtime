@@ -381,6 +381,19 @@ public final class AdaptiveWorldBuilderRuntimeHarness {
             NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER.validate(
                 NativeLayeredWorldPackageCatalog.of(
                     java.util.Collections.singletonList(source)));
+            NativeLayeredWorldRuntimeProfile.WORLD_BUILDER_INSTALLED.validate(
+                NativeLayeredWorldPackageCatalog.of(
+                    java.util.Collections.singletonList(source)));
+            if (!NativeLayeredWorldRuntimeProfile.WORLD_BUILDER_INSTALLED
+                    .replacesLegacyBasePopulation()
+                || !NativeLayeredWorldRuntimeProfile.WORLD_BUILDER_INSTALLED
+                    .skipsLegacyTerrainArchive()
+                || !NativeLayeredWorldRuntimeProfile.WORLD_BUILDER_INSTALLED
+                    .requiresConfiguredManifestSha256()
+                || NativeLayeredWorldRuntimeProfile.WORLD_BUILDER_INSTALLED
+                    .requiresConfiguredInventorySha256()) {
+                throw new IllegalStateException("unsafe installed profile ownership");
+            }
             NativeLayeredWorldPackage origin = workingDescendant
                 ? NativeLayeredWorldPackage.load(Paths.get(args[2])) : source;
             NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER.validate(
@@ -1778,8 +1791,25 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         profile = (ROOT / "server/src/com/openrsc/server/io/NativeLayeredWorldRuntimeProfile.java").read_text()
         self.assertIn('PRESERVATION_R64_REPLACEMENT("preservation-r64-replacement", true)', profile)
         self.assertIn('SPOILED_MILK_REPLACEMENT("spoiled-milk-replacement", true)', profile)
+        self.assertIn('WORLD_BUILDER_INSTALLED("world-builder-installed", true)', profile)
         self.assertIn('ADAPTIVE_WORLD_BUILDER("adaptive-world-builder", true)', profile)
         self.assertNotIn("ADAPTIVE_WORLD_BUILDER = SPOILED", profile)
+        installed = json.loads((
+            ROOT / "server/conf/world-builder/installed-runtime-capability-v1.json"
+        ).read_text())
+        self.assertEqual(
+            "world-builder-installed-runtime-capability",
+            installed["manifestType"],
+        )
+        self.assertEqual("world-builder-installed", installed["profileId"])
+        self.assertEqual([1, 2, 3, 4], installed["encodingVersions"])
+        self.assertFalse(installed["activation"]["builderOnly"])
+        self.assertTrue(installed["activation"]["replacesLegacyTerrain"])
+        self.assertTrue(installed["activation"]["replacesLegacyPlacements"])
+        self.assertIn(
+            "layered_native_terrain_package_path",
+            installed["activation"]["requiredStringKeys"],
+        )
         publisher = (ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderPackagePublisher.java").read_text()
         self.assertNotIn("rsc-remastered.spoiled-milk-layered-world", publisher)
         self.assertNotIn("SPOILED_MILK_PACKAGE", publisher)
