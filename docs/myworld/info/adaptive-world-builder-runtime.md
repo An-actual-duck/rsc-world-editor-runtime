@@ -32,6 +32,11 @@ client code independently pin the same values.
 | Coordinate model | `signed-layered-v1` |
 | Placement encoding | `layered-world-placements-v4` for newly saved work; v3 remains readable |
 
+The ordered `encodingVersions` capability list is `[1, 2, 3, 4]`: legacy and
+wide terrain plus placement payloads v3 and v4. Target-server integration must
+preserve that complete declaration so World Editor can reject an incompatible
+install before copying or activating a map package.
+
 `scripts/write-adaptive-world-builder-runtime-evidence.py` emits canonical
 `world-builder-runtime-evidence` schema-version-1 JSON for adaptive discovery.
 It hashes a real, bounded, non-linked definition-catalog evidence file rather

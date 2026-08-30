@@ -73,7 +73,7 @@ def main() -> int:
         "definitionCatalogSha256": catalog_sha256,
         "mapFormatId": "signed-layered-v1",
         "packageSchemaId": "layered-world-package-v1",
-        "encodingVersions": [1, 2, 3],
+        "encodingVersions": [1, 2, 3, 4],
         "authoring": {
             "editExistingLevels": True,
             "createLevels": True,

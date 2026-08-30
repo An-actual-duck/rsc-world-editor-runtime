@@ -1719,7 +1719,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertEqual("rsc-world-editor-runtime-adaptive-builder-server-v5", evidence["buildId"])
         self.assertEqual("generic-signed-layered-loader-v6-project-content-bundle-v3", evidence["loaderId"])
         self.assertEqual("world-builder-native-layered-protocol-v2-u16-elevation", evidence["protocolId"])
-        self.assertEqual([1, 2, 3], evidence["encodingVersions"])
+        self.assertEqual([1, 2, 3, 4], evidence["encodingVersions"])
         self.assertEqual(
             ["boundary", "ground-item", "npc", "scenery"],
             evidence["authoring"]["placementFamilies"],
