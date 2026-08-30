@@ -339,10 +339,10 @@ public class RegionManager {
 	}
 
 	public void load() {
-		if (nativeLayeredWorldRuntimeProfile
-			== NativeLayeredWorldRuntimeProfile.ADAPTIVE_WORLD_BUILDER) {
+		if (nativeLayeredWorldRuntimeProfile.skipsLegacyTerrainArchive()) {
 			LOGGER.info(
-				"Skipping legacy terrain archives for explicit adaptive World Builder profile");
+				"Skipping legacy terrain archives for explicit World Builder package profile {}",
+				nativeLayeredWorldRuntimeProfile.getId());
 			return;
 		}
 		// TODO: The WorldLoader.loadWorld() should accept a RegionManager as an argument and place regions there.

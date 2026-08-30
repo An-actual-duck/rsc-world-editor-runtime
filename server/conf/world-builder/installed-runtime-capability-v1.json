@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "world-builder-installed-runtime-capability",
+  "capabilityId": "world-builder-installed-runtime-capability-v1",
+  "profileId": "world-builder-installed",
+  "serverBuildId": "rsc-world-editor-runtime-installed-server-v1",
+  "clientBuildId": "rsc-world-editor-runtime-installed-client-v1",
+  "loaderId": "generic-signed-layered-loader-v6-project-content-bundle-v3",
+  "protocolId": "world-builder-native-layered-protocol-v2-u16-elevation",
+  "mapFormatId": "signed-layered-v1",
+  "packageSchemaId": "layered-world-package-v1",
+  "coordinateModel": "signed-layered-v1",
+  "encodingVersions": [1, 2, 3, 4],
+  "placementFamilies": ["boundary", "ground-item", "npc", "scenery"],
+  "runtimeArchives": {
+    "serverRelativePath": "server/core.jar",
+    "clientNames": ["Client_Base/Open_RSC_Client.jar", "client/Open_RSC_Client.jar"]
+  },
+  "activation": {
+    "runtimeProfile": "world-builder-installed",
+    "builderOnly": false,
+    "requiresExactManifestSha256": true,
+    "requiresExactInventorySha256": false,
+    "replacesLegacyTerrain": true,
+    "replacesLegacyPlacements": true,
+    "requiredBooleanKeys": [
+      "want_layered_player_location_authority",
+      "want_layered_spatial_runtime_authority",
+      "want_layered_protocol_client_authority",
+      "want_layered_native_terrain_package",
+      "want_layered_native_terrain_residency",
+      "want_layered_native_terrain_readiness",
+      "want_layered_native_terrain_prediction",
+      "want_layered_native_terrain_symmetric_residency",
+      "want_layered_native_terrain_atomic_activation"
+    ],
+    "requiredStringKeys": [
+      "layered_native_terrain_package_path",
+      "layered_native_terrain_manifest_sha256",
+      "layered_native_world_runtime_profile"
+    ]
+  }
+}
