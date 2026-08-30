@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFS = ROOT / "server" / "conf" / "server" / "defs"
 ENTITY_HANDLER = ROOT / "server" / "src" / "com" / "openrsc" / "server" / "external" / "EntityHandler.java"
+FIXTURES = ROOT / "tests" / "myworld" / "fixtures"
+SERVER_CORE = ROOT / "server" / "core.jar"
+SERVER_PLUGINS = ROOT / "server" / "plugins.jar"
 
 NPC_FIELDS = {
-    "id", "name", "description", "attack", "strength", "hits", "defense", "ranged",
+    "id", "name", "description", "command", "attack", "strength", "hits", "defense", "ranged",
     "projectileRange",
     "meleeOffense", "rangedOffense", "magicOffense",
     "meleeDefense", "rangedDefense", "magicDefense", "meleeDefenseMultiplier",
@@ -61,6 +68,116 @@ def require(source: str, text: str, description: str) -> None:
         raise AssertionError(f"Missing {description}: {text}")
 
 
+def test_runtime_command_override() -> None:
+    javac = shutil.which("javac")
+    java = shutil.which("java")
+    if javac is None or java is None:
+        raise AssertionError("Java compiler/runtime are required")
+    if not SERVER_CORE.is_file() or not SERVER_PLUGINS.is_file():
+        raise AssertionError("Server jars are required; run ./scripts/build-server.sh first")
+
+    harness_source = r'''
+import com.openrsc.server.external.EntityHandler;
+import com.openrsc.server.external.NPCDef;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import sun.misc.Unsafe;
+
+public final class NpcCommandOverrideHarness {
+    private static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+    }
+
+    private static Throwable invokeFailure(Method apply, EntityHandler handler, String path)
+            throws Exception {
+        try {
+            apply.invoke(handler, path);
+            throw new AssertionError("Expected override failure for " + path);
+        } catch (InvocationTargetException failure) {
+            return failure.getCause();
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
+        unsafeField.setAccessible(true);
+        Unsafe unsafe = (Unsafe) unsafeField.get(null);
+        EntityHandler handler = (EntityHandler) unsafe.allocateInstance(EntityHandler.class);
+        handler.npcs = new ArrayList<NPCDef>();
+        for (int id = 0; id <= 3; id++) handler.npcs.add(null);
+        NPCDef original = new NPCDef();
+        original.command1 = "Inspect";
+        handler.npcs.set(3, original);
+
+        Method apply = EntityHandler.class.getDeclaredMethod(
+            "applyOptionalNpcOverrides", String.class);
+        apply.setAccessible(true);
+        apply.invoke(handler, args[0]);
+        check(handler.npcs.get(3) != original, "override must preserve copy-on-write staging");
+        check("Inspect".equals(original.command1), "override must not mutate the source definition");
+        check("Talk-to".equals(handler.npcs.get(3).command1), "command must map to command1");
+
+        ArrayList<NPCDef> acceptedCatalog = handler.npcs;
+        Throwable unknown = invokeFailure(apply, handler, args[1]);
+        check(unknown instanceof IllegalStateException, "unknown field must fail startup");
+        check(unknown.getCause() instanceof IllegalArgumentException,
+            "unknown field must retain strict schema validation");
+        check(unknown.getCause().getMessage().contains("Unexpected npc override field 'commmand'"),
+            "unknown-field failure must identify the field");
+        check(handler.npcs == acceptedCatalog, "unknown field must not swap the staged catalog");
+
+        Throwable nonString = invokeFailure(apply, handler, args[2]);
+        check(nonString instanceof IllegalStateException, "non-string command must fail startup");
+        check(nonString.getCause() != null
+                && nonString.getCause().getClass().getName().equals("org.json.JSONException"),
+            "command must retain the provider's string contract");
+        check(handler.npcs == acceptedCatalog, "invalid command must not swap the staged catalog");
+    }
+}
+'''
+    classpath = os.pathsep.join((str(SERVER_CORE), str(SERVER_PLUGINS)))
+    with tempfile.TemporaryDirectory(prefix="npc-command-override-") as temporary:
+        temporary_path = Path(temporary)
+        harness = temporary_path / "NpcCommandOverrideHarness.java"
+        harness.write_text(harness_source, encoding="utf-8")
+        compiled = subprocess.run(
+            [
+                javac,
+                "-source", "8",
+                "-target", "8",
+                "-cp", classpath,
+                "-d", str(temporary_path),
+                str(ENTITY_HANDLER),
+                str(harness),
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        )
+        if compiled.returncode != 0:
+            raise AssertionError(f"NPC override harness compilation failed:\n{compiled.stderr}")
+        executed = subprocess.run(
+            [
+                java,
+                "-cp", os.pathsep.join((str(temporary_path), classpath)),
+                "NpcCommandOverrideHarness",
+                str(FIXTURES / "npc-command-override.json"),
+                str(FIXTURES / "npc-unknown-field-override.json"),
+                str(FIXTURES / "npc-non-string-command-override.json"),
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        )
+        if executed.returncode != 0:
+            raise AssertionError(
+                "NPC override harness execution failed:\n"
+                f"stdout:\n{executed.stdout}\nstderr:\n{executed.stderr}"
+            )
+
+
 def main() -> None:
     validate_overrides(
         load_entries("NpcDefsMyWorld.json"),
@@ -75,11 +192,31 @@ def main() -> None:
         "ItemDefsMyWorld.json",
     )
 
+    command_override = json.loads(
+        (FIXTURES / "npc-command-override.json").read_text(encoding="utf-8")
+    )["npcs"]
+    validate_overrides(command_override, {3}, NPC_FIELDS, "npc-command-override.json")
+    if command_override[0]["command"] != "Talk-to":
+        raise AssertionError("NPC command override fixture must exercise a string command")
+
+    unknown_override = json.loads(
+        (FIXTURES / "npc-unknown-field-override.json").read_text(encoding="utf-8")
+    )["npcs"]
+    try:
+        validate_overrides(unknown_override, {3}, NPC_FIELDS, "npc-unknown-field-override.json")
+    except AssertionError as failure:
+        if "commmand" not in str(failure):
+            raise
+    else:
+        raise AssertionError("unknown NPC override fields must remain rejected")
+
     source = ENTITY_HANDLER.read_text(encoding="utf-8")
     require(source, "ArrayList<NPCDef> stagedNpcs = new ArrayList<>(npcs);", "staged NPC catalog")
     require(source, "npcs = stagedNpcs;", "atomic NPC catalog swap")
     require(source, '"meleeOffense", "rangedOffense", "magicOffense"', "NPC power override whitelist")
     require(source, '"projectileRange"', "NPC projectile range override whitelist")
+    require(source, '"id", "name", "description", "command"', "NPC command override whitelist")
+    require(source, 'if (npc.has("command")) staged.command1 = npc.getString("command");', "NPC command override")
     require(source, 'if (npc.has("projectileRange"))', "NPC projectile range override")
     require(source, 'if (npc.has("meleeOffense")) staged.meleeOffense', "NPC melee power override")
     require(source, 'if (npc.has("rangedOffense")) staged.rangedOffense', "NPC ranged power override")
@@ -87,9 +224,13 @@ def main() -> None:
     require(source, "ArrayList<ItemDefinition> stagedItems = new ArrayList<>(items);", "staged item catalog")
     require(source, "items = stagedItems;", "atomic item catalog swap")
     require(source, 'throw new IllegalArgumentException("Duplicate npc override id "', "duplicate NPC rejection")
+    require(source, 'validateOverrideFields(npc, MYWORLD_NPC_OVERRIDE_FIELDS, "npc", i);', "NPC unknown-field validation")
+    require(source, '"Unexpected " + type + " override field \'" + field + "\' at index " + index', "unknown-field rejection")
     require(source, 'throw new IllegalArgumentException("Duplicate item override id "', "duplicate item rejection")
     require(source, 'throw new IllegalStateException("Failed to apply npc overrides from "', "NPC startup failure")
     require(source, 'throw new IllegalStateException("Failed to apply item overrides from "', "item startup failure")
+
+    test_runtime_command_override()
 
     print("PASS: MyWorld definition overrides are validated and applied transactionally")
 
