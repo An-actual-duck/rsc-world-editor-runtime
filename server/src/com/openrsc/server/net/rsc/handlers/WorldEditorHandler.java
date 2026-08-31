@@ -8,6 +8,7 @@ import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeOper
 import com.openrsc.server.content.worldedit.WorldEditorTerrainStroke;
 import com.openrsc.server.content.worldedit.WorldBuilderMode;
 import com.openrsc.server.content.worldedit.WorldBuilderPlayerSession;
+import com.openrsc.server.content.worldedit.WorldBuilderTerrainOverlay;
 import com.openrsc.server.io.NativeLayeredTerrainTile;
 import com.openrsc.server.io.WorldEditorTerrainArchive;
 import com.openrsc.server.io.WorldLoader;
@@ -347,6 +348,7 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 	}
 	private void validateWall(Player p,int raw,String label){if(raw==0)return;try{if(p.getWorld().getServer().getEntityHandler().getDoorDef(raw-1)==null)throw new Exception();}catch(Exception e){throw new IllegalArgumentException(label+" "+raw+" is not defined.");}WorldBuilderPlayerSession.requireProjectDefinition(p,"boundary",raw-1);}
 	private boolean overlayBlocks(Player p,int overlay){
+		if(WorldBuilderTerrainOverlay.isBlockingBaseColor(overlay))return true;
 		int effective=overlay==250?2:overlay;if(effective==0)return false;
 		WorldBuilderPlayerSession.requireProjectDefinition(p,"floor",effective-1);
 		try{return p.getWorld().getServer().getEntityHandler().getTileDef(effective-1).getObjectType()!=0;}

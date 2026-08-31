@@ -9,6 +9,7 @@ import orsc.NativeLayeredTerrainSnapshot;
 import orsc.RenderTelemetry;
 import orsc.WorldBuilderClientProfile;
 import orsc.WorldBuilderTerrainBootstrap;
+import orsc.WorldBuilderTerrainOverlay;
 import orsc.WorldEditorBuildSettings;
 import orsc.graphics.two.GraphicsController;
 import orsc.util.FastMath;
@@ -3185,22 +3186,22 @@ public final class World {
 		for (int x = 0; x < LOCAL_TILE_COUNT; ++x) {
 			for (int z = 0; z < LOCAL_TILE_COUNT; ++z) {
 				int y = -source.tileElevation(x, z);
-				if (source.tileDecorationID(x, z) > 0 && Objects.requireNonNull(EntityHandler
-					.getTileDef(source.tileDecorationID(x, z) - 1)).getTileValue() == 4) {
+				if (source.tileDecorationID(x, z) > 0
+					&& tileDecorationType(source.tileDecorationID(x, z)) == 4) {
 					y = 0;
 				}
-				if (source.tileDecorationID(x - 1, z) > 0 && Objects.requireNonNull(EntityHandler
-					.getTileDef(source.tileDecorationID(x - 1, z) - 1)).getTileValue() == 4) {
-					y = 0;
-				}
-
-				if (source.tileDecorationID(x, z - 1) > 0 && Objects.requireNonNull(EntityHandler
-					.getTileDef(source.tileDecorationID(x, z - 1) - 1)).getTileValue() == 4) {
+				if (source.tileDecorationID(x - 1, z) > 0
+					&& tileDecorationType(source.tileDecorationID(x - 1, z)) == 4) {
 					y = 0;
 				}
 
-				if (source.tileDecorationID(x - 1, z - 1) > 0 && Objects.requireNonNull(EntityHandler
-					.getTileDef(source.tileDecorationID(x - 1, z - 1) - 1)).getTileValue() == 4) {
+				if (source.tileDecorationID(x, z - 1) > 0
+					&& tileDecorationType(source.tileDecorationID(x, z - 1)) == 4) {
+					y = 0;
+				}
+
+				if (source.tileDecorationID(x - 1, z - 1) > 0
+					&& tileDecorationType(source.tileDecorationID(x - 1, z - 1)) == 4) {
 					y = 0;
 				}
 
@@ -3238,7 +3239,8 @@ public final class World {
 				if (tileX < 0 || tileZ < 0 || tileX >= LOCAL_FACE_TILE_COUNT || tileZ >= LOCAL_FACE_TILE_COUNT) {
 					continue;
 				}
-				if (source.tileDecorationID(tileX, tileZ) != 0) {
+				if (!WorldBuilderTerrainOverlay.usesBaseColor(
+					source.tileDecorationID(tileX, tileZ))) {
 					continue;
 				}
 				int color = terrainRgbForTile(source, tileX, tileZ);
@@ -3265,6 +3267,14 @@ public final class World {
 
 	private int terrainRgbForTile(TerrainModelInputSource source, int tileX, int tileZ) {
 		return resourceToRgb(this.colorToResource[source.terrainColour(tileX, tileZ)]) & 0xffffff;
+	}
+
+	private static int tileDecorationType(int rawOverlay) {
+		if (WorldBuilderTerrainOverlay.isBlockingBaseColor(rawOverlay)) {
+			return 6;
+		}
+		return Objects.requireNonNull(
+			EntityHandler.getTileDef(rawOverlay - 1)).getTileValue();
 	}
 
 	private static int resourceToRgb(int resource) {
@@ -3301,9 +3311,12 @@ public final class World {
 				boolean collisionObject = false;
 				boolean waterLike = false;
 				int decorID = source.tileDecorationID(x, z);
-				boolean terrainVariationEligible = plane == 0 && decorID == 0;
+				boolean terrainVariationEligible = plane == 0
+					&& WorldBuilderTerrainOverlay.usesBaseColor(decorID);
 				boolean lavaGlowEmitter = decorID == LAVA_GLOW_OVERLAY_ID;
-				if (decorID > 0) {
+				if (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {
+					collisionFullBlock = true;
+				} else if (decorID > 0) {
 					int decorType = Objects.requireNonNull(EntityHandler.getTileDef(decorID - 1)).getTileValue();
 					waterLike = decorType == 4;
 					int decorType2 = source.tileType2(x, z);
@@ -3319,22 +3332,22 @@ public final class World {
 
 					if (decorType == 5) {
 						if (source.wallDiagonal(x, z) > 0 && source.wallDiagonal(x, z) < 24000) {
-							if (source.tileDecorationCacheVal(x - 1, z, defaultVal) != Scene.TRANSPARENT
-								&& source.tileDecorationCacheVal(x, z - 1, defaultVal) != Scene.TRANSPARENT) {
+							if (source.tileDecorationCacheVal(x - 1, z, defaultVal, colorToResource) != Scene.TRANSPARENT
+								&& source.tileDecorationCacheVal(x, z - 1, defaultVal, colorToResource) != Scene.TRANSPARENT) {
 								bridge00_11 = 0;
-								colorResource = source.tileDecorationCacheVal(x - 1, z, defaultVal);
-							} else if (source.tileDecorationCacheVal(x + 1, z, defaultVal) != Scene.TRANSPARENT
-								&& source.tileDecorationCacheVal(x, z + 1, defaultVal) != Scene.TRANSPARENT) {
-								res01 = source.tileDecorationCacheVal(x + 1, z, defaultVal);
+								colorResource = source.tileDecorationCacheVal(x - 1, z, defaultVal, colorToResource);
+							} else if (source.tileDecorationCacheVal(x + 1, z, defaultVal, colorToResource) != Scene.TRANSPARENT
+								&& source.tileDecorationCacheVal(x, z + 1, defaultVal, colorToResource) != Scene.TRANSPARENT) {
+								res01 = source.tileDecorationCacheVal(x + 1, z, defaultVal, colorToResource);
 								bridge00_11 = 0;
-							} else if (source.tileDecorationCacheVal(x + 1, z, defaultVal) != Scene.TRANSPARENT
-								&& source.tileDecorationCacheVal(x, z - 1, defaultVal) != Scene.TRANSPARENT) {
-								res01 = source.tileDecorationCacheVal(x + 1, z, defaultVal);
+							} else if (source.tileDecorationCacheVal(x + 1, z, defaultVal, colorToResource) != Scene.TRANSPARENT
+								&& source.tileDecorationCacheVal(x, z - 1, defaultVal, colorToResource) != Scene.TRANSPARENT) {
+								res01 = source.tileDecorationCacheVal(x + 1, z, defaultVal, colorToResource);
 								bridge00_11 = 1;
-							} else if (source.tileDecorationCacheVal(x - 1, z, defaultVal) != Scene.TRANSPARENT
-								&& source.tileDecorationCacheVal(x, z + 1, defaultVal) != Scene.TRANSPARENT) {
+							} else if (source.tileDecorationCacheVal(x - 1, z, defaultVal, colorToResource) != Scene.TRANSPARENT
+								&& source.tileDecorationCacheVal(x, z + 1, defaultVal, colorToResource) != Scene.TRANSPARENT) {
 								bridge00_11 = 1;
-								colorResource = source.tileDecorationCacheVal(x - 1, z, defaultVal);
+								colorResource = source.tileDecorationCacheVal(x - 1, z, defaultVal, colorToResource);
 							}
 						}
 					} else if (decorType != 2
@@ -3386,8 +3399,8 @@ public final class World {
 		List<TerrainOverlayFaceInput> overlays = new ArrayList<TerrainOverlayFaceInput>();
 		for (int x = 1; x < LOCAL_FACE_TILE_COUNT; ++x) {
 			for (int z = 1; z < LOCAL_FACE_TILE_COUNT; ++z) {
-				if (source.tileDecorationID(x, z) > 0 && Objects.requireNonNull(EntityHandler
-					.getTileDef(source.tileDecorationID(x, z) - 1)).getTileValue() == 4) {
+				if (source.tileDecorationID(x, z) > 0
+					&& tileDecorationType(source.tileDecorationID(x, z)) == 4) {
 
 					int tileDecor = Objects.requireNonNull(EntityHandler.getTileDef(source.tileDecorationID(x, z) - 1))
 						.getColour();
@@ -3396,11 +3409,10 @@ public final class World {
 						(x + 1) * 128, -source.tileElevation(x + 1, z), z * 128,
 						(x + 1) * 128, -source.tileElevation(x + 1, z + 1), (z + 1) * 128,
 						x * 128, -source.tileElevation(x, z + 1), 128 + z * 128);
-				} else if (source.tileDecorationID(x, z) == 0 || Objects.requireNonNull(EntityHandler
-					.getTileDef(source.tileDecorationID(x, z) - 1)).getTileValue() != 3) {
+				} else if (source.tileDecorationID(x, z) == 0
+					|| tileDecorationType(source.tileDecorationID(x, z)) != 3) {
 					if (source.tileDecorationID(x, z + 1) > 0 && !source.editorPaintedOverlay(x,z+1)
-						&& Objects.requireNonNull(EntityHandler.getTileDef(source.tileDecorationID(x, z + 1) - 1))
-						.getTileValue() == 4) {
+						&& tileDecorationType(source.tileDecorationID(x, z + 1)) == 4) {
 						int tileDecor = Objects.requireNonNull(EntityHandler
 							.getTileDef(source.tileDecorationID(x, z + 1) - 1))
 							.getColour();
@@ -3412,8 +3424,7 @@ public final class World {
 					}
 
 					if (source.tileDecorationID(x, z - 1) > 0 && !source.editorPaintedOverlay(x,z-1)
-						&& Objects.requireNonNull(EntityHandler.getTileDef(source.tileDecorationID(x, z - 1) - 1))
-						.getTileValue() == 4) {
+						&& tileDecorationType(source.tileDecorationID(x, z - 1)) == 4) {
 						int tileDecor = Objects.requireNonNull(EntityHandler
 							.getTileDef(source.tileDecorationID(x, z - 1) - 1))
 							.getColour();
@@ -3424,9 +3435,8 @@ public final class World {
 							x * 128, -source.tileElevation(x, z + 1), 128 + z * 128);
 					}
 
-					if (source.tileDecorationID(x + 1, z) > 0 && !source.editorPaintedOverlay(x+1,z) && Objects.requireNonNull(EntityHandler
-						.getTileDef(source.tileDecorationID(x + 1, z) - 1))
-						.getTileValue() == 4) {
+					if (source.tileDecorationID(x + 1, z) > 0 && !source.editorPaintedOverlay(x+1,z)
+						&& tileDecorationType(source.tileDecorationID(x + 1, z)) == 4) {
 						int tileDecor = Objects.requireNonNull(EntityHandler
 							.getTileDef(source.tileDecorationID(x + 1, z) - 1))
 							.getColour();
@@ -3437,9 +3447,8 @@ public final class World {
 							x * 128, -source.tileElevation(x, z + 1), (z + 1) * 128);
 					}
 
-					if (source.tileDecorationID(x - 1, z) > 0 && !source.editorPaintedOverlay(x-1,z) && Objects.requireNonNull(EntityHandler
-						.getTileDef(source.tileDecorationID(x - 1, z) - 1))
-						.getTileValue() == 4) {
+					if (source.tileDecorationID(x - 1, z) > 0 && !source.editorPaintedOverlay(x-1,z)
+						&& tileDecorationType(source.tileDecorationID(x - 1, z)) == 4) {
 						int tileDecor = Objects.requireNonNull(EntityHandler
 							.getTileDef(source.tileDecorationID(x - 1, z) - 1))
 							.getColour();
@@ -4390,6 +4399,9 @@ public final class World {
 			if (id == 0) {
 				return defaultVal;
 			}
+			if (WorldBuilderTerrainOverlay.isBlockingBaseColor(id)) {
+				return this.colorToResource[this.getTerrainColour(xTile, zTile)];
+			}
 			return Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getColour();
 		} catch (RuntimeException var7) {
 			throw GenUtil.makeThrowable(var7,
@@ -4559,8 +4571,10 @@ public final class World {
 			int id = this.getTileDecorationID(xTile, zTile, plane);
 			if (id == 0)
 				return -1;
+			else if (WorldBuilderTerrainOverlay.isBlockingBaseColor(id))
+				return 0;
 			else {
-				int type = Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getTileValue();
+				int type = tileDecorationType(id);
 				return type != 2 ? 0 : 1;
 			}
 		} catch (RuntimeException var7) {
@@ -5593,9 +5607,12 @@ public final class World {
 					defaultVal = Scene.TRANSPARENT;
 				}
 				byte bridge00_11 = 0;
-				if (this.getTileDecorationID((int) x, z, plane) > 0) {
-					int decorID = this.getTileDecorationID((int) x, z, plane);
-					int decorType = Objects.requireNonNull(EntityHandler.getTileDef(decorID - 1)).getTileValue();
+				int decorID = this.getTileDecorationID((int) x, z, plane);
+				if (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {
+					this.collisionFlags[x][z] = FastMath.bitwiseOr(
+						this.collisionFlags[x][z], CollisionFlag.FULL_BLOCK_C);
+				} else if (decorID > 0) {
+					int decorType = tileDecorationType(decorID);
 					int decorType2 = this.isTileType2(x, z, plane, 15282);
 					colorResource = res01 = Objects.requireNonNull(EntityHandler.getTileDef(decorID - 1)).getColour();
 					if (decorType == 4) {
@@ -5652,7 +5669,7 @@ public final class World {
 						this.collisionFlags[x][z] = FastMath.bitwiseOr(this.collisionFlags[x][z],
 							CollisionFlag.FULL_BLOCK_C);
 
-					if (Objects.requireNonNull(EntityHandler.getTileDef(decorID - 1)).getTileValue() == 2)
+					if (tileDecorationType(decorID) == 2)
 						this.collisionFlags[x][z] = FastMath.bitwiseOr(this.collisionFlags[x][z], CollisionFlag.OBJECT);
 				}
 				this.drawMinimapTile(x, (int) z, bridge00_11, res01, colorResource);
@@ -5660,35 +5677,35 @@ public final class World {
 		}
 		for (int x = 1; x < LEGACY_MINIMAP_FACE_TILE_COUNT; ++x) {
 			for (int z = 1; z < LEGACY_MINIMAP_FACE_TILE_COUNT; ++z) {
-				if (this.getTileDecorationID((int) x, z, plane) > 0 && Objects.requireNonNull(EntityHandler
-					.getTileDef(this.getTileDecorationID((int) x, z, plane) - 1)).getTileValue() == 4) {
+				if (this.getTileDecorationID((int) x, z, plane) > 0
+					&& tileDecorationType(this.getTileDecorationID((int) x, z, plane)) == 4) {
 					int tileDecor = Objects.requireNonNull(EntityHandler.getTileDef(this.getTileDecorationID(x, z, plane) - 1)).getColour();
 					this.drawMinimapTile(x, z, 0, tileDecor, tileDecor);
 				} else if (this.getTileDecorationID((int) x, z, plane) == 0
-					|| Objects.requireNonNull(EntityHandler.getTileDef(this.getTileDecorationID(x, z, plane) - 1)).getTileValue() != 3) {
-					if (this.getTileDecorationID(x, z + 1, plane) > 0 && Objects.requireNonNull(EntityHandler
-						.getTileDef(this.getTileDecorationID(x, 1 + z, plane) - 1)).getTileValue() == 4) {
+					|| tileDecorationType(this.getTileDecorationID(x, z, plane)) != 3) {
+					if (this.getTileDecorationID(x, z + 1, plane) > 0
+						&& tileDecorationType(this.getTileDecorationID(x, 1 + z, plane)) == 4) {
 						int tileDecor = Objects.requireNonNull(EntityHandler.getTileDef(this.getTileDecorationID((int) x, z + 1, plane) - 1))
 							.getColour();
 						this.drawMinimapTile(x, (int) z, 0, tileDecor, tileDecor);
 					}
 
-					if (this.getTileDecorationID((int) x, z - 1, plane) > 0 && Objects.requireNonNull(EntityHandler
-						.getTileDef(this.getTileDecorationID((int) x, z - 1, plane) - 1)).getTileValue() == 4) {
+					if (this.getTileDecorationID((int) x, z - 1, plane) > 0
+						&& tileDecorationType(this.getTileDecorationID((int) x, z - 1, plane)) == 4) {
 						int tileDecor = Objects.requireNonNull(EntityHandler.getTileDef(this.getTileDecorationID((int) x, z - 1, plane) - 1))
 							.getColour();
 						this.drawMinimapTile(x, (int) z, 0, tileDecor, tileDecor);
 					}
 
-					if (this.getTileDecorationID((int) (x + 1), z, plane) > 0 && Objects.requireNonNull(EntityHandler
-						.getTileDef(this.getTileDecorationID((int) (x + 1), z, plane) - 1)).getTileValue() == 4) {
+					if (this.getTileDecorationID((int) (x + 1), z, plane) > 0
+						&& tileDecorationType(this.getTileDecorationID((int) (x + 1), z, plane)) == 4) {
 						int tileDecor = Objects.requireNonNull(EntityHandler.getTileDef(this.getTileDecorationID((int) (1 + x), z, plane) - 1))
 							.getColour();
 						this.drawMinimapTile(x, (int) z, 0, tileDecor, tileDecor);
 					}
 
-					if (this.getTileDecorationID((int) (x - 1), z, plane) > 0 && Objects.requireNonNull(EntityHandler
-						.getTileDef(this.getTileDecorationID((int) (x - 1), z, plane) - 1)).getTileValue() == 4) {
+					if (this.getTileDecorationID((int) (x - 1), z, plane) > 0
+						&& tileDecorationType(this.getTileDecorationID((int) (x - 1), z, plane)) == 4) {
 						int tileDecor = Objects.requireNonNull(EntityHandler.getTileDef(this.getTileDecorationID((int) (x - 1), z, plane) - 1))
 							.getColour();
 						this.drawMinimapTile(x, (int) z, 0, tileDecor, tileDecor);
@@ -7239,10 +7256,14 @@ public final class World {
 			return sector!=null&&sector.getTile(tileInSector(tileX),tileInSector(tileZ)).editorPaintedOverlay;
 		}
 
-		private int tileDecorationCacheVal(int tileX, int tileZ, int defaultVal) {
+		private int tileDecorationCacheVal(int tileX, int tileZ, int defaultVal,
+			int[] colorToResource) {
 			int id = tileDecorationID(tileX, tileZ);
 			if (id == 0) {
 				return defaultVal;
+			}
+			if (WorldBuilderTerrainOverlay.isBlockingBaseColor(id)) {
+				return colorToResource[terrainColour(tileX, tileZ)];
 			}
 			return Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getColour();
 		}
@@ -7259,7 +7280,7 @@ public final class World {
 			if (id == 0) {
 				return -1;
 			}
-			return Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getTileValue() == 2 ? 1 : 0;
+			return tileDecorationType(id) == 2 ? 1 : 0;
 		}
 
 		private boolean pickableInvisibleOverlay(int tileX, int tileZ) {

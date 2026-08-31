@@ -10,6 +10,7 @@ import orsc.WorldBuilderRegionBundleClientBridge;
 import orsc.WorldBuilderRegionBundleFileDialog;
 import orsc.WorldBuilderRegionCopyClientBridge;
 import orsc.WorldBuilderRegionPasteClientBridge;
+import orsc.WorldBuilderTerrainOverlay;
 import orsc.mudclient;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -748,7 +749,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private int[] projectDefinitionIds(String family){return WorldBuilderClientProfile.current().hasAuthoringDefinitionBinding()?WorldBuilderClientProfile.current().definitionIds(family):null;}
 	private int[] projectFloorOverlayIds(){
 		int[] ids=projectDefinitionIds("floor");if(ids==null)return null;
-		java.util.TreeSet<Integer> overlays=new java.util.TreeSet<Integer>();overlays.add(Integer.valueOf(0));
+		java.util.TreeSet<Integer> overlays=new java.util.TreeSet<Integer>();overlays.add(Integer.valueOf(0));overlays.add(Integer.valueOf(WorldBuilderTerrainOverlay.BLOCKING_BASE_COLOR));
 		for(int id:ids){if(id>=0&&id<255&&id+1!=250)overlays.add(Integer.valueOf(id+1));if(id==1)overlays.add(Integer.valueOf(250));}
 		int[] result=new int[overlays.size()];int index=0;for(Integer overlay:overlays)result[index++]=overlay.intValue();return result;
 	}
@@ -1394,7 +1395,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private String activeTerrainText(){return terrainText(terrainActiveField);}
 	private String terrainText(int field){switch(field){case 6:return terrainElevationText;case 7:return terrainFloorColorText;case 8:return terrainFloorTextureText;case 9:return terrainRoofText;case 10:return terrainNorthWallText;case 11:return terrainEastWallText;case 12:return terrainDiagonalWallText;case 18:return terrainSmartWallText;default:return terrainBrushSize+"x"+terrainBrushSize;}}
 	private String activeTerrainCompactName(){switch(terrainActiveField){case 9:return roofDescription();case 10:return wallDescription(terrainNorthWall);case 11:return wallDescription(terrainEastWall);case 12:return wallDescription(terrainDiagonalWall);case 18:return wallDescription(terrainSmartWall);default:return "";}}
-	private boolean terrainFieldInvalid(int field){try{if(field==8&&terrainFloorTexture!=0&&terrainFloorTexture!=250)return EntityHandler.getTileDef(terrainFloorTexture-1)==null;if(field==9)return terrainRoof<0||terrainRoof>EntityHandler.elevationCount();
+	private boolean terrainFieldInvalid(int field){try{if(field==8&&terrainFloorTexture!=0&&terrainFloorTexture!=250&&!WorldBuilderTerrainOverlay.isBlockingBaseColor(terrainFloorTexture))return EntityHandler.getTileDef(terrainFloorTexture-1)==null;if(field==9)return terrainRoof<0||terrainRoof>EntityHandler.elevationCount();
 		if(field==10)return terrainNorthWall<0||terrainNorthWall>EntityHandler.doorCount();if(field==11)return terrainEastWall<0||terrainEastWall>EntityHandler.doorCount();if(field==12)return terrainDiagonalWall<0||terrainDiagonalWall>EntityHandler.doorCount();if(field==18)return terrainSmartWall<0||terrainSmartWall>EntityHandler.doorCount();return false;}catch(Exception e){return true;}}
 	private void renderExpanded(){
 		if(!isVisible()||Config.isAndroid())return;int x=getX(),y=getY();
@@ -1463,6 +1464,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private String wallDescription(int raw){try{return raw==0?"none":WorldEditorDefinitionCatalog.boundaryLabel(raw-1);}catch(Exception e){return "undefined";}}
 	private String floorTextureVisualName(){return WorldEditorDefinitionCatalog.floorTextureLabel(terrainFloorTexture);}
 	private String floorTextureTraversal(){
+		if(WorldBuilderTerrainOverlay.isBlockingBaseColor(terrainFloorTexture))return "Not Walkable";
 		int effective=terrainFloorTexture==250?2:terrainFloorTexture;if(effective==0)return "Walkable";
 		try{return EntityHandler.getTileDef(effective-1).getObjectType()!=0?"Not Walkable":"Walkable";}catch(Exception e){return "Undefined";}
 	}

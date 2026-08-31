@@ -41,7 +41,7 @@ public final class AdaptiveWorldBuilderRuntimeIdentity {
 	public static final String CLIENT_BUILD_ID =
 		"rsc-world-editor-runtime-adaptive-builder-client-v5";
 	public static final String LOADER_ID =
-		"generic-signed-layered-loader-v6-project-content-bundle-v3";
+		"generic-signed-layered-loader-v7-blocking-base-color";
 	public static final String AUTHORING_ID =
 		"generic-signed-layered-authoring-v2-u16-elevation";
 	public static final String DEFINITION_CONTRACT_ID =

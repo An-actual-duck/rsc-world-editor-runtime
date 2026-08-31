@@ -103,8 +103,12 @@ public final class WorldEditorDefinitionBrowserFixture {
 		browser.setQuery("#250");
 		require(browser.resultCount() == 1 && visibleContains(browser, 250),
 			"special bridge overlay search changed");
-		browser.open(WorldEditorDefinitionBrowser.Family.FLOOR, 11, new int[]{0, 11, 250});
-		require(browser.resultCount() == 3 && visibleContains(browser, 11),
+		browser.setQuery("non-walkable base color");
+		require(browser.resultCount() == 1 && visibleContains(browser, 255),
+			"blocking base-color overlay search changed");
+		browser.open(WorldEditorDefinitionBrowser.Family.FLOOR, 11, new int[]{0, 11, 250, 255});
+		require(browser.resultCount() == 4 && visibleContains(browser, 11)
+			&& visibleContains(browser, 255),
 			"project-bound floor overlays were not exact");
 
 		browser.open(WorldEditorDefinitionBrowser.Family.NPC, 0);

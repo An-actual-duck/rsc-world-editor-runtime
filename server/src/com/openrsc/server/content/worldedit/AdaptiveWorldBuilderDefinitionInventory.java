@@ -43,7 +43,10 @@ public final class AdaptiveWorldBuilderDefinitionInventory {
 								+ tile.getRoof() + " at " + sector.getIdentity());
 					}
 					int overlay = tile.getOverlay() == 250 ? 2 : tile.getOverlay();
-					if (overlay != 0) tileIds.add(Integer.valueOf(overlay - 1));
+					if (overlay != 0
+						&& !WorldBuilderTerrainOverlay.isBlockingBaseColor(overlay)) {
+						tileIds.add(Integer.valueOf(overlay - 1));
+					}
 					collectWall(tile.getVerticalWall(), boundaryIds, sector);
 					collectWall(tile.getHorizontalWall(), boundaryIds, sector);
 					int diagonal = tile.getDiagonalWall();

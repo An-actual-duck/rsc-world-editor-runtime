@@ -1,6 +1,7 @@
 package com.openrsc.server.model.world.region;
 
 import com.openrsc.server.io.NativeLayeredTerrainTile;
+import com.openrsc.server.content.worldedit.WorldBuilderTerrainOverlay;
 import com.openrsc.server.util.rsc.CollisionFlag;
 
 import java.util.Objects;
@@ -84,7 +85,8 @@ public final class NativeLayeredTerrainCollisionPlan {
 		int rawOverlay = checkedCurrent.getOverlay();
 		int collisionOverlay = rawOverlay == 250 ? 2 : rawOverlay;
 		boolean terrainBlocked =
-			collisionOverlay > 0 && checkedOverlay.test(collisionOverlay);
+			WorldBuilderTerrainOverlay.isBlockingBaseColor(rawOverlay)
+				|| collisionOverlay > 0 && checkedOverlay.test(collisionOverlay);
 		boolean overlayProjectileBlocked =
 			rawOverlay == 2 || rawOverlay == 11;
 		return new Result(

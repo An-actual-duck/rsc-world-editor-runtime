@@ -158,6 +158,7 @@ public final class WorldEditorDefinitionCatalogFixture {
         expect("Lava", WorldEditorDefinitionCatalog.floorTextureLabel(11));
         expect("Invisible Path", WorldEditorDefinitionCatalog.floorTextureLabel(26));
         expect("Bridge Transition", WorldEditorDefinitionCatalog.floorTextureLabel(250));
+        expect("Non-Walkable Base Floor Color", WorldEditorDefinitionCatalog.floorTextureLabel(255));
         expect("Undefined Texture", WorldEditorDefinitionCatalog.floorTextureLabel(27));
         expect("runtime mismatch", WorldEditorDefinitionCatalog.sceneryLabel(104, "runtime mismatch"));
         if (WorldEditorDefinitionCatalog.sceneryEntries().size() != 1332) {
@@ -169,7 +170,8 @@ public final class WorldEditorDefinitionCatalogFixture {
 		if (WorldEditorDefinitionCatalog.wallEntries().size() != EntityHandler.doorCount()) {
 			throw new AssertionError("runtime wall inventory is incomplete");
 		}
-		int expectedFloors = EntityHandler.tileCount() + (EntityHandler.tileCount() > 249 ? 1 : 2);
+		int expectedFloors = EntityHandler.tileCount()
+			+ (EntityHandler.tileCount() > 254 ? 1 : EntityHandler.tileCount() > 249 ? 2 : 3);
 		if (WorldEditorDefinitionCatalog.floorEntries().size() != expectedFloors) {
 			throw new AssertionError("runtime floor inventory is incomplete");
 		}

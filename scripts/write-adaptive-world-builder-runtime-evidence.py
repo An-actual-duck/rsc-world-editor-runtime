@@ -14,7 +14,7 @@ IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{0,127}\Z")
 MAX_CATALOG_BYTES = 16 * 1024 * 1024
 SERVER_BUILD_ID = "rsc-world-editor-runtime-adaptive-builder-server-v5"
 CLIENT_BUILD_ID = "rsc-world-editor-runtime-adaptive-builder-client-v4"
-LOADER_ID = "generic-signed-layered-loader-v6-project-content-bundle-v3"
+LOADER_ID = "generic-signed-layered-loader-v7-blocking-base-color"
 PROTOCOL_ID = "world-builder-native-layered-protocol-v2-u16-elevation"
 
 
