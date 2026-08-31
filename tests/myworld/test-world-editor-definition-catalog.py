@@ -170,7 +170,8 @@ public final class WorldEditorDefinitionCatalogFixture {
 		if (WorldEditorDefinitionCatalog.wallEntries().size() != EntityHandler.doorCount()) {
 			throw new AssertionError("runtime wall inventory is incomplete");
 		}
-		int expectedFloors = EntityHandler.tileCount() + (EntityHandler.tileCount() > 249 ? 2 : 3);
+		int expectedFloors = EntityHandler.tileCount()
+			+ (EntityHandler.tileCount() > 254 ? 1 : EntityHandler.tileCount() > 249 ? 2 : 3);
 		if (WorldEditorDefinitionCatalog.floorEntries().size() != expectedFloors) {
 			throw new AssertionError("runtime floor inventory is incomplete");
 		}
