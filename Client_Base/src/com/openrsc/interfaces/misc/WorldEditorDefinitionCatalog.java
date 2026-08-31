@@ -312,7 +312,8 @@ public final class WorldEditorDefinitionCatalog {
 				continue;
 			}
 			int overlay = id + 1;
-			if (overlay == 250) {
+			if (overlay == 250
+				|| WorldBuilderTerrainOverlay.isBlockingBaseColor(overlay)) {
 				continue;
 			}
 			String display = overlay < FLOOR_TEXTURE_LABELS.length
