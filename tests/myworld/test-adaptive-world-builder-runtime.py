@@ -1658,7 +1658,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "WorldBuilderPlayerSession.java"
         ).read_text()
 
-        strict_branch = world.index("isStrictAdaptiveTerrain()")
+        strict_branch = world.index("WorldBuilderTerrainBootstrap.isNativeOnly()")
         archive_choice = world.index("Authentic_Landscape.orsc")
         self.assertLess(strict_branch, archive_choice)
         for entry in ("archive-open", "archive-hash", "sector-entry-read"):
@@ -1667,7 +1667,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             )
         self.assertIn("LEGACY_LANDSCAPE_READ_ATTEMPTS.incrementAndGet()", world)
         self.assertIn(
-            "!WorldBuilderClientProfile.current().isStrictAdaptiveTerrain()", world
+            "!WorldBuilderTerrainBootstrap.isNativeOnly()", world
         )
         self.assertIn("adaptiveServerBindingAccepted", profile)
         self.assertIn("adaptiveNativeContextAccepted", profile)
@@ -1795,17 +1795,24 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertIn('ADAPTIVE_WORLD_BUILDER("adaptive-world-builder", true)', profile)
         self.assertNotIn("ADAPTIVE_WORLD_BUILDER = SPOILED", profile)
         installed = json.loads((
-            ROOT / "server/conf/world-builder/installed-runtime-capability-v1.json"
+            ROOT / "server/conf/world-builder/installed-runtime-capability-v2.json"
         ).read_text())
         self.assertEqual(
             "world-builder-installed-runtime-capability",
             installed["manifestType"],
         )
         self.assertEqual("world-builder-installed", installed["profileId"])
+        self.assertEqual(
+            "world-builder-installed-client-profile-v1",
+            installed["clientBootstrapId"],
+        )
         self.assertEqual([1, 2, 3, 4], installed["encodingVersions"])
         self.assertFalse(installed["activation"]["builderOnly"])
         self.assertTrue(installed["activation"]["replacesLegacyTerrain"])
         self.assertTrue(installed["activation"]["replacesLegacyPlacements"])
+        self.assertTrue(
+            installed["activation"]["replacesLegacyClientBootstrap"]
+        )
         self.assertIn(
             "layered_native_terrain_package_path",
             installed["activation"]["requiredStringKeys"],

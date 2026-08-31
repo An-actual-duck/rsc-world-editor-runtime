@@ -8,6 +8,7 @@ import orsc.Config;
 import orsc.NativeLayeredTerrainSnapshot;
 import orsc.RenderTelemetry;
 import orsc.WorldBuilderClientProfile;
+import orsc.WorldBuilderTerrainBootstrap;
 import orsc.WorldEditorBuildSettings;
 import orsc.graphics.two.GraphicsController;
 import orsc.util.FastMath;
@@ -258,14 +259,13 @@ public final class World {
 
 			sectors = new Sector[ACTIVE_SECTION_COUNT];
 
-			if (WorldBuilderClientProfile.current().isStrictAdaptiveTerrain()) {
+			if (WorldBuilderTerrainBootstrap.isNativeOnly()) {
 				/*
 				 * The signed layered package is the sole terrain authority. Do not
 				 * resolve, probe, hash, or open a legacy landscape path here.
 				 */
 				tileArchive = null;
-				mapHash = WorldBuilderClientProfile.current()
-					.strictAdaptiveMapIdentity();
+				mapHash = WorldBuilderTerrainBootstrap.mapIdentity();
 			} else {
 				try {
 					String path;
@@ -1680,7 +1680,7 @@ public final class World {
 
 	private static void requireLegacyLandscapeArchiveReadAllowed(
 		String entryPoint) {
-		if (WorldBuilderClientProfile.current().isStrictAdaptiveTerrain()) {
+		if (WorldBuilderTerrainBootstrap.isNativeOnly()) {
 			LEGACY_LANDSCAPE_READ_ATTEMPTS.incrementAndGet();
 			throw new IllegalStateException(
 				"Strict adaptive World Builder forbids legacy landscape archive read at "
@@ -4692,7 +4692,7 @@ public final class World {
 
 	private boolean shouldLoadUpperPlaneModels(int presentationPlane) {
 		return presentationPlane == 0
-			&& !WorldBuilderClientProfile.current().isStrictAdaptiveTerrain()
+			&& !WorldBuilderTerrainBootstrap.isNativeOnly()
 			&& !syntheticDeepFixtureTerrain
 			&& (nativeLayeredTerrainSnapshot == null
 				|| nativeLayeredTerrainSnapshot.getLevel() == 0);

@@ -23734,7 +23734,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private static boolean shouldRenderLegacyLoginWorld() {
-		return !WorldBuilderClientProfile.current().isStrictAdaptiveTerrain();
+		return !WorldBuilderTerrainBootstrap.isNativeOnly();
 	}
 
 	private static void requireLegacyLoginWorldRenderingAllowed() {
