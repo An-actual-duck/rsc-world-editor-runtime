@@ -1803,6 +1803,10 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         )
         self.assertEqual("world-builder-installed", installed["profileId"])
         self.assertEqual(
+            "world-builder-managed-runtime-current",
+            installed["managedRuntimeBundleId"],
+        )
+        self.assertEqual(
             "world-builder-installed-client-profile-v1",
             installed["clientBootstrapId"],
         )
@@ -1816,6 +1820,29 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertIn(
             "layered_native_terrain_package_path",
             installed["activation"]["requiredStringKeys"],
+        )
+        bundle = json.loads((
+            ROOT / "server/conf/world-builder/managed-runtime-bundle.json"
+        ).read_text())
+        self.assertEqual(
+            "world-builder-managed-runtime-bundle", bundle["manifestType"]
+        )
+        self.assertEqual(
+            installed["managedRuntimeBundleId"], bundle["bundleId"]
+        )
+        self.assertEqual(installed["profileId"], bundle["profileId"])
+        self.assertEqual(installed["loaderId"], bundle["loaderId"])
+        self.assertEqual(installed["protocolId"], bundle["protocolId"])
+        self.assertEqual(
+            installed["clientBootstrapId"], bundle["clientBootstrapId"]
+        )
+        self.assertEqual(
+            ["server-runtime", "client-runtime", "runtime-capability"],
+            [component["role"] for component in bundle["components"]],
+        )
+        self.assertEqual(
+            ["server/conf/world-builder/installed-runtime-capability-v1.json"],
+            bundle["legacyCapabilityPaths"],
         )
         publisher = (ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderPackagePublisher.java").read_text()
         self.assertNotIn("rsc-remastered.spoiled-milk-layered-world", publisher)

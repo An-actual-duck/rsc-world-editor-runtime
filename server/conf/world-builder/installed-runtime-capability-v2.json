@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "manifestType": "world-builder-installed-runtime-capability",
   "capabilityId": "world-builder-installed-runtime-capability-v2",
+  "managedRuntimeBundleId": "world-builder-managed-runtime-current",
   "profileId": "world-builder-installed",
   "serverBuildId": "rsc-world-editor-runtime-installed-server-v2",
   "clientBuildId": "rsc-world-editor-runtime-installed-client-v2",
