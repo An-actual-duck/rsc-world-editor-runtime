@@ -43,6 +43,9 @@ The authoritative response reports both raw archive fields and the current
 runtime tile's derived traversal mask/projectile flag. Collision is derived
 from overlay definitions, horizontal/vertical walls, diagonal walls, runtime
 scenery, and neighboring tiles; it must never be inferred from one raw field.
+Raw ground overlay `255` is the explicit exception to one-based definition
+lookup: it displays and blends the tile's `groundTexture` color like overlay
+`0`, while contributing full terrain collision.
 The Surface UI calls raw `groundTexture` **Floor Color**; it selects one of the
 256 base palette colors and does not affect collision. It calls raw
 `groundOverlay` **Floor Texture**; nonzero values are one-based tile-definition

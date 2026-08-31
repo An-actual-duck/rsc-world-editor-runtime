@@ -22,7 +22,7 @@ client code independently pin the same values.
 | Runtime profile | `adaptive-world-builder` |
 | Server build | `rsc-world-editor-runtime-adaptive-builder-server-v5` |
 | Client build | `rsc-world-editor-runtime-adaptive-builder-client-v5` |
-| Loader | `generic-signed-layered-loader-v6-project-content-bundle-v3` |
+| Loader | `generic-signed-layered-loader-v7-blocking-base-color` |
 | Authoring | `generic-signed-layered-authoring-v2-u16-elevation` |
 | Definition binding | `world-builder-definition-catalog-binding-v1` |
 | Client asset binding | `world-builder-client-asset-binding-v1` |
@@ -36,6 +36,12 @@ The ordered `encodingVersions` capability list is `[1, 2, 3, 4]`: legacy and
 wide terrain plus placement payloads v3 and v4. Target-server integration must
 preserve that complete declaration so World Editor can reject an incompatible
 install before copying or activating a map package.
+
+Raw ground overlay `255` is the loader-v7 blocking base-color overlay. It uses
+the tile's ordinary `groundTexture` palette color, participates in the same
+vertex-color blending as overlay `0`, and contributes full terrain collision.
+It is a product-defined value rather than tile-definition ID `254`; definition
+inventories must therefore neither require nor allocate a `TileDef` for it.
 
 `scripts/write-adaptive-world-builder-runtime-evidence.py` emits canonical
 `world-builder-runtime-evidence` schema-version-1 JSON for adaptive discovery.

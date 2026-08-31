@@ -2,6 +2,7 @@ package com.openrsc.server.io;
 
 import com.openrsc.server.ServerConfiguration;
 import com.openrsc.server.constants.Constants;
+import com.openrsc.server.content.worldedit.WorldBuilderTerrainOverlay;
 import com.openrsc.server.database.WorldPopulator;
 import com.openrsc.server.model.world.World;
 import com.openrsc.server.model.world.region.Region;
@@ -382,9 +383,11 @@ public class WorldLoader {
 					sectorTile.groundOverlay = (byte) 2;
 				}
 
-				final byte groundOverlay = sectorTile.groundOverlay;
-				tile.setTerrainBlocked(groundOverlay > 0
-					&& getWorld().getServer().getEntityHandler().getTileDef(groundOverlay - 1).getObjectType() != 0);
+				final int groundOverlay = sectorTile.groundOverlay & 0xff;
+				tile.setTerrainBlocked(
+					WorldBuilderTerrainOverlay.isBlockingBaseColor(groundOverlay)
+						|| groundOverlay > 0
+						&& getWorld().getServer().getEntityHandler().getTileDef(groundOverlay - 1).getObjectType() != 0);
 
 				final int verticalWall = sectorTile.verticalWall & 0xFF;
 				if (verticalWall > 0

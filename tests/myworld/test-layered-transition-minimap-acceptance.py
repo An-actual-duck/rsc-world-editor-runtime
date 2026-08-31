@@ -211,6 +211,21 @@ class LayeredTransitionMinimapAcceptanceTest(unittest.TestCase):
                 check=True,
             )
 
+    def test_blocking_base_color_shares_walkable_color_blending(self):
+        self.assertIn(
+            "WorldBuilderTerrainOverlay.usesBaseColor(\n"
+            "\t\t\t\t\tsource.tileDecorationID(tileX, tileZ))",
+            self.world,
+        )
+        self.assertIn(
+            "WorldBuilderTerrainOverlay.usesBaseColor(decorID)",
+            self.world,
+        )
+        self.assertIn(
+            "WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)",
+            self.world,
+        )
+
     def test_legacy_minimap_and_active_click_authority_remain_bounded(self):
         self.assertIn(
             "isLegacyMinimapFaceTile(segment.x, segment.z)",

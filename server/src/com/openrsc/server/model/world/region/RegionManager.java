@@ -27,6 +27,7 @@ import com.openrsc.server.io.NativeLayeredWorldPackageCatalog;
 import com.openrsc.server.io.NativeLayeredWorldRuntimeProfile;
 import com.openrsc.server.io.AdaptiveWorldBuilderPackageGuard;
 import com.openrsc.server.content.worldedit.AdaptiveWorldBuilderRuntimeIdentity;
+import com.openrsc.server.content.worldedit.WorldBuilderTerrainOverlay;
 import com.openrsc.server.model.Point;
 import com.openrsc.server.model.entity.Entity;
 import com.openrsc.server.model.entity.GameObject;
@@ -4230,6 +4231,9 @@ public class RegionManager {
 	}
 
 	private boolean nativeTerrainOverlayBlocks(final int overlayId) {
+		if (WorldBuilderTerrainOverlay.isBlockingBaseColor(overlayId)) {
+			return true;
+		}
 		return overlayId > 0
 			&& getWorld().getServer().getEntityHandler()
 				.getTileDef(overlayId - 1)

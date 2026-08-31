@@ -5,6 +5,7 @@ import com.openrsc.client.entityhandling.defs.DoorDef;
 import com.openrsc.client.entityhandling.defs.ItemDef;
 import com.openrsc.client.entityhandling.defs.NPCDef;
 import com.openrsc.client.entityhandling.defs.TileDef;
+import orsc.WorldBuilderTerrainOverlay;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -159,6 +160,9 @@ public final class WorldEditorDefinitionCatalog {
 	 * alter rendering, collision, archives, or protocol values.
 	 */
 	public static String floorTextureLabel(int overlay) {
+		if (WorldBuilderTerrainOverlay.isBlockingBaseColor(overlay)) {
+			return "Non-Walkable Base Floor Color";
+		}
 		if (overlay == 250) {
 			return "Bridge Transition";
 		}
@@ -326,6 +330,10 @@ public final class WorldEditorDefinitionCatalog {
 			entries.add(new Entry("floor", 250, "bridge transition", "Bridge Transition",
 				"editor", tags, "bridge transition floor texture overlay alias " + tags));
 		}
+		entries.add(new Entry("floor", WorldBuilderTerrainOverlay.BLOCKING_BASE_COLOR,
+			"non-walkable base floor color", "Non-Walkable Base Floor Color",
+			"editor", "Not Walkable",
+			"blocking non-walkable base floor colour color blended terrain overlay"));
 		return Collections.unmodifiableList(entries);
 	}
 

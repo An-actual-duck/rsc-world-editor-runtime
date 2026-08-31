@@ -109,6 +109,16 @@ public final class LayeredPreservationRuntimeParityFixture {
             "overlay projectile behavior retains the raw legacy value");
         check(collision.getProjectileWallCount() == 2,
             "native projectile wall contributions are exact");
+        NativeLayeredTerrainCollisionPlan.Result blockingBaseColor =
+            NativeLayeredTerrainCollisionPlan.derive(
+                new NativeLayeredTerrainTile(0, 173, 255, 0, 0, 0, 0),
+                null,
+                null,
+                overlayId -> false,
+                wallId -> false,
+                wallId -> false);
+        check(blockingBaseColor.isTerrainBlocked(),
+            "overlay 255 blocks without consuming a TileDef ID");
         TileValue runtimeTile = new TileValue();
         runtimeTile.initializeTerrainCollision();
         collision.applyTo(runtimeTile);
@@ -162,6 +172,10 @@ class LayeredPreservationRuntimeParityTest(unittest.TestCase):
                     "NativeLayeredTerrainTile.java"
                 ),
                 ROOT / "server/src/com/openrsc/server/io/Tile.java",
+                ROOT / (
+                    "server/src/com/openrsc/server/content/worldedit/"
+                    "WorldBuilderTerrainOverlay.java"
+                ),
                 ROOT / (
                     "server/src/com/openrsc/server/model/world/region/"
                     "NativeLayeredTerrainCollisionPlan.java"
