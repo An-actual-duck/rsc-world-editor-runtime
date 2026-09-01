@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "manifestType": "world-builder-managed-runtime-bundle",
   "bundleId": "world-builder-managed-runtime-current",
-  "runtimeContractId": "world-builder-installed-loader-v7",
+  "runtimeContractId": "world-builder-installed-loader-v8",
   "profileId": "world-builder-installed",
   "loaderId": "generic-signed-layered-loader-v7-blocking-base-color",
   "protocolId": "world-builder-native-layered-protocol-v2-u16-elevation",
@@ -16,11 +16,11 @@
       "replacementPolicy": "replace-with-verified-backup"
     },
     {
-      "role": "client-runtime",
-      "sourceRelativePath": "client/Open_RSC_Client.jar",
+      "role": "client-source-upgrade",
+      "sourceRelativePath": "server/conf/world-builder/installed-client-source-upgrade-v1.json",
       "destinationKind": "selected-client-root",
-      "destinationRelativePath": "Open_RSC_Client.jar",
-      "replacementPolicy": "replace-with-verified-backup"
+      "destinationRelativePath": "src",
+      "replacementPolicy": "semantic-upgrade-with-verified-backup"
     },
     {
       "role": "runtime-capability",
@@ -43,5 +43,10 @@
   "serverUpgradeBoundary": [
     "World Builder map loading, signed layered coordinates, placements, collision, and protocol integration",
     "target-owned gameplay, plugins, definitions, database implementations, and third-party libraries remain authoritative"
+  ],
+  "clientUpgradeBoundary": [
+    "World Builder installed-package bootstrap and native layered terrain selection are upgraded in target source",
+    "target client protocol version, entity definitions, advertised limits, custom behavior, and assets remain authoritative",
+    "the target client is compiled by its normal build before launch"
   ]
 }

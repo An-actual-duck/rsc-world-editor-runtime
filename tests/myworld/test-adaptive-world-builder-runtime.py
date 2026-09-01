@@ -1853,7 +1853,11 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             installed["clientBootstrapId"], bundle["clientBootstrapId"]
         )
         self.assertEqual(
-            ["server-runtime-upgrade", "client-runtime", "runtime-capability"],
+            [
+                "server-runtime-upgrade",
+                "client-source-upgrade",
+                "runtime-capability",
+            ],
             [component["role"] for component in bundle["components"]],
         )
         self.assertEqual(
@@ -1869,6 +1873,44 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             bundle["legacyCapabilityPaths"],
         )
         self.assertIn("target-owned gameplay", " ".join(bundle["serverUpgradeBoundary"]))
+        self.assertIn(
+            "target client protocol version",
+            " ".join(bundle["clientUpgradeBoundary"]),
+        )
+        source_upgrade = json.loads((
+            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v1.json"
+        ).read_text())
+        self.assertEqual(
+            "world-builder-installed-client-source-upgrade",
+            source_upgrade["manifestType"],
+        )
+        self.assertEqual(
+            installed["clientSourceUpgrade"]["upgradeId"],
+            source_upgrade["upgradeId"],
+        )
+        self.assertEqual(
+            "compile-target-client-before-run",
+            source_upgrade["buildPolicy"],
+        )
+        self.assertEqual(
+            [
+                "src/orsc/WorldBuilderInstalledClientProfile.java",
+                "src/orsc/WorldBuilderTerrainBootstrap.java",
+            ],
+            [entry["destinationRelativePath"] for entry in source_upgrade["sourceFiles"]],
+        )
+        for entry in source_upgrade["sourceFiles"]:
+            source = ROOT / "Client_Base" / entry["destinationRelativePath"]
+            self.assertEqual(
+                entry["sha256"], hashlib.sha256(source.read_bytes()).hexdigest()
+            )
+        self.assertEqual(
+            [
+                "world-builder-installed-terrain-bootstrap-v1",
+                "world-builder-installed-login-world-bootstrap-v1",
+            ],
+            [entry["transformId"] for entry in source_upgrade["semanticTransforms"]],
+        )
 
         self.assertTrue(
             INSTALLED_RUNTIME.is_file(),
