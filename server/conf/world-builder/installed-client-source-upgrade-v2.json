@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "manifestType": "world-builder-installed-client-source-upgrade",
+  "upgradeId": "world-builder-installed-client-source-upgrade-v2",
+  "clientBootstrapId": "world-builder-installed-client-profile-v1",
+  "sourceFiles": [
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/AdaptiveWorldBuilderClientSession.java",
+      "destinationRelativePath": "src/orsc/AdaptiveWorldBuilderClientSession.java",
+      "sha256": "fe63eae54b5bdcafec814c8e5192f311ff538532c1a056e0253675e442328d26",
+      "replacementPolicy": "add-or-exact"
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/ProjectContentBundle.java",
+      "destinationRelativePath": "src/orsc/ProjectContentBundle.java",
+      "sha256": "6c8a06fe3e33f5a347ee55ecd2b18892df81481a90f2c5f981a18e0286098cbd",
+      "replacementPolicy": "add-or-exact"
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/ProjectNpcAnimationRegistry.java",
+      "destinationRelativePath": "src/orsc/ProjectNpcAnimationRegistry.java",
+      "sha256": "ec2e6e435de7a70d25936e6ac67c0af8ecf3cdc4def6d09f6f9316e44f8ad8fb",
+      "replacementPolicy": "add-or-exact"
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/com/openrsc/client/model/Tile.java",
+      "destinationRelativePath": "src/com/openrsc/client/model/Tile.java",
+      "sha256": "43ecad4b2c8049942fc53399b2bd837fc1533c62868547a25b426ff3756ffb8e",
+      "replacementPolicy": "replace-supported-historical",
+      "supportedBeforeSha256": [
+        "0a9fac459682a3d9c041c2bbcd3b93e32ffbacdad8645e7619854f7935301ec6"
+      ]
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/WorldBuilderClientProfile.java",
+      "destinationRelativePath": "src/orsc/WorldBuilderClientProfile.java",
+      "sha256": "c9952284e04975ab4aaebad63e9e167d9a75ffbcef9bb8caeeaac127dcb09289",
+      "replacementPolicy": "replace-supported-historical",
+      "supportedBeforeSha256": [
+        "e4fa2d08c34afae5e23e16e08ada4910a94fe6da7bc7551c6a26c7a36d5e7087"
+      ]
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/WorldBuilderInstalledClientProfile.java",
+      "destinationRelativePath": "src/orsc/WorldBuilderInstalledClientProfile.java",
+      "sha256": "1a3780fe15081d155278cc2162bac076fd91ed6805f108720029bfc622cc12e2",
+      "replacementPolicy": "add-or-exact"
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/WorldBuilderTerrainBootstrap.java",
+      "destinationRelativePath": "src/orsc/WorldBuilderTerrainBootstrap.java",
+      "sha256": "da847d86d9d65c37288ee1ab3a96aed053cc8ed7aad5dafd1a9d43d37cbd219c",
+      "replacementPolicy": "add-or-exact"
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/WorldBuilderTerrainOverlay.java",
+      "destinationRelativePath": "src/orsc/WorldBuilderTerrainOverlay.java",
+      "sha256": "222c4803e58760111151263b710b02db12eaee12d193c8c2418aa7aa3b9bb9b0",
+      "replacementPolicy": "add-or-exact"
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/graphics/three/World.java",
+      "destinationRelativePath": "src/orsc/graphics/three/World.java",
+      "sha256": "3dbab065425ddd5781342d5de1292f2dd65a25fa4b9860181e95e6df42c2222a",
+      "replacementPolicy": "replace-supported-historical",
+      "supportedBeforeSha256": [
+        "f0c93d27b2202ad90842e3578ce3a13f8c4397dff6df5c213e5cb3ee35e055c8"
+      ]
+    }
+  ],
+  "semanticTransforms": [
+    {
+      "transformId": "world-builder-installed-login-world-bootstrap-v2",
+      "destinationRelativePath": "src/orsc/mudclient.java"
+    }
+  ],
+  "buildPolicy": "compile-target-client-before-run",
+  "preservedTargetAuthorities": [
+    "client protocol version",
+    "entity definitions and advertised limits",
+    "custom client behavior and assets",
+    "target-only source files"
+  ]
+}

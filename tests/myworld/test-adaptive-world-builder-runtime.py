@@ -1878,7 +1878,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             " ".join(bundle["clientUpgradeBoundary"]),
         )
         source_upgrade = json.loads((
-            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v1.json"
+            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v2.json"
         ).read_text())
         self.assertEqual(
             "world-builder-installed-client-source-upgrade",
@@ -1894,8 +1894,15 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         )
         self.assertEqual(
             [
+                "src/orsc/AdaptiveWorldBuilderClientSession.java",
+                "src/orsc/ProjectContentBundle.java",
+                "src/orsc/ProjectNpcAnimationRegistry.java",
+                "src/com/openrsc/client/model/Tile.java",
+                "src/orsc/WorldBuilderClientProfile.java",
                 "src/orsc/WorldBuilderInstalledClientProfile.java",
                 "src/orsc/WorldBuilderTerrainBootstrap.java",
+                "src/orsc/WorldBuilderTerrainOverlay.java",
+                "src/orsc/graphics/three/World.java",
             ],
             [entry["destinationRelativePath"] for entry in source_upgrade["sourceFiles"]],
         )
@@ -1905,11 +1912,15 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
                 entry["sha256"], hashlib.sha256(source.read_bytes()).hexdigest()
             )
         self.assertEqual(
-            [
-                "world-builder-installed-terrain-bootstrap-v1",
-                "world-builder-installed-login-world-bootstrap-v1",
-            ],
+            ["world-builder-installed-login-world-bootstrap-v2"],
             [entry["transformId"] for entry in source_upgrade["semanticTransforms"]],
+        )
+        self.assertEqual(
+            3,
+            sum(
+                entry["replacementPolicy"] == "replace-supported-historical"
+                for entry in source_upgrade["sourceFiles"]
+            ),
         )
 
         self.assertTrue(

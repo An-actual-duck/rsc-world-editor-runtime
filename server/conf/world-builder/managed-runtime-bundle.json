@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "manifestType": "world-builder-managed-runtime-bundle",
   "bundleId": "world-builder-managed-runtime-current",
-  "runtimeContractId": "world-builder-installed-loader-v8",
+  "runtimeContractId": "world-builder-installed-loader-v9",
   "profileId": "world-builder-installed",
   "loaderId": "generic-signed-layered-loader-v7-blocking-base-color",
   "protocolId": "world-builder-native-layered-protocol-v2-u16-elevation",
@@ -17,7 +17,7 @@
     },
     {
       "role": "client-source-upgrade",
-      "sourceRelativePath": "server/conf/world-builder/installed-client-source-upgrade-v1.json",
+      "sourceRelativePath": "server/conf/world-builder/installed-client-source-upgrade-v2.json",
       "destinationKind": "selected-client-root",
       "destinationRelativePath": "src",
       "replacementPolicy": "semantic-upgrade-with-verified-backup"
@@ -45,7 +45,8 @@
     "target-owned gameplay, plugins, definitions, database implementations, and third-party libraries remain authoritative"
   ],
   "clientUpgradeBoundary": [
-    "World Builder installed-package bootstrap and native layered terrain selection are upgraded in target source",
+    "known historical native-terrain sources are upgraded and missing installed-package support sources are added automatically",
+    "custom shared client sources receive bounded semantic integration rather than whole-file replacement",
     "target client protocol version, entity definitions, advertised limits, custom behavior, and assets remain authoritative",
     "the target client is compiled by its normal build before launch"
   ]
