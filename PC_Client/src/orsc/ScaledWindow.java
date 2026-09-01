@@ -242,6 +242,7 @@ public class ScaledWindow extends JFrame implements WindowListener, FocusListene
 
 		setLocationRelativeTo(null);
 		setVisible(true);
+		WorldBuilderClientWindowReady.signalWindowShown();
 	}
 
 	/**

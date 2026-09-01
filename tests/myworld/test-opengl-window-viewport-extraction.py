@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 PRESENTER = ROOT / "PC_Client/src/orsc/OpenGLFramePresenter.java"
 VIEWPORT = ROOT / "PC_Client/src/orsc/OpenGLViewportPresenter.java"
 WINDOW = ROOT / "PC_Client/src/orsc/OpenGLWindowController.java"
+WINDOW_READY = ROOT / "Client_Base/src/orsc/WorldBuilderClientWindowReady.java"
+SCALED_WINDOW = ROOT / "PC_Client/src/orsc/ScaledWindow.java"
 PRESENTATION_SETTINGS = ROOT / "Client_Base/src/orsc/OpenGLPresentationSettings.java"
 WINDOW_SETTINGS = ROOT / "Client_Base/src/orsc/OpenGLWindowSettings.java"
 MONITOR_MODE = ROOT / "PC_Client/src/orsc/MonitorMode.java"
@@ -27,6 +29,7 @@ def verify_source_ownership() -> None:
     presenter = PRESENTER.read_text(encoding="utf-8")
     viewport = VIEWPORT.read_text(encoding="utf-8")
     window = WINDOW.read_text(encoding="utf-8")
+    scaled_window = SCALED_WINDOW.read_text(encoding="utf-8")
 
     require("OpenGLWindowController windowController" in presenter, "presenter window delegate missing")
     require("OpenGLViewportPresenter viewportPresenter" in presenter, "presenter viewport delegate missing")
@@ -45,6 +48,20 @@ def verify_source_ownership() -> None:
     require("SurfaceSize prepareFrame" in window, "window/frame sizing boundary missing")
     require("void shutdown(boolean presenterClosed)" in window, "window shutdown boundary missing")
     require("OpenGL window cleanup failure during" in window, "native cleanup diagnostics missing")
+    require(
+        window.index("gl.glfwShowWindow(window);")
+        < window.index("WorldBuilderClientWindowReady.signalWindowShown();"),
+        "Builder readiness must follow the native window show call",
+    )
+    scaled_launch = scaled_window[
+        scaled_window.index("public void launchScaledWindow()") :
+        scaled_window.index("public void setGameImage(BufferedImage gameImage)")
+    ]
+    require(
+        scaled_launch.index("setVisible(true);")
+        < scaled_launch.index("WorldBuilderClientWindowReady.signalWindowShown();"),
+        "Builder readiness must follow the Swing window show call",
+    )
     require("OpenGL presenter cleanup failure during" in presenter, "resource cleanup diagnostics missing")
     readiness_enabled = "Renderer3DSettings.setOpenGLPresentationAvailable(true);"
     require(readiness_enabled in presenter, "OpenGL replacement readiness enable missing")
@@ -360,6 +377,31 @@ def verify_window_behavior() -> None:
             }
 
             public static void main(String[] args) throws Exception {
+                java.nio.file.Path readyDirectory = java.nio.file.Files.createTempDirectory(
+                    "world-builder-client-window-ready-");
+                java.nio.file.Path outside = readyDirectory.resolve("outside.ready");
+                System.setProperty("openrsc.worldBuilderWorkspaceRoot",
+                    readyDirectory.toString());
+                System.setProperty(WorldBuilderClientWindowReady.READY_FILE_PROPERTY,
+                    outside.toString());
+                WorldBuilderClientWindowReady.signalWindowShown();
+                require(!java.nio.file.Files.exists(outside),
+                    "World Builder readiness must stay inside the workspace");
+                java.nio.file.Path run = readyDirectory.resolve("run");
+                java.nio.file.Files.createDirectory(run);
+                java.nio.file.Path ready = run.resolve("client.ready");
+                System.setProperty(WorldBuilderClientWindowReady.READY_FILE_PROPERTY,
+                    ready.toString());
+                WorldBuilderClientWindowReady.signalWindowShown();
+                require(java.nio.file.Files.isRegularFile(ready),
+                    "World Builder visible-window readiness marker");
+                require("visible\n".equals(new String(
+                    java.nio.file.Files.readAllBytes(ready),
+                    java.nio.charset.StandardCharsets.US_ASCII)),
+                    "World Builder readiness marker content");
+                System.clearProperty(WorldBuilderClientWindowReady.READY_FILE_PROPERTY);
+                System.clearProperty("openrsc.worldBuilderWorkspaceRoot");
+
                 OpenGLWindowSettings.setMode(OpenGLWindowSettings.Mode.WINDOWED);
                 OpenGLWindowSettings.setWindowedBounds(120, 130, 800, 600);
                 LwjglBindings gl = new LwjglBindings();
@@ -441,7 +483,7 @@ def verify_window_behavior() -> None:
             "LwjglBindings.java": bindings,
             "WindowFixture.java": fixture,
         },
-        [WINDOW_SETTINGS, MONITOR_MODE, WINDOW],
+        [WINDOW_SETTINGS, WINDOW_READY, MONITOR_MODE, WINDOW],
     )
     require(output == "window-ok", "window fixture did not complete")
 

@@ -87,6 +87,7 @@ final class OpenGLWindowController {
 		delegate.log("OpenGL vsync: " + (vsyncEnabled ? "enabled" : "disabled") + ".");
 		syncWindowMode(width, height);
 		gl.glfwShowWindow(window);
+		WorldBuilderClientWindowReady.signalWindowShown();
 	}
 
 	long window() {
