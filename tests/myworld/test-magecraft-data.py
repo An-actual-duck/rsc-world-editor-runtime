@@ -12,7 +12,6 @@ EFFECTS_PATH = ROOT / "server" / "src" / "com" / "openrsc" / "server" / "content
 SPELL_HANDLER_PATH = ROOT / "server" / "src" / "com" / "openrsc" / "server" / "net" / "rsc" / "handlers" / "SpellHandler.java"
 MAGE_ARENA_PATH = ROOT / "server" / "plugins" / "com" / "openrsc" / "server" / "plugins" / "authentic" / "minigames" / "mage_arena" / "MageArena.java"
 MOB_PATH = ROOT / "server" / "src" / "com" / "openrsc" / "server" / "model" / "entity" / "Mob.java"
-BURN_EVENT_PATH = ROOT / "server" / "src" / "com" / "openrsc" / "server" / "event" / "rsc" / "impl" / "BurnEvent.java"
 WATER_SLOW_EVENT_PATH = ROOT / "server" / "src" / "com" / "openrsc" / "server" / "event" / "rsc" / "impl" / "WaterSlowEvent.java"
 ELEMENTAL_DEBUFF_EVENT_PATH = ROOT / "server" / "src" / "com" / "openrsc" / "server" / "event" / "rsc" / "impl" / "ElementalDebuffEvent.java"
 COMBAT_EVENT_PATH = ROOT / "server" / "src" / "com" / "openrsc" / "server" / "event" / "rsc" / "impl" / "combat" / "CombatEvent.java"
@@ -203,7 +202,6 @@ def ensure_source_support(items: dict[int, dict]) -> None:
     spell_text = SPELL_HANDLER_PATH.read_text(encoding="utf-8")
     mage_arena_text = MAGE_ARENA_PATH.read_text(encoding="utf-8")
     mob_text = MOB_PATH.read_text(encoding="utf-8")
-    burn_event_text = BURN_EVENT_PATH.read_text(encoding="utf-8")
     water_slow_event_text = WATER_SLOW_EVENT_PATH.read_text(encoding="utf-8")
     elemental_debuff_event_text = ELEMENTAL_DEBUFF_EVENT_PATH.read_text(encoding="utf-8")
     combat_event_text = COMBAT_EVENT_PATH.read_text(encoding="utf-8")
@@ -264,9 +262,6 @@ def ensure_source_support(items: dict[int, dict]) -> None:
         fail("MageArena.java should allow the current altar-attuned staff line")
     for snippet in (
         "public void curePoison()",
-        "public void extinguish()",
-        "public void applyBurn(int burnDamage, int burnPulses)",
-        "public void startBurnEvent()",
         "public void applyWindDebuff(int percent)",
         "public void applyWaterMaxHitDebuff(int percent)",
         "public void applyEarthAttackSpeedDebuff(int percent)",
@@ -294,15 +289,16 @@ def ensure_source_support(items: dict[int, dict]) -> None:
     ):
         if snippet not in elemental_debuff_event_text:
             fail(f"ElementalDebuffEvent.java missing expected snippet: {snippet}")
-    for snippet in (
-        "class BurnEvent",
-        "super(world, owner, 8, \"Burn Event\"",
-        "You are burning! You lose",
-        "player.getCache().set(\"burn_damage\", burnDamage);",
-        "player.getCache().set(\"burn_pulses\", pulsesRemaining);",
+    for retired in (
+        "BurnEvent",
+        "burnEvent",
+        "burn_damage",
+        "burn_pulses",
+        "applyBurn(",
+        "startBurnEvent(",
     ):
-        if snippet not in burn_event_text:
-            fail(f"BurnEvent.java missing expected snippet: {snippet}")
+        if retired in mob_text:
+            fail(f"Mob.java still contains retired generic burn state: {retired}")
     for snippet in (
         "class WaterSlowEvent",
         "super(world, owner, 24, \"Water Slow Event\"",

@@ -4014,11 +4014,6 @@ public final class Player extends Mob {
 				poisonEvent.setPoisonPower(getCache().getInt("poisoned"));
 				setPoisonMaxPower(getCache().hasKey("poisoned_max") ? getCache().getInt("poisoned_max") : getCache().getInt("poisoned"));
 			}
-			if (getCache().hasKey("burn_pulses") && getCache().hasKey("burn_damage")) {
-				setBurnDamage(getCache().getInt("burn_damage"));
-				setBurnPulseCount(getCache().getInt("burn_pulses"));
-				startBurnEvent();
-			}
 			if (!getConfig().LACKS_PRAYERS) {
 				prayerStatePoints = getSkills().getLevel(Skill.PRAYER.id()) * 120;
 				prayerDrainEvent = new PrayerDrainEvent(getWorld(), this);

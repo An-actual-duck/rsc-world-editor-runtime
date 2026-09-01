@@ -272,6 +272,23 @@ def artifact_inventory(require_artifacts: bool) -> tuple[dict, list[str]]:
                 "world-builder-managed-runtime.jar contains target-owned gameplay, "
                 f"plugin, or third-party classes: {forbidden[:20]}"
             )
+        retired_linkages = (
+            b"com/openrsc/server/event/rsc/impl/BurnEvent",
+        )
+        with zipfile.ZipFile(INSTALLED_RUNTIME_JAR) as archive:
+            linked_from = {
+                retired.decode("ascii"): sorted(
+                    name for name in installed_classes
+                    if retired in archive.read(name)
+                )
+                for retired in retired_linkages
+            }
+        for retired, owners in linked_from.items():
+            if owners:
+                errors.append(
+                    "world-builder-managed-runtime.jar links target-retired gameplay "
+                    f"class {retired}: {owners[:20]}"
+                )
     return result, errors
 
 
