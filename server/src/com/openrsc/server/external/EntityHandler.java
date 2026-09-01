@@ -22,14 +22,22 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.TreeMap;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -258,6 +266,12 @@ public final class EntityHandler {
 		loadNpcs(projectContent.isPresent()
 			? projectContent.path("definition.npc.custom").toString()
 			: getServer().getConfig().CONFIG_DIR + "/defs/NpcDefsCustom.json");
+		Path targetDefinitions = Paths.get(getServer().getConfig().CONFIG_DIR, "defs");
+		if (!projectContent.isPresent() || sameFileContent(
+			projectContent.path("definition.npc.custom"),
+			targetDefinitions.resolve("NpcDefsCustom.json"))) {
+			loadSupplementalNpcs(targetDefinitions);
+		}
 		//loadNpcs(getServer().getConfig().CONFIG_DIR + "/defs/NpcDefsExpansion.json");
 		if (projectContent.isPresent()) {
 			applyProjectNpcOverlays(
@@ -572,6 +586,74 @@ public final class EntityHandler {
 		}
 		catch (Exception e) {
 			LOGGER.error(e);
+		}
+	}
+
+	private void loadSupplementalNpcs(Path definitionsDirectory) {
+		for (Path catalog : supplementalNpcDefinitionFiles(definitionsDirectory)) {
+			loadNpcs(catalog.toString());
+		}
+	}
+
+	private static List<Path> supplementalNpcDefinitionFiles(Path definitionsDirectory) {
+		if (!Files.isDirectory(definitionsDirectory, LinkOption.NOFOLLOW_LINKS)) {
+			return Collections.emptyList();
+		}
+		TreeMap<String,Path> catalogs = new TreeMap<>();
+		try (DirectoryStream<Path> entries = Files.newDirectoryStream(definitionsDirectory)) {
+			for (Path candidate : entries) {
+				String name = candidate.getFileName().toString();
+				if (!name.endsWith("NpcDefs.json") || "NpcDefs.json".equals(name)
+					|| "NpcDefsCustom.json".equals(name)) {
+					continue;
+				}
+				if (Files.isSymbolicLink(candidate)
+					|| !Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)) {
+					throw new IllegalStateException(
+						"Supplemental NPC definition catalog is not a regular file: " + name);
+				}
+				String portableName = name.toLowerCase(Locale.ROOT);
+				if (catalogs.put(portableName, candidate) != null) {
+					throw new IllegalStateException(
+						"Supplemental NPC definition catalogs have a portable-name collision: "
+							+ name);
+				}
+				if (catalogs.size() > 64) {
+					throw new IllegalStateException(
+						"Too many supplemental NPC definition catalogs");
+				}
+			}
+		} catch (IOException failure) {
+			throw new IllegalStateException(
+				"Unable to discover supplemental NPC definition catalogs", failure);
+		}
+		return new ArrayList<>(catalogs.values());
+	}
+
+	private static boolean sameFileContent(Path left, Path right) {
+		try {
+			if (!Files.isRegularFile(left, LinkOption.NOFOLLOW_LINKS)
+				|| !Files.isRegularFile(right, LinkOption.NOFOLLOW_LINKS)
+				|| Files.size(left) != Files.size(right)) {
+				return false;
+			}
+			try (InputStream leftInput = Files.newInputStream(left);
+				 InputStream rightInput = Files.newInputStream(right)) {
+				byte[] leftBuffer = new byte[8192];
+				byte[] rightBuffer = new byte[8192];
+				while (true) {
+					int leftCount = leftInput.read(leftBuffer);
+					int rightCount = rightInput.read(rightBuffer);
+					if (leftCount != rightCount) return false;
+					if (leftCount < 0) return true;
+					for (int index = 0; index < leftCount; index++) {
+						if (leftBuffer[index] != rightBuffer[index]) return false;
+					}
+				}
+			}
+		} catch (IOException failure) {
+			throw new IllegalStateException(
+				"Unable to compare project and target NPC definition catalogs", failure);
 		}
 	}
 

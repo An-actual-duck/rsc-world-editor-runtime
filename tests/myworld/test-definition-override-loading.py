@@ -82,7 +82,10 @@ import com.openrsc.server.external.NPCDef;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.List;
 import sun.misc.Unsafe;
 
 public final class NpcCommandOverrideHarness {
@@ -134,6 +137,29 @@ public final class NpcCommandOverrideHarness {
                 && nonString.getCause().getClass().getName().equals("org.json.JSONException"),
             "command must retain the provider's string contract");
         check(handler.npcs == acceptedCatalog, "invalid command must not swap the staged catalog");
+
+        Method supplemental = EntityHandler.class.getDeclaredMethod(
+            "supplementalNpcDefinitionFiles", Path.class);
+        supplemental.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<Path> catalogs = (List<Path>) supplemental.invoke(null, Paths.get(args[3]));
+        check(catalogs.size() == 2, "only supplemental append catalogs must be discovered");
+        check("AlphaNpcDefs.json".equals(catalogs.get(0).getFileName().toString()),
+            "supplemental catalogs must use deterministic portable ordering");
+        check("ZetaNpcDefs.json".equals(catalogs.get(1).getFileName().toString()),
+            "supplemental catalogs must preserve every matching extension");
+
+        Method sameContent = EntityHandler.class.getDeclaredMethod(
+            "sameFileContent", Path.class, Path.class);
+        sameContent.setAccessible(true);
+        check((Boolean) sameContent.invoke(null,
+                Paths.get(args[3], "AlphaNpcDefs.json"),
+                Paths.get(args[3], "NpcDefs.json")),
+            "legacy bundle copies must opt into target supplemental catalogs");
+        check(!((Boolean) sameContent.invoke(null,
+                Paths.get(args[3], "AlphaNpcDefs.json"),
+                Paths.get(args[3], "ZetaNpcDefs.json"))),
+            "merged project catalogs must not append target supplements twice");
     }
 }
 '''
@@ -142,6 +168,14 @@ public final class NpcCommandOverrideHarness {
         temporary_path = Path(temporary)
         harness = temporary_path / "NpcCommandOverrideHarness.java"
         harness.write_text(harness_source, encoding="utf-8")
+        supplemental = temporary_path / "defs"
+        supplemental.mkdir()
+        for name in (
+            "NpcDefs.json", "NpcDefsCustom.json", "NpcDefsMyWorld.json",
+            "NpcDefsPatch18.json", "ZetaNpcDefs.json", "AlphaNpcDefs.json",
+        ):
+            (supplemental / name).write_text("{}", encoding="utf-8")
+        (supplemental / "ZetaNpcDefs.json").write_text('{"z":1}', encoding="utf-8")
         compiled = subprocess.run(
             [
                 javac,
@@ -166,6 +200,7 @@ public final class NpcCommandOverrideHarness {
                 str(FIXTURES / "npc-command-override.json"),
                 str(FIXTURES / "npc-unknown-field-override.json"),
                 str(FIXTURES / "npc-non-string-command-override.json"),
+                str(supplemental),
             ],
             cwd=ROOT,
             text=True,
