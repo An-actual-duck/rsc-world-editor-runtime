@@ -534,7 +534,7 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 			case WORLD_EDITOR_REQUEST:
 				WorldEditorRequestStruct editor = new WorldEditorRequestStruct();
 				editor.type = packet.readByte() & 0xff;
-				int expectedEditorLength = editor.type == 1 ? 13 : editor.type == 2 ? 19 : editor.type == 3 ? 22 : editor.type == 4 ? 15 : editor.type == 5 ? 29 : editor.type == 10 || editor.type == 11 ? 13 : -1;
+				int expectedEditorLength = editor.type == 1 ? 13 : editor.type == 2 ? 19 : editor.type == 3 ? 22 : editor.type == 4 ? 15 : editor.type == 5 ? 29 : editor.type == 10 || editor.type == 11 ? 13 : editor.type == 12 ? 32 : -1;
 				if (editor.type!=6&&editor.type!=7&&editor.type!=8&&editor.type!=9&&packet.getLength()!=expectedEditorLength) return null;
 				editor.sessionId = packet.readLong();
 				editor.sequence = packet.readInt();
@@ -583,6 +583,10 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 					editor.rectangleFlags=packet.readByte()&0xff;editor.smartWall=packet.readByte()&0xff;
 					if(!WorldEditorPacketFraming.acceptsTerrainRectangle(9,packet.getLength(),editor.rectangleFlags))return null;
 					editor.x=packet.readShort();editor.y=packet.readShort();editor.endX=packet.readShort();editor.endY=packet.readShort();
+				} else if(editor.type==12){
+					editor.entityOperation=packet.readByte()&0xff;editor.entityId=packet.readShort()&0xffff;
+					editor.x=packet.readShort();editor.y=packet.readShort();editor.endX=packet.readShort();editor.endY=packet.readShort();
+					editor.entityArgument0=packet.readInt();editor.entityArgument1=packet.readInt();
 				}
 				result = editor;
 				break;

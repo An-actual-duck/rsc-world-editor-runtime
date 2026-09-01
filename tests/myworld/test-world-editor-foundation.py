@@ -121,7 +121,7 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertIn("detached component without a complete", package)
         self.assertNotIn("provisionNativeNavigationTarget", updater)
 
-    def test_scenery_and_npc_tools_delegate_to_established_commands(self):
+    def test_scenery_and_npc_tools_use_authoritative_editor_protocol(self):
         ui = (ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorInterface.java").read_text()
         client = (ROOT / "Client_Base/src/orsc/mudclient.java").read_text()
         actions = (ROOT / "Client_Base/src/orsc/enumerations/MenuItemAction.java").read_text()
@@ -153,16 +153,14 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertIn('sendCommandString("saveworldedits")', ui)
         self.assertIn("getNpcRespawnSeconds()", ui)
         self.assertIn('"Awaiting "+queued', ui)
-        self.assertIn("if(pendingEntityActions>0){pendingEntityActions--;", ui)
+        self.assertIn("entityEditTracker.complete(sequence,operation)", ui)
         self.assertIn("World edit save is already in progress.", ui)
         self.assertIn("Wait for the active world edit save to finish", ui)
-        potential = re.search(
-            r"public void markPotentialEntityEdit\(\)\{(?P<body>.*?)\}", ui
-        )
-        self.assertIsNotNone(potential)
-        self.assertNotIn("unsavedChanges=true", potential.group("body"))
-        self.assertIn('message.contains("Added layered ")', ui)
-        self.assertIn("pendingEntityActions>0", ui)
+        self.assertIn("requestEntityEdit(2,0,x,y", ui)
+        self.assertIn("acceptEntityEdit", ui)
+        self.assertIn("request.type == 12", handler)
+        self.assertNotIn('message.contains("Added layered ")', ui)
+        self.assertIn("entityEditTracker.isPending()", ui)
         self.assertIn("saveAfterPendingEdits", ui)
         self.assertIn("Save queued; waiting for ", ui)
         self.assertIn("maybeSubmitDeferredSave()", ui)
@@ -187,17 +185,13 @@ class WorldEditorFoundationTest(unittest.TestCase):
         self.assertNotIn("WORLD_EDITOR_UNDO", actions)
         self.assertNotIn("WORLD_EDITOR_REDO", actions)
 
-        expected_commands = (
-            'sendCommandString("aobject "+',
-            'sendCommandString("rotateobject "+',
-            'sendCommandString("robject "+',
-            'sendCommandString("cnpc "+',
-            'sendCommandString("rpc "+',
-            'sendCommandString("buildergrounditem "',
-            'sendCommandString("removebuildergrounditem "',
+        expected_requests = (
+            "requestPlaceScenery", "requestRotateScenery", "requestRemoveScenery",
+            "requestPlaceNpc", "requestRemoveNpc", "requestPlaceGroundItem",
+            "requestRemoveGroundItem",
         )
-        for command in expected_commands:
-            self.assertIn(command, client)
+        for request in expected_requests:
+            self.assertIn(request, client)
         for action in (
             "WORLD_EDITOR_PLACE_SCENERY(100)",
             "WORLD_EDITOR_ROTATE_SCENERY(100)",
