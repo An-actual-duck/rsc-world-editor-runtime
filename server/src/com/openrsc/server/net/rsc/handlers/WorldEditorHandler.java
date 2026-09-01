@@ -14,6 +14,7 @@ import com.openrsc.server.io.WorldEditorTerrainArchive;
 import com.openrsc.server.io.WorldLoader;
 import com.openrsc.server.model.Point;
 import com.openrsc.server.model.entity.GameObject;
+import com.openrsc.server.model.entity.GroundItem;
 import com.openrsc.server.model.entity.npc.Npc;
 import com.openrsc.server.model.entity.player.Player;
 import com.openrsc.server.model.world.coordinate.WorldCoordinate;
@@ -29,6 +30,8 @@ import com.openrsc.server.util.rsc.CollisionFlag;
 public final class WorldEditorHandler implements PayloadProcessor<WorldEditorRequestStruct, OpcodeIn> {
 	private static final int MAX_ROOF_TEXTURE=6;
 	private static final int TERRAIN_RESULT_CHUNK=64;
+	private static final int PLACE_SCENERY=1,REMOVE_SCENERY=2,ROTATE_SCENERY=3,MOVE_SCENERY=4;
+	private static final int PLACE_NPC=5,REMOVE_NPC=6,PLACE_GROUND_ITEM=7,REMOVE_GROUND_ITEM=8;
 	@Override public void process(WorldEditorRequestStruct request, Player player) {
 		if (!player.getConfig().ALLOW_IN_GAME_WORLD_EDITOR || !player.isAdmin()) { error(player, 0, "Editor authorization was revoked."); return; }
 		Validation validation = player.getWorld().getServer().getWorldEditorSessions().validate(player, request.sessionId, request.sequence);
@@ -61,8 +64,54 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			else if (request.type == 9) paintTerrainRectangle(request, player, validation.nextSequence);
 			else if (request.type == 10) applyOperationHistory(player, validation.nextSequence, false);
 			else if (request.type == 11) applyOperationHistory(player, validation.nextSequence, true);
+			else if (request.type == 12) editEntity(request, player, validation.nextSequence);
 			else error(player, validation.nextSequence, "Unsupported editor operation.");
-		} catch (Exception e) { error(player, validation.nextSequence, "Editor request failed: " + e.getMessage()); }
+		} catch (Exception e) {
+			if(request.type==12)entityResult(player,validation.nextSequence,request.entityOperation,false,
+				"Entity edit refused: "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()));
+			else error(player, validation.nextSequence, "Editor request failed: " + e.getMessage());
+		}
+	}
+
+	private void editEntity(WorldEditorRequestStruct r,Player p,int next){
+		if(!p.getConfig().WORLD_BUILDER_LAYERED_REVIEW_MODE
+			||!WorldBuilderMode.isLayeredAuthoringProfile(p.getConfig()))
+			throw new IllegalArgumentException("Entity editing requires an editable layered Builder project.");
+		String message;
+		if(r.entityOperation==PLACE_SCENERY){
+			GameObject value=p.getWorld().getServer().getWorldEditorSessions().placeNativeScenery(p,r.entityId,r.x,r.y);
+			message="Added layered scenery: "+value.getGameObjectDef().getName()+" at "+logicalLocation(value.getWorldLocation());
+		}else if(r.entityOperation==REMOVE_SCENERY){
+			GameObject value=p.getWorld().getServer().getWorldEditorSessions().removeNativeScenery(p,r.x,r.y);
+			message="Removed layered scenery: "+value.getGameObjectDef().getName()+" at "+r.x+","+r.y;
+		}else if(r.entityOperation==ROTATE_SCENERY){
+			GameObject value=p.getWorld().getServer().getWorldEditorSessions().rotateNativeScenery(p,r.x,r.y,r.entityArgument0<0?null:Integer.valueOf(r.entityArgument0));
+			message="Rotated layered scenery: "+value.getGameObjectDef().getName()+" to rotation "+value.getDirection();
+		}else if(r.entityOperation==MOVE_SCENERY){
+			GameObject value=p.getWorld().getServer().getWorldEditorSessions().moveNativeScenery(p,r.x,r.y,r.endX,r.endY);
+			message="Moved layered scenery: "+value.getGameObjectDef().getName()+" from "+r.x+","+r.y+" to "+r.endX+","+r.endY;
+		}else if(r.entityOperation==PLACE_NPC){
+			Npc value=p.getWorld().getServer().getWorldEditorSessions().placeNativeNpc(p,r.entityId,r.entityArgument0,r.entityArgument1,r.x,r.y);
+			message="Added layered NPC: "+value.getDef().getName()+" at "+logicalLocation(value.getWorldLocation());
+		}else if(r.entityOperation==REMOVE_NPC){
+			Npc value=p.getWorld().getNpc(r.entityId);
+			Npc removed=p.getWorld().getServer().getWorldEditorSessions().removeNativeNpc(p,value);
+			message="Removed layered NPC: "+removed.getDef().getName()+" with instance ID "+r.entityId;
+		}else if(r.entityOperation==PLACE_GROUND_ITEM){
+			GroundItem value=p.getWorld().getServer().getWorldEditorSessions().placeNativeGroundItem(p,r.entityId,r.entityArgument0,r.entityArgument1,r.x,r.y);
+			message="Added layered ground-item spawn: "+value.getDef().getName()+" at "+logicalLocation(value.getWorldLocation());
+		}else if(r.entityOperation==REMOVE_GROUND_ITEM){
+			GroundItem value=p.getWorld().getServer().getWorldEditorSessions().removeNativeGroundItem(p,r.entityId,r.x,r.y);
+			message="Removed layered ground-item spawn: "+value.getDef().getName()+" at "+logicalLocation(value.getWorldLocation());
+		}else throw new IllegalArgumentException("Unknown entity-edit operation.");
+		entityResult(p,next,r.entityOperation,true,message);
+	}
+
+	private static void entityResult(Player p,int next,int operation,boolean accepted,String message){
+		WorldEditorStruct out=new WorldEditorStruct();out.type=12;out.sequence=next;out.entityOperation=operation;out.entityAccepted=accepted;
+		out.historyCanUndo=p.getWorld().getServer().getWorldEditorSessions().canUndoNativeOperation();
+		out.historyCanRedo=p.getWorld().getServer().getWorldEditorSessions().canRedoNativeOperation();out.message=message;
+		ActionSender.sendWorldEditor(p,out);
 	}
 
 	private void inspectTerrain(WorldEditorRequestStruct r, Player p, int next) throws Exception {

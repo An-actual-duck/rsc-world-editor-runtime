@@ -104,7 +104,8 @@ assert "editor.type == 8 || editor.type == 9 || editor.type == 10" in generator
 assert "editor.type == 11" in generator
 assert "acceptTerrainHistoryChunk" in client and "requestTerrainHistory" in client
 assert "acceptPlacementHistory" in client
-assert "terrainHistoryCanUndo=true;terrainHistoryCanRedo=false" in client
+assert "acceptEntityEdit" in client
+assert "terrainHistoryCanUndo=canUndo;terrainHistoryCanRedo=canRedo" in client
 assert "Ctrl+Z" in client and "Ctrl+Y" in client
 assert "Availability is presentation state, not authority" in client
 assert "if(redo?!terrainHistoryCanRedo:!terrainHistoryCanUndo)" not in client

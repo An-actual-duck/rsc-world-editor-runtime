@@ -4,10 +4,11 @@ import com.openrsc.server.net.rsc.struct.AbstractStruct;
 import java.util.ArrayList;
 import java.util.List;
 public final class WorldEditorStruct extends AbstractStruct<OpcodeOut> {
-	public int type, protocolVersion=4, sequence, x, y, plane, sectorX, sectorY, localX, localY;
+	public int type, protocolVersion=5, sequence, x, y, plane, sectorX, sectorY, localX, localY;
 	public int elevation, groundTexture, groundOverlay, roofTexture, horizontalWall, verticalWall, diagonal;
 	public int traversalMask, fieldMask; public boolean projectileAllowed, copy;
 	public boolean historyCanUndo,historyCanRedo;
+	public int entityOperation; public boolean entityAccepted;
 	public int operationTotal, operationOffset;
 	public long sessionId; public String message="";
 	public final List<TerrainTile> terrainTiles = new ArrayList<TerrainTile>();

@@ -17,7 +17,7 @@ class WorldEditorSceneryMoveTests(unittest.TestCase):
         self.assertIn("sceneryMovePreviewTiles", ui)
         self.assertIn("updateSceneryMovePointer", ui)
         self.assertIn("Scenery move cancelled; the source was not changed.", ui)
-        self.assertIn("moveobject ", ui)
+        self.assertIn("requestEntityEdit(4,0,sceneryMoveSourceX", ui)
         self.assertIn("WORLD_EDITOR_SELECT_SCENERY_MOVE(100)", actions)
         self.assertIn("WORLD_EDITOR_MOVE_SCENERY(100)", actions)
         self.assertIn("drawWorldEditorSceneryMovePreview", client)

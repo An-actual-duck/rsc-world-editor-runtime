@@ -3,6 +3,8 @@ import com.openrsc.server.net.rsc.enums.OpcodeIn;
 import com.openrsc.server.net.rsc.struct.AbstractStruct;
 public final class WorldEditorRequestStruct extends AbstractStruct<OpcodeIn> {
 	public int type, sequence, x, y, plane, entityId, direction, objectType;
+	/** Entity-edit operation and two operation-specific signed arguments. */
+	public int entityOperation, entityArgument0, entityArgument1;
 	public int brushSize, endX, endY;
 	/** Positive client operation identity; drag batches share one token. */
 	public int historyToken;

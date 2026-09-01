@@ -19695,31 +19695,24 @@ public final class mudclient implements Runnable {
 					if(editorNpc!=null){worldEditorInterface.recordWorldClick(midRegionBaseX+editorNpc.currentX/tileSize,midRegionBaseZ+editorNpc.currentZ/tileSize);worldEditorInterface.selectNpc(editorNpc.npcId,worldEditorInterface.getNpcRadius());}
 					worldEditorInterface.inspectNpc(indexOrX,true);break;
 				}
-				case WORLD_EDITOR_PLACE_SCENERY: { if(!worldEditorInterface.canPlaceSelectedScenery()){worldEditorInterface.showError("Selected scenery is not permitted by this project.");break;}worldEditorInterface.markPotentialEntityEdit();sendCommandString("aobject "+worldEditorInterface.getSceneryId()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
+				case WORLD_EDITOR_PLACE_SCENERY: { if(!worldEditorInterface.canPlaceSelectedScenery()){worldEditorInterface.showError("Selected scenery is not permitted by this project.");break;}worldEditorInterface.requestPlaceScenery(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
 				case WORLD_EDITOR_SELECT_SCENERY_MOVE: { worldEditorInterface.selectSceneryMoveSource(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ,tileID,dir); break; }
 				case WORLD_EDITOR_MOVE_SCENERY: { worldEditorInterface.commitSceneryMove(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
-				case WORLD_EDITOR_ROTATE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("rotateobject "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
-				case WORLD_EDITOR_REMOVE_SCENERY: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("robject "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
-				case WORLD_EDITOR_PLACE_NPC: { if(!worldEditorInterface.canPlaceSelectedNpc()){worldEditorInterface.showError("Selected NPC is not permitted by this project.");break;}worldEditorInterface.markPotentialEntityEdit();sendCommandString("cnpc "+worldEditorInterface.getNpcId()+" "+worldEditorInterface.getNpcRadius()+" "+worldEditorInterface.getNpcRespawnSeconds()+" "+(indexOrX+midRegionBaseX)+" "+(idOrZ+midRegionBaseZ)); break; }
-				case WORLD_EDITOR_REMOVE_NPC: { worldEditorInterface.markPotentialEntityEdit();sendCommandString("rpc "+indexOrX); break; }
+				case WORLD_EDITOR_ROTATE_SCENERY: { worldEditorInterface.requestRotateScenery(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
+				case WORLD_EDITOR_REMOVE_SCENERY: { worldEditorInterface.requestRemoveScenery(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
+				case WORLD_EDITOR_PLACE_NPC: { if(!worldEditorInterface.canPlaceSelectedNpc()){worldEditorInterface.showError("Selected NPC is not permitted by this project.");break;}worldEditorInterface.requestPlaceNpc(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
+				case WORLD_EDITOR_REMOVE_NPC: { worldEditorInterface.requestRemoveNpc(indexOrX); break; }
 				case WORLD_EDITOR_PLACE_GROUND_ITEM: {
 					if(!worldEditorInterface.canPlaceSelectedGroundItem()){worldEditorInterface.showError("Selected item is not permitted by this project.");break;}
 					int worldX=indexOrX+midRegionBaseX,worldY=idOrZ+midRegionBaseZ;
 					worldEditorInterface.recordWorldClick(worldX,worldY);
-					worldEditorInterface.markPotentialEntityEdit();
-					sendCommandString("buildergrounditem "
-						+worldEditorInterface.getGroundItemId()+" "
-						+worldEditorInterface.getGroundItemAmount()+" "
-						+worldEditorInterface.getGroundItemRespawnSeconds()+" "
-						+worldX+" "+worldY);
+					worldEditorInterface.requestPlaceGroundItem(worldX,worldY);
 					break;
 				}
 				case WORLD_EDITOR_REMOVE_GROUND_ITEM: {
 					int worldX=indexOrX+midRegionBaseX,worldY=idOrZ+midRegionBaseZ;
 					worldEditorInterface.recordWorldClick(worldX,worldY);
-					worldEditorInterface.markPotentialEntityEdit();
-					sendCommandString("removebuildergrounditem "
-						+tileID+" "+worldX+" "+worldY);
+					worldEditorInterface.requestRemoveGroundItem(tileID,worldX,worldY);
 					break;
 				}
 				case WORLD_EDITOR_ADD_REGION_MARKER: { worldEditorInterface.addRegionMarker(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
