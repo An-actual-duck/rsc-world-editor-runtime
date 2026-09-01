@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 TRACKER = ROOT / "Client_Base/src/com/openrsc/interfaces/misc/WorldEditorEntityEditTracker.java"
+FRAMING = ROOT / "server/src/com/openrsc/server/net/rsc/parsers/impl/WorldEditorPacketFraming.java"
 
 
 class WorldEditorEntityAcknowledgementTests(unittest.TestCase):
@@ -15,11 +16,18 @@ class WorldEditorEntityAcknowledgementTests(unittest.TestCase):
         harness = textwrap.dedent(
             """
             package com.openrsc.interfaces.misc;
+            import com.openrsc.server.net.rsc.parsers.impl.WorldEditorPacketFraming;
             public final class WorldEditorEntityEditTrackerHarness {
                 private static void require(boolean value, String message) {
                     if (!value) throw new AssertionError(message);
                 }
                 public static void main(String[] args) {
+                    require(WorldEditorPacketFraming.acceptsEnvelopeLength(32),
+                        "entity-edit envelope was rejected before parsing");
+                    require(!WorldEditorPacketFraming.acceptsEnvelopeLength(31),
+                        "truncated entity-edit envelope was accepted");
+                    require(!WorldEditorPacketFraming.acceptsEnvelopeLength(33),
+                        "oversized entity-edit envelope was accepted");
                     WorldEditorEntityEditTracker tracker = new WorldEditorEntityEditTracker();
                     require(tracker.begin(41, 2), "remove did not begin");
                     require(tracker.isPending(), "remove was not pending for immediate Save");
@@ -41,7 +49,10 @@ class WorldEditorEntityAcknowledgementTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="world-editor-entity-ack-") as temp:
             source = Path(temp) / "WorldEditorEntityEditTrackerHarness.java"
             source.write_text(harness, encoding="utf-8")
-            subprocess.run(["javac", "-d", temp, str(TRACKER), str(source)], check=True)
+            subprocess.run(
+                ["javac", "-d", temp, str(TRACKER), str(FRAMING), str(source)],
+                check=True,
+            )
             result = subprocess.run(
                 ["java", "-cp", temp, "com.openrsc.interfaces.misc.WorldEditorEntityEditTrackerHarness"],
                 check=True, text=True, capture_output=True,

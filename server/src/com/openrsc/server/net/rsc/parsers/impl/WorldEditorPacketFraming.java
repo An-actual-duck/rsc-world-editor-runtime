@@ -2,7 +2,7 @@ package com.openrsc.server.net.rsc.parsers.impl;
 
 /** Exact length rules for the private World Builder protocol envelope. */
 public final class WorldEditorPacketFraming {
-	private static final int[] FIXED_LENGTHS = {13, 15, 19, 22, 29, 42, 43};
+	private static final int[] FIXED_LENGTHS = {13, 15, 19, 22, 29, 32, 42, 43};
 	private static final int MAX_TERRAIN_TILES = 64;
 
 	private WorldEditorPacketFraming() {}

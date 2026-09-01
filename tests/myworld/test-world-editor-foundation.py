@@ -269,7 +269,7 @@ class WorldEditorFoundationTest(unittest.TestCase):
         match = re.search(r"FIXED_LENGTHS\s*=\s*\{([^}]+)\}", framing)
         self.assertIsNotNone(match)
         accepted = {int(value) for value in re.findall(r"\d+", match.group(1))}
-        self.assertEqual({13, 15, 19, 22, 29, 42, 43}, accepted)
+        self.assertEqual({13, 15, 19, 22, 29, 32, 42, 43}, accepted)
         self.assertTrue(accepted.isdisjoint({12, 14, 16, 18, 20, 21, 23, 28, 31}))
         self.assertIn("return isWorldEditorPacketLength(packet.getLength());", parser)
         self.assertIn("WorldEditorPacketFraming.acceptsEnvelopeLength(length)", parser)
