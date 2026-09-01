@@ -9,10 +9,10 @@
   "clientBootstrapId": "world-builder-installed-client-profile-v1",
   "components": [
     {
-      "role": "server-runtime",
+      "role": "server-runtime-overlay",
       "sourceRelativePath": "server/core.jar",
       "destinationKind": "target-root",
-      "destinationRelativePath": "server/core.jar",
+      "destinationRelativePath": "server/lib/world-builder-managed-runtime.jar",
       "replacementPolicy": "replace-with-verified-backup"
     },
     {

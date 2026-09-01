@@ -1811,6 +1811,14 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             installed["clientBootstrapId"],
         )
         self.assertEqual([1, 2, 3, 4], installed["encodingVersions"])
+        self.assertEqual(
+            "server/lib/world-builder-managed-runtime.jar",
+            installed["runtimeArchives"]["serverRelativePath"],
+        )
+        self.assertEqual(
+            "server/core.jar",
+            installed["runtimeArchives"]["targetFallbackRelativePath"],
+        )
         self.assertFalse(installed["activation"]["builderOnly"])
         self.assertTrue(installed["activation"]["replacesLegacyTerrain"])
         self.assertTrue(installed["activation"]["replacesLegacyPlacements"])
@@ -1837,8 +1845,12 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             installed["clientBootstrapId"], bundle["clientBootstrapId"]
         )
         self.assertEqual(
-            ["server-runtime", "client-runtime", "runtime-capability"],
+            ["server-runtime-overlay", "client-runtime", "runtime-capability"],
             [component["role"] for component in bundle["components"]],
+        )
+        self.assertEqual(
+            "server/lib/world-builder-managed-runtime.jar",
+            bundle["components"][0]["destinationRelativePath"],
         )
         self.assertEqual(
             ["server/conf/world-builder/installed-runtime-capability-v1.json"],
