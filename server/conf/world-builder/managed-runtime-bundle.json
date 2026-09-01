@@ -12,7 +12,7 @@
       "role": "server-runtime-overlay",
       "sourceRelativePath": "server/core.jar",
       "destinationKind": "target-root",
-      "destinationRelativePath": "server/lib/world-builder-managed-runtime.jar",
+      "destinationRelativePath": "server/world-builder-runtime/world-builder-managed-runtime.jar",
       "replacementPolicy": "replace-with-verified-backup"
     },
     {

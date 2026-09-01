@@ -1812,7 +1812,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         )
         self.assertEqual([1, 2, 3, 4], installed["encodingVersions"])
         self.assertEqual(
-            "server/lib/world-builder-managed-runtime.jar",
+            "server/world-builder-runtime/world-builder-managed-runtime.jar",
             installed["runtimeArchives"]["serverRelativePath"],
         )
         self.assertEqual(
@@ -1849,7 +1849,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             [component["role"] for component in bundle["components"]],
         )
         self.assertEqual(
-            "server/lib/world-builder-managed-runtime.jar",
+            "server/world-builder-runtime/world-builder-managed-runtime.jar",
             bundle["components"][0]["destinationRelativePath"],
         )
         self.assertEqual(
