@@ -4,7 +4,7 @@
   "capabilityId": "world-builder-installed-runtime-capability-v2",
   "managedRuntimeBundleId": "world-builder-managed-runtime-current",
   "profileId": "world-builder-installed",
-  "serverBuildId": "rsc-world-editor-runtime-installed-server-overlay-v5",
+  "serverBuildId": "rsc-world-editor-runtime-installed-server-upgrade-v6",
   "clientBuildId": "rsc-world-editor-runtime-installed-client-v2",
   "clientBootstrapId": "world-builder-installed-client-profile-v1",
   "loaderId": "generic-signed-layered-loader-v7-blocking-base-color",

@@ -9,8 +9,8 @@
   "clientBootstrapId": "world-builder-installed-client-profile-v1",
   "components": [
     {
-      "role": "server-runtime-overlay",
-      "sourceRelativePath": "server/core.jar",
+      "role": "server-runtime-upgrade",
+      "sourceRelativePath": "server/world-builder-runtime/world-builder-managed-runtime.jar",
       "destinationKind": "target-root",
       "destinationRelativePath": "server/world-builder-runtime/world-builder-managed-runtime.jar",
       "replacementPolicy": "replace-with-verified-backup"
@@ -39,5 +39,9 @@
     "definitions and custom assets",
     "databases and player data",
     "credentials, keys, logs, and backups"
+  ],
+  "serverUpgradeBoundary": [
+    "World Builder map loading, signed layered coordinates, placements, collision, and protocol integration",
+    "target-owned gameplay, plugins, definitions, database implementations, and third-party libraries remain authoritative"
   ]
 }

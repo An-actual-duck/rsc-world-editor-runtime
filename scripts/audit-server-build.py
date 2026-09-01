@@ -25,6 +25,7 @@ BUILD_GRADLE = SERVER / "build.gradle"
 LIB = SERVER / "lib"
 CORE_JAR = SERVER / "core.jar"
 PLUGINS_JAR = SERVER / "plugins.jar"
+INSTALLED_RUNTIME_JAR = SERVER / "world-builder-runtime/world-builder-managed-runtime.jar"
 
 ANT_TARGETS = ("compile_core", "compile_plugins", "runserver", "runserverzgc")
 AUTHORITATIVE_SCRIPTS = {
@@ -180,7 +181,11 @@ def library_inventory(core_classes: set[str] | None) -> tuple[list[dict], dict]:
 def artifact_inventory(require_artifacts: bool) -> tuple[dict, list[str]]:
     errors = []
     result = {}
-    for label, path in (("core", CORE_JAR), ("plugins", PLUGINS_JAR)):
+    for label, path in (
+        ("core", CORE_JAR),
+        ("plugins", PLUGINS_JAR),
+        ("installed_runtime", INSTALLED_RUNTIME_JAR),
+    ):
         if not path.is_file():
             result[label] = {"file": path.name, "present": False}
             if require_artifacts:
@@ -238,6 +243,35 @@ def artifact_inventory(require_artifacts: bool) -> tuple[dict, list[str]]:
             errors.append("plugins.jar contains no authentic plugin classes")
         if not any(name.startswith("com/openrsc/server/plugins/custom/myworld/") for name in plugin_classes):
             errors.append("plugins.jar contains no MyWorld plugin classes")
+    if result.get("installed_runtime", {}).get("present"):
+        installed_classes = jar_classes(INSTALLED_RUNTIME_JAR)
+        for required in (
+            "com/openrsc/server/io/NativeLayeredWorldPackage.class",
+            "com/openrsc/server/model/world/World.class",
+            "com/openrsc/server/model/world/coordinate/WorldCoordinate.class",
+            "com/openrsc/server/net/rsc/NativeLayeredTerrainClientResidency.class",
+        ):
+            if required not in installed_classes:
+                errors.append(
+                    "world-builder-managed-runtime.jar missing required upgrade class "
+                    + required
+                )
+        forbidden_prefixes = (
+            "com/openrsc/server/content/minigame/",
+            "com/openrsc/server/plugins/",
+            "org/apache/",
+            "org/slf4j/",
+            "com/google/",
+        )
+        forbidden = sorted(
+            name for name in installed_classes
+            if name.startswith(forbidden_prefixes)
+        )
+        if forbidden:
+            errors.append(
+                "world-builder-managed-runtime.jar contains target-owned gameplay, "
+                f"plugin, or third-party classes: {forbidden[:20]}"
+            )
     return result, errors
 
 

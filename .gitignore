@@ -108,6 +108,7 @@ server/.settings/
 
 server/avatars/*.png
 server/*.jar
+server/world-builder-runtime/*.jar
 server/out/
 server/local.conf
 server/local.env

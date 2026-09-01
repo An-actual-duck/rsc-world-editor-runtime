@@ -7,11 +7,15 @@ import subprocess
 import tempfile
 import textwrap
 import unittest
+import zipfile
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
 CORE = ROOT / "server/core.jar"
+INSTALLED_RUNTIME = (
+    ROOT / "server/world-builder-runtime/world-builder-managed-runtime.jar"
+)
 CLIENT = ROOT / "Client_Base/Open_RSC_Client.jar"
 EVIDENCE_WRITER = ROOT / "scripts/write-adaptive-world-builder-runtime-evidence.py"
 
@@ -916,7 +920,11 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        cls.classpath = os.pathsep.join((str(classes), str(CORE)))
+        # Exercise the same authority order installed targets use: the bounded
+        # World Builder upgrade first, then the target/server fallback runtime.
+        cls.classpath = os.pathsep.join(
+            (str(classes), str(INSTALLED_RUNTIME), str(CORE))
+        )
         cls.client_classpath = os.pathsep.join((str(classes), str(CLIENT)))
 
     @classmethod
@@ -1845,8 +1853,12 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             installed["clientBootstrapId"], bundle["clientBootstrapId"]
         )
         self.assertEqual(
-            ["server-runtime-overlay", "client-runtime", "runtime-capability"],
+            ["server-runtime-upgrade", "client-runtime", "runtime-capability"],
             [component["role"] for component in bundle["components"]],
+        )
+        self.assertEqual(
+            "server/world-builder-runtime/world-builder-managed-runtime.jar",
+            bundle["components"][0]["sourceRelativePath"],
         )
         self.assertEqual(
             "server/world-builder-runtime/world-builder-managed-runtime.jar",
@@ -1856,6 +1868,32 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             ["server/conf/world-builder/installed-runtime-capability-v1.json"],
             bundle["legacyCapabilityPaths"],
         )
+        self.assertIn("target-owned gameplay", " ".join(bundle["serverUpgradeBoundary"]))
+
+        self.assertTrue(
+            INSTALLED_RUNTIME.is_file(),
+            "installed server upgrade is required; run ./scripts/build-server.sh",
+        )
+        with zipfile.ZipFile(INSTALLED_RUNTIME) as archive:
+            installed_entries = set(archive.namelist())
+        for required in (
+            "com/openrsc/server/io/NativeLayeredWorldPackage.class",
+            "com/openrsc/server/model/world/World.class",
+            "com/openrsc/server/model/world/coordinate/WorldCoordinate.class",
+            "com/openrsc/server/net/rsc/NativeLayeredTerrainClientResidency.class",
+        ):
+            self.assertIn(required, installed_entries)
+        for forbidden_prefix in (
+            "com/openrsc/server/content/minigame/",
+            "com/openrsc/server/plugins/",
+            "org/apache/",
+            "org/slf4j/",
+            "com/google/",
+        ):
+            self.assertFalse(
+                any(name.startswith(forbidden_prefix) for name in installed_entries),
+                f"installed server upgrade leaked target-owned {forbidden_prefix}",
+            )
         publisher = (ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderPackagePublisher.java").read_text()
         self.assertNotIn("rsc-remastered.spoiled-milk-layered-world", publisher)
         self.assertNotIn("SPOILED_MILK_PACKAGE", publisher)
