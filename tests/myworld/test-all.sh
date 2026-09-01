@@ -102,6 +102,7 @@ python3 ./tests/myworld/test-native-terrain-wire-cache.py
 python3 ./tests/myworld/test-native-terrain-residency.py
 python3 ./tests/myworld/test-world-editor-terrain-drag.py
 python3 ./tests/myworld/test-wide-terrain-elevation-client-surfaces.py
+python3 ./tests/myworld/test-wide-terrain-elevation-v2.py
 python3 ./tests/myworld/test-terrain-foreground-picking.py
 python3 ./tests/myworld/test-fatigue-sleep-removal.py
 python3 ./tests/myworld/test-gathering-rework-plan.py

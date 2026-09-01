@@ -49,12 +49,16 @@ class WideTerrainElevationV2Test(unittest.TestCase):
         subprocess.run([str(ROOT / "scripts/build-server.sh")], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
         subprocess.run([str(ROOT / "scripts/build-client.sh")], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
 
-    def compile_run(self, source, name, classpath, args=()):
+    def compile_run(self, source, name, classpath, args=(), run_name=None):
         with tempfile.TemporaryDirectory(prefix="wide-elevation-java-") as temp:
             path = Path(temp) / f"{name}.java"
             path.write_text(source, encoding="utf-8")
             subprocess.run(["javac", "-source", "8", "-target", "8", "-cp", str(classpath), "-d", temp, str(path)], check=True)
-            return subprocess.run(["java", "-cp", f"{temp}:{classpath}", name, *map(str, args)], text=True, capture_output=True)
+            return subprocess.run(
+                ["java", "-cp", f"{temp}:{classpath}", run_name or name, *map(str, args)],
+                text=True,
+                capture_output=True,
+            )
 
     def test_v1_read_and_v2_boundary_decode_preserve_non_elevation_fields(self):
         source = r'''
@@ -124,6 +128,38 @@ public final class WideClientProbe {
         result = self.compile_run(source, "WideClientProbe", CLIENT)
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_client_unsigned_v1_elevation_materializers_agree_at_boundaries(self):
+        source = r'''
+package orsc;
+import com.openrsc.client.model.Tile;
+public final class UnsignedElevationProbe {
+ static final String SHA="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+ static void ok(boolean v,String m){if(!v)throw new AssertionError(m);}
+ static byte[] records(int elevation){byte[] all=new byte[48*48*10];for(int p=0;p<all.length;p+=10)all[p]=(byte)elevation;return all;}
+ static void check(int elevation){
+  NativeLayeredTerrainChunk chunk=NativeLayeredTerrainChunk.available(48,0,0,0,0,NativeLayeredTerrainChunk.RAW_ENCODING,SHA,records(elevation));
+  Tile direct=chunk.createTile(0,0);
+  ok(direct.groundElevation==elevation,"chunk tile "+elevation);
+  ok(chunk.groundElevation(0,0)==elevation,"chunk scalar "+elevation);
+  NativeLayeredTerrainChunk[] chunks=new NativeLayeredTerrainChunk[9];int index=0;
+  for(int dx=-1;dx<=1;dx++)for(int dy=-1;dy<=1;dy++)chunks[index++]=dx==0&&dy==0?chunk:NativeLayeredTerrainChunk.voidChunk(48,dx,dy);
+  NativeLayeredTerrainSnapshot chunked=new NativeLayeredTerrainSnapshot("unsigned-elevation","1.0.0",SHA,48,"global",0,0,0,1,chunks);
+  ok(chunked.createTile(0,0).groundElevation==elevation,"snapshot tile "+elevation);
+  ok(chunked.getGroundElevation(0,0)==elevation,"snapshot scalar "+elevation);
+  NativeLayeredTerrainSnapshot uniform=new NativeLayeredTerrainSnapshot("unsigned-elevation","1.0.0",SHA,48,"global",0,0,0,NativeLayeredTerrainSnapshot.UNIFORM_ENCODING,SHA,elevation,1,2,3,4,5,6);
+  ok(uniform.createUniformTile().groundElevation==elevation,"uniform tile "+elevation);
+  ok(uniform.getGroundElevation(0,0)==elevation,"uniform scalar "+elevation);
+ }
+ public static void main(String[] a){int[] values={0,1,126,127,128,129,254,255};for(int value:values)check(value);}
+}'''
+        result = self.compile_run(
+            source,
+            "UnsignedElevationProbe",
+            CLIENT,
+            run_name="orsc.UnsignedElevationProbe",
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+
     def test_absolute_raise_lower_and_atomic_bounds(self):
         source = r'''
 import com.openrsc.server.content.worldedit.WorldEditorTerrainStroke;
@@ -147,7 +183,9 @@ public final class ElevationOperationProbe {static void ok(boolean v,String m){i
         for evidence in ("groundElevation * 3", "ROOF_ELEVATION_MARKER", "collectRoofFaceInputs", "getElevation(pixelX, pixelZ)", "NATIVE_MINIMAP"):
             self.assertIn(evidence, client_world)
         handler = (ROOT / "Client_Base/src/orsc/PacketHandler.java").read_text()
-        self.assertIn("World Editor operation-history capability mismatch", handler)
+        self.assertIn(
+            "World Editor authoritative-entity capability mismatch", handler
+        )
         server_tile = (ROOT / "server/src/com/openrsc/server/model/world/region/TileValue.java").read_text()
         self.assertIn("public int elevation", server_tile)
 

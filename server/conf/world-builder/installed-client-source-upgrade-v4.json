@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "manifestType": "world-builder-installed-client-source-upgrade",
-  "upgradeId": "world-builder-installed-client-source-upgrade-v3",
+  "upgradeId": "world-builder-installed-client-source-upgrade-v4",
   "clientBootstrapId": "world-builder-installed-client-profile-v1",
   "sourceFiles": [
     {
@@ -80,6 +80,14 @@
     {
       "transformId": "world-builder-installed-login-world-bootstrap-v2",
       "destinationRelativePath": "src/orsc/mudclient.java"
+    },
+    {
+      "transformId": "world-builder-unsigned-native-chunk-elevation-v1",
+      "destinationRelativePath": "src/orsc/NativeLayeredTerrainChunk.java"
+    },
+    {
+      "transformId": "world-builder-unsigned-uniform-elevation-v1",
+      "destinationRelativePath": "src/orsc/NativeLayeredTerrainSnapshot.java"
     }
   ],
   "buildPolicy": "atomic-compile-target-client-before-run",

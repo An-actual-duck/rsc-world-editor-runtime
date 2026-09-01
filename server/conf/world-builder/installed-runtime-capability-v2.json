@@ -5,7 +5,7 @@
   "managedRuntimeBundleId": "world-builder-managed-runtime-current",
   "profileId": "world-builder-installed",
   "serverBuildId": "rsc-world-editor-runtime-installed-server-upgrade-v6",
-  "clientBuildId": "rsc-world-editor-runtime-installed-client-source-v5",
+  "clientBuildId": "rsc-world-editor-runtime-installed-client-source-v6",
   "clientBootstrapId": "world-builder-installed-client-profile-v1",
   "loaderId": "generic-signed-layered-loader-v7-blocking-base-color",
   "protocolId": "world-builder-native-layered-protocol-v2-u16-elevation",
@@ -20,8 +20,8 @@
     "clientNames": ["Client_Base/Open_RSC_Client.jar", "client/Open_RSC_Client.jar"]
   },
   "clientSourceUpgrade": {
-    "upgradeId": "world-builder-installed-client-source-upgrade-v3",
-    "manifestRelativePath": "server/conf/world-builder/installed-client-source-upgrade-v3.json",
+    "upgradeId": "world-builder-installed-client-source-upgrade-v4",
+    "manifestRelativePath": "server/conf/world-builder/installed-client-source-upgrade-v4.json",
     "buildPolicy": "atomic-compile-target-client-before-run"
   },
   "activation": {

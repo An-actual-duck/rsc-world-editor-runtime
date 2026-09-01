@@ -1878,7 +1878,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             " ".join(bundle["clientUpgradeBoundary"]),
         )
         source_upgrade = json.loads((
-            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v3.json"
+            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v4.json"
         ).read_text())
         self.assertEqual(
             "world-builder-installed-client-source-upgrade",
@@ -1912,8 +1912,21 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
                 entry["sha256"], hashlib.sha256(source.read_bytes()).hexdigest()
             )
         self.assertEqual(
-            ["world-builder-installed-login-world-bootstrap-v2"],
-            [entry["transformId"] for entry in source_upgrade["semanticTransforms"]],
+            [
+                {
+                    "transformId": "world-builder-installed-login-world-bootstrap-v2",
+                    "destinationRelativePath": "src/orsc/mudclient.java",
+                },
+                {
+                    "transformId": "world-builder-unsigned-native-chunk-elevation-v1",
+                    "destinationRelativePath": "src/orsc/NativeLayeredTerrainChunk.java",
+                },
+                {
+                    "transformId": "world-builder-unsigned-uniform-elevation-v1",
+                    "destinationRelativePath": "src/orsc/NativeLayeredTerrainSnapshot.java",
+                },
+            ],
+            source_upgrade["semanticTransforms"],
         )
         self.assertEqual(
             3,
