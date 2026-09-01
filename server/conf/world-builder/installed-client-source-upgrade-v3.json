@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "manifestType": "world-builder-installed-client-source-upgrade",
-  "upgradeId": "world-builder-installed-client-source-upgrade-v2",
+  "upgradeId": "world-builder-installed-client-source-upgrade-v3",
   "clientBootstrapId": "world-builder-installed-client-profile-v1",
   "sourceFiles": [
     {
@@ -68,13 +68,21 @@
       ]
     }
   ],
+  "dependencies": [
+    {
+      "sourceRelativePath": "server/lib/json-20190722.jar",
+      "destinationRelativePath": "PC_Client/lib/json-20190722.jar",
+      "sha256": "e35b3830de02a8992ca8beb6936f52ee80e509753d64469c8f0dde93e17a880b",
+      "replacementPolicy": "add-or-exact"
+    }
+  ],
   "semanticTransforms": [
     {
       "transformId": "world-builder-installed-login-world-bootstrap-v2",
       "destinationRelativePath": "src/orsc/mudclient.java"
     }
   ],
-  "buildPolicy": "compile-target-client-before-run",
+  "buildPolicy": "atomic-compile-target-client-before-run",
   "preservedTargetAuthorities": [
     "client protocol version",
     "entity definitions and advertised limits",

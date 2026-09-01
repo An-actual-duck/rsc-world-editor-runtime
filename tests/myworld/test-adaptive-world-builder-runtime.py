@@ -1878,7 +1878,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             " ".join(bundle["clientUpgradeBoundary"]),
         )
         source_upgrade = json.loads((
-            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v2.json"
+            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v3.json"
         ).read_text())
         self.assertEqual(
             "world-builder-installed-client-source-upgrade",
@@ -1889,7 +1889,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             source_upgrade["upgradeId"],
         )
         self.assertEqual(
-            "compile-target-client-before-run",
+            "atomic-compile-target-client-before-run",
             source_upgrade["buildPolicy"],
         )
         self.assertEqual(
@@ -1921,6 +1921,19 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
                 entry["replacementPolicy"] == "replace-supported-historical"
                 for entry in source_upgrade["sourceFiles"]
             ),
+        )
+        self.assertEqual(
+            [
+                {
+                    "sourceRelativePath": "server/lib/json-20190722.jar",
+                    "destinationRelativePath": "PC_Client/lib/json-20190722.jar",
+                    "sha256": hashlib.sha256(
+                        (ROOT / "server/lib/json-20190722.jar").read_bytes()
+                    ).hexdigest(),
+                    "replacementPolicy": "add-or-exact",
+                }
+            ],
+            source_upgrade["dependencies"],
         )
 
         self.assertTrue(
