@@ -104,7 +104,8 @@ public final class BundleV2ServerHarness {
     config.WORLD_BUILDER_CONTENT_BUNDLE_PATH=args[1];config.WORLD_BUILDER_CONTENT_CAPABILITY_ID="project-local-custom-content-v2";
     config.WORLD_BUILDER_CONTENT_BUNDLE_SHA256=args[2];config.WORLD_BUILDER_CONTENT_DEFINITION_SHA256=args[3];config.WORLD_BUILDER_CONTENT_ASSET_SHA256=args[4];config.WORLD_BUILDER_CONTENT_ITEM_VISUAL_SHA256=args[5];
     AdaptiveWorldBuilderProjectContentBundle b=AdaptiveWorldBuilderProjectContentBundle.load(config,storage);
-    AdaptiveWorldBuilderProjectContentBundle.ItemVisual custom=b.itemVisuals().get(9000),authentic=b.itemVisuals().get(9001),pack=b.itemVisuals().get(9002);
+    int customId=Integer.parseInt(args[6]),authenticId=Integer.parseInt(args[7]),packId=Integer.parseInt(args[8]);
+    AdaptiveWorldBuilderProjectContentBundle.ItemVisual custom=b.itemVisuals().get(customId),authentic=b.itemVisuals().get(authenticId),pack=b.itemVisuals().get(packId);
     if(b.schemaVersion()!=2||b.itemVisuals().size()!=3
       ||!"asset.sprite.custom".equals(custom.customSpriteAssetRole())||!"items".equals(custom.customSpriteSubspace())||!"0".equals(custom.customSpriteEntry())||custom.pictureMask()!=3368601||custom.blueMask()!=1122867
       ||authentic.authenticSpriteId().intValue()!=417||authentic.pictureMask()!=-1||authentic.blueMask()!=0
@@ -133,12 +134,13 @@ public final class BundleV2ClientHarness {
   private static int nonzero(Sprite sprite){int count=0;for(int pixel:sprite.getPixels())if(pixel!=0)count++;return count;}
   public static void main(String[] args) throws Exception {
     ProjectContentBundle b=ProjectContentBundle.load(Paths.get(args[0]),args[1],"project-local-custom-content-v2",args[2],args[3],args[4],args[5]);
-    ProjectContentBundle.ItemVisual custom=b.itemVisual(9000),authentic=b.itemVisual(9001),pack=b.itemVisual(9002);
+    int customId=Integer.parseInt(args[6]),authenticId=Integer.parseInt(args[7]),packId=Integer.parseInt(args[8]);
+    ProjectContentBundle.ItemVisual custom=b.itemVisual(customId),authentic=b.itemVisual(authenticId),pack=b.itemVisual(packId);
     Sprite customDecoded=decoded(b,"asset.sprite.custom","items","0"),packDecoded=decoded(b,"asset.spritepack","GUI","0");
     int customPixels=nonzero(customDecoded),packPixels=nonzero(packDecoded);
     int authenticPixels=0;for(int pixel:b.authenticItemSprite(417).getPixels())if(pixel!=0)authenticPixels++;
     if(b.schemaVersion()!=2||b.itemVisuals().size()!=3||customPixels<1||authenticPixels<1||packPixels<1
-      ||b.itemSprite(9000).getPixels()[0]!=customDecoded.getPixels()[0]||b.itemSprite(9002).getPixels()[0]!=packDecoded.getPixels()[0]
+      ||b.itemSprite(customId).getPixels()[0]!=customDecoded.getPixels()[0]||b.itemSprite(packId).getPixels()[0]!=packDecoded.getPixels()[0]
       ||!"asset.sprite.custom".equals(custom.customSpriteAssetRole())||!"items".equals(custom.customSpriteSubspace())||!"0".equals(custom.customSpriteEntry())||custom.pictureMask()!=3368601||custom.blueMask()!=1122867
       ||authentic.authenticSpriteId().intValue()!=417||authentic.pictureMask()!=-1||authentic.blueMask()!=0
       ||!"asset.spritepack".equals(pack.customSpriteAssetRole())||!"GUI".equals(pack.customSpriteSubspace())||!"0".equals(pack.customSpriteEntry())||pack.pictureMask()!=4478310||pack.blueMask()!=-16776961)throw new AssertionError("v2 visual semantics absent");
@@ -184,7 +186,10 @@ class BundleV2RuntimeTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         return workspace, manifest
 
-    def run_harnesses(self, workspace, manifest, success=True, identities=None):
+    def run_harnesses(
+        self, workspace, manifest, success=True, identities=None,
+        item_ids=(9000, 9001, 9002),
+    ):
         identities = identities or manifest
         args = [
             str(workspace), str(workspace / "working/content-bundle"),
@@ -192,6 +197,7 @@ class BundleV2RuntimeTest(unittest.TestCase):
             identities["definitionFingerprintSha256"],
             identities["assetFingerprintSha256"],
             identities["itemVisualFingerprintSha256"],
+            *(str(item_id) for item_id in item_ids),
         ]
         outputs = []
         for name, jar in (
@@ -265,6 +271,44 @@ class BundleV2RuntimeTest(unittest.TestCase):
         )
         self.assertEqual(4478310, manifest["itemVisuals"][2]["pictureMask"])
         self.assertEqual(-16776961, manifest["itemVisuals"][2]["blueMask"])
+
+    def test_target_owned_visuals_may_replace_packaged_numeric_ids(self):
+        for target_item_id in (42, 1544):
+            with self.subTest(target_item_id=target_item_id):
+                workspace, manifest = self.workspace()
+                bundle = workspace / "working/content-bundle"
+                document = json.loads((bundle / "manifest.json").read_text())
+                document["definitionCatalog"]["groundItems"][1] = target_item_id
+                catalog = dict(document["definitionCatalog"])
+                catalog["catalogSha256"] = "0" * 64
+                document["definitionCatalog"]["catalogSha256"] = hashlib.sha256(
+                    canonical(catalog)
+                ).hexdigest()
+                document["itemVisuals"][0]["itemId"] = target_item_id
+                (bundle / "manifest.json").write_text(
+                    json.dumps(document, sort_keys=True, indent=2) + "\n"
+                )
+
+                evidence = bundle / "files/server/conf/world-builder/item-visuals-v1.json"
+                evidence_document = json.loads(evidence.read_text())
+                evidence_document["itemVisuals"][0]["itemId"] = target_item_id
+                evidence.write_text(
+                    json.dumps(evidence_document, sort_keys=True, indent=2) + "\n"
+                )
+
+                definitions = bundle / "files/server/conf/server/defs/ItemDefsCustom.json"
+                definition_document = json.loads(definitions.read_text())
+                definition_document["items"][0]["id"] = target_item_id
+                definitions.write_text(
+                    json.dumps(definition_document, sort_keys=True, indent=2) + "\n"
+                )
+
+                manifest = resign(bundle)
+                outputs = self.run_harnesses(
+                    workspace, manifest,
+                    item_ids=(target_item_id, 9001, 9002),
+                )
+                self.assertTrue(all("v2-decoded=3" in output for output in outputs))
 
     def test_hostile_missing_duplicate_and_archive_entry_cases_fail_both(self):
         for mutation in (

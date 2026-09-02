@@ -492,16 +492,6 @@ public final class AdaptiveWorldBuilderProjectContentBundle {
 				role, subspace, entry, pictureMask, blueMask));
 			previous = itemId;
 		}
-		for (Integer itemId : groundItems) {
-			if (itemId.intValue() >= 3309 && !result.containsKey(itemId)) {
-				throw new IOException("Every beyond-packaged item requires one item visual");
-			}
-		}
-		for (Integer itemId : result.keySet()) {
-			if (itemId.intValue() < 3309) {
-				throw new IOException("Packaged item must retain its packaged visual");
-			}
-		}
 		return result;
 	}
 

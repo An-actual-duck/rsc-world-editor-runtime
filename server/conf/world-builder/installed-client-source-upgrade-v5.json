@@ -13,7 +13,7 @@
     {
       "sourceRelativePath": "client/world-builder-source/orsc/ProjectContentBundle.java",
       "destinationRelativePath": "src/orsc/ProjectContentBundle.java",
-      "sha256": "6c8a06fe3e33f5a347ee55ecd2b18892df81481a90f2c5f981a18e0286098cbd",
+      "sha256": "9863c51a241d96ee589a2001db7e24f53ed5acd710e1c1a9ad817885fb2c47bb",
       "replacementPolicy": "add-or-exact"
     },
     {
