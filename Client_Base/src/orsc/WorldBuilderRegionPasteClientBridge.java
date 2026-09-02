@@ -250,7 +250,7 @@ public final class WorldBuilderRegionPasteClientBridge {
 		public final int placementCount;
 		public final int levelCount;
 
-		Snapshot(String id, String name, int tileCount, int placementCount, int levelCount) {
+		public Snapshot(String id, String name, int tileCount, int placementCount, int levelCount) {
 			this.id = id;
 			this.name = name;
 			this.tileCount = tileCount;

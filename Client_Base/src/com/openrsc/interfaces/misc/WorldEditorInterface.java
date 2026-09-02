@@ -288,14 +288,25 @@ public final class WorldEditorInterface extends NCustomComponent {
 		WorldBuilderRegionCopyClientBridge.Result result=regionCopyBridge.poll();if(result==null)return;
 		if(!result.accepted){inspectionStatus="Region "+(result.operation!=null&&result.operation.startsWith("cut")?"Cut":"Copy")+" refused ["+result.errorCode+"]: "+result.message+" Next: "+result.nextStep;return;}
 		saveRequested=false;unsavedChanges=false;
-		if("copy".equals(result.operation)){lastRegionSnapshotId=result.snapshotId;lastRegionSnapshotName=result.name;regionClipboardSnapshotId=result.snapshotId;regionClipboardSnapshotName=result.name;lastRegionTileCount=result.tileCount;lastRegionPlacementCount=result.placementCount;lastRegionCrossingCount=result.crossingReportCount;inspectionStatus="Copied '"+result.name+"': "+result.tileCount+" tiles, "+result.placementCount+" placements, snapshot "+shortHash(result.snapshotId)+(result.crossingReportCount>0?"; "+result.crossingReportCount+" crossing footprint report(s).":".");return;}
-		if("cut-preview".equals(result.operation)){lastRegionSnapshotId=result.snapshotId;lastRegionSnapshotName=result.name;regionClipboardSnapshotId=result.snapshotId;regionClipboardSnapshotName=result.name;lastRegionTileCount=result.tileCount;lastRegionPlacementCount=result.placementCount;lastRegionCrossingCount=result.crossingReportCount;regionCutSnapshotId=result.snapshotId;regionCutPlanHash=result.planHash;regionCutBlocked=result.blocked;inspectionStatus=result.blocked?"Cut snapshot was secured, but the exact plan is blocked. Reset or correct the selection; the world was unchanged.":"Cut snapshot secured: "+result.tileCount+" tiles and "+result.placementCount+" placements. Review the selection, then select Confirm Cut.";return;}
+		if("copy".equals(result.operation)){rememberCapturedRegionSnapshot(result);inspectionStatus="Copied '"+result.name+"': "+result.tileCount+" tiles, "+result.placementCount+" placements, snapshot "+shortHash(result.snapshotId)+(result.crossingReportCount>0?"; "+result.crossingReportCount+" crossing footprint report(s).":".");return;}
+		if("cut-preview".equals(result.operation)){rememberCapturedRegionSnapshot(result);regionCutSnapshotId=result.snapshotId;regionCutPlanHash=result.planHash;regionCutBlocked=result.blocked;inspectionStatus=result.blocked?"Cut snapshot was secured, but the exact plan is blocked. Reset or correct the selection; the world was unchanged.":"Cut snapshot secured: "+result.tileCount+" tiles and "+result.placementCount+" placements. Review the selection, then select Confirm Cut.";return;}
 		if("cut-apply".equals(result.operation)){inspectionStatus="Region cut atomically. Activating the published region live...";clearRegionSelection();mc.sendCommandString("activateregioncut "+result.requestId);}
+	}
+	private void rememberCapturedRegionSnapshot(WorldBuilderRegionCopyClientBridge.Result result){
+		lastRegionSnapshotId=result.snapshotId;lastRegionSnapshotName=result.name;regionClipboardSnapshotId=result.snapshotId;regionClipboardSnapshotName=result.name;lastRegionTileCount=result.tileCount;lastRegionPlacementCount=result.placementCount;lastRegionCrossingCount=result.crossingReportCount;
+		WorldBuilderRegionPasteClientBridge.Snapshot snapshot=new WorldBuilderRegionPasteClientBridge.Snapshot(result.snapshotId,result.name,result.tileCount,result.placementCount,1);
+		regionLibraryIndex=-1;for(int i=0;i<regionLibrary.size();i++)if(regionLibrary.get(i).id.equals(result.snapshotId)){regionLibrary.set(i,snapshot);regionLibraryIndex=i;break;}
+		if(regionLibraryIndex<0){regionLibrary.add(snapshot);regionLibraryIndex=regionLibrary.size()-1;}
+	}
+	private boolean selectRegionLibrarySnapshot(String snapshotId){
+		regionLibraryIndex=-1;if(snapshotId==null||snapshotId.isEmpty())return false;
+		for(int i=0;i<regionLibrary.size();i++)if(regionLibrary.get(i).id.equals(snapshotId)){regionLibraryIndex=i;return true;}
+		return false;
 	}
 	private void selectRegionTool(RegionTool selected){
 		if(regionCopyBridge.isPending()||regionPasteBridge.isPending()||isRegionSharingPending()){inspectionStatus="Wait for the active region operation before changing Copy/Cut/Paste tools.";return;}
 		regionTool=selected;coordinateFocus=0;regionPasteOverwritePrompted=false;regionPasteOverwriteArmed=false;
-		if(selected==RegionTool.PASTE){clearRegionSelection();regionLibraryPreferredSnapshotId=regionClipboardSnapshotId;requestRegionLibrary();}
+		if(selected==RegionTool.PASTE){clearRegionSelection();regionLibraryPreferredSnapshotId=regionClipboardSnapshotId;if(selectRegionLibrarySnapshot(regionClipboardSnapshotId)){regionLibraryPreferredSnapshotId="";clearPastePreview();inspectionStatus="Clipboard ready: '"+selectedRegionSnapshot().name+"'. Click terrain to choose its Paste destination.";}else requestRegionLibrary();}
 		else{clearPastePreview();clearRegionSelection();inspectionStatus=selected==RegionTool.CUT?"Cut selected: trace and Stop a boundary, then Cut to secure its snapshot and preview.":"Copy selected: click terrain to start an ordered boundary, Stop it, then Copy.";}
 	}
 	private void requestRegionLibrary(){
@@ -356,7 +367,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if("library".equals(result.operation)){
 			String selected=regionLibraryPreferredSnapshotId.isEmpty()?regionClipboardSnapshotId:regionLibraryPreferredSnapshotId;
 			regionLibrary.clear();regionLibrary.addAll(result.snapshots);regionLibraryIndex=-1;
-			for(int i=0;i<regionLibrary.size();i++)if(regionLibrary.get(i).id.equals(selected)){regionLibraryIndex=i;break;}
+			selectRegionLibrarySnapshot(selected);
 			if(regionLibraryIndex<0&&selected.isEmpty()&&regionLibrary.size()==1)regionLibraryIndex=0;
 			if(regionLibraryIndex>=0){regionClipboardSnapshotId=regionLibrary.get(regionLibraryIndex).id;regionClipboardSnapshotName=regionLibrary.get(regionLibraryIndex).name;}
 			clearPastePreview();
