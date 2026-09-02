@@ -121,6 +121,7 @@ assert 'return "Overwrite?"' in ui and 'return "Confirm"' in ui
 assert '"There is nothing copied to clipboard"' in ui
 assert "regionLibraryPreferredSnapshotId=regionClipboardSnapshotId" in ui
 assert "selected.isEmpty()&&regionLibrary.size()==1" in ui
+assert "selectRegionLibrarySnapshot(result.activeSnapshotId)" in ui
 assert "snapshot library has multiple entries but no active clipboard selection" in ui
 assert "Paste selected. There is nothing copied to clipboard" not in ui
 assert "rememberCapturedRegionSnapshot(result)" in ui
@@ -128,6 +129,8 @@ assert "new WorldBuilderRegionPasteClientBridge.Snapshot(result.snapshotId,resul
 assert "if(selectRegionLibrarySnapshot(regionClipboardSnapshotId))" in ui
 assert "else requestRegionLibrary()" in ui
 assert "public Snapshot(String id, String name" in paste_bridge
+assert 'value.optString("activeSnapshotId", "")' in paste_bridge
+assert "Region Paste active clipboard is absent from the snapshot library" in paste_bridge
 assert "c!='\\uffff'&&!Character.isSurrogate(c)" in ui
 assert "drawWorldEditorRegionPastePreview" in client
 assert "WORLD_EDITOR_SET_REGION_PASTE_DESTINATION" in client

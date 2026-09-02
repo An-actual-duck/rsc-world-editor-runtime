@@ -368,6 +368,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			String selected=regionLibraryPreferredSnapshotId.isEmpty()?regionClipboardSnapshotId:regionLibraryPreferredSnapshotId;
 			regionLibrary.clear();regionLibrary.addAll(result.snapshots);regionLibraryIndex=-1;
 			selectRegionLibrarySnapshot(selected);
+			if(regionLibraryIndex<0)selectRegionLibrarySnapshot(result.activeSnapshotId);
 			if(regionLibraryIndex<0&&selected.isEmpty()&&regionLibrary.size()==1)regionLibraryIndex=0;
 			if(regionLibraryIndex>=0){regionClipboardSnapshotId=regionLibrary.get(regionLibraryIndex).id;regionClipboardSnapshotName=regionLibrary.get(regionLibraryIndex).name;}
 			clearPastePreview();

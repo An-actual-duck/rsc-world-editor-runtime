@@ -164,7 +164,7 @@ public final class WorldBuilderRegionPasteClientBridge {
 		}
 	}
 
-	private Result libraryResult(JSONObject value) {
+	private Result libraryResult(JSONObject value) throws IOException {
 		JSONArray array = value.getJSONArray("snapshots");
 		List<Snapshot> snapshots = new ArrayList<Snapshot>();
 		for (int index = 0; index < array.length(); index++) {
@@ -173,7 +173,17 @@ public final class WorldBuilderRegionPasteClientBridge {
 				record.getString("name"), record.getInt("tileCount"),
 				record.getInt("placementCount"), record.getInt("levelCount")));
 		}
-		return Result.library(requestId, snapshots);
+		String activeSnapshotId = value.optString("activeSnapshotId", "");
+		if (!activeSnapshotId.isEmpty()) {
+			requireHash(activeSnapshotId, "active clipboard snapshot ID");
+			boolean found = false;
+			for (Snapshot snapshot : snapshots) {
+				if (activeSnapshotId.equals(snapshot.id)) { found = true; break; }
+			}
+			if (!found) throw new IOException(
+				"Region Paste active clipboard is absent from the snapshot library.");
+		}
+		return Result.library(requestId, snapshots, activeSnapshotId);
 	}
 
 	private Result previewResult(JSONObject value) {
@@ -264,6 +274,7 @@ public final class WorldBuilderRegionPasteClientBridge {
 		public final String operation;
 		public final String requestId;
 		public final List<Snapshot> snapshots;
+		public final String activeSnapshotId;
 		public final String snapshotId;
 		public final String name;
 		public final int tileCount;
@@ -280,13 +291,15 @@ public final class WorldBuilderRegionPasteClientBridge {
 		public final String nextStep;
 
 		private Result(boolean accepted, String operation, String requestId,
-			List<Snapshot> snapshots, String snapshotId, String name, int tileCount,
+			List<Snapshot> snapshots, String activeSnapshotId, String snapshotId,
+			String name, int tileCount,
 			int placementCount, String planHash, String packageManifestSha256,
 			String packageInventorySha256, boolean blocked, boolean overwrite,
 			int[][] markers, int[][] collisions, String errorCode, String message,
 			String nextStep) {
 			this.accepted = accepted; this.operation = operation; this.requestId = requestId;
-			this.snapshots = snapshots; this.snapshotId = snapshotId; this.name = name;
+			this.snapshots = snapshots; this.activeSnapshotId = activeSnapshotId;
+			this.snapshotId = snapshotId; this.name = name;
 			this.tileCount = tileCount; this.placementCount = placementCount;
 			this.planHash = planHash; this.blocked = blocked; this.overwrite = overwrite;
 			this.packageManifestSha256 = packageManifestSha256;
@@ -295,15 +308,16 @@ public final class WorldBuilderRegionPasteClientBridge {
 			this.errorCode = errorCode; this.message = message; this.nextStep = nextStep;
 		}
 
-		static Result library(String id, List<Snapshot> snapshots) {
-			return new Result(true, "library", id, snapshots, "", "", 0, 0, "", "", "",
+		static Result library(String id, List<Snapshot> snapshots,
+			String activeSnapshotId) {
+			return new Result(true, "library", id, snapshots, activeSnapshotId, "", "", 0, 0, "", "", "",
 				false, false, new int[0][2], new int[0][3], "", "", "");
 		}
 
 		static Result preview(String id, String snapshotId, String name, int tiles,
 			int placements, String plan, boolean blocked, boolean overwrite,
 			int[][] markers, int[][] collisions) {
-			return new Result(true, "preview", id, new ArrayList<Snapshot>(), snapshotId,
+			return new Result(true, "preview", id, new ArrayList<Snapshot>(), "", snapshotId,
 				name, tiles, placements, plan, "", "", blocked, overwrite, markers, collisions,
 				"", "", "");
 		}
@@ -312,14 +326,14 @@ public final class WorldBuilderRegionPasteClientBridge {
 			String manifestSha256, String inventorySha256) throws IOException {
 			requireHash(manifestSha256, "published manifest hash");
 			requireHash(inventorySha256, "published inventory hash");
-			return new Result(true, operation, id, new ArrayList<Snapshot>(), snapshotId,
+			return new Result(true, operation, id, new ArrayList<Snapshot>(), "", snapshotId,
 				"", 0, 0, plan, manifestSha256, inventorySha256, false, false,
 				new int[0][2], new int[0][3], "", "", "");
 		}
 
 		static Result refused(String id, String operation, String code,
 			String message, String nextStep) {
-			return new Result(false, operation, id, new ArrayList<Snapshot>(), "", "",
+			return new Result(false, operation, id, new ArrayList<Snapshot>(), "", "", "",
 				0, 0, "", "", "", false, false, new int[0][2], new int[0][3], code,
 				message, nextStep);
 		}
