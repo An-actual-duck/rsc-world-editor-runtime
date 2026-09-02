@@ -201,8 +201,12 @@ public final class WorldBuilderRegionPasteClientBridge {
 		}
 		JSONArray collisionArray = plan.getJSONArray("collisions");
 		int[][] collisions = new int[collisionArray.length()][3];
+		boolean noChange = false;
 		for (int index = 0; index < collisionArray.length(); index++) {
 			JSONObject collision = collisionArray.getJSONObject(index);
+			if ("destination-already-matches".equals(collision.getString("kind"))) {
+				noChange = true;
+			}
 			collisions[index][0] = collision.getInt("level");
 			collisions[index][1] = collision.getInt("x");
 			collisions[index][2] = collision.getInt("y");
@@ -211,7 +215,7 @@ public final class WorldBuilderRegionPasteClientBridge {
 			value.getString("name"), value.getInt("tileCount"),
 			value.getInt("placementCount"), plan.getString("planFingerprintSha256"),
 			plan.getBoolean("blocked"), plan.getBoolean("overwriteRequired"),
-			markers, collisions);
+			noChange, markers, collisions);
 	}
 
 	private static void requireHash(String value, String label) throws IOException {
@@ -284,6 +288,7 @@ public final class WorldBuilderRegionPasteClientBridge {
 		public final String packageInventorySha256;
 		public final boolean blocked;
 		public final boolean overwrite;
+		public final boolean noChange;
 		public final int[][] markers;
 		public final int[][] collisions;
 		public final String errorCode;
@@ -295,13 +300,15 @@ public final class WorldBuilderRegionPasteClientBridge {
 			String name, int tileCount,
 			int placementCount, String planHash, String packageManifestSha256,
 			String packageInventorySha256, boolean blocked, boolean overwrite,
-			int[][] markers, int[][] collisions, String errorCode, String message,
+			boolean noChange, int[][] markers, int[][] collisions,
+			String errorCode, String message,
 			String nextStep) {
 			this.accepted = accepted; this.operation = operation; this.requestId = requestId;
 			this.snapshots = snapshots; this.activeSnapshotId = activeSnapshotId;
 			this.snapshotId = snapshotId; this.name = name;
 			this.tileCount = tileCount; this.placementCount = placementCount;
 			this.planHash = planHash; this.blocked = blocked; this.overwrite = overwrite;
+			this.noChange = noChange;
 			this.packageManifestSha256 = packageManifestSha256;
 			this.packageInventorySha256 = packageInventorySha256;
 			this.markers = markers; this.collisions = collisions;
@@ -311,14 +318,15 @@ public final class WorldBuilderRegionPasteClientBridge {
 		static Result library(String id, List<Snapshot> snapshots,
 			String activeSnapshotId) {
 			return new Result(true, "library", id, snapshots, activeSnapshotId, "", "", 0, 0, "", "", "",
-				false, false, new int[0][2], new int[0][3], "", "", "");
+				false, false, false, new int[0][2], new int[0][3], "", "", "");
 		}
 
 		static Result preview(String id, String snapshotId, String name, int tiles,
 			int placements, String plan, boolean blocked, boolean overwrite,
-			int[][] markers, int[][] collisions) {
+			boolean noChange, int[][] markers, int[][] collisions) {
 			return new Result(true, "preview", id, new ArrayList<Snapshot>(), "", snapshotId,
-				name, tiles, placements, plan, "", "", blocked, overwrite, markers, collisions,
+				name, tiles, placements, plan, "", "", blocked, overwrite, noChange,
+				markers, collisions,
 				"", "", "");
 		}
 
@@ -328,13 +336,14 @@ public final class WorldBuilderRegionPasteClientBridge {
 			requireHash(inventorySha256, "published inventory hash");
 			return new Result(true, operation, id, new ArrayList<Snapshot>(), "", snapshotId,
 				"", 0, 0, plan, manifestSha256, inventorySha256, false, false,
-				new int[0][2], new int[0][3], "", "", "");
+				false, new int[0][2], new int[0][3], "", "", "");
 		}
 
 		static Result refused(String id, String operation, String code,
 			String message, String nextStep) {
 			return new Result(false, operation, id, new ArrayList<Snapshot>(), "", "", "",
-				0, 0, "", "", "", false, false, new int[0][2], new int[0][3], code,
+				0, 0, "", "", "", false, false, false,
+				new int[0][2], new int[0][3], code,
 				message, nextStep);
 		}
 	}

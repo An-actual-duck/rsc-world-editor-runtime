@@ -153,6 +153,8 @@ assert '"undo".equals(operation)' in paste_server
 assert "adoptPublishedAdaptivePackage" in paste_server
 assert 'inspectionStatus="Region Paste refused [' in ui
 assert '"Paste preview ready:' in ui
+assert 'result.noChange?"This destination already exactly matches the copied region.' in ui
+assert '"destination-already-matches".equals(collision.getString("kind"))' in paste_bridge
 assert 'mc.sendCommandString("activateregionpaste "+result.requestId)' in ui
 assert "restartWorldBuilderAfterRegionPaste" not in client
 assert "activateregionpaste" in ui
