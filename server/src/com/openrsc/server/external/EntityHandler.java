@@ -536,51 +536,8 @@ public final class EntityHandler {
 			JSONObject object = new JSONObject(new String(Files.readAllBytes(Paths.get(filename))));
 			JSONArray npcDefs = object.getJSONArray(JSONObject.getNames(object)[0]);
 			for (int i = 0; i < npcDefs.length(); i++) {
-				NPCDef def = new NPCDef();
-				JSONObject npc = npcDefs.getJSONObject(i);
-				def.name = npc.getString("name");
-				def.description = npc.getString("description");
-				def.command1 = npc.getString("command");
-				def.command2 = npc.getString("command2");
-					def.attack = npc.getInt("attack");
-					def.strength = npc.getInt("strength");
-					def.hits = npc.getInt("hits");
-					def.defense = npc.getInt("defense");
-					def.ranged = npc.getBoolean("ranged") ? 1 : 0;
-					def.projectileRange = readProjectileRange(npc, "Npc definition " + i);
-					def.meleeOffense = npc.has("meleeOffense") ? npc.getInt("meleeOffense") : 0;
-					def.rangedOffense = npc.has("rangedOffense") ? npc.getInt("rangedOffense") : 0;
-					def.magicOffense = npc.has("magicOffense") ? npc.getInt("magicOffense") : 0;
-					def.meleeDefense = npc.has("meleeDefense") ? npc.getInt("meleeDefense") : 0;
-					def.rangedDefense = npc.has("rangedDefense") ? npc.getInt("rangedDefense") : 0;
-					def.magicDefense = npc.has("magicDefense") ? npc.getInt("magicDefense") : 0;
-					def.meleeDefenseMultiplier = npc.has("meleeDefenseMultiplier") ? npc.getDouble("meleeDefenseMultiplier") : -1.0D;
-					def.rangedDefenseMultiplier = npc.has("rangedDefenseMultiplier") ? npc.getDouble("rangedDefenseMultiplier") : -1.0D;
-					def.magicDefenseMultiplier = npc.has("magicDefenseMultiplier") ? npc.getDouble("magicDefenseMultiplier") : -1.0D;
-					def.meleeDefenseDivisor = npc.has("meleeDefenseDivisor") ? npc.getDouble("meleeDefenseDivisor") : -1.0D;
-					def.rangedDefenseDivisor = npc.has("rangedDefenseDivisor") ? npc.getDouble("rangedDefenseDivisor") : -1.0D;
-					def.magicDefenseDivisor = npc.has("magicDefenseDivisor") ? npc.getDouble("magicDefenseDivisor") : -1.0D;
-					def.combatLevel = npc.getInt("combatlvl");
-				def.members = npc.getInt("isMembers") == 1;
-				def.attackable = npc.getInt("attackable") == 1;
-				def.aggressive = npc.getInt("aggressive") == 1;
-				def.respawnTime = npc.getInt("respawnTime");
-				int[] sprites = new int[12];
-				for (int j = 0; j < 12; j++) {
-					sprites[j] = npc.getInt("sprites" + (j+1));
-				}
-				def.sprites = sprites;
-				def.hairColour = npc.getInt("hairColour");
-				def.topColour = npc.getInt("topColour");
-				def.bottomColour = npc.getInt("bottomColour");
-				def.skinColour = npc.getInt("skinColour");
-				def.camera1 = npc.getInt("camera1");
-				def.camera2 = npc.getInt("camera2");
-				def.walkModel = npc.getInt("walkModel");
-				def.combatModel = npc.getInt("combatModel");
-				def.combatSprite = npc.getInt("combatSprite");
-				def.roundMode = npc.getInt("roundMode");
-				npcs.add(def);
+				npcs.add(readNpcDefinition(
+					npcDefs.getJSONObject(i), "Npc definition " + i + " in " + filename));
 			}
 			LOGGER.info("Loaded " + npcDefs.length() + " npcs from " + filename);
 		}
@@ -589,9 +546,89 @@ public final class EntityHandler {
 		}
 	}
 
+	private NPCDef readNpcDefinition(JSONObject npc, String label) {
+		NPCDef def = new NPCDef();
+		def.name = npc.getString("name");
+		def.description = npc.getString("description");
+		def.command1 = npc.getString("command");
+		def.command2 = npc.getString("command2");
+		def.attack = npc.getInt("attack");
+		def.strength = npc.getInt("strength");
+		def.hits = npc.getInt("hits");
+		def.defense = npc.getInt("defense");
+		def.ranged = npc.getBoolean("ranged") ? 1 : 0;
+		def.projectileRange = readProjectileRange(npc, label);
+		def.meleeOffense = npc.has("meleeOffense") ? npc.getInt("meleeOffense") : 0;
+		def.rangedOffense = npc.has("rangedOffense") ? npc.getInt("rangedOffense") : 0;
+		def.magicOffense = npc.has("magicOffense") ? npc.getInt("magicOffense") : 0;
+		def.meleeDefense = npc.has("meleeDefense") ? npc.getInt("meleeDefense") : 0;
+		def.rangedDefense = npc.has("rangedDefense") ? npc.getInt("rangedDefense") : 0;
+		def.magicDefense = npc.has("magicDefense") ? npc.getInt("magicDefense") : 0;
+		def.meleeDefenseMultiplier = npc.has("meleeDefenseMultiplier") ? npc.getDouble("meleeDefenseMultiplier") : -1.0D;
+		def.rangedDefenseMultiplier = npc.has("rangedDefenseMultiplier") ? npc.getDouble("rangedDefenseMultiplier") : -1.0D;
+		def.magicDefenseMultiplier = npc.has("magicDefenseMultiplier") ? npc.getDouble("magicDefenseMultiplier") : -1.0D;
+		def.meleeDefenseDivisor = npc.has("meleeDefenseDivisor") ? npc.getDouble("meleeDefenseDivisor") : -1.0D;
+		def.rangedDefenseDivisor = npc.has("rangedDefenseDivisor") ? npc.getDouble("rangedDefenseDivisor") : -1.0D;
+		def.magicDefenseDivisor = npc.has("magicDefenseDivisor") ? npc.getDouble("magicDefenseDivisor") : -1.0D;
+		def.combatLevel = npc.getInt("combatlvl");
+		def.members = npc.getInt("isMembers") == 1;
+		def.attackable = npc.getInt("attackable") == 1;
+		def.aggressive = npc.getInt("aggressive") == 1;
+		def.respawnTime = npc.getInt("respawnTime");
+		int[] sprites = new int[12];
+		for (int j = 0; j < 12; j++) {
+			sprites[j] = npc.getInt("sprites" + (j + 1));
+		}
+		def.sprites = sprites;
+		def.hairColour = npc.getInt("hairColour");
+		def.topColour = npc.getInt("topColour");
+		def.bottomColour = npc.getInt("bottomColour");
+		def.skinColour = npc.getInt("skinColour");
+		def.camera1 = npc.getInt("camera1");
+		def.camera2 = npc.getInt("camera2");
+		def.walkModel = npc.getInt("walkModel");
+		def.combatModel = npc.getInt("combatModel");
+		def.combatSprite = npc.getInt("combatSprite");
+		def.roundMode = npc.getInt("roundMode");
+		return def;
+	}
+
 	private void loadSupplementalNpcs(Path definitionsDirectory) {
-		for (Path catalog : supplementalNpcDefinitionFiles(definitionsDirectory)) {
-			loadNpcs(catalog.toString());
+		TreeMap<Integer,JSONObject> definitions = new TreeMap<>();
+		HashMap<Integer,String> sources = new HashMap<>();
+		try {
+			for (Path catalog : supplementalNpcDefinitionFiles(definitionsDirectory)) {
+				JSONObject document = new JSONObject(new String(Files.readAllBytes(catalog)));
+				JSONArray rows = document.getJSONArray(JSONObject.getNames(document)[0]);
+				for (int index = 0; index < rows.length(); index++) {
+					JSONObject row = rows.getJSONObject(index);
+					int id = row.getInt("id");
+					String source = catalog.getFileName() + " row " + index;
+					if (definitions.put(id, row) != null) {
+						throw new IllegalArgumentException(
+							"Duplicate supplemental NPC id " + id + " in " + sources.get(id)
+								+ " and " + source);
+					}
+					sources.put(id, source);
+				}
+			}
+			for (java.util.Map.Entry<Integer,JSONObject> definition : definitions.entrySet()) {
+				int id = definition.getKey();
+				if (id != npcs.size()) {
+					throw new IllegalArgumentException(
+						"Supplemental NPC registry is not sequential: expected id " + npcs.size()
+							+ " but found " + id + " in " + sources.get(id));
+				}
+				npcs.add(readNpcDefinition(definition.getValue(),
+					"Supplemental NPC definition " + id + " in " + sources.get(id)));
+			}
+			if (!definitions.isEmpty()) {
+				LOGGER.info("Loaded " + definitions.size()
+					+ " supplemental npcs by declared id from " + definitionsDirectory);
+			}
+		} catch (Exception failure) {
+			throw new IllegalStateException(
+				"Failed to load supplemental NPC definitions from " + definitionsDirectory, failure);
 		}
 	}
 

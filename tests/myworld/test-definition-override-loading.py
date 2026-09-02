@@ -160,6 +160,21 @@ public final class NpcCommandOverrideHarness {
                 Paths.get(args[3], "AlphaNpcDefs.json"),
                 Paths.get(args[3], "ZetaNpcDefs.json"))),
             "merged project catalogs must not append target supplements twice");
+
+        handler.npcs = new ArrayList<NPCDef>();
+        for (int id = 0; id < 846; id++) handler.npcs.add(null);
+        Method loadSupplemental = EntityHandler.class.getDeclaredMethod(
+            "loadSupplementalNpcs", Path.class);
+        loadSupplemental.setAccessible(true);
+        loadSupplemental.invoke(handler, Paths.get(args[4]));
+        check(handler.npcs.size() == 863,
+            "supplemental catalogs must extend the registry through declared id 862");
+        check("Gorak".equals(handler.npcs.get(861).name)
+                && !handler.npcs.get(861).isAttackable(),
+            "id 861 must come from the later-sorted visual catalog");
+        check("Green Dragon".equals(handler.npcs.get(862).name)
+                && handler.npcs.get(862).isAttackable(),
+            "id 862 must retain its attackable definition from the earlier-sorted world catalog");
     }
 }
 '''
@@ -176,6 +191,56 @@ public final class NpcCommandOverrideHarness {
         ):
             (supplemental / name).write_text("{}", encoding="utf-8")
         (supplemental / "ZetaNpcDefs.json").write_text('{"z":1}', encoding="utf-8")
+
+        def npc_definition(npc_id: int, name: str, attackable: bool) -> dict:
+            definition = {
+                "id": npc_id,
+                "name": name,
+                "description": name,
+                "command": "",
+                "command2": "",
+                "attack": 1,
+                "strength": 1,
+                "hits": 1,
+                "defense": 1,
+                "ranged": False,
+                "combatlvl": 1,
+                "isMembers": 0,
+                "attackable": 1 if attackable else 0,
+                "aggressive": 0,
+                "respawnTime": 30,
+                "hairColour": 0,
+                "topColour": 0,
+                "bottomColour": 0,
+                "skinColour": 0,
+                "camera1": 0,
+                "camera2": 0,
+                "walkModel": 0,
+                "combatModel": 0,
+                "combatSprite": 0,
+                "roundMode": 0,
+            }
+            for sprite in range(1, 13):
+                definition[f"sprites{sprite}"] = -1
+            return definition
+
+        declared_id_supplemental = temporary_path / "declared-id-defs"
+        declared_id_supplemental.mkdir()
+        monster_slayer = [
+            npc_definition(npc_id, f"Monster Slayer {npc_id}", False)
+            for npc_id in range(846, 861)
+        ]
+        (declared_id_supplemental / "MonsterSlayerNpcDefs.json").write_text(
+            json.dumps({"npcs": monster_slayer}), encoding="utf-8"
+        )
+        (declared_id_supplemental / "MyWorldNpcDefs.json").write_text(
+            json.dumps({"npcs": [npc_definition(862, "Green Dragon", True)]}),
+            encoding="utf-8",
+        )
+        (declared_id_supplemental / "VisualTestNpcDefs.json").write_text(
+            json.dumps({"npcs": [npc_definition(861, "Gorak", False)]}),
+            encoding="utf-8",
+        )
         compiled = subprocess.run(
             [
                 javac,
@@ -201,6 +266,7 @@ public final class NpcCommandOverrideHarness {
                 str(FIXTURES / "npc-unknown-field-override.json"),
                 str(FIXTURES / "npc-non-string-command-override.json"),
                 str(supplemental),
+                str(declared_id_supplemental),
             ],
             cwd=ROOT,
             text=True,
