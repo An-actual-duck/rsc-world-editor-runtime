@@ -148,8 +148,11 @@ assert 'command.equalsIgnoreCase("pasteregion")' in commands
 assert 'command.equalsIgnoreCase("activateregionpaste")' in commands
 assert "editor.saveAdaptivePackage(player)" in paste_server
 assert '"world-builder-region-paste-response"' in paste_server
+assert "wait for the separate completed or refused result" in paste_server
 assert '"undo".equals(operation)' in paste_server
 assert "adoptPublishedAdaptivePackage" in paste_server
+assert 'inspectionStatus="Region Paste refused [' in ui
+assert '"Paste preview ready:' in ui
 assert 'mc.sendCommandString("activateregionpaste "+result.requestId)' in ui
 assert "restartWorldBuilderAfterRegionPaste" not in client
 assert "activateregionpaste" in ui

@@ -103,7 +103,7 @@ public final class AdaptiveWorldBuilderRegionPasteRequest {
 			}
 			forceDirectory(control);
 			player.message("[World Editor] Region Paste " + operation
-				+ " request accepted for exact Editor processing.");
+				+ " request queued for exact Editor processing; wait for the separate completed or refused result.");
 		} catch (Exception failure) {
 			try {
 				if (pending != null) Files.deleteIfExists(pending);
