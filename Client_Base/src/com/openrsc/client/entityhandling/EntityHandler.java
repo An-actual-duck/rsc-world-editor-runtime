@@ -9797,6 +9797,7 @@ public class EntityHandler {
 			loadProjectDoors(bundle.path("definition.boundary"));
 			loadProjectScenery(bundle.path("definition.scenery"));
 			validateProjectCatalog(bundle.catalog());
+			REGISTRY.useProjectFallbacks();
 			System.out.println("Loaded validated project-content-bundle-v"
 				+ bundle.schemaVersion() + " definitions");
 		} catch (Exception failure) {

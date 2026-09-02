@@ -171,8 +171,8 @@ public final class ClientDefinitionRegistryFixture {
 	}
 
 	private static void assertFallbacks() throws Exception {
-		if (EntityHandler.getNpcDef(Integer.MAX_VALUE) != EntityHandler.getNpcDef(825)) {
-			throw new AssertionError("Malformed NPC ID did not use NPC 825");
+		if (EntityHandler.getNpcDef(Integer.MAX_VALUE) != EntityHandler.getNpcDef(0)) {
+			throw new AssertionError("Malformed NPC ID did not use vanilla NPC 0");
 		}
 		if (EntityHandler.getAnimationDef(Integer.MAX_VALUE) != EntityHandler.getAnimationDef(0)) {
 			throw new AssertionError("Malformed animation ID did not use animation 0");
@@ -188,8 +188,8 @@ public final class ClientDefinitionRegistryFixture {
 			ItemDef first = EntityHandler.getItemDef(999999);
 			ItemDef duplicate = EntityHandler.getItemDef(999999);
 			ItemDef noted = EntityHandler.getItemDef(-999999);
-			if (first.id != 1544 || duplicate.id != 1544 || noted.id != 1544) {
-				throw new AssertionError("Malformed item ID did not use item 1544");
+			if (first.id != 0 || duplicate.id != 0 || noted.id != 0) {
+				throw new AssertionError("Malformed item ID did not use vanilla item 0");
 			}
 		} finally {
 			System.setErr(originalErr);
@@ -308,6 +308,7 @@ def require_source_boundaries() -> None:
         "loadNpcDefinitions1();",
         "loadAnimationDefinitions();",
         "loadSpellDefinitions();",
+        "REGISTRY.useProjectFallbacks();",
     )
     for snippet in required_handler:
         if snippet not in handler:
@@ -326,6 +327,8 @@ def require_source_boundaries() -> None:
             raise AssertionError(f"ClientDefinitionRegistry missing {catalog} catalog")
     if "ClientDefinitionFallbackDiagnostics" not in registry:
         raise AssertionError("Registry does not delegate fallback diagnostics")
+    if "void useProjectFallbacks()" not in registry:
+        raise AssertionError("Registry does not select fallbacks from project definitions")
     ordinary_prayers = prayer_books.count("\t\taddPrayerDefinition(")
     special_prayers = prayer_books.count("\t\taddSpecialPrayerDefinition(")
     if (ordinary_prayers, special_prayers) != (45, 3):

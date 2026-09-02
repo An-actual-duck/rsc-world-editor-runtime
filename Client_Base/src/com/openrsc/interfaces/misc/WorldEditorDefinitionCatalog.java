@@ -119,6 +119,10 @@ public final class WorldEditorDefinitionCatalog {
 		private static final List<Entry> ITEMS = runtimeItems();
 	}
 
+	private static final class SceneryHolder {
+		private static final List<Entry> SCENERY = runtimeScenery();
+	}
+
 	private static final class WallHolder {
 		private static final List<Entry> WALLS = runtimeWalls();
 	}
@@ -181,7 +185,7 @@ public final class WorldEditorDefinitionCatalog {
 	}
 
 	public static List<Entry> sceneryEntries() {
-		return Holder.INSTANCE.sceneryEntries;
+		return SceneryHolder.SCENERY;
 	}
 
 	public static List<Entry> boundaryEntries() {
@@ -243,7 +247,7 @@ public final class WorldEditorDefinitionCatalog {
 			} catch (RuntimeException failure) {
 				continue;
 			}
-			if (definition == null || definition.id != id || isPlaceholderItem(definition)) {
+			if (definition == null || definition.id != id) {
 				continue;
 			}
 			String name = normalized(definition.getName());
@@ -265,6 +269,33 @@ public final class WorldEditorDefinitionCatalog {
 				+ commandTerms(definition.getCommand()) + " " + traits
 				+ " item ground spawn respawn");
 			entries.add(new Entry("item", id, name, name, "runtime", tags, search));
+		}
+		return Collections.unmodifiableList(entries);
+	}
+
+	private static List<Entry> runtimeScenery() {
+		List<Entry> entries = new ArrayList<Entry>();
+		for (int id = 0; id < EntityHandler.objectCount(); id++) {
+			com.openrsc.client.entityhandling.defs.GameObjectDef definition;
+			try {
+				definition = EntityHandler.getObjectDef(id);
+			} catch (RuntimeException failure) {
+				continue;
+			}
+			if (definition == null || definition.id != id) continue;
+			String canonical = normalized(definition.getName());
+			if (canonical.isEmpty()) continue;
+			String display = sceneryLabel(id, canonical);
+			String tags = definition.getType() == 0 ? "Passable" : "Blocking";
+			String search = normalized(display + " " + canonical + " "
+				+ safe(definition.getDescription()) + " "
+				+ safe(definition.getCommand1()) + " "
+				+ safe(definition.getCommand2()) + " "
+				+ safe(definition.getObjectModel()) + " scenery object " + tags
+				+ " width " + definition.getWidth() + " height "
+				+ definition.getHeight());
+			entries.add(new Entry("scenery", id, canonical, display,
+				"runtime", tags, search));
 		}
 		return Collections.unmodifiableList(entries);
 	}
@@ -336,10 +367,6 @@ public final class WorldEditorDefinitionCatalog {
 			"editor", "Not Walkable",
 			"blocking non-walkable base floor colour color blended terrain overlay"));
 		return Collections.unmodifiableList(entries);
-	}
-
-	private static boolean isPlaceholderItem(ItemDef definition) {
-		return "Unobtanium".equals(definition.getName()) && definition.getSpriteID() == 70;
 	}
 
 	private static String commandTerms(String[] commands) {

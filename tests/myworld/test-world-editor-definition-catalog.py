@@ -114,6 +114,8 @@ class WorldEditorDefinitionCatalogTest(unittest.TestCase):
         self.assertIn("WorldEditorDefinitionCatalog.boundaryLabel(raw-1)", editor)
         self.assertIn("WorldEditorDefinitionCatalog.sceneryReference", client)
         self.assertIn("WorldEditorDefinitionCatalog.boundaryReference", client)
+        self.assertIn("return SceneryHolder.SCENERY", catalog_source)
+        self.assertIn("for (int id = 0; id < EntityHandler.objectCount(); id++)", catalog_source)
         self.assertIn("EntityHandler.getObjectDef(id).getCommand1()", client)
         self.assertIn("EntityHandler.getDoorDef(id).getCommand1()", client)
         self.assertNotIn("WorldEditorDefinitionCatalog", SCENERY_XML.read_text(encoding="utf-8"))
@@ -161,8 +163,8 @@ public final class WorldEditorDefinitionCatalogFixture {
         expect("Non-Walkable Base Floor Color", WorldEditorDefinitionCatalog.floorTextureLabel(255));
         expect("Undefined Texture", WorldEditorDefinitionCatalog.floorTextureLabel(27));
         expect("runtime mismatch", WorldEditorDefinitionCatalog.sceneryLabel(104, "runtime mismatch"));
-        if (WorldEditorDefinitionCatalog.sceneryEntries().size() != 1332) {
-            throw new AssertionError("wrong scenery catalog size");
+        if (WorldEditorDefinitionCatalog.sceneryEntries().size() != EntityHandler.objectCount()) {
+            throw new AssertionError("runtime scenery inventory is incomplete");
         }
         if (WorldEditorDefinitionCatalog.boundaryEntries().size() != 214) {
             throw new AssertionError("wrong boundary catalog size");

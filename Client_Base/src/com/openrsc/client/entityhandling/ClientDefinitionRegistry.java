@@ -19,8 +19,8 @@ import java.util.ArrayList;
  * Authored definitions continue to be assembled by {@link EntityHandler}.
  */
 final class ClientDefinitionRegistry {
-	static final int FALLBACK_NPC_ID = 825;
-	private static final int FALLBACK_ITEM_ID = 1544;
+	static final int FALLBACK_NPC_ID = 0;
+	private static final int FALLBACK_ITEM_ID = 0;
 	private static final int FALLBACK_OBJECT_ID = 4;
 
 	private final ArrayList<NPCDef> npcs = new ArrayList<>();
@@ -40,6 +40,9 @@ final class ClientDefinitionRegistry {
 	private final ClientDefinitionFallbackDiagnostics fallbackDiagnostics =
 		new ClientDefinitionFallbackDiagnostics();
 	private int inventoryPictureCount = 0;
+	private int fallbackNpcId = FALLBACK_NPC_ID;
+	private int fallbackItemId = FALLBACK_ITEM_ID;
+	private int fallbackObjectId = FALLBACK_OBJECT_ID;
 
 	ArrayList<NPCDef> mutableNpcs() {
 		return npcs;
@@ -120,7 +123,7 @@ final class ClientDefinitionRegistry {
 
 	NPCDef npc(int id) {
 		if (id < 0 || id >= npcs.size()) {
-			return npcs.get(FALLBACK_NPC_ID);
+			return npcs.get(fallbackNpcId);
 		}
 		return npcs.get(id);
 	}
@@ -146,16 +149,15 @@ final class ClientDefinitionRegistry {
 	private ItemDef item(int requestedId, int resolvedId, boolean noted) {
 		if (resolvedId < 0 || resolvedId >= items.size()) {
 			logItemFallback(requestedId, resolvedId, noted, "out-of-range");
-			return items.get(FALLBACK_ITEM_ID);
+			return items.get(fallbackItemId);
 		}
 		ItemDef item = findItem(resolvedId, noted);
 		if (item == null) {
 			logItemFallback(requestedId, resolvedId, noted, "missing-definition");
-			return items.get(FALLBACK_ITEM_ID);
+			return items.get(fallbackItemId);
 		}
 		if (isUnobtaniumPlaceholder(item)
-			&& resolvedId != FALLBACK_ITEM_ID
-			&& resolvedId != FALLBACK_ITEM_ID + 1) {
+			&& resolvedId != fallbackItemId) {
 			logItemFallback(requestedId, resolvedId, noted, "placeholder-definition");
 		}
 		return item;
@@ -270,13 +272,42 @@ final class ClientDefinitionRegistry {
 	GameObjectDef object(int id) {
 		if (id < 0 || id >= objects.size() || (objects.get(id) != null && objects.get(id).id != id)) {
 			for (int i = objects.size() - 1; i >= 0; i--) {
-				if (objects.get(i).id == id) {
+				if (objects.get(i) != null && objects.get(i).id == id) {
 					return objects.get(i);
 				}
 			}
-			return objects.get(FALLBACK_OBJECT_ID);
+			return objects.get(fallbackObjectId);
 		}
 		return objects.get(id);
+	}
+
+	/** Selects safe fallbacks from the definitions supplied by this project. */
+	void useProjectFallbacks() {
+		fallbackNpcId = firstNpcId();
+		fallbackItemId = firstItemId();
+		fallbackObjectId = firstObjectId();
+	}
+
+	private int firstNpcId() {
+		for (int id = 0; id < npcs.size(); id++) {
+			if (npcs.get(id) != null && npcs.get(id).id == id) return id;
+		}
+		throw new IllegalStateException("Project contains no usable NPC definition");
+	}
+
+	private int firstItemId() {
+		for (int id = 0; id < items.size(); id++) {
+			ItemDef item = items.get(id);
+			if (item != null && item.id == id) return id;
+		}
+		throw new IllegalStateException("Project contains no usable item definition");
+	}
+
+	private int firstObjectId() {
+		for (int id = 0; id < objects.size(); id++) {
+			if (objects.get(id) != null && objects.get(id).id == id) return id;
+		}
+		throw new IllegalStateException("Project contains no usable scenery definition");
 	}
 
 	int storeModel(String name) {
