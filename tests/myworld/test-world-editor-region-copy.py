@@ -119,6 +119,10 @@ assert "setRegionPasteDestination" in ui and "requestRegionPasteApply" in ui
 assert "regionPasteOverwritePrompted" in ui and "regionPasteOverwriteArmed" in ui
 assert 'return "Overwrite?"' in ui and 'return "Confirm"' in ui
 assert '"There is nothing copied to clipboard"' in ui
+assert "regionLibraryPreferredSnapshotId=regionClipboardSnapshotId;requestRegionLibrary()" in ui
+assert "selected.isEmpty()&&regionLibrary.size()==1" in ui
+assert "snapshot library has multiple entries but no active clipboard selection" in ui
+assert "Paste selected. There is nothing copied to clipboard" not in ui
 assert "c!='\\uffff'&&!Character.isSurrogate(c)" in ui
 assert "drawWorldEditorRegionPastePreview" in client
 assert "WORLD_EDITOR_SET_REGION_PASTE_DESTINATION" in client

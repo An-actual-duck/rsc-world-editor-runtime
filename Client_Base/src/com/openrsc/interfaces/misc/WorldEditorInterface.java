@@ -295,7 +295,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void selectRegionTool(RegionTool selected){
 		if(regionCopyBridge.isPending()||regionPasteBridge.isPending()||isRegionSharingPending()){inspectionStatus="Wait for the active region operation before changing Copy/Cut/Paste tools.";return;}
 		regionTool=selected;coordinateFocus=0;regionPasteOverwritePrompted=false;regionPasteOverwriteArmed=false;
-		if(selected==RegionTool.PASTE){clearRegionSelection();if(regionClipboardSnapshotId.isEmpty())inspectionStatus="Paste selected. There is nothing copied to clipboard; use Copy or Import first.";else{regionLibraryPreferredSnapshotId=regionClipboardSnapshotId;requestRegionLibrary();}}
+		if(selected==RegionTool.PASTE){clearRegionSelection();regionLibraryPreferredSnapshotId=regionClipboardSnapshotId;requestRegionLibrary();}
 		else{clearPastePreview();clearRegionSelection();inspectionStatus=selected==RegionTool.CUT?"Cut selected: trace and Stop a boundary, then Cut to secure its snapshot and preview.":"Copy selected: click terrain to start an ordered boundary, Stop it, then Copy.";}
 	}
 	private void requestRegionLibrary(){
@@ -353,7 +353,16 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void pollRegionPaste(){
 		WorldBuilderRegionPasteClientBridge.Result result=regionPasteBridge.poll();if(result==null)return;
 		if(!result.accepted){regionPasteOverwriteArmed=false;inspectionStatus="Region Paste refused ["+result.errorCode+"]: "+result.message+" Next: "+result.nextStep;return;}
-		if("library".equals(result.operation)){String selected=regionLibraryPreferredSnapshotId.isEmpty()?regionClipboardSnapshotId:regionLibraryPreferredSnapshotId;regionLibrary.clear();regionLibrary.addAll(result.snapshots);regionLibraryIndex=-1;for(int i=0;i<regionLibrary.size();i++)if(regionLibrary.get(i).id.equals(selected)){regionLibraryIndex=i;regionClipboardSnapshotId=regionLibrary.get(i).id;regionClipboardSnapshotName=regionLibrary.get(i).name;break;}clearPastePreview();inspectionStatus=regionLibraryRefreshStatus.isEmpty()?(regionLibraryIndex<0?"There is nothing copied to clipboard. Use Copy or Import first.":"Clipboard ready: '"+selectedRegionSnapshot().name+"'. Click terrain to choose its Paste destination."):regionLibraryRefreshStatus;regionLibraryRefreshStatus="";regionLibraryPreferredSnapshotId="";return;}
+		if("library".equals(result.operation)){
+			String selected=regionLibraryPreferredSnapshotId.isEmpty()?regionClipboardSnapshotId:regionLibraryPreferredSnapshotId;
+			regionLibrary.clear();regionLibrary.addAll(result.snapshots);regionLibraryIndex=-1;
+			for(int i=0;i<regionLibrary.size();i++)if(regionLibrary.get(i).id.equals(selected)){regionLibraryIndex=i;break;}
+			if(regionLibraryIndex<0&&selected.isEmpty()&&regionLibrary.size()==1)regionLibraryIndex=0;
+			if(regionLibraryIndex>=0){regionClipboardSnapshotId=regionLibrary.get(regionLibraryIndex).id;regionClipboardSnapshotName=regionLibrary.get(regionLibraryIndex).name;}
+			clearPastePreview();
+			inspectionStatus=regionLibraryRefreshStatus.isEmpty()?(regionLibraryIndex<0?(regionLibrary.isEmpty()?"There is nothing copied to clipboard. Use Copy or Import first.":"The snapshot library has multiple entries but no active clipboard selection. Copy or import the region you want to Paste."):"Clipboard ready: '"+selectedRegionSnapshot().name+"'. Click terrain to choose its Paste destination."):regionLibraryRefreshStatus;
+			regionLibraryRefreshStatus="";regionLibraryPreferredSnapshotId="";return;
+		}
 		if("preview".equals(result.operation)){regionPastePlanHash=result.planHash;regionPasteBlocked=result.blocked;regionPasteOverwrite=result.overwrite;regionPasteOverwriteArmed=false;try{regionPastePreviewTiles=WorldEditorRegionSelection.ownedTiles(result.markers,65536);}catch(Exception invalid){regionPastePreviewTiles=new int[0][2];regionPasteBlocked=true;}List<int[]> collisions=new ArrayList<int[]>();for(int[] collision:result.collisions)if(collision[0]==mc.getEditorPlayerWorldLevel())collisions.add(new int[]{collision[1],collision[2]});regionPasteCollisionTiles=collisions.toArray(new int[collisions.size()][2]);inspectionStatus=result.blocked?"Paste preview is blocked with "+result.collisions.length+" collision/compatibility issue(s).":result.overwrite?"Paste preview ready: "+result.tileCount+" tiles and "+result.placementCount+" placements; overwrite confirmation is required.":"Paste preview ready: "+result.tileCount+" tiles and "+result.placementCount+" placements. Review the ghost, then Apply Paste.";return;}
 		if("apply".equals(result.operation)||"undo".equals(result.operation)){saveRequested=false;unsavedChanges=false;inspectionStatus="undo".equals(result.operation)?"Last Paste restored atomically. Activating the restored region live...":"Region pasted atomically. Activating the published region live...";mc.sendCommandString("activateregionpaste "+result.requestId);}
 	}
