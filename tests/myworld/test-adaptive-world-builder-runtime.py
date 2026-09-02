@@ -1878,7 +1878,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             " ".join(bundle["clientUpgradeBoundary"]),
         )
         source_upgrade = json.loads((
-            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v4.json"
+            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v5.json"
         ).read_text())
         self.assertEqual(
             "world-builder-installed-client-source-upgrade",
@@ -1897,6 +1897,8 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
                 "src/orsc/AdaptiveWorldBuilderClientSession.java",
                 "src/orsc/ProjectContentBundle.java",
                 "src/orsc/ProjectNpcAnimationRegistry.java",
+                "src/orsc/NativeLayeredTerrainChunk.java",
+                "src/orsc/NativeLayeredTerrainPacketDecoder.java",
                 "src/com/openrsc/client/model/Tile.java",
                 "src/orsc/WorldBuilderClientProfile.java",
                 "src/orsc/WorldBuilderInstalledClientProfile.java",
@@ -1918,10 +1920,6 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
                     "destinationRelativePath": "src/orsc/mudclient.java",
                 },
                 {
-                    "transformId": "world-builder-unsigned-native-chunk-elevation-v1",
-                    "destinationRelativePath": "src/orsc/NativeLayeredTerrainChunk.java",
-                },
-                {
                     "transformId": "world-builder-unsigned-uniform-elevation-v1",
                     "destinationRelativePath": "src/orsc/NativeLayeredTerrainSnapshot.java",
                 },
@@ -1929,7 +1927,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             source_upgrade["semanticTransforms"],
         )
         self.assertEqual(
-            3,
+            5,
             sum(
                 entry["replacementPolicy"] == "replace-supported-historical"
                 for entry in source_upgrade["sourceFiles"]

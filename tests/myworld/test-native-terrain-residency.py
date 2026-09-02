@@ -315,6 +315,207 @@ class NativeTerrainResidencyTest(unittest.TestCase):
             ],
         )
 
+    def test_v9_halo_decodes_mixed_v1_and_v2_full_sectors_strictly(self):
+        harness = textwrap.dedent(
+            """
+            import java.io.ByteArrayOutputStream;
+            import java.io.DataOutputStream;
+            import java.nio.charset.StandardCharsets;
+            import java.util.Arrays;
+            import java.util.zip.Deflater;
+            import orsc.NativeLayeredTerrainChunk;
+            import orsc.NativeLayeredTerrainPacketDecoder;
+            import orsc.NativeLayeredTerrainResidentCache;
+            import orsc.NativeLayeredTerrainSnapshot;
+
+            public final class NativeTerrainWideHaloHarness {
+                private static final String PACKAGE = "wide-halo";
+                private static final String VERSION = "1.0.0";
+                private static final String SHA =
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+                public static void main(String[] arguments) throws Exception {
+                    NativeLayeredTerrainSnapshot active = active(4, 11);
+                    NativeLayeredTerrainResidentCache cache =
+                        new NativeLayeredTerrainResidentCache();
+                    NativeLayeredTerrainSnapshot halo =
+                        NativeLayeredTerrainPacketDecoder.decodeV9Halo(
+                            halo(false, false), "global", 0, cache, active);
+                    require(halo.getAvailableChunkCount() == 16,
+                        "outer halo count");
+                    require(cache.size() == 16
+                            && cache.getLastPayloads() == 16,
+                        "wide halo residency");
+                    int worldX = 2 * 48;
+                    int worldY = 13 * 48;
+                    require(halo.createTile(worldX, worldY)
+                            .groundElevation == 500,
+                        "wide halo Tile elevation");
+                    require(halo.getGroundElevation(worldX, worldY) == 500,
+                        "wide halo scalar elevation");
+
+                    NativeLayeredTerrainResidentCache declaredV1 =
+                        new NativeLayeredTerrainResidentCache();
+                    expectFailure(() -> decode(
+                        haloUnchecked(true, false), declaredV1, active),
+                        "wide payload accepted as v1");
+                    require(declaredV1.size() == 0,
+                        "failed v1 declaration changed residency");
+
+                    NativeLayeredTerrainResidentCache declaredV2 =
+                        new NativeLayeredTerrainResidentCache();
+                    expectFailure(() -> decode(
+                        haloUnchecked(false, true), declaredV2, active),
+                        "v1 payload accepted as v2");
+                    require(declaredV2.size() == 0,
+                        "failed v2 declaration changed residency");
+                }
+
+                private static NativeLayeredTerrainSnapshot active(
+                        int centerX, int centerY) {
+                    NativeLayeredTerrainChunk[] chunks =
+                        new NativeLayeredTerrainChunk[9];
+                    int index = 0;
+                    for (int dx = -1; dx <= 1; dx++) {
+                        for (int dy = -1; dy <= 1; dy++) {
+                            chunks[index++] =
+                                NativeLayeredTerrainChunk.voidChunk(
+                                    48, centerX + dx, centerY + dy);
+                        }
+                    }
+                    return new NativeLayeredTerrainSnapshot(
+                        NativeLayeredTerrainSnapshot
+                            .ATOMIC_ACTIVATION_PROTOCOL_VERSION,
+                        PACKAGE, VERSION, SHA, 48, "global", 0,
+                        centerX, centerY, 1, chunks);
+                }
+
+                private static byte[] halo(
+                        boolean declareWideAsV1,
+                        boolean encodeWideAsV1) throws Exception {
+                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                    DataOutputStream output = new DataOutputStream(bytes);
+                    line(output, PACKAGE);
+                    line(output, VERSION);
+                    line(output, SHA);
+                    output.writeByte(48);
+                    output.writeInt(4);
+                    output.writeInt(11);
+                    output.writeByte(2);
+                    output.writeByte(25);
+                    for (int dx = -2; dx <= 2; dx++) {
+                        for (int dy = -2; dy <= 2; dy++) {
+                            int chunkX = 4 + dx;
+                            int chunkY = 11 + dy;
+                            output.writeInt(chunkX);
+                            output.writeInt(chunkY);
+                            boolean outer = Math.max(
+                                Math.abs(dx), Math.abs(dy)) == 2;
+                            output.writeByte(outer ? 1 : 0);
+                            if (!outer) continue;
+                            boolean wide = chunkX == 2 && chunkY == 13;
+                            output.writeInt(chunkX);
+                            output.writeInt(chunkY);
+                            line(output, wide && !declareWideAsV1
+                                ? NativeLayeredTerrainChunk.RAW_ENCODING_V2
+                                : NativeLayeredTerrainChunk.RAW_ENCODING);
+                            line(output, SHA);
+                            output.writeByte(1);
+                            byte[] compressed = sector(
+                                wide && !encodeWideAsV1,
+                                wide ? 500 : 33);
+                            output.writeShort(compressed.length);
+                            output.write(compressed);
+                        }
+                    }
+                    output.close();
+                    return bytes.toByteArray();
+                }
+
+                private static byte[] haloUnchecked(
+                        boolean declareWideAsV1,
+                        boolean encodeWideAsV1) {
+                    try {
+                        return halo(declareWideAsV1, encodeWideAsV1);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                }
+
+                private static byte[] sector(boolean wide, int elevation) {
+                    int width = wide ? 11 : 10;
+                    byte[] raw = new byte[48 * 48 * width];
+                    for (int offset = 0; offset < raw.length; offset += width) {
+                        if (wide) {
+                            raw[offset] = (byte)(elevation >>> 8);
+                            raw[offset + 1] = (byte)elevation;
+                            raw[offset + 2] = 44;
+                            raw[offset + 3] = 5;
+                        } else {
+                            raw[offset] = (byte)elevation;
+                            raw[offset + 1] = 44;
+                            raw[offset + 2] = 5;
+                        }
+                    }
+                    Deflater compressor = new Deflater(Deflater.BEST_SPEED);
+                    try {
+                        compressor.setInput(raw);
+                        compressor.finish();
+                        byte[] compressed = new byte[raw.length + 128];
+                        int length = compressor.deflate(compressed);
+                        require(compressor.finished(), "compression");
+                        return Arrays.copyOf(compressed, length);
+                    } finally {
+                        compressor.end();
+                    }
+                }
+
+                private static void decode(
+                        byte[] receipt,
+                        NativeLayeredTerrainResidentCache cache,
+                        NativeLayeredTerrainSnapshot active) {
+                    NativeLayeredTerrainPacketDecoder.decodeV9Halo(
+                        receipt, "global", 0, cache, active);
+                }
+
+                private static void line(
+                        DataOutputStream output, String value)
+                        throws Exception {
+                    output.write(value.getBytes(StandardCharsets.US_ASCII));
+                    output.writeByte(10);
+                }
+
+                private static void expectFailure(
+                        Runnable operation, String label) {
+                    try {
+                        operation.run();
+                        throw new AssertionError(label);
+                    } catch (IllegalArgumentException
+                            | IllegalStateException expected) {
+                        // Expected.
+                    }
+                }
+
+                private static void require(boolean value, String label) {
+                    if (!value) throw new AssertionError(label);
+                }
+            }
+            """
+        )
+        self._compile_and_run(
+            "NativeTerrainWideHaloHarness",
+            harness,
+            [
+                CLIENT_TILE,
+                CLIENT_CHUNK,
+                CLIENT_SNAPSHOT,
+                CLIENT_RESIDENCY,
+                CLIENT_PROFILE_STUB,
+                CLIENT_DECODER,
+            ],
+        )
+
     def test_v6_gate_wire_and_disconnect_contracts_are_integrated(self):
         configuration = (
             ROOT / "server/src/com/openrsc/server/ServerConfiguration.java"

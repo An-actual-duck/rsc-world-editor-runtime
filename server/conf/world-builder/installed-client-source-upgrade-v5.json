@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "manifestType": "world-builder-installed-client-source-upgrade",
-  "upgradeId": "world-builder-installed-client-source-upgrade-v4",
+  "upgradeId": "world-builder-installed-client-source-upgrade-v5",
   "clientBootstrapId": "world-builder-installed-client-profile-v1",
   "sourceFiles": [
     {
@@ -21,6 +21,25 @@
       "destinationRelativePath": "src/orsc/ProjectNpcAnimationRegistry.java",
       "sha256": "ec2e6e435de7a70d25936e6ac67c0af8ecf3cdc4def6d09f6f9316e44f8ad8fb",
       "replacementPolicy": "add-or-exact"
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/NativeLayeredTerrainChunk.java",
+      "destinationRelativePath": "src/orsc/NativeLayeredTerrainChunk.java",
+      "sha256": "44c54180b49748087d37fba46a56c2ebf657029cd7cf175e6cbbcd3d29566dfc",
+      "replacementPolicy": "replace-supported-historical",
+      "supportedBeforeSha256": [
+        "3addf8d0a03dfe034accd362c57aa5326837593746cce3fa1dfb680671e3fd9e",
+        "2ee943cc6f10f9adadf55bf93c621e19f7159092c5d44424279b800f2fb4f8b1"
+      ]
+    },
+    {
+      "sourceRelativePath": "client/world-builder-source/orsc/NativeLayeredTerrainPacketDecoder.java",
+      "destinationRelativePath": "src/orsc/NativeLayeredTerrainPacketDecoder.java",
+      "sha256": "3f22bb2caa55a8ac2f165f29f4a9c703d7f56082189530b90f29a496b967ea26",
+      "replacementPolicy": "replace-supported-historical",
+      "supportedBeforeSha256": [
+        "99be9c0012beea1e92cc49573f01fb001a51903e8b7fd44ee77df439dae1048c"
+      ]
     },
     {
       "sourceRelativePath": "client/world-builder-source/com/openrsc/client/model/Tile.java",
@@ -80,10 +99,6 @@
     {
       "transformId": "world-builder-installed-login-world-bootstrap-v2",
       "destinationRelativePath": "src/orsc/mudclient.java"
-    },
-    {
-      "transformId": "world-builder-unsigned-native-chunk-elevation-v1",
-      "destinationRelativePath": "src/orsc/NativeLayeredTerrainChunk.java"
     },
     {
       "transformId": "world-builder-unsigned-uniform-elevation-v1",
