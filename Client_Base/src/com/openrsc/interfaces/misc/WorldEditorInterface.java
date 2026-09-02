@@ -141,6 +141,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private int[][] regionPreviewTiles=new int[0][2];
 	private String regionLibraryRefreshStatus="";
 	private String regionLibraryPreferredSnapshotId="";
+	private String lastRegionCopyFailure="";
 
 	public WorldEditorInterface(mudclient client) {
 		super(client);mc=client;setLocation(8,8);setSize(DOCK_WIDTH+FLYOUT_GAP+FLYOUT_WIDTH,DOCK_HEIGHT);setVisible(false);setIsOverlay(true);
@@ -266,7 +267,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void requestRegionCopy(){
 		if(!regionClosed){inspectionStatus="Close a valid region selection before copying it.";return;}
 		if(terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||entityEditTracker.isPending()){inspectionStatus="Wait for authoritative edit responses before copying the region.";return;}
-		try{regionCopyBridge.submit(regionName,mc.getEditorPlayerWorldLevel(),regionMarkerTiles());mc.sendCommandString("copyregion");inspectionStatus="Saving pending edits, then copying the exact closed region...";closeArmed=false;}
+		try{lastRegionCopyFailure="";regionCopyBridge.submit(regionName,mc.getEditorPlayerWorldLevel(),regionMarkerTiles());mc.sendCommandString("copyregion");inspectionStatus="Region Copy queued; waiting for the completed Editor result...";closeArmed=false;}
 		catch(Exception failure){inspectionStatus="Region Copy could not start: "+failure.getMessage();}
 	}
 	private void requestRegionCut(){
@@ -286,9 +287,9 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void pollRegionCopy(){
 		WorldBuilderRegionCopyClientBridge.Result result=regionCopyBridge.poll();if(result==null)return;
-		if(!result.accepted){inspectionStatus="Region "+(result.operation!=null&&result.operation.startsWith("cut")?"Cut":"Copy")+" refused ["+result.errorCode+"]: "+result.message+" Next: "+result.nextStep;return;}
+		if(!result.accepted){inspectionStatus="Region "+(result.operation!=null&&result.operation.startsWith("cut")?"Cut":"Copy")+" refused ["+result.errorCode+"]: "+result.message+" Next: "+result.nextStep;if(result.operation==null||!result.operation.startsWith("cut"))lastRegionCopyFailure=inspectionStatus;mc.showWorldEditorStatus(inspectionStatus);return;}
 		saveRequested=false;unsavedChanges=false;
-		if("copy".equals(result.operation)){rememberCapturedRegionSnapshot(result);inspectionStatus="Copied '"+result.name+"': "+result.tileCount+" tiles, "+result.placementCount+" placements, snapshot "+shortHash(result.snapshotId)+(result.crossingReportCount>0?"; "+result.crossingReportCount+" crossing footprint report(s).":".");return;}
+		if("copy".equals(result.operation)){lastRegionCopyFailure="";rememberCapturedRegionSnapshot(result);inspectionStatus="Region Copy completed: '"+result.name+"' is on the clipboard ("+result.tileCount+" tiles, "+result.placementCount+" placements, snapshot "+shortHash(result.snapshotId)+").";mc.showWorldEditorStatus(inspectionStatus);return;}
 		if("cut-preview".equals(result.operation)){rememberCapturedRegionSnapshot(result);regionCutSnapshotId=result.snapshotId;regionCutPlanHash=result.planHash;regionCutBlocked=result.blocked;inspectionStatus=result.blocked?"Cut snapshot was secured, but the exact plan is blocked. Reset or correct the selection; the world was unchanged.":"Cut snapshot secured: "+result.tileCount+" tiles and "+result.placementCount+" placements. Review the selection, then select Confirm Cut.";return;}
 		if("cut-apply".equals(result.operation)){inspectionStatus="Region cut atomically. Activating the published region live...";clearRegionSelection();mc.sendCommandString("activateregioncut "+result.requestId);}
 	}
@@ -309,6 +310,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(selected==RegionTool.PASTE){clearRegionSelection();regionLibraryPreferredSnapshotId=regionClipboardSnapshotId;if(selectRegionLibrarySnapshot(regionClipboardSnapshotId)){regionLibraryPreferredSnapshotId="";clearPastePreview();inspectionStatus="Clipboard ready: '"+selectedRegionSnapshot().name+"'. Click terrain to choose its Paste destination.";}else requestRegionLibrary();}
 		else{clearPastePreview();clearRegionSelection();inspectionStatus=selected==RegionTool.CUT?"Cut selected: trace and Stop a boundary, then Cut to secure its snapshot and preview.":"Copy selected: click terrain to start an ordered boundary, Stop it, then Copy.";}
 	}
+	private String emptyRegionClipboardStatus(){return lastRegionCopyFailure.isEmpty()?"There is nothing copied to clipboard. Use Copy or Import first.":lastRegionCopyFailure+" No clipboard snapshot was created.";}
 	private void requestRegionLibrary(){
 		if(regionPasteBridge.isPending()||isRegionSharingPending())return;
 		try{regionPasteBridge.requestLibrary();mc.sendCommandString("pasteregion");inspectionStatus="Loading the verified project snapshot library...";}
@@ -343,7 +345,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private WorldBuilderRegionPasteClientBridge.Snapshot selectedRegionSnapshot(){return regionLibraryIndex>=0&&regionLibraryIndex<regionLibrary.size()?regionLibrary.get(regionLibraryIndex):null;}
 	public void setRegionPasteDestination(int worldX,int worldY){
-		if(!isRegionPasteSelectingDestination())return;WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();if(snapshot==null){inspectionStatus="There is nothing copied to clipboard";mc.showWorldEditorStatus(inspectionStatus);return;}
+		if(!isRegionPasteSelectingDestination())return;WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();if(snapshot==null){inspectionStatus=emptyRegionClipboardStatus();mc.showWorldEditorStatus(inspectionStatus);return;}
 		regionPasteX=worldX;regionPasteY=worldY;regionPasteLevel=mc.getEditorPlayerWorldLevel();clearPastePreview();
 		try{regionPasteBridge.requestPreview(snapshot.id,regionPasteLevel,worldX,worldY);mc.sendCommandString("pasteregion");inspectionStatus="Saving pending edits and calculating the exact Paste preview...";}
 		catch(Exception failure){inspectionStatus="Region Paste preview could not start: "+failure.getMessage();}
@@ -372,7 +374,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 			if(regionLibraryIndex<0&&selected.isEmpty()&&regionLibrary.size()==1)regionLibraryIndex=0;
 			if(regionLibraryIndex>=0){regionClipboardSnapshotId=regionLibrary.get(regionLibraryIndex).id;regionClipboardSnapshotName=regionLibrary.get(regionLibraryIndex).name;}
 			clearPastePreview();
-			inspectionStatus=regionLibraryRefreshStatus.isEmpty()?(regionLibraryIndex<0?(regionLibrary.isEmpty()?"There is nothing copied to clipboard. Use Copy or Import first.":"The snapshot library has multiple entries but no active clipboard selection. Copy or import the region you want to Paste."):"Clipboard ready: '"+selectedRegionSnapshot().name+"'. Click terrain to choose its Paste destination."):regionLibraryRefreshStatus;
+			inspectionStatus=regionLibraryRefreshStatus.isEmpty()?(regionLibraryIndex<0?(regionLibrary.isEmpty()?emptyRegionClipboardStatus():"The snapshot library has multiple entries but no active clipboard selection. Copy or import the region you want to Paste."):"Clipboard ready: '"+selectedRegionSnapshot().name+"'. Click terrain to choose its Paste destination."):regionLibraryRefreshStatus;
+			if(regionLibraryIndex<0&&regionLibrary.isEmpty()&&!lastRegionCopyFailure.isEmpty())mc.showWorldEditorStatus(inspectionStatus);
 			regionLibraryRefreshStatus="";regionLibraryPreferredSnapshotId="";return;
 		}
 		if("preview".equals(result.operation)){regionPastePlanHash=result.planHash;regionPasteBlocked=result.blocked;regionPasteOverwrite=result.overwrite;regionPasteOverwriteArmed=false;try{regionPastePreviewTiles=WorldEditorRegionSelection.ownedTiles(result.markers,65536);}catch(Exception invalid){regionPastePreviewTiles=new int[0][2];regionPasteBlocked=true;}List<int[]> collisions=new ArrayList<int[]>();for(int[] collision:result.collisions)if(collision[0]==mc.getEditorPlayerWorldLevel())collisions.add(new int[]{collision[1],collision[2]});regionPasteCollisionTiles=collisions.toArray(new int[collisions.size()][2]);inspectionStatus=result.blocked?"Paste preview is blocked with "+result.collisions.length+" collision/compatibility issue(s).":result.overwrite?"Paste preview ready: "+result.tileCount+" tiles and "+result.placementCount+" placements; overwrite confirmation is required.":"Paste preview ready: "+result.tileCount+" tiles and "+result.placementCount+" placements. Review the ghost, then Apply Paste.";return;}
@@ -386,7 +389,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void clearPastePreview(){regionPastePreviewTiles=new int[0][2];regionPasteCollisionTiles=new int[0][2];regionPastePlanHash="";regionPasteBlocked=false;regionPasteOverwrite=false;regionPasteOverwritePrompted=false;regionPasteOverwriteArmed=false;}
 	private void clearRegionCutPlan(){regionCutSnapshotId="";regionCutPlanHash="";regionCutBlocked=false;}
-	private void resetRegionPaste(){regionTool=RegionTool.COPY;regionLibrary.clear();regionLibraryIndex=-1;regionPasteX=regionPasteY=-1;regionPasteLevel=0;regionClipboardSnapshotId=regionClipboardSnapshotName="";regionLibraryRefreshStatus="";regionLibraryPreferredSnapshotId="";clearPastePreview();}
+	private void resetRegionPaste(){regionTool=RegionTool.COPY;regionLibrary.clear();regionLibraryIndex=-1;regionPasteX=regionPasteY=-1;regionPasteLevel=0;regionClipboardSnapshotId=regionClipboardSnapshotName="";regionLibraryRefreshStatus="";regionLibraryPreferredSnapshotId="";lastRegionCopyFailure="";clearPastePreview();}
 	public int[][] regionMarkerTiles(){int[][] result=new int[regionMarkers.size()][2];for(int index=0;index<regionMarkers.size();index++){result[index][0]=regionMarkers.get(index)[0];result[index][1]=regionMarkers.get(index)[1];}return result;}
 	public int[][] regionSelectionPreviewTiles(){return regionClosed?regionPreviewTiles:new int[0][2];}
 	public int[] regionSelectionHoverTile(){return isRegionSelecting()&&!regionClosed&&regionHoverX>=0?new int[]{regionHoverX,regionHoverY}:null;}

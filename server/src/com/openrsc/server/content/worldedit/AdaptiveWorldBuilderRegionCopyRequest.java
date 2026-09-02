@@ -106,7 +106,7 @@ public final class AdaptiveWorldBuilderRegionCopyRequest {
 			}
 			forceDirectory(control);
 			player.message("[World Editor] Region " + operation
-				+ " request accepted for exact Editor processing.");
+				+ " request queued for exact Editor processing; wait for the separate completed or refused result before changing tools.");
 		} catch (Exception failure) {
 			try {
 				if (pending != null) Files.deleteIfExists(pending);

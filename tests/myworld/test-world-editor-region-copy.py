@@ -107,6 +107,7 @@ assert 'command.equalsIgnoreCase("cutregion")' in commands
 assert server.index("editor.saveAdaptivePackage(player)") < server.index("Files.move(pending, request")
 assert "ownsActiveSession(player)" in server
 assert '"world-builder-region-copy-response"' in server
+assert "wait for the separate completed or refused result before changing tools" in server
 assert "RegionTool { COPY, CUT, PASTE }" in ui
 assert "requestRegionCut" in ui and "requestCutPreview" in ui
 assert "requestCutApply" in ui and 'mc.sendCommandString("cutregion")' in ui
@@ -126,6 +127,12 @@ assert "snapshot library has multiple entries but no active clipboard selection"
 assert "Paste selected. There is nothing copied to clipboard" not in ui
 assert "rememberCapturedRegionSnapshot(result)" in ui
 assert "new WorldBuilderRegionPasteClientBridge.Snapshot(result.snapshotId,result.name,result.tileCount,result.placementCount,1)" in ui
+assert 'inspectionStatus="Region Copy queued; waiting for the completed Editor result..."' in ui
+assert 'inspectionStatus="Region Copy completed:' in ui
+assert "mc.showWorldEditorStatus(inspectionStatus)" in ui
+assert "lastRegionCopyFailure=inspectionStatus" in ui
+assert "emptyRegionClipboardStatus()" in ui
+assert 'lastRegionCopyFailure+" No clipboard snapshot was created."' in ui
 assert "if(selectRegionLibrarySnapshot(regionClipboardSnapshotId))" in ui
 assert "else requestRegionLibrary()" in ui
 assert "public Snapshot(String id, String name" in paste_bridge
