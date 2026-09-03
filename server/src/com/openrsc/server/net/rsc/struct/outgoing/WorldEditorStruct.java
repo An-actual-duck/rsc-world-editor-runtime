@@ -10,6 +10,7 @@ public final class WorldEditorStruct extends AbstractStruct<OpcodeOut> {
 	public boolean historyCanUndo,historyCanRedo;
 	public int entityOperation; public boolean entityAccepted;
 	public int operationTotal, operationOffset;
+	public boolean lockdownEnabled; public int lockdownTileCount,lockdownLevel;
 	public long sessionId; public String message="";
 	public final List<TerrainTile> terrainTiles = new ArrayList<TerrainTile>();
 	public static final class TerrainTile {

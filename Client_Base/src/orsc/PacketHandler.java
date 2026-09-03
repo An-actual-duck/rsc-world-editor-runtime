@@ -1476,6 +1476,7 @@ public class PacketHandler {
 		if(type==12){int operation=packetsIncoming.getByte()&0xff;boolean accepted=packetsIncoming.getByte()!=0;
 			boolean canUndo=packetsIncoming.getByte()!=0,canRedo=packetsIncoming.getByte()!=0;
 			mc.worldEditorInterface.acceptEntityEdit(sequence,operation,accepted,canUndo,canRedo,packetsIncoming.readString());return;}
+		if(type==13){boolean enabled=packetsIncoming.getByte()!=0;int count=packetsIncoming.get32(),level=packetsIncoming.get32();mc.worldEditorInterface.acceptLockdown(sequence,enabled,count,level,packetsIncoming.readString());return;}
 		if(type==3||type==7){int x=packetsIncoming.getShort(),y=packetsIncoming.getShort(),plane=packetsIncoming.getByte();
 			int sx=packetsIncoming.getShort(),sy=packetsIncoming.getShort(),lx=packetsIncoming.getByte()&0xff,ly=packetsIncoming.getByte()&0xff;
 			int elev=packetsIncoming.getShort()&0xffff,texture=packetsIncoming.getByte()&0xff,overlay=packetsIncoming.getByte()&0xff,roof=packetsIncoming.getByte()&0xff;

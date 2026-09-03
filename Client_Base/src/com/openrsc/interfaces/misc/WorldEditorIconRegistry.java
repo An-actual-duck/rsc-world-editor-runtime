@@ -47,6 +47,7 @@ public final class WorldEditorIconRegistry {
 		TOOL_FREEHAND("tool-freehand.png", "Hand"),
 		TOOL_LINE("tool-line.png", "Line"),
 		TOOL_RECTANGLE(null, "Box"),
+		TOOL_LOCKDOWN(null, "Lock"),
 		PROFILE_BUILD("profile-build.png", "Build"),
 		ACTION_UNDO(null, "Undo"),
 		ACTION_REDO(null, "Redo"),
@@ -123,6 +124,7 @@ public final class WorldEditorIconRegistry {
 		if (key == Key.TOOL_RECTANGLE) {
 			return rectangleIcon();
 		}
+		if (key == Key.TOOL_LOCKDOWN) return lockdownIcon();
 		if (key == Key.MODE_REGION) return regionIcon(false);
 		if (key == Key.MODE_REGION_COPY) return regionCopyIcon();
 		if (key == Key.MODE_REGION_CUT) return regionCutIcon();
@@ -179,6 +181,7 @@ public final class WorldEditorIconRegistry {
 		sprite.setSomething(ICON_SIZE, ICON_SIZE);
 		return sprite;
 	}
+	private static Sprite lockdownIcon(){int[] pixels=new int[ICON_SIZE*ICON_SIZE];java.util.Arrays.fill(pixels,RendererTransparency.TRANSPARENT_SAMPLE);int color=0xffffff;for(int x=6;x<=17;x++){pixels[10*ICON_SIZE+x]=color;pixels[20*ICON_SIZE+x]=color;}for(int y=10;y<=20;y++){pixels[y*ICON_SIZE+6]=color;pixels[y*ICON_SIZE+17]=color;}for(int x=9;x<=14;x++){pixels[5*ICON_SIZE+x]=color;pixels[6*ICON_SIZE+x]=color;}for(int y=5;y<=10;y++){pixels[y*ICON_SIZE+8]=color;pixels[y*ICON_SIZE+15]=color;}Sprite sprite=new Sprite(pixels,ICON_SIZE,ICON_SIZE);sprite.setShift(0,0);sprite.setRequiresShift(false);sprite.setSomething(ICON_SIZE,ICON_SIZE);return sprite;}
 
 	private static Sprite historyIcon(boolean redo) {
 		int[] pixels = new int[ICON_SIZE * ICON_SIZE];

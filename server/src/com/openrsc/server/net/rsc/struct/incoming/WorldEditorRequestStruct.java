@@ -15,5 +15,8 @@ public final class WorldEditorRequestStruct extends AbstractStruct<OpcodeIn> {
 	public int elevationOperation, elevationStep;
 	public int roofTexture, horizontalWall, verticalWall, diagonal;
 	public int[][] terrainTiles;
+	/** Lockdown operation (reset/configure/toggle), selection mode, enabled flag, and points. */
+	public int lockdownOperation, lockdownMode; public boolean lockdownEnabled;
+	public int[][] lockdownPoints;
 	public long sessionId;
 }

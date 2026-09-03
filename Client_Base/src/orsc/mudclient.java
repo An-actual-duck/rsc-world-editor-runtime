@@ -8888,6 +8888,7 @@ public final class mudclient implements Runnable {
 						this.getSurface().setRenderer2DPhase(Renderer2DFrame.Phase.WORLD_OVERLAY);
 						this.drawWorldEditorTerrainToolPreview(renderer3DFrame);
 						this.drawWorldEditorSceneryMovePreview(renderer3DFrame);
+						this.drawWorldEditorLockdownPreview(renderer3DFrame);
 						this.drawWorldEditorRegionSelectionPreview(renderer3DFrame);
 						this.drawWorldEditorRegionPastePreview(renderer3DFrame);
 						this.drawQueuedStaticProjectiles();
@@ -12045,6 +12046,8 @@ public final class mudclient implements Runnable {
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_PLACE_GROUND_ITEM,"Place "+EntityHandler.getItemDef(worldEditorInterface.getGroundItemId()).getName(),localZ);
 		if(worldEditorInterface.isRegionSelecting()&&!worldEditorInterface.isRegionClosed())
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_ADD_REGION_MARKER,"Add next region marker",localZ);
+		if(worldEditorInterface.isLockdownSelecting())
+			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_ADD_REGION_MARKER,"Add Lockdown selection",localZ);
 		if(worldEditorInterface.isRegionPasteSelectingDestination())
 			this.menuCommon.addCharacterItem_WithID(localX,"",MenuItemAction.WORLD_EDITOR_SET_REGION_PASTE_DESTINATION,"Place snapshot marker 1 here",localZ);
 	}
@@ -19715,7 +19718,7 @@ public final class mudclient implements Runnable {
 					worldEditorInterface.requestRemoveGroundItem(tileID,worldX,worldY);
 					break;
 				}
-				case WORLD_EDITOR_ADD_REGION_MARKER: { worldEditorInterface.addRegionMarker(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
+				case WORLD_EDITOR_ADD_REGION_MARKER: { if(worldEditorInterface.isLockdownSelecting())worldEditorInterface.addLockdownPoint(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ);else worldEditorInterface.addRegionMarker(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
 				case WORLD_EDITOR_SET_REGION_PASTE_DESTINATION: { worldEditorInterface.setRegionPasteDestination(indexOrX+midRegionBaseX,idOrZ+midRegionBaseZ); break; }
 				case MOD_SUMMON_PLAYER: {
 					String playerName = var9;
@@ -23973,6 +23976,11 @@ public final class mudclient implements Runnable {
 		for(int index=0;index<markers.length;index++)drawWorldEditorRegionMarker(frame,markers[index][0]-midRegionBaseX,markers[index][1]-midRegionBaseZ,String.valueOf(index+1),index==0?0xff4dff:0x55e6a5);
 		if(hover!=null&&markers.length<256)drawWorldEditorRegionMarker(frame,hover[0]-midRegionBaseX,hover[1]-midRegionBaseZ,String.valueOf(markers.length+1),0xffc04d);
 	}
+	private void drawWorldEditorLockdownPreview(Renderer3DFrame frame){
+		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.lockdownProtectedTiles(),markers=worldEditorInterface.lockdownMarkerTiles();int[] hover=worldEditorInterface.lockdownHoverTile();
+		if(tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}int color=worldEditorInterface.isLockdownEnabled()?0xff4058:0x888888;for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,color);}}
+		for(int i=0;i<markers.length;i++)drawWorldEditorRegionMarker(frame,markers[i][0]-midRegionBaseX,markers[i][1]-midRegionBaseZ,"L",worldEditorInterface.isLockdownEnabled()?0xff4058:0x888888);if(hover!=null)drawWorldEditorRegionMarker(frame,hover[0]-midRegionBaseX,hover[1]-midRegionBaseZ,"+",0xffc04d);
+	}
 	private void drawWorldEditorRegionPastePreview(Renderer3DFrame frame){
 		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.regionPastePreviewTiles(),collisions=worldEditorInterface.regionPasteCollisionTiles();int[] anchor=worldEditorInterface.regionPasteAnchorTile();if(tiles.length==0&&anchor==null)return;
 		if(tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,collisions.length>0?0xff981f:0x45f3ff);}}
@@ -24059,10 +24067,10 @@ public final class mudclient implements Runnable {
 	}
 	private boolean updateWorldEditorTerrainDrag(){
 		if(worldEditorInterface==null||!worldEditorInterface.isEditorOpen()||!isAdaptiveWorldStateReadyForEditor())return false;int worldX=-1,worldY=-1;
-		boolean picking=(worldEditorInterface.isTerrainPainting()||worldEditorInterface.isSceneryMoveArmed()||worldEditorInterface.isRegionSelecting())&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
+		boolean picking=(worldEditorInterface.isTerrainPainting()||worldEditorInterface.isSceneryMoveArmed()||worldEditorInterface.isRegionSelecting()||worldEditorInterface.isLockdownSelecting())&&showUiTab==0&&mouseY<getGameHeight()-70&&!mouseInTabArea_CUSTOM();
 		if(picking&&scene!=null&&world!=null&&localPlayer!=null){int[] local=projectScreenToCurrentTerrainTile();
 			if(local!=null&&local[0]>=0&&local[0]<World.LOCAL_TILE_COUNT&&local[1]>=0&&local[1]<World.LOCAL_TILE_COUNT){worldX=midRegionBaseX+local[0];worldY=midRegionBaseZ+local[1];}}
-		boolean terrainConsumed=worldEditorInterface.updateTerrainDrag(controlPressed,currentMouseButtonDown==1,worldX,worldY);boolean moveConsumed=worldEditorInterface.updateSceneryMovePointer(currentMouseButtonDown==2,worldX,worldY);worldEditorInterface.updateRegionSelectionPointer(worldX,worldY);return terrainConsumed||moveConsumed;
+		boolean terrainConsumed=worldEditorInterface.updateTerrainDrag(controlPressed,currentMouseButtonDown==1,worldX,worldY);boolean moveConsumed=worldEditorInterface.updateSceneryMovePointer(currentMouseButtonDown==2,worldX,worldY);worldEditorInterface.updateRegionSelectionPointer(worldX,worldY);worldEditorInterface.updateLockdownPointer(worldX,worldY);return terrainConsumed||moveConsumed;
 	}
 
 	public void worldEditorTeleport(int worldX, int worldY) {

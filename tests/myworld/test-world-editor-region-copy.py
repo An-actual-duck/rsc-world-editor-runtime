@@ -97,7 +97,7 @@ assert "drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_REGION_COPY" not 
 assert "drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_REGION_PASTE" not in ui
 assert "addRegionMarker" in ui and "closeRegionSelection" in ui
 assert "removeLastRegionMarker" in ui and "cancelRegionSelection" in ui
-assert "advanceRegionSelectionState" in ui and '"Start":"Stop"' in ui
+assert "advanceRegionSelectionState" in ui and '"Start":"Done"' in ui
 assert "requestRegionCopy" in ui and 'mc.sendCommandString("copyregion")' in ui
 assert "drawWorldEditorRegionSelectionPreview" in client
 assert "drawWorldEditorRegionMarker" in client

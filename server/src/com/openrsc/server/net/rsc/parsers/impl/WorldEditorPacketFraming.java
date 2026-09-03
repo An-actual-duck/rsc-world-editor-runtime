@@ -11,7 +11,14 @@ public final class WorldEditorPacketFraming {
 		for (int accepted : FIXED_LENGTHS) {
 			if (length == accepted) return true;
 		}
-		return length >= 34 && length <= 290 && (length - 30) % 4 == 0;
+		return (length >= 34 && length <= 290 && (length - 30) % 4 == 0)
+			|| (length >= 22 && length <= 1046 && (length - 22) % 4 == 0);
+	}
+
+	public static boolean acceptsLockdown(int subtype,int length,int operation,int count){
+		if(subtype!=13||operation<0||operation>2||count<0||count>256)return false;
+		if(operation==1&&count<1)return false;if(operation!=1&&count!=0)return false;
+		return length==22+count*4;
 	}
 
 	public static boolean acceptsTerrainStroke(int subtype, int length, int count) {
