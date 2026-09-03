@@ -943,7 +943,7 @@ def main() -> None:
         "private int incompleteSceneResets = 0;",
         "private int completedBaselines = 0;",
         "private long baselineStartedMillis = 0L;",
-        "void recordPacket(",
+        "boolean recordPacket(",
         "incompleteSceneResets++;",
         "private void resetPageState()",
         "private void storePageRecords(",

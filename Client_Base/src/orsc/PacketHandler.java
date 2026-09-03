@@ -3079,7 +3079,7 @@ public class PacketHandler {
 			packetsIncoming.packetEnd = length;
 			return;
 		}
-		sceneBaselineState.recordPacket(
+		final boolean staticSceneUpdated = sceneBaselineState.recordPacket(
 			protocolVersion,
 			serverTick,
 			locationContextSequence,
@@ -3106,10 +3106,12 @@ public class PacketHandler {
 			pageTotal,
 			recordsRead,
 			pageRecords);
-		sceneBaselineState.pruneLegacyListsOutsideSyncRange(mc);
-		applyCompleteSceneBaselineToLegacyLists();
-		applyCompleteStaticPresentation();
-		acceptCompleteAtomicSceneBaseline();
+		if (staticSceneUpdated) {
+			sceneBaselineState.pruneLegacyListsOutsideSyncRange(mc);
+			applyCompleteSceneBaselineToLegacyLists();
+			applyCompleteStaticPresentation();
+			acceptCompleteAtomicSceneBaseline();
+		}
 		sceneBaselineState.recordSceneDiagnostics(mc);
 		packetsIncoming.packetEnd = length;
 	}

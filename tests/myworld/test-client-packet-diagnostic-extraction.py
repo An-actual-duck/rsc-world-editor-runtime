@@ -169,9 +169,12 @@ def verify_source_ownership_and_order() -> None:
             "pageTotal = packetsIncoming.getShort();",
             "int recordCount = packetsIncoming.getShort();",
             "pageRecords.add(new SceneBaselineState.Record",
-            "sceneBaselineState.recordPacket(",
+            "final boolean staticSceneUpdated = sceneBaselineState.recordPacket(",
+            "if (staticSceneUpdated) {",
             "sceneBaselineState.pruneLegacyListsOutsideSyncRange(mc);",
             "applyCompleteSceneBaselineToLegacyLists();",
+            "applyCompleteStaticPresentation();",
+            "acceptCompleteAtomicSceneBaseline();",
             "sceneBaselineState.recordSceneDiagnostics(mc);",
         ),
         "scene-baseline decode/apply order changed",
@@ -602,22 +605,28 @@ def verify_scene_baseline_state() -> None:
                         .size() == 1,
                     "stored outer wall count");
 
-                presentation.recordPacket(
+                boolean itemOnlyTouchedStaticScene = presentation.recordPacket(
                     8, 21, 7, "global@0", 120, 620,
                     1, 1, 9, 16, 101, 202, 999,
                     3, 13, 2, 1, 1, 1, 404, 505,
                     0, 0, 0, 0,
                     new ArrayList<SceneBaselineState.Record>());
                 require(
+                    !itemOnlyTouchedStaticScene,
+                    "ground-item telemetry must not request scenery reconciliation");
+                require(
                     presentation.hasStoredCompleteBaseline()
                         && presentation.hasStoredCompletePresentation(),
                     "ground-item telemetry must not reset static products");
 
-                presentation.recordPacket(
+                boolean changedOuterSceneTouchedStaticScene = presentation.recordPacket(
                     8, 22, 7, "global@0", 120, 620,
                     1, 1, 9, 16, 101, 202, 999,
                     3, 13, 2, 1, 1, 1, 406, 505,
                     1, 0, 1, 1, scenery);
+                require(
+                    changedOuterSceneTouchedStaticScene,
+                    "changed outer identity must request scenery reconciliation");
                 require(
                     !presentation.hasStoredCompleteBaseline()
                         && !presentation.hasStoredCompletePresentation(),

@@ -81,7 +81,13 @@ final class SceneBaselineState {
 	private int lastLoggedSceneIssueSignature = 0;
 	private String scopeIdentity = "legacy";
 
-	void recordPacket(
+	/**
+	 * Records one baseline packet and reports whether it changes or contributes
+	 * to the static scenery product. Ground-item-only telemetry with an
+	 * unchanged static identity deliberately returns false so its caller does
+	 * not prune or rebuild scenery lists.
+	 */
+	boolean recordPacket(
 		int protocolVersion,
 		int serverTick,
 		int localX,
@@ -98,7 +104,7 @@ final class SceneBaselineState {
 		int pageTotal,
 		int recordsRead,
 		List<Record> pageRecords) {
-		recordPacket(
+		return recordPacket(
 			protocolVersion,
 			serverTick,
 			0,
@@ -127,7 +133,7 @@ final class SceneBaselineState {
 			pageRecords);
 	}
 
-	void recordPacket(
+	boolean recordPacket(
 		int protocolVersion,
 		int serverTick,
 		String scopeIdentity,
@@ -145,7 +151,7 @@ final class SceneBaselineState {
 		int pageTotal,
 		int recordsRead,
 		List<Record> pageRecords) {
-		recordPacket(
+		return recordPacket(
 			protocolVersion,
 			serverTick,
 			0,
@@ -174,7 +180,7 @@ final class SceneBaselineState {
 			pageRecords);
 	}
 
-	void recordPacket(
+	boolean recordPacket(
 		int protocolVersion,
 		int serverTick,
 		int locationContextSequence,
@@ -233,7 +239,9 @@ final class SceneBaselineState {
 			presentationWalls,
 			presentationSceneryHash,
 			presentationWallsHash);
-		if (nextStaticSceneKey != staticSceneKey) {
+		final boolean staticSceneChanged =
+			nextStaticSceneKey != staticSceneKey;
+		if (staticSceneChanged) {
 			if (staticSceneKey != 0 && packets > 0 && !hasCompleteBaseline()) {
 				incompleteSceneResets++;
 			}
@@ -278,7 +286,7 @@ final class SceneBaselineState {
 
 		if (!isStaticCategory(pageCategory)) {
 			rebuildCompleteStoredProducts();
-			return;
+			return staticSceneChanged;
 		}
 		if (pageTotal <= 0) {
 			throw new IllegalArgumentException(
@@ -336,13 +344,14 @@ final class SceneBaselineState {
 
 		if (categoryPages[pageIndex]) {
 			duplicatePages.put(pageCategory, duplicatePages.getOrDefault(pageCategory, 0) + 1);
-			return;
+			return true;
 		}
 
 		categoryPages[pageIndex] = true;
 		receivedPages.put(pageCategory, receivedPages.getOrDefault(pageCategory, 0) + 1);
 		storePageRecords(pageCategory, pageIndex, pageRecords);
 		rebuildCompleteStoredProducts();
+		return true;
 	}
 
 	void resetForScopeChange(String nextScopeIdentity) {
