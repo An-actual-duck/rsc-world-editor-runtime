@@ -16,6 +16,7 @@ BUNDLE_BRIDGE = ROOT / "Client_Base/src/orsc/WorldBuilderRegionBundleClientBridg
 BUNDLE_DIALOG = ROOT / "Client_Base/src/orsc/WorldBuilderRegionBundleFileDialog.java"
 BUNDLE_SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRegionBundleRequest.java"
 PASTE_SERVER = ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderRegionPasteRequest.java"
+SESSION_MANAGER = ROOT / "server/src/com/openrsc/server/content/worldedit/WorldEditorSessionManager.java"
 COMMANDS = ROOT / "server/plugins/com/openrsc/server/plugins/authentic/commands/Development.java"
 
 HARNESS = r"""
@@ -78,6 +79,7 @@ bundle_bridge = BUNDLE_BRIDGE.read_text(encoding="utf-8")
 bundle_dialog = BUNDLE_DIALOG.read_text(encoding="utf-8")
 bundle_server = BUNDLE_SERVER.read_text(encoding="utf-8")
 paste_server = PASTE_SERVER.read_text(encoding="utf-8")
+session_manager = SESSION_MANAGER.read_text(encoding="utf-8")
 commands = COMMANDS.read_text(encoding="utf-8")
 
 assert "Mode { NAVIGATE, INSPECT, TERRAIN, SCENERY, NPC, ITEMS, REGION }" in ui
@@ -151,6 +153,10 @@ assert '"world-builder-region-paste-response"' in paste_server
 assert "wait for the separate completed or refused result" in paste_server
 assert '"undo".equals(operation)' in paste_server
 assert "adoptPublishedAdaptivePackage" in paste_server
+assert "requirePublishedAdaptiveLayout(current, published)" in session_manager
+assert "expectedSectors.addAll(nativeTerrainGrowthSaved)" in session_manager
+assert "nativeLevelCreationsSaved.values()" in session_manager
+assert "changed the terrain-sector layout beyond saved Builder growth" in session_manager
 assert 'inspectionStatus="Region Paste refused [' in ui
 assert '"Paste preview ready:' in ui
 assert 'result.noChange?"This destination already exactly matches the copied region.' in ui

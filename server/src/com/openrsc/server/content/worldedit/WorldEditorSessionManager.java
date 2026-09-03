@@ -1332,16 +1332,11 @@ public final class WorldEditorSessionManager {
 		NativeLayeredWorldPackage startup = player.getWorld().getRegionManager()
 			.getNativeLayeredWorldPackage();
 		NativeLayeredWorldPackage current = effectiveNativeOwner(startup);
-		if (startup == null || published == null
-			|| !current.getPackageId().equals(published.getPackageId())
-			|| !current.getPackageVersion().equals(published.getPackageVersion())
-			|| !current.getTerrainSectors().keySet().equals(
-				published.getTerrainSectors().keySet())
-			|| !current.getPlacementSets().keySet().equals(
-				published.getPlacementSets().keySet())) {
+		if (startup == null || current == null || published == null) {
 			throw new IOException(
-				"Published Region Paste changed the bounded package layout.");
+				"Published Region Paste has no active package to replace.");
 		}
+		requirePublishedAdaptiveLayout(current, published);
 		if (inventorySha256 == null
 			|| !inventorySha256.matches("[0-9a-f]{64}")) {
 			throw new IOException(
@@ -1356,6 +1351,70 @@ public final class WorldEditorSessionManager {
 		resetNativeDraftAgainstAdoptedPackage(inventorySha256);
 		populateNativePackagePlacements(player, published);
 		nativeTerrainSceneRevision++;
+	}
+
+	private void requirePublishedAdaptiveLayout(
+		NativeLayeredWorldPackage current,
+		NativeLayeredWorldPackage published) throws IOException {
+		if (!current.getPackageId().equals(published.getPackageId())
+			|| !current.getPackageVersion().equals(published.getPackageVersion())) {
+			throw new IOException(
+				"Published Region Paste changed the package identity or version.");
+		}
+		if (current.getPresentationChunkSize()
+				!= published.getPresentationChunkSize()
+			|| !current.getWorldSpaceKinds().equals(
+				published.getWorldSpaceKinds())) {
+			throw new IOException(
+				"Published Region Paste changed the presentation or world-space layout.");
+		}
+
+		Set<String> expectedLevels = adaptiveLevelLayout(current);
+		for (NativeLevelCreation level : nativeLevelCreationsSaved.values()) {
+			expectedLevels.add(adaptiveLevelLayout(
+				WorldSpaceId.GLOBAL.getValue(), level.level, level.name, level.role));
+		}
+		if (!expectedLevels.equals(adaptiveLevelLayout(published))) {
+			throw new IOException(
+				"Published Region Paste changed the level layout beyond saved Builder growth.");
+		}
+
+		Set<WorldMapSectorId> expectedSectors =
+			new HashSet<WorldMapSectorId>(current.getTerrainSectors().keySet());
+		expectedSectors.addAll(nativeTerrainGrowthSaved);
+		if (!expectedSectors.equals(published.getTerrainSectors().keySet())) {
+			throw new IOException(
+				"Published Region Paste changed the terrain-sector layout beyond saved Builder growth.");
+		}
+
+		Set<String> expectedPlacementSets =
+			new HashSet<String>(current.getPlacementSets().keySet());
+		for (NativeLevelCreation level : nativeLevelCreationsSaved.values()) {
+			expectedPlacementSets.add(
+				new AdaptiveWorldBuilderPackagePublisher.Level(
+					WorldSpaceId.GLOBAL.getValue(), level.level,
+					level.name, level.role).placementSetId);
+		}
+		if (!expectedPlacementSets.equals(published.getPlacementSets().keySet())) {
+			throw new IOException(
+				"Published Region Paste changed the placement-set layout beyond saved Builder growth.");
+		}
+	}
+
+	private static Set<String> adaptiveLevelLayout(
+		NativeLayeredWorldPackage worldPackage) {
+		Set<String> result = new HashSet<String>();
+		for (NativeLayeredWorldPackage.LevelDeclaration level
+			: worldPackage.getLevelDeclarations()) {
+			result.add(adaptiveLevelLayout(level.getWorldSpace().getValue(),
+				level.getLevel(), level.getName(), level.getRole()));
+		}
+		return result;
+	}
+
+	private static String adaptiveLevelLayout(
+		String worldSpace, int level, String name, String role) {
+		return worldSpace + "\u0000" + level + "\u0000" + name + "\u0000" + role;
 	}
 
 	private void retireNativePackagePlacements(Player player) {
