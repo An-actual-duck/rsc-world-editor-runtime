@@ -45,6 +45,7 @@ import java.util.TreeMap;
 public final class WorldEditorSessionManager {
 	public static final int TERRAIN_DRAFT_LIMIT = 4096;
 	public static final int ADAPTIVE_PLACEMENT_DRAFT_LIMIT = 4096;
+	public static final int LOCKDOWN_TILE_LIMIT = 65536;
 	private final SecureRandom random;
 	private final WorldEditStorageContext storage;
 	private Session active;
@@ -108,6 +109,9 @@ public final class WorldEditorSessionManager {
 		nativeOperationHistory =
 			new WorldEditorOperationHistory<Object,Optional<Object>>();
 	private long nativePlacementHistorySequence;
+	private final Set<NativeTileKey> lockdownTiles =
+		new java.util.LinkedHashSet<NativeTileKey>();
+	private boolean lockdownEnabled;
 	public WorldEditorSessionManager() { this(null, new SecureRandom()); }
 	public WorldEditorSessionManager(WorldEditStorageContext storage) { this(storage, new SecureRandom()); }
 	WorldEditorSessionManager(SecureRandom random) { this(null, random); }
@@ -119,6 +123,7 @@ public final class WorldEditorSessionManager {
 		if (active != null && active.ownerHash != player.getUsernameHash()) return OpenResult.denied("Another administrator owns the active editor session.");
 		if (active == null) {
 			clearNativeOperationHistory();
+			clearLockdown();
 			long id;
 			do { id = random.nextLong(); } while (id == 0L);
 			active = new Session(id, player.getUsernameHash());
@@ -139,16 +144,33 @@ public final class WorldEditorSessionManager {
 		if (!validate(player, id, sequence).accepted) return false;
 		active = null;
 		clearNativeOperationHistory();
+		clearLockdown();
 		return true;
 	}
 	public synchronized void closeFor(Player player) {
 		if (player != null && active != null && active.ownerHash == player.getUsernameHash()) {
 			active = null;
 			clearNativeOperationHistory();
+			clearLockdown();
 		}
 	}
 	public synchronized boolean hasActiveSession() { return active != null; }
 	public synchronized boolean ownsActiveSession(Player player){return player!=null&&player.isAdmin()&&active!=null&&active.ownerHash==player.getUsernameHash();}
+	public synchronized LockdownResult configureLockdown(Player player,int mode,int level,int[][] points){
+		requireNativeDraftSession(player);
+		WorldLocation current=player.getLayeredLocation();
+		if(current.getCoordinate().getLevel()!=level)throw new IllegalArgumentException("Create Lockdown on the active signed level.");
+		int[][] selected=WorldEditorLockdownSelection.tiles(mode,points,LOCKDOWN_TILE_LIMIT);
+		lockdownTiles.clear();for(int[] tile:selected)lockdownTiles.add(new NativeTileKey(new WorldLocation(current.getWorldSpace(),new WorldCoordinate(tile[0],tile[1],level))));
+		lockdownEnabled=true;return new LockdownResult(true,lockdownTiles.size(),level);
+	}
+	public synchronized LockdownResult resetLockdown(Player player){requireNativeDraftSession(player);clearLockdown();return new LockdownResult(false,0,player.getLayeredLocation().getCoordinate().getLevel());}
+	public synchronized LockdownResult setLockdownEnabled(Player player,boolean enabled){requireNativeDraftSession(player);if(lockdownTiles.isEmpty()&&enabled)throw new IllegalStateException("Select and finish Lockdown tiles before enabling protection.");lockdownEnabled=enabled;int level=lockdownTiles.isEmpty()?player.getLayeredLocation().getCoordinate().getLevel():lockdownTiles.iterator().next().level;return new LockdownResult(lockdownEnabled,lockdownTiles.size(),level);}
+	public synchronized boolean lockdownIntersects(Player player,int level,int[][] tiles){
+		if(!lockdownEnabled||lockdownTiles.isEmpty()||player==null||tiles==null)return false;WorldSpaceId space=player.getLayeredLocation().getWorldSpace();
+		for(int[] tile:tiles)if(tile!=null&&tile.length>=2&&lockdownTiles.contains(new NativeTileKey(space,level,tile[0],tile[1])))return true;return false;
+	}
+	private void clearLockdown(){lockdownTiles.clear();lockdownEnabled=false;}
 	public synchronized WorldEditorTerrainArchive.Snapshot inspectTerrain(Player player, int x, int y, int plane) throws IOException {
 		WorldEditorTerrainArchive.Snapshot archived=inspectArchivedTerrain(player,x,y,plane);
 		WorldEditorTerrainArchive.Snapshot drafted=terrainDraft.get(terrainKey(x,y,plane));
@@ -341,6 +363,8 @@ public final class WorldEditorSessionManager {
 			new java.util.LinkedHashSet<WorldMapSectorId>(nativeTerrainGrowth);
 		int[][] coordinates = operation?WorldEditorTerrainStroke.validateOperationTiles(requestedTiles):WorldEditorTerrainStroke.validateTiles(requestedTiles);
 		int[] fieldMasks=terrainFieldMasks(coordinates.length,requestedFieldMasks,fieldMask);
+		LockdownFilter lockdown=filterLockdown(player,level,coordinates,fieldMasks);
+		coordinates=lockdown.coordinates;fieldMasks=lockdown.fieldMasks;
 		for(int mask:fieldMasks){validateTerrainPaint(mask,elevation,groundTexture,groundOverlay,roofTexture,horizontalWall,verticalWall);
 			requireClientBoundaryPlacementDefinitions(player,mask,horizontalWall,verticalWall,diagonal);}
 		if(operation)requireNativeOperationCoverage(player,coordinates,level);else ensureNativePaintCoverage(player, coordinates, level);
@@ -754,6 +778,8 @@ public final class WorldEditorSessionManager {
 			player, "scenery", sceneryId,
 			player.getClientLimitations().maxSceneryId);
 		WorldLocation location = activeNativeSceneryLocation(player, x, y);
+		requireUnlocked(location);
+		requireUnlockedScenery(new GameObject(player.getWorld(),new GameObjectLoc(sceneryId,x,y,0,0)),location);
 		if (player.getWorld().getRegionManager().findInteractionScenery(
 				Point.location(x, y), player) != null) {
 			throw new IllegalArgumentException(
@@ -770,11 +796,13 @@ public final class WorldEditorSessionManager {
 	public synchronized GameObject removeNativeScenery(
 		Player player, int x, int y) {
 		WorldLocation location = activeNativeSceneryLocation(player, x, y);
+		requireUnlocked(location);
 		GameObject object =
 			player.getWorld().getRegionManager().findInteractionScenery(
 				Point.location(x, y), player);
 		NativeSceneryState current =
 			requireEditableNativeScenery(player, location, object);
+		requireUnlockedScenery(object,location);
 		NativeSceneryKey key = new NativeSceneryKey(location);
 		requireAdaptivePlacementDraftCapacity(
 			player,key,nativeSceneryBase,nativeSceneryOverlay);
@@ -789,6 +817,7 @@ public final class WorldEditorSessionManager {
 	public synchronized GameObject rotateNativeScenery(
 		Player player, int x, int y, Integer requestedDirection) {
 		WorldLocation location = activeNativeSceneryLocation(player, x, y);
+		requireUnlocked(location);
 		GameObject object =
 			player.getWorld().getRegionManager().findInteractionScenery(
 				Point.location(x, y), player);
@@ -804,6 +833,7 @@ public final class WorldEditorSessionManager {
 		GameObject replacement = new GameObject(
 			player.getWorld(),
 			new GameObjectLoc(object.getID(), x, y, direction, 0));
+		requireUnlockedScenery(object,location);requireUnlockedScenery(replacement,location);
 		player.getWorld().replaceGameObject(object, replacement);
 		NativeSceneryState rotated=NativeSceneryState.from(replacement);
 		recordNativeScenery(key,rotated);
@@ -818,6 +848,7 @@ public final class WorldEditorSessionManager {
 			player, sourceX, sourceY);
 		WorldLocation destinationLocation = activeNativeSceneryLocation(
 			player, destinationX, destinationY);
+		requireUnlocked(sourceLocation);requireUnlocked(destinationLocation);
 		if (sourceLocation.equals(destinationLocation)) {
 			throw new IllegalArgumentException(
 				"Scenery is already at that destination.");
@@ -826,6 +857,7 @@ public final class WorldEditorSessionManager {
 			.findInteractionScenery(Point.location(sourceX, sourceY), player);
 		NativeSceneryState current =
 			requireEditableNativeScenery(player, sourceLocation, source);
+		requireUnlockedScenery(source,sourceLocation);
 		if (player.getWorld().getRegionManager()
 				.findNativeLayeredScenery(destinationLocation) != null) {
 			throw new IllegalArgumentException(
@@ -850,6 +882,7 @@ public final class WorldEditorSessionManager {
 			new GameObjectLoc(
 				current.sceneryId, destinationX, destinationY,
 				current.direction, 0));
+		requireUnlockedScenery(moved,destinationLocation);
 		moved.setInitialWorldLocation(destinationLocation);
 		player.getWorld().getRegionManager().markNativeLayeredPlacement(
 			moved, sourceOwner.getPackageId(), current.placementId,
@@ -874,6 +907,7 @@ public final class WorldEditorSessionManager {
 			player, "NPC", npcId,
 			player.getClientLimitations().maxNpcId);
 		WorldLocation location = activeNativePlacementLocation(player, x, y);
+		requireUnlocked(location);
 		if (player.getWorld().getServer().getEntityHandler()
 				.getNpcDef(npcId) == null) {
 			throw new IllegalArgumentException("Invalid NPC definition ID.");
@@ -924,6 +958,7 @@ public final class WorldEditorSessionManager {
 			throw new IllegalArgumentException(
 				"Only package-owned NPCs on this Builder-created level are editable.");
 		}
+		requireUnlocked(npc.getWorldLocation());
 		NativeNpcState current = NativeNpcState.from(npc);
 		NativeNpcKey key = new NativeNpcKey(
 			npc.getWorldLocation().getWorldSpace(),current.level,current.placementId);
@@ -948,6 +983,7 @@ public final class WorldEditorSessionManager {
 			player, "item", itemId,
 			player.getClientLimitations().maxItemId);
 		WorldLocation location = activeNativePlacementLocation(player, x, y);
+		requireUnlocked(location);
 		com.openrsc.server.external.ItemDefinition definition =
 			player.getWorld().getServer().getEntityHandler()
 				.getItemDef(itemId);
@@ -1007,6 +1043,7 @@ public final class WorldEditorSessionManager {
 		int x,
 		int y) {
 		WorldLocation location = activeNativePlacementLocation(player, x, y);
+		requireUnlocked(location);
 		GroundItem item =
 			player.getWorld().findNativeLayeredGroundItem(location);
 		if (item == null || item.getID() != itemId
@@ -2515,6 +2552,16 @@ public final class WorldEditorSessionManager {
 		}else throw new IllegalStateException(
 			"Editor history contains an unsupported operation key.");
 	}
+	private LockdownFilter filterLockdown(Player player,int level,int[][] coordinates,int[] fieldMasks){
+		if(!lockdownEnabled||lockdownTiles.isEmpty())return new LockdownFilter(coordinates,fieldMasks);
+		WorldSpaceId space=player.getLayeredLocation().getWorldSpace();List<int[]> kept=new ArrayList<int[]>();List<Integer> masks=new ArrayList<Integer>();
+		for(int index=0;index<coordinates.length;index++){int[] tile=coordinates[index];if(lockdownTiles.contains(new NativeTileKey(space,level,tile[0],tile[1])))continue;kept.add(tile);masks.add(Integer.valueOf(fieldMasks[index]));}
+		if(kept.isEmpty())throw new IllegalStateException("Lockdown protected every tile in that edit; no changes were made.");
+		int[] keptMasks=new int[masks.size()];for(int index=0;index<masks.size();index++)keptMasks[index]=masks.get(index).intValue();
+		return new LockdownFilter(kept.toArray(new int[kept.size()][2]),keptMasks);
+	}
+	private void requireUnlocked(WorldLocation location){if(lockdownEnabled&&location!=null&&lockdownTiles.contains(new NativeTileKey(location)))throw new IllegalStateException("That tile is protected by Lockdown; no changes were made.");}
+	private void requireUnlockedScenery(GameObject object,WorldLocation origin){if(!lockdownEnabled||object==null||origin==null)return;Point[] bounds=object.getObjectBoundary();int minX=Math.min(bounds[0].getX(),bounds[1].getX()),maxX=Math.max(bounds[0].getX(),bounds[1].getX()),minY=Math.min(bounds[0].getY(),bounds[1].getY()),maxY=Math.max(bounds[0].getY(),bounds[1].getY());for(int x=minX;x<=maxX;x++)for(int y=minY;y<=maxY;y++)requireUnlocked(new WorldLocation(origin.getWorldSpace(),new WorldCoordinate(x,y,origin.getCoordinate().getLevel())));}
 	private String availableNativePlacementId(
 		Player player,String family,WorldLocation location){
 		if(isAdaptive(player)){
@@ -2739,10 +2786,13 @@ public final class WorldEditorSessionManager {
 	private static boolean rawByte(int value){return value>=0&&value<=255;}
 	private static boolean unsignedShort(int value){return value>=0&&value<=65535;}
 
+	public static final class LockdownResult { public final boolean enabled;public final int tileCount,level;LockdownResult(boolean enabled,int tileCount,int level){this.enabled=enabled;this.tileCount=tileCount;this.level=level;} }
+	private static final class LockdownFilter { final int[][] coordinates;final int[] fieldMasks;LockdownFilter(int[][] coordinates,int[] fieldMasks){this.coordinates=coordinates;this.fieldMasks=fieldMasks;} }
 	private static final class Session { final long id, ownerHash; int nextSequence=1; Session(long i,long o){id=i;ownerHash=o;} }
 	private static final class NativeTileKey {
 		final WorldSpaceId worldSpace;final int level,x,y;
 		NativeTileKey(WorldLocation location){worldSpace=location.getWorldSpace();WorldCoordinate coordinate=location.getCoordinate();level=coordinate.getLevel();x=coordinate.getX();y=coordinate.getY();}
+		NativeTileKey(WorldSpaceId worldSpace,int level,int x,int y){this.worldSpace=worldSpace;this.level=level;this.x=x;this.y=y;}
 		WorldLocation location(){return new WorldLocation(worldSpace,new WorldCoordinate(x,y,level));}
 		@Override public boolean equals(Object other){if(this==other)return true;if(!(other instanceof NativeTileKey))return false;NativeTileKey key=(NativeTileKey)other;return level==key.level&&x==key.x&&y==key.y&&worldSpace.equals(key.worldSpace);}
 		@Override public int hashCode(){int result=worldSpace.hashCode();result=31*result+level;result=31*result+x;return 31*result+y;}

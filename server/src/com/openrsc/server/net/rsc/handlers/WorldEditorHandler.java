@@ -1,10 +1,12 @@
 package com.openrsc.server.net.rsc.handlers;
 
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.Validation;
+import com.openrsc.server.content.worldedit.WorldEditorSessionManager;
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.TerrainStrokeResult;
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeTerrainSnapshot;
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeTerrainStrokeResult;
 import com.openrsc.server.content.worldedit.WorldEditorSessionManager.NativeOperationHistoryResult;
+import com.openrsc.server.content.worldedit.WorldEditorSessionManager.LockdownResult;
 import com.openrsc.server.content.worldedit.WorldEditorTerrainStroke;
 import com.openrsc.server.content.worldedit.WorldBuilderMode;
 import com.openrsc.server.content.worldedit.WorldBuilderPlayerSession;
@@ -65,12 +67,22 @@ public final class WorldEditorHandler implements PayloadProcessor<WorldEditorReq
 			else if (request.type == 10) applyOperationHistory(player, validation.nextSequence, false);
 			else if (request.type == 11) applyOperationHistory(player, validation.nextSequence, true);
 			else if (request.type == 12) editEntity(request, player, validation.nextSequence);
+			else if (request.type == 13) editLockdown(request, player, validation.nextSequence);
 			else error(player, validation.nextSequence, "Unsupported editor operation.");
 		} catch (Exception e) {
 			if(request.type==12)entityResult(player,validation.nextSequence,request.entityOperation,false,
 				"Entity edit refused: "+(e.getMessage()==null?e.getClass().getSimpleName():e.getMessage()));
 			else error(player, validation.nextSequence, "Editor request failed: " + e.getMessage());
 		}
+	}
+	private void editLockdown(WorldEditorRequestStruct r,Player p,int next){
+		WorldEditorSessionManager manager=p.getWorld().getServer().getWorldEditorSessions();LockdownResult result;
+		if(r.lockdownOperation==0)result=manager.resetLockdown(p);
+		else if(r.lockdownOperation==1)result=manager.configureLockdown(p,r.lockdownMode,r.plane,r.lockdownPoints);
+		else if(r.lockdownOperation==2)result=manager.setLockdownEnabled(p,r.lockdownEnabled);
+		else throw new IllegalArgumentException("Unknown Lockdown operation.");
+		WorldEditorStruct out=new WorldEditorStruct();out.type=13;out.sequence=next;out.lockdownEnabled=result.enabled;out.lockdownTileCount=result.tileCount;out.lockdownLevel=result.level;
+		out.message=result.tileCount==0?"Lockdown reset; all tiles may be edited.":"Lockdown "+(result.enabled?"ON":"OFF")+": "+result.tileCount+" tile"+(result.tileCount==1?"":"s")+" protected on level "+result.level+".";ActionSender.sendWorldEditor(p,out);
 	}
 
 	private void editEntity(WorldEditorRequestStruct r,Player p,int next){

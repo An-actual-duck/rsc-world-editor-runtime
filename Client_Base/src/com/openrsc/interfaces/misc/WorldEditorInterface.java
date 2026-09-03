@@ -36,7 +36,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public enum SceneryTool { PLACE, MOVE, ROTATE, REMOVE }
 	public enum NpcTool { PLACE, REMOVE }
 	public enum GroundItemTool { PLACE, REMOVE }
-	public enum TerrainTool { FREEHAND, LINE, RECTANGLE }
+	public enum TerrainTool { FREEHAND, LINE, RECTANGLE, LOCKDOWN }
+	public enum LockdownMode { TILES, MARKERS }
 	public enum RegionTool { COPY, CUT, PASTE }
 	private static final String[] TABS={"Navigate","Inspect","Terrain","Scenery","NPC","Items","Regions"};
 	private final mudclient mc;
@@ -95,6 +96,12 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private boolean terrainBuildMode=false,terrainDragActive=false,terrainDragReleasePending=false;
 	private int terrainDragHoverX=-1,terrainDragHoverY=-1,terrainDragCenterX=-1,terrainDragCenterY=-1,terrainDragAccepted=0;
 	private TerrainTool terrainTool=TerrainTool.FREEHAND;
+	private LockdownMode lockdownMode=LockdownMode.TILES;
+	private final List<int[]> lockdownPoints=new ArrayList<int[]>();
+	private int[][] lockdownTiles=new int[0][2];
+	private final HashSet<Long> lockdownTileKeys=new HashSet<Long>();
+	private int lockdownHoverX=-1,lockdownHoverY=-1,lockdownLevel=0;
+	private boolean lockdownDone=false,lockdownEnabled=false,lockdownPending=false;
 	private int terrainLineAnchorX=-1,terrainLineAnchorY=-1;
 	private int[][] terrainLineCommitTiles=null;
 	private int[] terrainLineCommitMasks=null;
@@ -154,7 +161,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 
 	public void open(long id,int sequence){
 		if(Config.isAndroid())return;
-		sessionId=id;nextSequence=sequence;mode=Mode.NAVIGATE;terrainTool=TerrainTool.FREEHAND;clearTerrainLine();clearSceneryMove();clearRegionSelection();resetRegionPaste();regionCopyBridge.reset();regionPasteBridge.reset();regionBundleBridge.reset();regionBundleDialog.reset();toolbar.reset();definitionBrowser.close();icons.initialize();
+		sessionId=id;nextSequence=sequence;mode=Mode.NAVIGATE;terrainTool=TerrainTool.FREEHAND;clearTerrainLine();clearSceneryMove();clearLockdownLocal();clearRegionSelection();resetRegionPaste();regionCopyBridge.reset();regionPasteBridge.reset();regionBundleBridge.reset();regionBundleDialog.reset();toolbar.reset();definitionBrowser.close();icons.initialize();
 		normalizeProjectBoundSelections();
 		int x=mc.getEditorPlayerWorldX(),y=mc.getEditorPlayerWorldY(),level=mc.getEditorPlayerWorldLevel();
 		brushX=x;brushY=y;brushLevel=level;teleportX=String.valueOf(x);teleportY=String.valueOf(y);teleportLevel=String.valueOf(level);
@@ -162,13 +169,14 @@ public final class WorldEditorInterface extends NCustomComponent {
 		terrainHistoryNextToken=1;terrainStrokeHistoryToken=0;terrainHistoryCanUndo=false;terrainHistoryCanRedo=false;terrainHistoryPending=false;terrainHistoryTotal=terrainHistoryReceived=0;
 		setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);clearTerrainDrag();updatePresentationBounds();setVisible(true);
 	}
-	public void closeFromServer(){setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);setVisible(false);sessionId=0;coordinateFocus=0;clearTerrainLine();clearTerrainDrag();clearSceneryMove();clearRegionSelection();resetRegionPaste();regionCopyBridge.reset();regionPasteBridge.reset();regionBundleBridge.reset();regionBundleDialog.reset();definitionBrowser.close();toolbar.reset();}
+	public void closeFromServer(){setTerrainBuildMode(false);mc.setWorldEditorNavigateClickTeleport(false);setVisible(false);sessionId=0;coordinateFocus=0;clearTerrainLine();clearTerrainDrag();clearSceneryMove();clearLockdownLocal();clearRegionSelection();resetRegionPaste();regionCopyBridge.reset();regionPasteBridge.reset();regionBundleBridge.reset();regionBundleDialog.reset();definitionBrowser.close();toolbar.reset();}
 	public boolean isEditorOpen(){return isVisible()&&sessionId!=0;}
 	public boolean isKeyboardCaptureActive(){return isEditorOpen()&&(keyboardShortcutsEnabled||coordinateFocus!=0||definitionBrowser.isOpen());}
 	public boolean isKeyboardShortcutMode(){return isEditorOpen()&&keyboardShortcutsEnabled;}
 	public boolean isInspecting(){return isEditorOpen()&&mode==Mode.INSPECT;}
 	public boolean isNavigating(){return isEditorOpen()&&mode==Mode.NAVIGATE;}
-	public boolean isTerrainPainting(){return isEditorOpen()&&(!isLayeredReview()||isLayeredPlacementDraftLevel())&&mode==Mode.TERRAIN;}
+	public boolean isTerrainPainting(){return isEditorOpen()&&(!isLayeredReview()||isLayeredPlacementDraftLevel())&&mode==Mode.TERRAIN&&terrainTool!=TerrainTool.LOCKDOWN;}
+	public boolean isLockdownSelecting(){return isEditorOpen()&&isLayeredTerrainDraft()&&mode==Mode.TERRAIN&&terrainTool==TerrainTool.LOCKDOWN&&!lockdownDone&&!lockdownPending;}
 	public boolean isTerrainLineTool(){return isTerrainPainting()&&terrainTool==TerrainTool.LINE;}
 	public String terrainPaintActionLabel(){if(terrainTool==TerrainTool.LINE)return terrainLineAnchorX<0?"Set line anchor":"Commit terrain line";
 		if(terrainTool==TerrainTool.RECTANGLE)return terrainLineAnchorX<0?"Set rectangle corner":"Commit terrain rectangle";return "Paint terrain";}
@@ -176,11 +184,11 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public int[][] terrainToolPreviewTiles(){
 		if(terrainLineCommitTiles!=null)return terrainLineCommitTiles;
 		if(!isTerrainPainting()||terrainDragHoverX<0||terrainDragHoverY<0)return new int[0][2];
-		try{return terrainTool==TerrainTool.LINE&&terrainLineAnchorX>=0
+		try{int[][] preview=terrainTool==TerrainTool.LINE&&terrainLineAnchorX>=0
 			?WorldEditorTerrainBrush.lineFootprint(terrainLineAnchorX,terrainLineAnchorY,terrainDragHoverX,terrainDragHoverY,terrainBrushSize,TERRAIN_DRAG_LIMIT)
 			:terrainTool==TerrainTool.RECTANGLE&&terrainLineAnchorX>=0
 				?WorldEditorTerrainBrush.rectangleFootprint(terrainLineAnchorX,terrainLineAnchorY,terrainDragHoverX,terrainDragHoverY,rectangleOptions.isFill(),TERRAIN_DRAG_LIMIT)
-				:WorldEditorTerrainBrush.centeredFootprint(terrainDragHoverX,terrainDragHoverY,terrainBrushSize);
+				:WorldEditorTerrainBrush.centeredFootprint(terrainDragHoverX,terrainDragHoverY,terrainBrushSize);return unlockedTiles(preview);
 		}catch(IllegalArgumentException ignored){return new int[0][2];}
 	}
 	public int[] terrainLineAnchorTile(){return terrainTool!=TerrainTool.FREEHAND&&terrainLineAnchorX>=0?new int[]{terrainLineAnchorX,terrainLineAnchorY}:null;}
@@ -232,6 +240,39 @@ public final class WorldEditorInterface extends NCustomComponent {
 	public int[] sceneryMoveSourceTile(){return isSceneryMoveArmed()?new int[]{sceneryMoveSourceX,sceneryMoveSourceY}:null;}
 	public int[] sceneryMoveDestinationTile(){return isSceneryMoveArmed()&&sceneryMoveHoverX>=0?new int[]{sceneryMoveHoverX,sceneryMoveHoverY}:null;}
 	private void clearSceneryMove(){sceneryMoveSourceX=sceneryMoveSourceY=sceneryMoveSourceId=sceneryMoveHoverX=sceneryMoveHoverY=-1;sceneryMoveSourceDirection=0;}
+	public void updateLockdownPointer(int worldX,int worldY){if(!isLockdownSelecting())return;lockdownHoverX=worldX;lockdownHoverY=worldY;}
+	public void addLockdownPoint(int worldX,int worldY){
+		if(!isLockdownSelecting())return;for(int[] point:lockdownPoints)if(point[0]==worldX&&point[1]==worldY){inspectionStatus="That tile is already in the Lockdown selection.";return;}
+		if(!lockdownPoints.isEmpty()&&lockdownLevel!=mc.getEditorPlayerWorldLevel()){inspectionStatus="Finish or Reset the Lockdown selection before changing levels.";return;}
+		if(lockdownPoints.size()>=256){inspectionStatus="Lockdown is limited to 256 individual tiles or ordered markers.";return;}
+		lockdownPoints.add(new int[]{worldX,worldY});lockdownHoverX=worldX;lockdownHoverY=worldY;lockdownLevel=mc.getEditorPlayerWorldLevel();
+		try{setLockdownTiles(WorldEditorLockdownSelection.tiles(lockdownMode==LockdownMode.TILES?0:1,lockdownPointTiles(),65536));}catch(IllegalArgumentException ignored){setLockdownTiles(new int[0][2]);}
+		inspectionStatus=lockdownMode==LockdownMode.TILES?"Selected "+lockdownPoints.size()+" Lockdown tile"+(lockdownPoints.size()==1?"":"s")+"; select Done to protect them.":"Placed Lockdown marker "+lockdownPoints.size()+"; one tile, a straight line, or a polygon may be finished.";
+	}
+	private int[][] lockdownPointTiles(){int[][] result=new int[lockdownPoints.size()][2];for(int i=0;i<lockdownPoints.size();i++)result[i]=lockdownPoints.get(i).clone();return result;}
+	private void removeLastLockdownPoint(){if(lockdownDone||lockdownPending||lockdownPoints.isEmpty())return;lockdownPoints.remove(lockdownPoints.size()-1);try{setLockdownTiles(lockdownPoints.isEmpty()?new int[0][2]:WorldEditorLockdownSelection.tiles(lockdownMode==LockdownMode.TILES?0:1,lockdownPointTiles(),65536));}catch(Exception ignored){setLockdownTiles(new int[0][2]);}inspectionStatus="Removed the last Lockdown selection point.";}
+	private void setLockdownMode(LockdownMode selected){if(lockdownDone||lockdownPending){inspectionStatus="Reset the current Lockdown before changing selection modes.";return;}lockdownMode=selected;lockdownPoints.clear();setLockdownTiles(new int[0][2]);inspectionStatus=selected==LockdownMode.TILES?"Tiles mode: click every tile to protect, then select Done.":"Markers mode: select one tile, a straight line, or trace a polygon, then select Done.";}
+	private void advanceLockdown(){
+		if(lockdownPending)return;if(lockdownDone){sendLockdown(0,false,new int[0][2]);return;}if(lockdownPoints.isEmpty()){inspectionStatus="Select at least one tile or marker before choosing Done.";return;}
+		try{setLockdownTiles(WorldEditorLockdownSelection.tiles(lockdownMode==LockdownMode.TILES?0:1,lockdownPointTiles(),65536));sendLockdown(1,true,lockdownPointTiles());}
+		catch(IllegalArgumentException invalid){inspectionStatus="Lockdown cannot finish: "+invalid.getMessage();}
+	}
+	private void toggleLockdown(){if(lockdownPending)return;if(!lockdownDone){inspectionStatus="Finish a Lockdown selection before toggling it.";return;}sendLockdown(2,!lockdownEnabled,new int[0][2]);}
+	private void sendLockdown(int operation,boolean enabled,int[][] points){
+		lockdownPending=true;mc.packetHandler.getClientStream().newPacket(152);mc.packetHandler.getClientStream().bufferBits.putByte(13);mc.packetHandler.getClientStream().bufferBits.putLong(sessionId);mc.packetHandler.getClientStream().bufferBits.putInt(nextSequence);
+		mc.packetHandler.getClientStream().bufferBits.putByte(operation);mc.packetHandler.getClientStream().bufferBits.putByte(lockdownMode==LockdownMode.TILES?0:1);mc.packetHandler.getClientStream().bufferBits.putByte(enabled?1:0);mc.packetHandler.getClientStream().bufferBits.putInt(lockdownLevel);mc.packetHandler.getClientStream().bufferBits.putShort(points.length);for(int[] point:points){mc.packetHandler.getClientStream().bufferBits.putShort(point[0]);mc.packetHandler.getClientStream().bufferBits.putShort(point[1]);}mc.packetHandler.getClientStream().finishPacket();inspectionStatus="Waiting for authoritative Lockdown confirmation...";
+	}
+	public void acceptLockdown(int sequence,boolean enabled,int count,int level,String message){nextSequence=sequence;lockdownPending=false;lockdownEnabled=enabled;lockdownDone=count>0;lockdownLevel=level;if(count==0)clearLockdownLocal();inspectionStatus=message;mc.showWorldEditorStatus(message);maybeSubmitDeferredSave();}
+	private void setLockdownTiles(int[][] tiles){lockdownTiles=tiles;lockdownTileKeys.clear();for(int[] tile:tiles)lockdownTileKeys.add(Long.valueOf(terrainTileKey(tile[0],tile[1])));}
+	private void clearLockdownLocal(){lockdownPoints.clear();setLockdownTiles(new int[0][2]);lockdownHoverX=lockdownHoverY=-1;lockdownLevel=0;lockdownDone=lockdownEnabled=lockdownPending=false;lockdownMode=LockdownMode.TILES;}
+	public int[][] lockdownProtectedTiles(){return lockdownLevel==mc.getEditorPlayerWorldLevel()?lockdownTiles:new int[0][2];}
+	public int[][] lockdownMarkerTiles(){return lockdownLevel==mc.getEditorPlayerWorldLevel()?lockdownPointTiles():new int[0][2];}
+	public int[] lockdownHoverTile(){return isLockdownSelecting()&&lockdownLevel==mc.getEditorPlayerWorldLevel()&&lockdownHoverX>=0?new int[]{lockdownHoverX,lockdownHoverY}:null;}
+	public boolean isLockdownDone(){return lockdownDone;}
+	public boolean isLockdownEnabled(){return lockdownEnabled;}
+	private boolean lockdownContains(int x,int y){return lockdownEnabled&&lockdownLevel==mc.getEditorPlayerWorldLevel()&&lockdownTileKeys.contains(Long.valueOf(terrainTileKey(x,y)));}
+	private int[][] unlockedTiles(int[][] tiles){if(!lockdownEnabled||lockdownLevel!=mc.getEditorPlayerWorldLevel())return tiles;List<int[]> result=new ArrayList<int[]>();for(int[] tile:tiles)if(!lockdownContains(tile[0],tile[1]))result.add(tile);return result.toArray(new int[result.size()][2]);}
+	private boolean lockdownOverlaps(int[][] tiles,int level){if(!lockdownEnabled||lockdownLevel!=level)return false;for(int[] tile:tiles)if(lockdownTileKeys.contains(Long.valueOf(terrainTileKey(tile[0],tile[1]))))return true;return false;}
 	public void updateRegionSelectionPointer(int worldX,int worldY){if(!isRegionSelecting()||regionClosed)return;regionHoverX=worldX;regionHoverY=worldY;}
 	public void addRegionMarker(int worldX,int worldY){
 		if(!isRegionSelecting()||regionCopyBridge.isPending())return;if(regionClosed){inspectionStatus="Reopen or clear the selection before adding another marker.";return;}
@@ -247,7 +288,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void closeRegionSelection(){
 		if(regionCopyBridge.isPending())return;if(regionMarkers.size()<3){inspectionStatus="Place at least three ordered markers before closing the selection.";return;}
-		try{int[][] markers=regionMarkerTiles();WorldEditorRegionSelection.validateClosed(markers);regionPreviewTiles=WorldEditorRegionSelection.ownedTiles(markers,65536);regionClosed=true;inspectionStatus="Selection stopped: "+regionPreviewTiles.length+" terrain tiles. Review the preview, then select Copy.";}
+		try{int[][] markers=regionMarkerTiles();WorldEditorRegionSelection.validateClosed(markers);regionPreviewTiles=WorldEditorRegionSelection.ownedTiles(markers,65536);regionClosed=true;inspectionStatus="Selection done: "+regionPreviewTiles.length+" terrain tiles. Review the preview, then select Copy.";}
 		catch(IllegalArgumentException invalid){regionClosed=false;regionPreviewTiles=new int[0][2];inspectionStatus="Region cannot close: "+invalid.getMessage();}
 	}
 	private void clearRegionSelection(){
@@ -261,7 +302,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(regionMarkers.isEmpty()){inspectionStatus="Selection started. Click terrain to place marker 1, then continue around the boundary.";return;}
 		closeRegionSelection();
 	}
-	private String regionSelectionActionLabel(){return regionClosed?"Reset":regionMarkers.isEmpty()?"Start":"Stop";}
+	private String regionSelectionActionLabel(){return regionClosed?"Reset":regionMarkers.isEmpty()?"Start":"Done";}
 	private String regionCutActionLabel(){if(regionCopyBridge.isPending())return "Working";if(regionCutBlocked)return "Blocked";return regionCutPlanHash.isEmpty()?"Cut":"Confirm Cut";}
 	private String regionPasteActionLabel(){if(regionPasteBridge.isPending())return "Working";if(regionPasteBlocked)return "Blocked";if(regionPasteOverwriteArmed)return "Confirm";if(regionPasteOverwritePrompted)return "Overwrite?";return "Paste";}
 	private void requestRegionCopy(){
@@ -272,6 +313,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void requestRegionCut(){
 		if(!regionClosed){inspectionStatus="Close a valid region selection before cutting it.";return;}
+		if(lockdownOverlaps(regionPreviewTiles,mc.getEditorPlayerWorldLevel())){inspectionStatus="Region Cut overlaps protected Lockdown tiles. Toggle Lockdown off or Reset it before cutting.";mc.showWorldEditorStatus(inspectionStatus);return;}
 		if(terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||entityEditTracker.isPending()){inspectionStatus="Wait for authoritative edit responses before cutting the region.";return;}
 		if(regionCutBlocked){inspectionStatus="This Cut plan is blocked; reset or correct the selection before retrying.";return;}
 		try{
@@ -308,7 +350,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(regionCopyBridge.isPending()||regionPasteBridge.isPending()||isRegionSharingPending()){inspectionStatus="Wait for the active region operation before changing Copy/Cut/Paste tools.";return;}
 		regionTool=selected;coordinateFocus=0;regionPasteOverwritePrompted=false;regionPasteOverwriteArmed=false;
 		if(selected==RegionTool.PASTE){clearRegionSelection();regionLibraryPreferredSnapshotId=regionClipboardSnapshotId;if(selectRegionLibrarySnapshot(regionClipboardSnapshotId)){regionLibraryPreferredSnapshotId="";clearPastePreview();inspectionStatus="Clipboard ready: '"+selectedRegionSnapshot().name+"'. Click terrain to choose its Paste destination.";}else requestRegionLibrary();}
-		else{clearPastePreview();clearRegionSelection();inspectionStatus=selected==RegionTool.CUT?"Cut selected: trace and Stop a boundary, then Cut to secure its snapshot and preview.":"Copy selected: click terrain to start an ordered boundary, Stop it, then Copy.";}
+		else{clearPastePreview();clearRegionSelection();inspectionStatus=selected==RegionTool.CUT?"Cut selected: trace and finish a boundary, then Cut to secure its snapshot and preview.":"Copy selected: click terrain to start an ordered boundary, finish it with Done, then Copy.";}
 	}
 	private String emptyRegionClipboardStatus(){return lastRegionCopyFailure.isEmpty()?"There is nothing copied to clipboard. Use Copy or Import first.":lastRegionCopyFailure+" No clipboard snapshot was created.";}
 	private void requestRegionLibrary(){
@@ -352,6 +394,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void requestRegionPasteApply(){
 		if(regionPasteBridge.isPending()||isRegionSharingPending())return;if(regionPastePlanHash.isEmpty()){inspectionStatus="Choose a destination and wait for its exact Paste preview first.";return;}if(regionPasteBlocked){inspectionStatus="This Paste plan is blocked; choose another destination or compatible snapshot.";return;}
+		if(lockdownOverlaps(regionPastePreviewTiles,regionPasteLevel)){inspectionStatus="Region Paste overlaps protected Lockdown tiles. Toggle Lockdown off or Reset it before pasting.";mc.showWorldEditorStatus(inspectionStatus);return;}
 		if(regionPasteOverwrite&&!regionPasteOverwritePrompted){regionPasteOverwritePrompted=true;inspectionStatus="This destination is occupied. Select Overwrite? to continue.";return;}
 		if(regionPasteOverwrite&&!regionPasteOverwriteArmed){regionPasteOverwriteArmed=true;inspectionStatus="Overwrite will replace the highlighted content. Select Confirm to apply this exact plan.";return;}
 		WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();if(snapshot==null)return;
@@ -454,6 +497,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(copyNextInspection)copyInspected();copyNextInspection=false;
 	}
 	public void showError(String text){
+		lockdownPending=false;
 		boolean saveAcceptedDraft=saveAfterPendingEdits&&!saveRequested;
 		int unacknowledged=saveAcceptedDraft?pendingAuthoritativeEditCount():0;
 		if(entityEditTracker.isPending()){entityEditTracker.reset();noteDeferredSaveProgress(System.nanoTime());}
@@ -560,7 +604,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			if(terrainLineAnchorX<0){terrainLineAnchorX=worldX;terrainLineAnchorY=worldY;terrainDragHoverX=worldX;terrainDragHoverY=worldY;inspectionStatus="Rectangle corner set at "+worldX+","+worldY+"; move the pointer and click the opposite corner.";return;}
 			commitTerrainRectangle(worldX,worldY,mask);return;
 		}
-		int strokeSize=terrainBrushSize;terrainStrokeTiles=WorldEditorTerrainBrush.centeredFootprint(worldX,worldY,strokeSize);
+		int strokeSize=terrainBrushSize;terrainStrokeTiles=unlockedTiles(WorldEditorTerrainBrush.centeredFootprint(worldX,worldY,strokeSize));if(terrainStrokeTiles.length==0){inspectionStatus="Lockdown protected every tile in that brush; no changes were made.";terrainStrokeTiles=null;return;}
 		snapshotTerrainPaint(mask);terrainStrokeHistoryToken=nextTerrainHistoryToken();
 		terrainStrokeStartedNanos=System.nanoTime();sendTerrainStroke();
 	}
@@ -571,7 +615,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			if(tile[0]<0||tile[0]>32767||tile[1]<0||tile[1]>32767){inspectionStatus="Line crosses unsupported terrain coordinates; choose another destination.";return;}
 			if(!isLayeredReview()&&Math.floorDiv(tile[1],944)!=plane){inspectionStatus="Line cannot cross a legacy wilderness-level boundary.";return;}
 		}
-		int startX=terrainLineAnchorX,startY=terrainLineAnchorY;clearTerrainDrag();terrainGestureLabel="Line";snapshotTerrainPaint(mask);terrainStrokeHistoryToken=nextTerrainHistoryToken();
+		int startX=terrainLineAnchorX,startY=terrainLineAnchorY;tiles=unlockedTiles(tiles);if(tiles.length==0){clearTerrainLine();inspectionStatus="Lockdown protected every tile in that line; no changes were made.";return;}clearTerrainDrag();terrainGestureLabel="Line";snapshotTerrainPaint(mask);terrainStrokeHistoryToken=nextTerrainHistoryToken();
 		terrainLineCommitTiles=tiles;terrainLineCommitMasks=new int[tiles.length];java.util.Arrays.fill(terrainLineCommitMasks,mask);terrainLineReceived=0;terrainDragHoverX=worldX;terrainDragHoverY=worldY;terrainStrokeStartedNanos=System.nanoTime();terrainLineLastResponseNanos=terrainStrokeStartedNanos;
 		sendTerrainLine(startX,startY,worldX,worldY);inspectionStatus="Committing line atomically: "+tiles.length+" unique tiles.";
 	}
@@ -579,12 +623,12 @@ public final class WorldEditorInterface extends NCustomComponent {
 		WorldEditorTerrainBrush.RectanglePlan plan;try{plan=WorldEditorTerrainBrush.rectanglePlan(terrainLineAnchorX,terrainLineAnchorY,worldX,worldY,
 			rectangleOptions.isFill(),mask,rectangleOptions.isSmartWalls(),rectangleOptions.isNorthWall(),rectangleOptions.isEastWall(),TERRAIN_DRAG_LIMIT);}
 		catch(IllegalArgumentException exception){inspectionStatus="Rectangle exceeds the 4096-tile operation limit or has no applicable fields.";inspectionDetails=new String[]{"The entire rectangle is validated and committed atomically; no terrain was changed."};return;}
-		int[][] tiles=plan.tiles();int plane=editorLevel(terrainLineAnchorY);for(int[] tile:tiles){
+		int[][] tiles=plan.tiles();int[] plannedMasks=plan.fieldMasks();int plane=editorLevel(terrainLineAnchorY);for(int[] tile:tiles){
 			if(tile[0]<0||tile[0]>32767||tile[1]<0||tile[1]>32767){inspectionStatus="Rectangle crosses unsupported terrain coordinates; choose another corner.";return;}
 			if(!isLayeredReview()&&Math.floorDiv(tile[1],944)!=plane){inspectionStatus="Rectangle cannot cross a legacy wilderness-level boundary.";return;}
 		}
-		int startX=terrainLineAnchorX,startY=terrainLineAnchorY;clearTerrainDrag();terrainGestureLabel="Rectangle";snapshotTerrainPaint(mask);terrainStrokeHistoryToken=nextTerrainHistoryToken();
-		terrainLineCommitTiles=tiles;terrainLineCommitMasks=plan.fieldMasks();terrainLineReceived=0;terrainDragHoverX=worldX;terrainDragHoverY=worldY;terrainStrokeStartedNanos=System.nanoTime();terrainLineLastResponseNanos=terrainStrokeStartedNanos;
+		int startX=terrainLineAnchorX,startY=terrainLineAnchorY;List<int[]> keptTiles=new ArrayList<int[]>();List<Integer> keptMasks=new ArrayList<Integer>();for(int i=0;i<tiles.length;i++)if(!lockdownContains(tiles[i][0],tiles[i][1])){keptTiles.add(tiles[i]);keptMasks.add(Integer.valueOf(plannedMasks[i]));}if(keptTiles.isEmpty()){clearTerrainLine();inspectionStatus="Lockdown protected every tile in that rectangle; no changes were made.";return;}tiles=keptTiles.toArray(new int[keptTiles.size()][2]);plannedMasks=new int[keptMasks.size()];for(int i=0;i<plannedMasks.length;i++)plannedMasks[i]=keptMasks.get(i).intValue();clearTerrainDrag();terrainGestureLabel="Rectangle";snapshotTerrainPaint(mask);terrainStrokeHistoryToken=nextTerrainHistoryToken();
+		terrainLineCommitTiles=tiles;terrainLineCommitMasks=plannedMasks;terrainLineReceived=0;terrainDragHoverX=worldX;terrainDragHoverY=worldY;terrainStrokeStartedNanos=System.nanoTime();terrainLineLastResponseNanos=terrainStrokeStartedNanos;
 		sendTerrainRectangle(startX,startY,worldX,worldY);inspectionStatus="Committing rectangle atomically: "+tiles.length+" unique tiles.";
 	}
 	public boolean sendAutomatedBoundaryPlacementProbe(int worldX,int worldY,int raw){
@@ -640,7 +684,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			:WorldEditorTerrainBrush.lineCenters(terrainDragCenterX,terrainDragCenterY,worldX,worldY);
 		terrainDragCenterX=worldX;terrainDragCenterY=worldY;recordWorldClick(worldX,worldY);int strokeSize=terrainBrushSize;
 		for(int[] center:centers){int[][] footprint=WorldEditorTerrainBrush.centeredFootprint(center[0],center[1],strokeSize);int plane=editorLevel(center[1]);
-			for(int[] tile:footprint){if(!isLayeredReview()&&Math.floorDiv(tile[1],944)!=plane)continue;long key=terrainTileKey(tile[0],tile[1]);
+			for(int[] tile:footprint){if(!isLayeredReview()&&Math.floorDiv(tile[1],944)!=plane||lockdownContains(tile[0],tile[1]))continue;long key=terrainTileKey(tile[0],tile[1]);
 				if(terrainDragSeen.size()>=TERRAIN_DRAG_LIMIT&&!terrainDragSeen.contains(key))continue;
 				if(terrainDragSeen.add(key)){if(terrainDragPending.isEmpty())terrainDragPendingSinceNanos=now;terrainDragPending.put(key,new int[]{tile[0],tile[1]});}}
 		}
@@ -720,6 +764,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 
 	private void selectMode(Mode selected){
+		if(lockdownPending){inspectionStatus="Wait for the authoritative Lockdown response before changing modes.";return;}
 		if(terrainLineCommitTiles!=null){inspectionStatus="Wait for the authoritative line response before changing modes.";return;}
 		definitionBrowser.close();
 		if(selected==Mode.ITEMS&&!isLayeredTerrainDraft()){
@@ -821,7 +866,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			:"Coordinates must be whole numbers from 0 to 32767";inspectionDetails=new String[0];}
 	}
 	private void send(int type,int x,int y,int plane,int id,int direction,int subtype){
-		if(!isEditorOpen())return;mc.packetHandler.getClientStream().newPacket(152);mc.packetHandler.getClientStream().bufferBits.putByte(type);
+		if(!isEditorOpen())return;if(lockdownPending){inspectionStatus="Wait for the authoritative Lockdown response.";return;}mc.packetHandler.getClientStream().newPacket(152);mc.packetHandler.getClientStream().bufferBits.putByte(type);
 		mc.packetHandler.getClientStream().bufferBits.putLong(sessionId);mc.packetHandler.getClientStream().bufferBits.putInt(nextSequence);
 		if(type==2){mc.packetHandler.getClientStream().bufferBits.putShort(x);mc.packetHandler.getClientStream().bufferBits.putShort(y);mc.packetHandler.getClientStream().bufferBits.putByte(plane);mc.packetHandler.getClientStream().bufferBits.putByte(subtype);}
 		else if(type==3){mc.packetHandler.getClientStream().bufferBits.putShort(x);mc.packetHandler.getClientStream().bufferBits.putShort(y);mc.packetHandler.getClientStream().bufferBits.putByte(plane);mc.packetHandler.getClientStream().bufferBits.putShort(id);mc.packetHandler.getClientStream().bufferBits.putByte(direction);mc.packetHandler.getClientStream().bufferBits.putByte(subtype);}
@@ -960,8 +1005,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void setFocusedText(String value){switch(coordinateFocus){case 1:teleportX=value;break;case 2:teleportY=value;break;case 13:teleportLevel=value;break;case 3:sceneryIdText=value;break;case 4:npcIdText=value;break;case 5:npcRadiusText=value;break;case 20:npcRespawnText=value;break;case 14:groundItemIdText=value;break;case 15:groundItemAmountText=value;break;case 16:groundItemRespawnText=value;break;case 17:terrainElevationStepText=value;break;case 18:terrainSmartWallText=value;break;case 19:regionName=value;break;case 6:terrainElevationText=value;break;case 7:terrainFloorColorText=value;break;case 8:terrainFloorTextureText=value;break;case 9:terrainRoofText=value;break;case 10:terrainNorthWallText=value;break;case 11:terrainEastWallText=value;break;default:terrainDiagonalWallText=value;}}
 	private void focusNumber(int focus){coordinateFocus=focus;replaceFocusedText=true;}
 	private void rejectLayeredReviewMutation(String message){inspectionStatus=message;mc.showWorldEditorStatus(message);}
-	private boolean hasPendingAuthoritativeEdits(){return terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||entityEditTracker.isPending();}
-	private int pendingAuthoritativeEditCount(){return Math.max(1,terrainDragPending.size()+(terrainStrokeTiles==null?0:terrainStrokeTiles.length)+(terrainLineCommitTiles==null?0:terrainLineCommitTiles.length-terrainLineReceived)+entityEditTracker.pendingCount());}
+	private boolean hasPendingAuthoritativeEdits(){return terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragActive||terrainDragReleasePending||entityEditTracker.isPending()||lockdownPending;}
+	private int pendingAuthoritativeEditCount(){return Math.max(1,terrainDragPending.size()+(terrainStrokeTiles==null?0:terrainStrokeTiles.length)+(terrainLineCommitTiles==null?0:terrainLineCommitTiles.length-terrainLineReceived)+entityEditTracker.pendingCount()+(lockdownPending?1:0));}
 	private void submitWorldEditSave(){submitWorldEditSave("World edit save requested; wait for the completion message before closing.");}
 	private void submitWorldEditSave(String statusMessage){mc.sendCommandString("saveworldedits");saveAfterPendingEdits=false;deferredSaveProgressNanos=0L;entityEditTracker.clearQueuedSave();saveRequested=true;closeArmed=false;inspectionStatus=isLayeredTerrainDraft()?"Layered draft save requested; it will commit to working/ when this Builder closes.":"World edit save started; building resumes when completion is reported.";mc.showWorldEditorStatus(statusMessage);}
 	private void maybeSubmitDeferredSave(){if(!saveAfterPendingEdits||saveRequested||hasPendingAuthoritativeEdits())return;submitWorldEditSave();}
@@ -1028,7 +1073,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 				if(dockHit(rx,ry,1,6)){if(click==1)selectTerrainTool(TerrainTool.RECTANGLE);return true;}
 			}
 			int field=terrainFieldAtDock(rx,ry);if(field>=0){if(click==2)toggleTerrainField(field);else openTerrainTool(field);return true;}
-			TerrainTool terrainSelection=terrainToolAtDock(rx,ry);if(terrainSelection!=null){if(click==1)selectTerrainTool(terrainSelection);return true;}
+			TerrainTool terrainSelection=terrainToolAtDock(rx,ry);if(terrainSelection!=null){if(terrainSelection==TerrainTool.LOCKDOWN&&click==2)toggleLockdown();else if(click==1)selectTerrainTool(terrainSelection);return true;}
 			if(dockHit(rx,ry,0,7)){if(click==2)toggleBrushSize();else selectTerrainTool(TerrainTool.FREEHAND);return true;}
 			if(dockHit(rx,ry,0,8)){if(click==1)setTerrainBuildMode(!terrainBuildMode);return true;}
 			if(dockHit(rx,ry,0,9)){if(click==1)requestTerrainHistory(false);return true;}
@@ -1072,11 +1117,11 @@ public final class WorldEditorInterface extends NCustomComponent {
 		WorldEditorToolbarState.Flyout flyout=flyoutFor(mode);if(same)toolbar.selectMode(flyout);else toolbar.open(flyout);updatePresentationBounds();
 	}
 	private int terrainFieldAtDock(int x,int y){if(mode!=Mode.TERRAIN)return -1;if(dockHit(x,y,1,0))return 6;if(dockHit(x,y,1,1))return 7;if(dockHit(x,y,1,2))return 8;if(dockHit(x,y,1,3))return 9;if(terrainTool==TerrainTool.RECTANGLE&&rectangleOptions.isSmartWalls())return -1;if(dockHit(x,y,1,4))return 10;if(dockHit(x,y,1,5))return 11;if(dockHit(x,y,1,6))return 12;return -1;}
-	private TerrainTool terrainToolAtDock(int x,int y){if(mode!=Mode.TERRAIN)return null;if(dockHit(x,y,1,7))return TerrainTool.FREEHAND;if(dockHit(x,y,1,8))return TerrainTool.LINE;if(dockHit(x,y,1,9))return TerrainTool.RECTANGLE;return null;}
+	private TerrainTool terrainToolAtDock(int x,int y){if(mode!=Mode.TERRAIN)return null;if(dockHit(x,y,1,7))return TerrainTool.FREEHAND;if(dockHit(x,y,1,8))return TerrainTool.LINE;if(dockHit(x,y,1,9))return TerrainTool.RECTANGLE;if(dockHit(x,y,1,10))return TerrainTool.LOCKDOWN;return null;}
 	private void selectTerrainTool(TerrainTool selected){
 		if(selected==null)return;if(terrainStrokeTiles!=null||terrainLineCommitTiles!=null||terrainDragReleasePending){inspectionStatus="Wait for the current terrain operation before changing tools.";return;}if(terrainDragActive)releaseTerrainDrag();terrainTool=selected;clearTerrainLine();closeArmed=false;
 		definitionBrowser.close();mode=Mode.TERRAIN;terrainActiveField=0;coordinateFocus=0;replaceFocusedText=false;toolbar.open(WorldEditorToolbarState.Flyout.TERRAIN);mc.setWorldEditorNavigateClickTeleport(false);updatePresentationBounds();
-		inspectionStatus=selected==TerrainTool.FREEHAND?"Freehand selected: click once or Ctrl-drag to paint.":selected==TerrainTool.LINE?"Line selected: click an anchor, preview, then click the destination.":"Rectangle selected: click two opposite corners; Smart Walls is on by default.";
+		inspectionStatus=selected==TerrainTool.FREEHAND?"Freehand selected: click once or Ctrl-drag to paint.":selected==TerrainTool.LINE?"Line selected: click an anchor, preview, then click the destination.":selected==TerrainTool.RECTANGLE?"Rectangle selected: click two opposite corners; Smart Walls is on by default.":lockdownDone?"Lockdown selected: protected tiles remain "+(lockdownEnabled?"ON":"OFF")+" until Reset.":"Lockdown selected: choose Tiles or Markers, select terrain, then choose Done.";
 	}
 	private void openTerrainTool(int field){
 		if(isLayeredReview()&&!isLayeredTerrainDraft()){selectMode(Mode.TERRAIN);return;}
@@ -1099,6 +1144,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void handleCompactInspectMouse(int x,int y){if(y>=158&&y<182&&!inspectionKind.isEmpty())copyInspected();}
 	private void handleCompactTerrainMouse(int x,int y){
+		if(terrainTool==TerrainTool.LOCKDOWN&&terrainActiveField==0){if(y>=58&&y<82){setLockdownMode(x<90?LockdownMode.TILES:LockdownMode.MARKERS);return;}if(y>=88&&y<112){advanceLockdown();return;}if(y>=118&&y<142){removeLastLockdownPoint();return;}return;}
 		if(terrainActiveField==0){if(terrainTool==TerrainTool.RECTANGLE){if(y>=58&&y<82)rectangleOptions.setFill(x>=90);else if(y>=88&&y<112)rectangleOptions.toggleSmartWalls();else if(y>=118&&y<142){if(x<40)setTerrainSmartWall(steppedWallValue(terrainSmartWall,-1));else if(x<132)focusNumber(18);else setTerrainSmartWall(steppedWallValue(terrainSmartWall,1));}else if(y>=148&&y<172){if(x<88)rectangleOptions.toggleNorthWall();else rectangleOptions.toggleEastWall();}clearTerrainLine();return;}if(y>=58&&y<82)terrainBrushSize=1;else if(y>=88&&y<112)terrainBrushSize=3;else if(y>=118&&y<142)terrainBrushSize=5;else if(y>=148&&y<172)terrainBrushSize=7;return;}
 		if(y>=58&&y<82){if(x>=8&&x<38)adjustActiveTerrain(-1);else if(x>=42&&x<130)focusNumber(terrainActiveField);else if(x>=134&&x<164)adjustActiveTerrain(1);return;}
 		if(terrainActiveField==6&&isLayeredTerrainDraft()){if(y>=90&&y<114){terrainElevationOperation=x<60?0:x<114?1:2;return;}if(y>=120&&y<144){if(x<60)setTerrainElevationStep(terrainElevationStep-1);else if(x<114)focusNumber(17);else setTerrainElevationStep(terrainElevationStep+1);return;}}
@@ -1145,6 +1191,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private boolean handleExpandedMouse(int mx,int my,int down,int click){
 		if(!isVisible())return false;int rx=mx-getX(),ry=my-getY();
 		if(down==1&&ry>=0&&ry<24){if(dragX<0){dragX=rx;dragY=ry;}else setLocation(Math.max(0,mx-dragX),Math.max(0,my-dragY));}else{dragX=dragY=-1;}
+		if(click==2&&mode==Mode.TERRAIN&&ry>=56&&ry<78&&rx>=320&&rx<385){toggleLockdown();return true;}
 		if(click==1){
 			if(rx>=430&&ry<24){requestEditorClose();return true;}
 			if(rx>=343&&rx<425&&ry<24){toolbar.setExpandedFallback(false);updatePresentationBounds();return true;}
@@ -1158,7 +1205,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 			}
 			if(mode==Mode.INSPECT&&ry>=276&&ry<300&&rx>=10&&rx<175&&!inspectionKind.isEmpty()){copyInspected();return true;}
 			if(mode==Mode.TERRAIN){
-				if(ry>=56&&ry<78){if(rx>=10&&rx<75)terrainStructureTab=false;else if(rx>=78&&rx<148)terrainStructureTab=true;else if(rx>=152&&rx<212)selectTerrainTool(TerrainTool.FREEHAND);else if(rx>=215&&rx<259)selectTerrainTool(TerrainTool.LINE);else if(rx>=262&&rx<317)selectTerrainTool(TerrainTool.RECTANGLE);else if(rx>=321&&rx<390)setTerrainBuildMode(!terrainBuildMode);coordinateFocus=0;return true;}
+				if(ry>=56&&ry<78){if(rx>=10&&rx<75)terrainStructureTab=false;else if(rx>=78&&rx<148)terrainStructureTab=true;else if(rx>=152&&rx<212)selectTerrainTool(TerrainTool.FREEHAND);else if(rx>=215&&rx<259)selectTerrainTool(TerrainTool.LINE);else if(rx>=262&&rx<317)selectTerrainTool(TerrainTool.RECTANGLE);else if(rx>=320&&rx<385)selectTerrainTool(TerrainTool.LOCKDOWN);else if(rx>=390)setTerrainBuildMode(!terrainBuildMode);coordinateFocus=0;return true;}
+				if(terrainTool==TerrainTool.LOCKDOWN){if(ry>=90&&ry<114){setLockdownMode(rx<160?LockdownMode.TILES:LockdownMode.MARKERS);return true;}if(ry>=130&&ry<154){if(rx<180)advanceLockdown();else removeLastLockdownPoint();return true;}return true;}
 				if(!terrainStructureTab){
 					if(ry>=82&&ry<106){if(rx>=10&&rx<30)paintElevation=!paintElevation;else if(rx>=150&&rx<178)setTerrainElevation(terrainElevation-1);else if(rx>=185&&rx<265)focusNumber(6);else if(rx>=272&&rx<300)setTerrainElevation(terrainElevation+1);else if(rx>=307&&isLayeredTerrainDraft())terrainElevationOperation=(terrainElevationOperation+1)%3;return true;}
 					if(ry>=122&&ry<146){if(rx>=10&&rx<30)paintFloorColor=!paintFloorColor;else if(rx>=150&&rx<178)setTerrainFloorColor(terrainFloorColor-1);else if(rx>=185&&rx<265)focusNumber(7);else if(rx>=272&&rx<300)setTerrainFloorColor(terrainFloorColor+1);return true;}
@@ -1272,6 +1320,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 			drawTerrainToolIcon(WorldEditorIconRegistry.Key.TOOL_FREEHAND,x+DOCK_RIGHT,y+dockRowY(7),terrainTool==TerrainTool.FREEHAND);
 			drawTerrainToolIcon(WorldEditorIconRegistry.Key.TOOL_LINE,x+DOCK_RIGHT,y+dockRowY(8),terrainTool==TerrainTool.LINE);
 			drawTerrainToolIcon(WorldEditorIconRegistry.Key.TOOL_RECTANGLE,x+DOCK_RIGHT,y+dockRowY(9),terrainTool==TerrainTool.RECTANGLE);
+			drawTerrainToolIcon(WorldEditorIconRegistry.Key.TOOL_LOCKDOWN,x+DOCK_RIGHT,y+dockRowY(10),terrainTool==TerrainTool.LOCKDOWN);
 		}else if(mode==Mode.SCENERY){
 			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"+",x+DOCK_RIGHT,y+dockRowY(0),sceneryTool==SceneryTool.PLACE);
 			drawContextActionIcon(WorldEditorIconRegistry.Key.MODE_SCENERY,"M",x+DOCK_RIGHT,y+dockRowY(1),sceneryTool==SceneryTool.MOVE);
@@ -1330,7 +1379,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		else renderCompactRegion(x,y);
 		renderCompactStatus(x,y);
 	}
-	private String compactFlyoutTitle(){return mode==Mode.TERRAIN?(terrainActiveField==0?"Brush":activeTerrainLabel()):mode==Mode.REGION?(regionTool==RegionTool.COPY?"Region Copy":regionTool==RegionTool.CUT?"Region Cut":"Region Paste"):TABS[mode.ordinal()];}
+	private String compactFlyoutTitle(){return mode==Mode.TERRAIN?(terrainActiveField==0?(terrainTool==TerrainTool.LOCKDOWN?"Lockdown":"Brush"):activeTerrainLabel()):mode==Mode.REGION?(regionTool==RegionTool.COPY?"Region Copy":regionTool==RegionTool.CUT?"Region Cut":"Region Paste"):TABS[mode.ordinal()];}
 	private void drawHeaderIcon(WorldEditorIconRegistry.Key key,int x,int y,boolean active){
 		graphics().drawBoxAlpha(x,y,36,24,active?0x365b82:0x333333,235);graphics().drawBoxBorder(x,36,y,24,active?0x66b3ff:0);Sprite sprite=icons.get(key);
 		if(sprite!=null)graphics().drawSprite(sprite,x+6,y);else graphics().drawString(key.fallbackLabel(),x+5,y+16,0xffffff,1);
@@ -1348,6 +1397,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		button(x+8,y+158,164,inspectionKind.isEmpty()?"Copy (empty)":"Copy inspected");
 	}
 	private void renderCompactTerrain(int x,int y){
+		if(terrainTool==TerrainTool.LOCKDOWN&&terrainActiveField==0){graphics().drawString(lockdownDone?(lockdownEnabled?"Protection ON":"Protection OFF"):"Choose selection mode",x+8,y+49,lockdownEnabled?0xff4058:0xffff00,2);toolButton(x+8,y+58,78,"Tiles",lockdownMode==LockdownMode.TILES);toolButton(x+94,y+58,78,"Markers",lockdownMode==LockdownMode.MARKERS);button(x+8,y+88,164,lockdownDone?"Reset":"Done");button(x+8,y+118,164,"Undo selection");graphics().drawString(lockdownTiles.length+" protected tile"+(lockdownTiles.length==1?"":"s"),x+8,y+158,0xffffff,1);graphics().drawString("Right-click Lockdown: ON/OFF",x+8,y+176,0xff981f,1);return;}
 		if(terrainActiveField==0){if(terrainTool==TerrainTool.RECTANGLE){graphics().drawString("Rectangle settings",x+8,y+49,0xffff00,2);toolButton(x+8,y+58,80,"Outline",!rectangleOptions.isFill());toolButton(x+92,y+58,80,"Fill",rectangleOptions.isFill());toolButton(x+8,y+88,164,"Smart Walls: "+(rectangleOptions.isSmartWalls()?"ON":"OFF"),rectangleOptions.isSmartWalls());button(x+8,y+118,30,"-");textField(x+42,y+118,88,terrainSmartWallText,coordinateFocus==18);button(x+134,y+118,30,"+");toolButton(x+8,y+148,80,"North",rectangleOptions.isNorthWall());toolButton(x+92,y+148,80,"East",rectangleOptions.isEastWall());graphics().drawString("Two corners; one atomic commit.",x+8,y+184,0xff981f,1);graphics().drawString(rectangleOptions.isSmartWalls()?"Diagonal disabled; choose N, E, or both.":"Raw wall fields apply to the footprint.",x+8,y+200,0xff981f,1);return;}graphics().drawString("Footprint: "+terrainBrushSize+"x"+terrainBrushSize,x+8,y+49,0xffff00,2);toolButton(x+8,y+58,164,"1x1 single tile",terrainBrushSize==1);toolButton(x+8,y+88,164,"3x3 centered",terrainBrushSize==3);toolButton(x+8,y+118,164,"5x5 centered",terrainBrushSize==5);toolButton(x+8,y+148,164,"7x7 centered",terrainBrushSize==7);
 			graphics().drawString("Right-click cycles brush sizes.",x+8,y+184,0xff981f,1);graphics().drawString(terrainTool==TerrainTool.LINE?"Line width uses the centered brush.":"Ctrl + left-drag paints continuously.",x+8,y+200,0xff981f,1);return;}
 		graphics().drawString(activeTerrainLabel(),x+8,y+49,0xffff00,2);button(x+8,y+58,30,"-");textField(x+42,y+58,88,activeTerrainText(),coordinateFocus==terrainActiveField);button(x+134,y+58,30,"+");
@@ -1376,7 +1426,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		graphics().drawString("Respawn",x+8,y+153,0xffff00,1);button(x+68,y+136,24,"-");textField(x+96,y+136,48,groundItemRespawnText,coordinateFocus==16);button(x+148,y+136,24,"+");
 	}
 	private void renderCompactRegion(int x,int y){
-		if(regionTool!=RegionTool.PASTE){boolean cutting=regionTool==RegionTool.CUT;graphics().drawString(regionMarkers.isEmpty()?"Click terrain to place marker 1.":regionClosed?(cutting?"Selection closed; select Cut.":"Selection closed; select Copy."):"Keep tracing, then select Stop.",x+8,y+49,0xffffff,1);graphics().drawString("Markers: "+regionMarkers.size()+(regionClosed?" | "+regionPreviewTiles.length+" tiles":" | open"),x+8,y+65,regionClosed?0x80c080:0xffff00,1);toolButton(x+8,y+78,78,regionSelectionActionLabel(),!regionClosed);button(x+94,y+78,78,"Undo");button(x+8,y+110,78,cutting?regionCutActionLabel():regionCopyBridge.isPending()?"Copying...":"Copy");button(x+94,y+110,78,isRegionSharingPending()?"Working...":"Export");graphics().drawString(compactLine(lastRegionSnapshotId.isEmpty()?(cutting?"Cut secures a snapshot first.":"Copy stores the closed selection."):"Clipboard: "+lastRegionSnapshotName,28),x+8,y+151,lastRegionSnapshotId.isEmpty()?0xbdbdbd:0x80c080,1);graphics().drawString(cutting?(regionCutPlanHash.isEmpty()?"Cut previews before changing the world.":"Snapshot safe; Confirm Cut to void."):"Reset clears markers, not clipboard.",x+8,y+169,0xff981f,1);}
+		if(regionTool!=RegionTool.PASTE){boolean cutting=regionTool==RegionTool.CUT;graphics().drawString(regionMarkers.isEmpty()?"Click terrain to place marker 1.":regionClosed?(cutting?"Selection closed; select Cut.":"Selection closed; select Copy."):"Keep tracing, then select Done.",x+8,y+49,0xffffff,1);graphics().drawString("Markers: "+regionMarkers.size()+(regionClosed?" | "+regionPreviewTiles.length+" tiles":" | open"),x+8,y+65,regionClosed?0x80c080:0xffff00,1);toolButton(x+8,y+78,78,regionSelectionActionLabel(),!regionClosed);button(x+94,y+78,78,"Undo");button(x+8,y+110,78,cutting?regionCutActionLabel():regionCopyBridge.isPending()?"Copying...":"Copy");button(x+94,y+110,78,isRegionSharingPending()?"Working...":"Export");graphics().drawString(compactLine(lastRegionSnapshotId.isEmpty()?(cutting?"Cut secures a snapshot first.":"Copy stores the closed selection."):"Clipboard: "+lastRegionSnapshotName,28),x+8,y+151,lastRegionSnapshotId.isEmpty()?0xbdbdbd:0x80c080,1);graphics().drawString(cutting?(regionCutPlanHash.isEmpty()?"Cut previews before changing the world.":"Snapshot safe; Confirm Cut to void."):"Reset clears markers, not clipboard.",x+8,y+169,0xff981f,1);}
 		else{WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();boolean sharing=isRegionSharingPending();graphics().drawString(compactLine(snapshot==null?"Clipboard is empty":snapshot.name,28),x+8,y+49,snapshot==null?0xff981f:0xffff00,1);graphics().drawString(regionPasteX<0?"Click terrain to choose a destination.":"Anchor: "+regionPasteX+","+regionPasteY+",L"+regionPasteLevel,x+8,y+65,0xffffff,1);button(x+8,y+82,164,regionPasteActionLabel());button(x+8,y+114,78,regionPasteBridge.isPending()?"Working...":"Undo");button(x+94,y+114,78,sharing?"Working...":"Import");graphics().drawString(regionPastePlanHash.isEmpty()?"Import loads a shared .wbr.":regionPastePreviewTiles.length+" tiles | "+regionPasteCollisionTiles.length+" collisions",x+8,y+153,regionPasteBlocked?0xff4040:regionPasteOverwrite?0xff981f:0x80c080,1);graphics().drawString(regionPasteOverwrite?"Paste > Overwrite? > Confirm":"Paste applies the exact preview live.",x+8,y+171,regionPasteOverwrite?0xff981f:0xbdbdbd,1);}
 	}
 	private void renderCompactStatus(int x,int y){
@@ -1402,7 +1452,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		if(mode==Mode.TERRAIN&&terrainTool==TerrainTool.RECTANGLE&&rectangleOptions.isSmartWalls()&&dockHit(x,y,1,5))return "East Smart Wall: "+(rectangleOptions.isEastWall()?"ON":"OFF")+" | Left: wall type | Right: toggle";
 		if(mode==Mode.TERRAIN&&terrainTool==TerrainTool.RECTANGLE&&rectangleOptions.isSmartWalls()&&dockHit(x,y,1,6))return "Diagonal Wall: disabled by Smart Walls (red X)";
 		int field=terrainFieldAtDock(x,y);if(field>=0)return activeTerrainLabel(field)+": "+terrainText(field)+" | "+(terrainEnabled(field)?"paint ON":"paint OFF")+" | Left: edit | Right: toggle";
-		TerrainTool terrainSelection=terrainToolAtDock(x,y);if(terrainSelection!=null)return terrainSelection==TerrainTool.FREEHAND?"Freehand | click or Ctrl-drag":terrainSelection==TerrainTool.LINE?"Line | click anchor, preview, click destination":"Rectangle | click two opposite corners";
+		TerrainTool terrainSelection=terrainToolAtDock(x,y);if(terrainSelection!=null)return terrainSelection==TerrainTool.FREEHAND?"Freehand | click or Ctrl-drag":terrainSelection==TerrainTool.LINE?"Line | click anchor, preview, click destination":terrainSelection==TerrainTool.RECTANGLE?"Rectangle | click two opposite corners":"Lockdown: "+(lockdownDone?(lockdownEnabled?"ON":"OFF"):"selecting")+" | Left: edit | Right: toggle";
 		if(dockHit(x,y,0,7))return "Brush "+terrainBrushSize+"x"+terrainBrushSize+" | Left: edit | Right: toggle size";if(dockHit(x,y,0,8))return "Build view: "+(terrainBuildMode?"ON":"OFF")+" | faceted terrain grid";
 		if(dockHit(x,y,0,9))return terrainHistoryCanUndo?"Undo last Builder operation | Ctrl+Z":"Undo | no Builder operation available";
 		if(dockHit(x,y,0,10))return terrainHistoryCanRedo?"Redo next Builder operation | Ctrl+Y":"Redo | no Builder operation available";
@@ -1454,7 +1504,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 		button(x+10,y+276,165,inspectionKind.isEmpty()?"Copy inspected (empty)":"Copy inspected");
 	}
 	private void renderTerrain(int x,int y){
-		toolButton(x+10,y+56,65,"Surface",!terrainStructureTab);toolButton(x+78,y+56,70,"Structure",terrainStructureTab);toolButton(x+152,y+56,60,"Freehand",terrainTool==TerrainTool.FREEHAND);toolButton(x+215,y+56,44,"Line",terrainTool==TerrainTool.LINE);toolButton(x+262,y+56,55,"Rect",terrainTool==TerrainTool.RECTANGLE);checkbox(x+321,y+59,terrainBuildMode,"Build");
+		toolButton(x+10,y+56,65,"Surface",!terrainStructureTab);toolButton(x+78,y+56,70,"Structure",terrainStructureTab);toolButton(x+152,y+56,60,"Freehand",terrainTool==TerrainTool.FREEHAND);toolButton(x+215,y+56,44,"Line",terrainTool==TerrainTool.LINE);toolButton(x+262,y+56,55,"Rect",terrainTool==TerrainTool.RECTANGLE);toolButton(x+320,y+56,65,"Lock",terrainTool==TerrainTool.LOCKDOWN);checkbox(x+390,y+59,terrainBuildMode,"Build");
+		if(terrainTool==TerrainTool.LOCKDOWN){graphics().drawString("Protect selected tiles from terrain and placement edits",x+10,y+100,0xffff00,2);toolButton(x+10,y+110,140,"Tiles",lockdownMode==LockdownMode.TILES);toolButton(x+160,y+110,140,"Markers",lockdownMode==LockdownMode.MARKERS);button(x+10,y+150,165,lockdownDone?"Reset":"Done");button(x+185,y+150,165,"Undo selection");graphics().drawString(lockdownTiles.length+" protected tile"+(lockdownTiles.length==1?"":"s")+" | "+(lockdownEnabled?"ON":"OFF"),x+10,y+200,lockdownEnabled?0xff4058:0xbdbdbd,2);graphics().drawString("Tiles selects individually. Markers accepts one tile, a line, or a polygon.",x+10,y+230,0xffffff,1);graphics().drawString("Right-click the Lockdown dock icon to toggle protection without resetting it.",x+10,y+250,0xff981f,1);graphics().drawString(inspectionStatus,x+10,y+307,0xbdbdbd,1);return;}
 		if(terrainStructureTab){renderTerrainStructure(x,y);return;}
 		terrainField(x,y+82,"Elevation",paintElevation,terrainElevationText,coordinateFocus==6);
 		if(isLayeredTerrainDraft())button(x+307,y+82,68,(terrainElevationOperation==0?"Set":terrainElevationOperation==1?"Raise":"Lower")+" "+terrainElevationStep);
@@ -1556,7 +1607,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	}
 	private void renderRegion(int x,int y){
 		toolButton(x+10,y+56,100,"Copy",regionTool==RegionTool.COPY);toolButton(x+120,y+56,100,"Cut",regionTool==RegionTool.CUT);toolButton(x+230,y+56,100,"Paste",regionTool==RegionTool.PASTE);
-		if(regionTool!=RegionTool.PASTE){boolean cutting=regionTool==RegionTool.CUT;graphics().drawString(regionMarkers.isEmpty()?"Click terrain to place marker 1 and begin tracing the boundary.":regionClosed?(cutting?"Selection stopped. Cut secures a snapshot before changing the world.":"Selection stopped. Review it, then Copy to the clipboard."):"Continue placing ordered markers, then select Stop.",x+10,y+90,0xffffff,2);graphics().drawString("Markers: "+regionMarkers.size()+" | "+(regionClosed?regionPreviewTiles.length+" selected tiles":"selection open"),x+10,y+108,regionClosed?0x80c080:0xffff00,2);toolButton(x+10,y+122,100,regionSelectionActionLabel(),!regionClosed);button(x+120,y+122,100,"Undo");button(x+230,y+122,100,cutting?regionCutActionLabel():regionCopyBridge.isPending()?"Copying...":"Copy");button(x+340,y+122,100,isRegionSharingPending()?"Working...":"Export");graphics().drawString(cutting?"Cut creates/reopens the snapshot and exact plan before confirmation.":"Start/Stop/Reset controls markers. Copy captures the closed selection.",x+10,y+174,0xff981f,1);graphics().drawString(cutting?"Confirm Cut replaces terrain with canonical void and removes owned placements.":"Export saves the current clipboard snapshot as a portable .wbr file.",x+10,y+192,cutting?0xff981f:0xbdbdbd,1);if(!lastRegionSnapshotId.isEmpty()){graphics().drawString("Clipboard: "+lastRegionSnapshotName+" ["+shortHash(lastRegionSnapshotId)+"]",x+10,y+228,0xffff00,2);graphics().drawString(lastRegionTileCount+" tiles, "+lastRegionPlacementCount+" placements, "+lastRegionCrossingCount+" crossing reports",x+10,y+248,0xbdbdbd,1);}graphics().drawString(compactLine(inspectionStatus,62),x+10,y+292,0xbdbdbd,1);}
+		if(regionTool!=RegionTool.PASTE){boolean cutting=regionTool==RegionTool.CUT;graphics().drawString(regionMarkers.isEmpty()?"Click terrain to place marker 1 and begin tracing the boundary.":regionClosed?(cutting?"Selection done. Cut secures a snapshot before changing the world.":"Selection done. Review it, then Copy to the clipboard."):"Continue placing ordered markers, then select Done.",x+10,y+90,0xffffff,2);graphics().drawString("Markers: "+regionMarkers.size()+" | "+(regionClosed?regionPreviewTiles.length+" selected tiles":"selection open"),x+10,y+108,regionClosed?0x80c080:0xffff00,2);toolButton(x+10,y+122,100,regionSelectionActionLabel(),!regionClosed);button(x+120,y+122,100,"Undo");button(x+230,y+122,100,cutting?regionCutActionLabel():regionCopyBridge.isPending()?"Copying...":"Copy");button(x+340,y+122,100,isRegionSharingPending()?"Working...":"Export");graphics().drawString(cutting?"Cut creates/reopens the snapshot and exact plan before confirmation.":"Start/Done/Reset controls markers. Copy captures the closed selection.",x+10,y+174,0xff981f,1);graphics().drawString(cutting?"Confirm Cut replaces terrain with canonical void and removes owned placements.":"Export saves the current clipboard snapshot as a portable .wbr file.",x+10,y+192,cutting?0xff981f:0xbdbdbd,1);if(!lastRegionSnapshotId.isEmpty()){graphics().drawString("Clipboard: "+lastRegionSnapshotName+" ["+shortHash(lastRegionSnapshotId)+"]",x+10,y+228,0xffff00,2);graphics().drawString(lastRegionTileCount+" tiles, "+lastRegionPlacementCount+" placements, "+lastRegionCrossingCount+" crossing reports",x+10,y+248,0xbdbdbd,1);}graphics().drawString(compactLine(inspectionStatus,62),x+10,y+292,0xbdbdbd,1);}
 		else{WorldBuilderRegionPasteClientBridge.Snapshot snapshot=selectedRegionSnapshot();boolean sharing=isRegionSharingPending();graphics().drawString(snapshot==null?"Clipboard is empty. Use Copy or Import first.":"Clipboard: "+snapshot.name+" ["+shortHash(snapshot.id)+"]",x+10,y+90,snapshot==null?0xff981f:0xffff00,2);graphics().drawString(regionPasteX<0?"Click terrain to choose where marker 1 should be placed.":"Destination marker 1: "+regionPasteX+", "+regionPasteY+", level "+regionPasteLevel,x+10,y+110,0xffffff,2);button(x+10,y+122,165,regionPasteActionLabel());button(x+185,y+154,100,regionPasteBridge.isPending()?"Working...":"Undo");button(x+295,y+154,140,sharing?"Working...":"Import .wbr");if(snapshot!=null)graphics().drawString(snapshot.tileCount+" tiles, "+snapshot.placementCount+" placements, "+snapshot.levelCount+" level(s)",x+185,y+139,0xbdbdbd,1);graphics().drawString(regionPastePlanHash.isEmpty()?"Import loads one portable snapshot into the clipboard.":regionPastePreviewTiles.length+" preview tiles | "+regionPasteCollisionTiles.length+" visible collision marker(s)",x+10,y+212,regionPasteBlocked?0xff4040:regionPasteOverwrite?0xff981f:0x80c080,1);graphics().drawString(regionPasteOverwrite?"Occupied destination: Paste > Overwrite? > Confirm.":"Paste applies the exact preview live; Undo restores the exact prior package.",x+10,y+234,regionPasteOverwrite?0xff981f:0xbdbdbd,1);graphics().drawString(compactLine(inspectionStatus,62),x+10,y+292,0xbdbdbd,1);}
 	}
 	private void toolButton(int x,int y,int w,String text,boolean active){graphics().drawBoxAlpha(x,y,w,24,active?0x365b82:0x333333,220);graphics().drawBoxBorder(x,w,y,24,active?0x66b3ff:0);graphics().drawString(text,x+6,y+17,0xffffff,2);}

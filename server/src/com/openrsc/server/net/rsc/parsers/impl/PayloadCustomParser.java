@@ -535,7 +535,7 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 				WorldEditorRequestStruct editor = new WorldEditorRequestStruct();
 				editor.type = packet.readByte() & 0xff;
 				int expectedEditorLength = editor.type == 1 ? 13 : editor.type == 2 ? 19 : editor.type == 3 ? 22 : editor.type == 4 ? 15 : editor.type == 5 ? 29 : editor.type == 10 || editor.type == 11 ? 13 : editor.type == 12 ? 32 : -1;
-				if (editor.type!=6&&editor.type!=7&&editor.type!=8&&editor.type!=9&&packet.getLength()!=expectedEditorLength) return null;
+				if (editor.type!=6&&editor.type!=7&&editor.type!=8&&editor.type!=9&&editor.type!=13&&packet.getLength()!=expectedEditorLength) return null;
 				editor.sessionId = packet.readLong();
 				editor.sequence = packet.readInt();
 				if (editor.type == 2) {
@@ -587,6 +587,11 @@ public class PayloadCustomParser implements PayloadParser<OpcodeIn> {
 					editor.entityOperation=packet.readByte()&0xff;editor.entityId=packet.readShort()&0xffff;
 					editor.x=packet.readShort();editor.y=packet.readShort();editor.endX=packet.readShort();editor.endY=packet.readShort();
 					editor.entityArgument0=packet.readInt();editor.entityArgument1=packet.readInt();
+				} else if(editor.type==13){
+					editor.lockdownOperation=packet.readByte()&0xff;editor.lockdownMode=packet.readByte()&0xff;editor.lockdownEnabled=packet.readByte()!=0;
+					editor.plane=packet.readInt();int count=packet.readShort()&0xffff;
+					if(!WorldEditorPacketFraming.acceptsLockdown(13,packet.getLength(),editor.lockdownOperation,count))return null;
+					editor.lockdownPoints=new int[count][2];for(int i=0;i<count;i++){editor.lockdownPoints[i][0]=packet.readShort()&0xffff;editor.lockdownPoints[i][1]=packet.readShort()&0xffff;}
 				}
 				result = editor;
 				break;
