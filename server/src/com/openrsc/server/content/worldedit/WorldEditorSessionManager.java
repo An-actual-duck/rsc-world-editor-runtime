@@ -567,17 +567,15 @@ public final class WorldEditorSessionManager {
 			player.getLayeredLocation().getWorldSpace();
 		WorldLocation destination = new WorldLocation(
 			worldSpace, new WorldCoordinate(worldX, worldY, level));
-		if (player.getWorld().getRegionManager()
-				.hasNativeLayeredTerrain(destination)) {
+		NativeLayeredWorldPackage owner = activeNativePackage(player);
+		if (owner != null && findNativeTerrainSector(
+				owner, WorldMapSectorId.from(destination)).isPresent()) {
 			return NativeTerrainProvisionResult.existing(destination);
 		}
 		if (!isAdaptive(player) && isSourceLevel(level)) {
 			throw new IllegalArgumentException(
 				"Accepted source levels cannot be expanded in this Builder draft.");
 		}
-		NativeLayeredWorldPackage owner =
-			player.getWorld().getRegionManager()
-				.getNativeLayeredWorldPackage();
 		if (owner == null) {
 			throw new IllegalStateException(
 				"Layered Builder package is unavailable.");
@@ -1251,8 +1249,7 @@ public final class WorldEditorSessionManager {
 		if (!hasUnsavedNativeChanges()) {
 			throw new IllegalStateException("Layered draft is empty.");
 		}
-		NativeLayeredWorldPackage owner = player.getWorld().getRegionManager()
-			.getNativeLayeredWorldPackage();
+		NativeLayeredWorldPackage owner = activeNativePackage(player);
 		if (owner == null) {
 			throw new IllegalStateException(
 				"Adaptive layered working package is unavailable.");
@@ -1344,12 +1341,22 @@ public final class WorldEditorSessionManager {
 		}
 
 		// The package was fully parsed and definition-validated before this point.
-		// Replace package-owned runtime entities in one server command boundary;
-		// terrain switches only after the old entity set is retired.
-		retireNativePackagePlacements(player);
+		// Replace package-owned runtime entities in one server command boundary,
+		// restoring the current package if any registration is refused.
+		WorldEditorPlacementActivation.replace(current, published,
+			new WorldEditorPlacementActivation.Runtime<NativeLayeredWorldPackage>() {
+				@Override
+				public void retire() {
+					retireNativePackagePlacements(player);
+				}
+
+				@Override
+				public void populate(NativeLayeredWorldPackage value) {
+					populateNativePackagePlacements(player, value);
+				}
+			});
 		nativeAdoptedPackage = published;
 		resetNativeDraftAgainstAdoptedPackage(inventorySha256);
-		populateNativePackagePlacements(player, published);
 		nativeTerrainSceneRevision++;
 	}
 
@@ -1898,8 +1905,7 @@ public final class WorldEditorSessionManager {
 	}
 	private void requireAdaptivePlacementCapacity(Player player){
 		if(!isAdaptive(player))return;
-		NativeLayeredWorldPackage owner=player.getWorld().getRegionManager()
-			.getNativeLayeredWorldPackage();
+		NativeLayeredWorldPackage owner=activeNativePackage(player);
 		if(owner==null)throw new IllegalStateException(
 			"Adaptive layered working package is unavailable.");
 		long count=(long)owner.getBoundaryPlacementCount()
@@ -2067,8 +2073,7 @@ public final class WorldEditorSessionManager {
 		int level=destinationCoordinate.getLevel();
 		if(!isAdaptive(player)&&isSourceLevel(level))throw new IllegalArgumentException(
 			"Automatic pairing cannot modify an accepted source level.");
-		NativeLayeredWorldPackage owner=player.getWorld().getRegionManager()
-			.getNativeLayeredWorldPackage();
+		NativeLayeredWorldPackage owner=activeNativePackage(player);
 		if(owner==null)throw new IllegalStateException(
 			"Layered Builder package is unavailable.");
 		if(nativeTerrainBaseManifestSha256==null){
@@ -2538,8 +2543,7 @@ public final class WorldEditorSessionManager {
 			"Authored placement identity slots at this tile are exhausted.");
 	}
 	private boolean nativePlacementIdInUse(Player player,String candidate){
-		NativeLayeredWorldPackage owner=player.getWorld().getRegionManager()
-			.getNativeLayeredWorldPackage();
+		NativeLayeredWorldPackage owner=activeNativePackage(player);
 		if(owner!=null){
 			for(NativeLayeredPlacementSet set:owner.getPlacementSets().values()){
 				for(NativeLayeredBoundaryPlacement value:set.getBoundaries())
@@ -2625,10 +2629,15 @@ public final class WorldEditorSessionManager {
 	}
 	private NativeLayeredWorldPackage nativeOwner(Player player,WorldLocation location){
 		NativeLayeredWorldPackage owner=player.getWorld().getRegionManager()
-			.findNativeLayeredWorldPackage(location)
-			.orElseThrow(()->new IllegalArgumentException(
-				"Terrain tile is not allocated in the layered working package."));
+			.findNativeLayeredWorldPackage(location).orElse(null);
 		owner=effectiveNativeOwner(owner);
+		if(owner==null&&nativeAdoptedPackage!=null
+			&&findNativeTerrainSector(nativeAdoptedPackage,
+				WorldMapSectorId.from(location)).isPresent()){
+			owner=nativeAdoptedPackage;
+		}
+		if(owner==null)throw new IllegalArgumentException(
+			"Terrain tile is not allocated in the layered working package.");
 		String manifest=owner.getManifestSha256();
 		if(nativeTerrainBaseManifestSha256==null)nativeTerrainBaseManifestSha256=manifest;
 		else if(!nativeTerrainBaseManifestSha256.equals(manifest))throw new IllegalStateException(
@@ -2640,6 +2649,10 @@ public final class WorldEditorSessionManager {
 		if(owner==null||nativeAdoptedPackage==null)return owner;
 		return owner.getPackageId().equals(nativeAdoptedPackage.getPackageId())
 			?nativeAdoptedPackage:owner;
+	}
+	private NativeLayeredWorldPackage activeNativePackage(Player player){
+		return effectiveNativeOwner(player.getWorld().getRegionManager()
+			.getNativeLayeredWorldPackage());
 	}
 	private NativeLayeredTerrainTile nativeBaseTile(Player player,WorldLocation location){
 		return nativeBaseTile(nativeOwner(player,location),location);

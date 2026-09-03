@@ -101,6 +101,7 @@ python3 ./tests/myworld/test-adaptive-builder-real-login.py
 python3 ./tests/myworld/test-native-terrain-wire-cache.py
 python3 ./tests/myworld/test-native-terrain-residency.py
 python3 ./tests/myworld/test-world-editor-terrain-drag.py
+python3 ./tests/myworld/test-world-editor-placement-activation.py
 python3 ./tests/myworld/test-wide-terrain-elevation-client-surfaces.py
 python3 ./tests/myworld/test-wide-terrain-elevation-v2.py
 python3 ./tests/myworld/test-terrain-foreground-picking.py
