@@ -5,6 +5,7 @@ import com.openrsc.server.database.DatabaseType;
 import com.openrsc.server.util.EntityList;
 import com.openrsc.server.util.SystemUtil;
 import com.openrsc.server.util.YMLReader;
+import com.openrsc.server.io.WorldBuilderInstalledServerProfile;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -618,6 +619,7 @@ public class ServerConfiguration {
 			"OPENRSC_LAYERED_NATIVE_WORLD_RUNTIME_PROFILE",
 			"layered_native_world_runtime_profile",
 			"fixture-additive");
+		WorldBuilderInstalledServerProfile.apply(this);
 		MOVEMENT_STUTTER_DIAGNOSTIC_SUMMARY_SECONDS = Math.max(5, readIntSystemEnvConfig(
 			"openrsc.movementStutterDiagnosticSummarySeconds",
 			"OPENRSC_MOVEMENT_STUTTER_DIAGNOSTIC_SUMMARY_SECONDS",

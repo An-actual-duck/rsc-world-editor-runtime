@@ -3,8 +3,6 @@
     <property name="build" location="build"/>
     <property name="lib" location="lib"/>
     <property name="jar" location="core.jar"/>
-    <property name="installed.runtime.dir" location="world-builder-runtime"/>
-    <property name="installed.runtime.jar" location="${installed.runtime.dir}/world-builder-managed-runtime.jar"/>
     <property name="javac.source" value="1.8"/>
     <property name="javac.target" value="1.8"/>
     <property name="javac.lint" value="-Xlint:deprecation"/>
@@ -13,7 +11,7 @@
     <target name="clean">
         <delete dir="${build}" />
         <delete file="${jar}" />
-        <delete dir="${installed.runtime.dir}" />
+        <delete dir="world-builder-runtime" />
     </target>
 
     <target name="compile_plugins">
@@ -91,33 +89,6 @@
             <zipgroupfileset dir="${lib}" includes="*.jar"/>
             <manifest>
                 <attribute name="Main-Class" value="com.openrsc.server.Server"/>
-            </manifest>
-        </jar>
-        <!--
-          The installed-server artifact is an authoritative World Builder
-          upgrade layer, not a replacement copy of this provider's inherited
-          game server. Keep it first on an imported target's runtime classpath,
-          but deliberately omit unrelated gameplay/content implementations and
-          every bundled third-party dependency. The target remains authoritative
-          for its plugins, gameplay systems, definitions, database, and library
-          versions while these classes replace the map/coordinate/runtime seam.
-        -->
-        <mkdir dir="${installed.runtime.dir}"/>
-        <jar destfile="${installed.runtime.jar}" filesonly="true">
-            <fileset dir="${build}">
-                <include name="com/openrsc/server/**/*.class"/>
-                <exclude name="com/openrsc/server/constants/**/*.class"/>
-                <exclude name="com/openrsc/server/content/**/*.class"/>
-                <exclude name="com/openrsc/server/database/**/*.class"/>
-                <exclude name="com/openrsc/server/plugins/**/*.class"/>
-                <exclude name="com/openrsc/server/event/rsc/impl/**/*.class"/>
-            </fileset>
-            <fileset dir="${build}">
-                <include name="com/openrsc/server/content/worldedit/**/*.class"/>
-                <include name="com/openrsc/server/database/WorldPopulator*.class"/>
-            </fileset>
-            <manifest>
-                <attribute name="Implementation-Title" value="World Builder installed server upgrade"/>
             </manifest>
         </jar>
         <delete dir="${build}"/>

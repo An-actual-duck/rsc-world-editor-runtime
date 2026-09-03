@@ -1803,174 +1803,58 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertIn('ADAPTIVE_WORLD_BUILDER("adaptive-world-builder", true)', profile)
         self.assertNotIn("ADAPTIVE_WORLD_BUILDER = SPOILED", profile)
         installed = json.loads((
-            ROOT / "server/conf/world-builder/installed-runtime-capability-v2.json"
+            ROOT / "server/conf/world-builder/installed-runtime-capability-v3.json"
         ).read_text())
         self.assertEqual(
-            "world-builder-installed-runtime-capability",
+            "world-builder-host-runtime-capability",
             installed["manifestType"],
         )
         self.assertEqual("world-builder-installed", installed["profileId"])
         self.assertEqual(
-            "world-builder-managed-runtime-current",
-            installed["managedRuntimeBundleId"],
+            "host-integrated-core-v1",
+            installed["integrationModel"],
         )
         self.assertEqual(
             "world-builder-installed-client-profile-v1",
             installed["clientBootstrapId"],
         )
+        self.assertEqual(
+            "world-builder-installed-server-profile-v1",
+            installed["serverBootstrapId"],
+        )
         self.assertEqual([1, 2, 3, 4], installed["encodingVersions"])
         self.assertEqual(
-            "server/world-builder-runtime/world-builder-managed-runtime.jar",
-            installed["runtimeArchives"]["serverRelativePath"],
-        )
-        self.assertEqual(
-            "server/core.jar",
-            installed["runtimeArchives"]["targetFallbackRelativePath"],
-        )
-        self.assertFalse(installed["activation"]["builderOnly"])
-        self.assertTrue(installed["activation"]["replacesLegacyTerrain"])
-        self.assertTrue(installed["activation"]["replacesLegacyPlacements"])
-        self.assertTrue(
-            installed["activation"]["replacesLegacyClientBootstrap"]
-        )
-        self.assertIn(
-            "layered_native_terrain_package_path",
-            installed["activation"]["requiredStringKeys"],
-        )
-        bundle = json.loads((
-            ROOT / "server/conf/world-builder/managed-runtime-bundle.json"
-        ).read_text())
-        self.assertEqual(
-            "world-builder-managed-runtime-bundle", bundle["manifestType"]
-        )
-        self.assertEqual(
-            installed["managedRuntimeBundleId"], bundle["bundleId"]
-        )
-        self.assertEqual(installed["profileId"], bundle["profileId"])
-        self.assertEqual(installed["loaderId"], bundle["loaderId"])
-        self.assertEqual(installed["protocolId"], bundle["protocolId"])
-        self.assertEqual(
-            installed["clientBootstrapId"], bundle["clientBootstrapId"]
+            "server/world-builder-configs/installed-server.json",
+            installed["activation"]["serverProfileRelativePath"],
         )
         self.assertEqual(
             [
-                "server-runtime-upgrade",
-                "client-source-upgrade",
-                "runtime-capability",
+                "Client_Base/world-builder-configs/installed-client.json",
+                "client/world-builder-configs/installed-client.json",
             ],
-            [component["role"] for component in bundle["components"]],
+            installed["activation"]["clientProfileRelativePaths"],
         )
-        self.assertEqual(
-            "server/world-builder-runtime/world-builder-managed-runtime.jar",
-            bundle["components"][0]["sourceRelativePath"],
-        )
-        self.assertEqual(
-            "server/world-builder-runtime/world-builder-managed-runtime.jar",
-            bundle["components"][0]["destinationRelativePath"],
-        )
-        self.assertEqual(
-            ["server/conf/world-builder/installed-runtime-capability-v1.json"],
-            bundle["legacyCapabilityPaths"],
-        )
-        self.assertIn("target-owned gameplay", " ".join(bundle["serverUpgradeBoundary"]))
-        self.assertIn(
-            "target client protocol version",
-            " ".join(bundle["clientUpgradeBoundary"]),
-        )
-        source_upgrade = json.loads((
-            ROOT / "server/conf/world-builder/installed-client-source-upgrade-v5.json"
-        ).read_text())
-        self.assertEqual(
-            "world-builder-installed-client-source-upgrade",
-            source_upgrade["manifestType"],
-        )
-        self.assertEqual(
-            installed["clientSourceUpgrade"]["upgradeId"],
-            source_upgrade["upgradeId"],
-        )
-        self.assertEqual(
-            "atomic-compile-target-client-before-run",
-            source_upgrade["buildPolicy"],
-        )
+        self.assertFalse(installed["activation"]["replacesLegacyTerrain"])
+        self.assertFalse(installed["activation"]["replacesLegacyPlacements"])
         self.assertEqual(
             [
-                "src/orsc/AdaptiveWorldBuilderClientSession.java",
-                "src/orsc/ProjectContentBundle.java",
-                "src/orsc/ProjectNpcAnimationRegistry.java",
-                "src/orsc/NativeLayeredTerrainChunk.java",
-                "src/orsc/NativeLayeredTerrainPacketDecoder.java",
-                "src/com/openrsc/client/model/Tile.java",
-                "src/orsc/WorldBuilderClientProfile.java",
-                "src/orsc/WorldBuilderInstalledClientProfile.java",
-                "src/orsc/WorldBuilderTerrainBootstrap.java",
-                "src/orsc/WorldBuilderTerrainOverlay.java",
-                "src/orsc/graphics/three/World.java",
+                "content-addressed-map-package",
+                "world-builder-map-selection",
+                "world-builder-owned-activation-profile",
             ],
-            [entry["destinationRelativePath"] for entry in source_upgrade["sourceFiles"]],
+            installed["activation"]["ordinaryImportOwnership"],
         )
-        for entry in source_upgrade["sourceFiles"]:
-            source = ROOT / "Client_Base" / entry["destinationRelativePath"]
-            self.assertEqual(
-                entry["sha256"], hashlib.sha256(source.read_bytes()).hexdigest()
-            )
-        self.assertEqual(
-            [
-                {
-                    "transformId": "world-builder-installed-login-world-bootstrap-v2",
-                    "destinationRelativePath": "src/orsc/mudclient.java",
-                },
-                {
-                    "transformId": "world-builder-unsigned-uniform-elevation-v1",
-                    "destinationRelativePath": "src/orsc/NativeLayeredTerrainSnapshot.java",
-                },
-            ],
-            source_upgrade["semanticTransforms"],
-        )
-        self.assertEqual(
-            5,
-            sum(
-                entry["replacementPolicy"] == "replace-supported-historical"
-                for entry in source_upgrade["sourceFiles"]
-            ),
-        )
-        self.assertEqual(
-            [
-                {
-                    "sourceRelativePath": "server/lib/json-20190722.jar",
-                    "destinationRelativePath": "PC_Client/lib/json-20190722.jar",
-                    "sha256": hashlib.sha256(
-                        (ROOT / "server/lib/json-20190722.jar").read_bytes()
-                    ).hexdigest(),
-                    "replacementPolicy": "add-or-exact",
-                }
-            ],
-            source_upgrade["dependencies"],
-        )
-
-        self.assertTrue(
-            INSTALLED_RUNTIME.is_file(),
-            "installed server upgrade is required; run ./scripts/build-server.sh",
-        )
-        with zipfile.ZipFile(INSTALLED_RUNTIME) as archive:
+        self.assertFalse(INSTALLED_RUNTIME.exists())
+        with zipfile.ZipFile(CORE) as archive:
             installed_entries = set(archive.namelist())
         for required in (
             "com/openrsc/server/io/NativeLayeredWorldPackage.class",
+            "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class",
             "com/openrsc/server/model/world/World.class",
             "com/openrsc/server/model/world/coordinate/WorldCoordinate.class",
             "com/openrsc/server/net/rsc/NativeLayeredTerrainClientResidency.class",
         ):
             self.assertIn(required, installed_entries)
-        for forbidden_prefix in (
-            "com/openrsc/server/content/minigame/",
-            "com/openrsc/server/plugins/",
-            "org/apache/",
-            "org/slf4j/",
-            "com/google/",
-        ):
-            self.assertFalse(
-                any(name.startswith(forbidden_prefix) for name in installed_entries),
-                f"installed server upgrade leaked target-owned {forbidden_prefix}",
-            )
         publisher = (ROOT / "server/src/com/openrsc/server/content/worldedit/AdaptiveWorldBuilderPackagePublisher.java").read_text()
         self.assertNotIn("rsc-remastered.spoiled-milk-layered-world", publisher)
         self.assertNotIn("SPOILED_MILK_PACKAGE", publisher)
