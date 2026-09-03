@@ -1796,6 +1796,11 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             self.assertNotEqual(0, refused.returncode)
 
     def test_fixed_profiles_and_content_neutral_policy_remain_explicit(self):
+        build = (ROOT / "server/build.xml").read_text()
+        self.assertIn(
+            '<target name="compile_core">\n        <delete dir="world-builder-runtime"/>',
+            build,
+        )
         profile = (ROOT / "server/src/com/openrsc/server/io/NativeLayeredWorldRuntimeProfile.java").read_text()
         self.assertIn('PRESERVATION_R64_REPLACEMENT("preservation-r64-replacement", true)', profile)
         self.assertIn('SPOILED_MILK_REPLACEMENT("spoiled-milk-replacement", true)', profile)
