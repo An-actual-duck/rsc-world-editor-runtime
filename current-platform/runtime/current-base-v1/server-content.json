@@ -13,6 +13,14 @@
     "sceneryMaxId": 1189
   },
   "sourceFiles": [
+    {"sourcePath": "server/database/mysql/queries/bank_presets.xml", "bundlePath": "database/mysql/queries/bank_presets.xml", "transform": "copy"},
+    {"sourcePath": "server/database/mysql/queries/item.xml", "bundlePath": "database/mysql/queries/item.xml", "transform": "copy"},
+    {"sourcePath": "server/database/mysql/queries/patches.xml", "bundlePath": "database/mysql/queries/patches.xml", "transform": "copy"},
+    {"sourcePath": "server/database/mysql/queries/player.xml", "bundlePath": "database/mysql/queries/player.xml", "transform": "copy"},
+    {"sourcePath": "server/database/sqlite/queries/bank_presets.xml", "bundlePath": "database/sqlite/queries/bank_presets.xml", "transform": "copy"},
+    {"sourcePath": "server/database/sqlite/queries/item.xml", "bundlePath": "database/sqlite/queries/item.xml", "transform": "copy"},
+    {"sourcePath": "server/database/sqlite/queries/patches.xml", "bundlePath": "database/sqlite/queries/patches.xml", "transform": "copy"},
+    {"sourcePath": "server/database/sqlite/queries/player.xml", "bundlePath": "database/sqlite/queries/player.xml", "transform": "copy"},
     {"sourcePath": "server/conf/server/aliases.xml", "bundlePath": "conf/server/aliases.xml", "transform": "copy"},
     {"sourcePath": "server/conf/server/badwordsJag.txt", "bundlePath": "conf/server/badwordsJag.txt", "transform": "copy"},
     {"sourcePath": "server/conf/server/log4j2.xml", "bundlePath": "conf/server/log4j2.xml", "transform": "copy"},
