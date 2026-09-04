@@ -20,7 +20,7 @@
     },
     "transformations": {
       "type": "object", "additionalProperties": false,
-      "required": ["tables", "legacyColumnsRetained", "columnMappings", "newColumnDefaults"],
+      "required": ["tables", "legacyColumnsRetained", "columnMappings", "newColumnDefaults", "runtimePatchState"],
       "properties": {
         "tables": {"type": "array", "minItems": 4, "maxItems": 4, "prefixItems": [{"const": "curstats"}, {"const": "maxstats"}, {"const": "experience"}, {"const": "capped_experience"}], "items": false},
         "legacyColumnsRetained": {"const": true},
@@ -31,11 +31,21 @@
         },
         "newColumnDefaults": {
           "type": "object", "additionalProperties": false,
-          "required": ["fletching", "fishing", "agility", "harvesting", "runecraft", "blessing"],
+          "required": ["fletching", "fishing", "agility", "harvesting", "runecraft", "summoning", "blessing"],
           "properties": {
             "fletching": {"const": "level-one-experience-zero"}, "fishing": {"const": "level-one-experience-zero"},
             "agility": {"const": "level-one-experience-zero"}, "harvesting": {"const": "level-one-experience-zero"},
-            "runecraft": {"const": "level-one-experience-zero"}, "blessing": {"const": "level-one-experience-zero"}
+            "runecraft": {"const": "level-one-experience-zero"}, "summoning": {"const": "level-one-experience-zero"},
+            "blessing": {"const": "level-one-experience-zero"}
+          }
+        },
+        "runtimePatchState": {
+          "type": "object", "additionalProperties": false,
+          "required": ["schemaEvolution", "patchLedger", "startupPolicy"],
+          "properties": {
+            "schemaEvolution": {"const": "former-names-and-login-nonce-v1"},
+            "patchLedger": {"const": "all-provider-patches-through-2026-08-03"},
+            "startupPolicy": {"const": "no-unreviewed-patch-execution"}
           }
         }
       }

@@ -263,8 +263,42 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
             config = replace_config(config, "ws_server_port", str(ws_port))
             config_path.write_text(config, encoding="utf-8")
 
+            runtime_profile = json.loads((
+                ROOT / "current-platform/runtime/current-base-v1/profile.json"
+            ).read_text(encoding="utf-8"))
+            advanced_configuration = runtime_profile["advancedExclusions"][
+                "configuration"
+            ]
+            self.assertTrue(advanced_configuration)
+            for key, expected in advanced_configuration.items():
+                self.assertIs(expected, False)
+                matches = re.findall(
+                    rf"(?m)^\s*{re.escape(key)}:\s*(\S+)\s*$", config
+                )
+                self.assertEqual(
+                    ["false"], matches,
+                    f"launched server config did not exactly disable {key}",
+                )
+
             server_profile = server_root / "world-builder-configs/installed-server.json"
             client_profile = client_root / "world-builder-configs/installed-client.json"
+            refused = subprocess.run(
+                [
+                    "java",
+                    f"-Dopenrsc.currentCompositionIdentityFile={IDENTITY}",
+                    f"-Dopenrsc.worldBuilderInstalledClientProfile={client_profile}",
+                    "-Dopenrsc.currentBaseExecutionEvidence=true",
+                    "-Dopenrsc.currentBaseHost=localhost",
+                    f"-Dopenrsc.currentBasePort={port}",
+                    f"-Dopenrsc.currentBaseCredentialFile={credential}",
+                    "-jar", "Open_RSC_Client.jar",
+                ],
+                cwd=client_root, capture_output=True, text=True,
+            )
+            self.assertEqual(2, refused.returncode, refused.stdout + refused.stderr)
+            self.assertIn(
+                "endpoint must be literal loopback 127.0.0.1", refused.stderr
+            )
             evidence_runs = []
             for run_number in (1, 2):
                 server_log = fixture / f"server-{run_number}.log"
@@ -333,7 +367,8 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
             expected_marker = (
                 "CURRENT_BASE_RUNTIME_EXECUTION variant=current-base-v1 "
                 "canonicalMap=true initialRegion=true worldX=120 worldY=648 "
-                "coins=73 prayer=18 magic=19 woodcut=20 quest1=3 advanced=false"
+                "coins=73 prayer=18 magic=19 woodcut=20 quest1=3 "
+                "clientAdvanced=false"
             )
             for evidence in evidence_runs:
                 self.assertIn(expected_marker, evidence)

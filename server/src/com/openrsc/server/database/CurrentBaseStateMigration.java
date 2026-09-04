@@ -36,7 +36,7 @@ public final class CurrentBaseStateMigration {
 	private static final String ROW_ID = "preservation-retro-to-current-base-v1";
 	private static final String CONTRACT_TYPE = "current-base-state-migration";
 	private static final String CONTRACT_SHA256 =
-		"2cc505ae5f764b1021a8898796af20962b0b6ae644f1301e4db6c44bb668a4e4";
+		"06f2bca49f7e4dd653545695fd74ced91e9b306c9b7514bba114ea9361be2477";
 	private static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 	private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
 	private static final Set<String> CONTRACT_KEYS = set(
@@ -47,7 +47,8 @@ public final class CurrentBaseStateMigration {
 		"sourceSchemaFingerprintAlgorithm", "verificationRuntime", "stageMode", "sourceMutation",
 		"rollback", "credentialPolicy");
 	private static final Set<String> TRANSFORM_KEYS = set(
-		"tables", "legacyColumnsRetained", "columnMappings", "newColumnDefaults");
+		"tables", "legacyColumnsRetained", "columnMappings", "newColumnDefaults",
+		"runtimePatchState");
 	private static final Set<String> INVOCATION_KEYS = set(
 		"toolArtifactRole", "mainClass", "arguments");
 	private static final Set<String> EVIDENCE_KEYS = set(
@@ -111,17 +112,18 @@ public final class CurrentBaseStateMigration {
 				staged.setAutoCommit(false);
 				try {
 					applyTransform(staged, "sqlite");
+					String projected = stateHash(staged, sourceSchema, null);
+					if (!sourceState.equals(projected)) throw new SQLException(
+						"staged SQLite database did not preserve source durable rows");
+					writeRuntimePatchLedger(staged, "sqlite");
 					writeLedger(staged, contract, sourceSchema.fingerprint, sourceState);
 					staged.commit();
+					writeEvidence(evidence, contract, "sqlite", sourceSchema.fingerprint,
+						sourceState, projected, sourceBytes, sha256(source), stage.toString());
 				} catch (Exception failure) {
 					staged.rollback();
 					throw failure;
 				}
-				String projected = stateHash(staged, sourceSchema, null);
-				if (!sourceState.equals(projected)) throw new SQLException(
-					"staged SQLite database did not preserve source durable rows");
-				writeEvidence(evidence, contract, "sqlite", sourceSchema.fingerprint,
-					sourceState, projected, sourceBytes, sha256(source), stage.toString());
 			}
 		} catch (Exception failure) {
 			if (stageOwned) try { Files.deleteIfExists(stage); } catch (IOException ignored) { }
@@ -154,10 +156,11 @@ public final class CurrentBaseStateMigration {
 			if (injectedFailure) throw new SQLException("injected failure after staged copy");
 			connection.setCatalog(target.stageSchema);
 			applyTransform(connection, "mariadb");
-			writeLedger(connection, contract, sourceSchema.fingerprint, sourceState);
 			String projected = stateHash(connection, sourceSchema, target.stageSchema);
 			if (!sourceState.equals(projected)) throw new SQLException(
 				"staged MariaDB schema did not preserve source durable rows");
+			writeRuntimePatchLedger(connection, "mariadb");
+			writeLedger(connection, contract, sourceSchema.fingerprint, sourceState);
 			writeEvidence(evidence, contract, "mariadb", sourceSchema.fingerprint,
 				sourceState, projected, sourceState, sourceState, target.stageSchema);
 		} catch (Exception failure) {
@@ -176,7 +179,7 @@ public final class CurrentBaseStateMigration {
 			addColumn(connection, engine, table, "magic", defaultValue);
 			addColumn(connection, engine, table, "woodcut", defaultValue);
 			for (String column : Arrays.asList("fletching", "fishing", "agility",
-				"harvesting", "runecraft", "blessing")) {
+				"harvesting", "runecraft", "summoning", "blessing")) {
 				addColumn(connection, engine, table, column, defaultValue);
 			}
 			try (Statement statement = connection.createStatement()) {
@@ -185,6 +188,73 @@ public final class CurrentBaseStateMigration {
 					+ " magic=CASE WHEN goodmagic > evilmagic THEN goodmagic ELSE evilmagic END,"
 					+ " woodcut=woodcutting");
 			}
+		}
+		applyCurrentRuntimeSchema(connection, engine);
+	}
+
+	private static void applyCurrentRuntimeSchema(Connection connection, String engine)
+		throws SQLException {
+		try (Statement statement = connection.createStatement()) {
+			if ("sqlite".equals(engine)) {
+				statement.executeUpdate("CREATE TABLE former_names (dbid INTEGER NOT NULL "
+					+ "PRIMARY KEY, playerId INTEGER NOT NULL, formerName VARCHAR(13) NOT NULL "
+					+ "DEFAULT '0', changeType TINYINT NOT NULL DEFAULT 0, time INTEGER NOT NULL "
+					+ "DEFAULT 0, whoChanged VARCHAR(12) NOT NULL DEFAULT '0', reason VARCHAR(120) "
+					+ "NOT NULL DEFAULT '0')");
+				statement.executeUpdate("ALTER TABLE players ADD COLUMN former_name "
+					+ "VARCHAR(13) NOT NULL DEFAULT ''");
+				statement.executeUpdate("ALTER TABLE friends ADD COLUMN friendFormerName "
+					+ "VARCHAR(13) NOT NULL DEFAULT ''");
+				statement.executeUpdate("ALTER TABLE ignores ADD COLUMN ignoreFormer "
+					+ "BIGINT(19) NOT NULL DEFAULT 0");
+				statement.executeUpdate("CREATE INDEX ignoreFormer ON ignores(ignoreFormer)");
+				statement.executeUpdate("ALTER TABLE logins ADD COLUMN nonce VARCHAR(96)");
+				statement.executeUpdate("CREATE UNIQUE INDEX nonce_index ON logins(nonce)");
+			} else {
+				statement.executeUpdate("CREATE TABLE former_names (dbid INT UNSIGNED NOT NULL "
+					+ "AUTO_INCREMENT PRIMARY KEY, playerId INT UNSIGNED NULL, formerName "
+					+ "VARCHAR(13) NOT NULL DEFAULT '0', changeType TINYINT UNSIGNED NOT NULL "
+					+ "DEFAULT 0, time INT UNSIGNED NOT NULL DEFAULT 0, whoChanged VARCHAR(12) "
+					+ "NOT NULL DEFAULT '0', reason VARCHAR(120) NOT NULL DEFAULT '0') "
+					+ "DEFAULT CHARSET=utf8");
+				statement.executeUpdate("ALTER TABLE players ADD COLUMN former_name "
+					+ "VARCHAR(13) NOT NULL DEFAULT ''");
+				statement.executeUpdate("ALTER TABLE friends ADD COLUMN friendFormerName "
+					+ "VARCHAR(13) NOT NULL DEFAULT ''");
+				statement.executeUpdate("ALTER TABLE ignores ADD COLUMN ignoreFormer "
+					+ "BIGINT UNSIGNED NOT NULL DEFAULT 0, ADD INDEX ignoreFormer(ignoreFormer)");
+				statement.executeUpdate("ALTER TABLE logins ADD COLUMN nonce VARCHAR(96) NULL, "
+					+ "ADD UNIQUE INDEX nonce(nonce)");
+			}
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS db_patches (patch_name "
+				+ "VARCHAR(200) NOT NULL PRIMARY KEY, run_date DATE NOT NULL)");
+		}
+	}
+
+	private static void writeRuntimePatchLedger(Connection connection, String engine)
+		throws SQLException {
+		List<String> patches = "sqlite".equals(engine)
+			? Arrays.asList("2021_05_11_add_db_patches.sql",
+				"2023_02_01_former_names.sql", "2026_05_14_add_summoning_skill.sql",
+				"2026_08_03_add_blessing_skill.sql")
+			: Arrays.asList("2020_09_23_rsc235.sql", "2020_10_28_player_transfers.sql",
+				"2021_03_14_xp_rollover.sql", "2021_03_24_message_logging_length.sql",
+				"2021_05_11_add_db_patches.sql",
+				"2021_05_27_move_ironman_to_separate_table.sql",
+				"2021_05_28_delete_bank_size_from_players.sql",
+				"2023_02_01_former_names.sql", "2023_12_23_change_itemid_to_bigint.sql",
+				"2026_05_14_add_summoning_skill.sql",
+				"2026_08_03_add_blessing_skill.sql");
+		String insert = "sqlite".equals(engine)
+			? "INSERT OR IGNORE INTO db_patches (patch_name,run_date) VALUES (?,?)"
+			: "INSERT IGNORE INTO db_patches (patch_name,run_date) VALUES (?,?)";
+		try (PreparedStatement statement = connection.prepareStatement(insert)) {
+			for (String patch : patches) {
+				statement.setString(1, patch);
+				statement.setString(2, patch.substring(0, 10).replace('_', '-'));
+				statement.addBatch();
+			}
+			statement.executeBatch();
 		}
 	}
 

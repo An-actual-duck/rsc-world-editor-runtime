@@ -41,7 +41,13 @@
       "agility": "level-one-experience-zero",
       "harvesting": "level-one-experience-zero",
       "runecraft": "level-one-experience-zero",
+      "summoning": "level-one-experience-zero",
       "blessing": "level-one-experience-zero"
+    },
+    "runtimePatchState": {
+      "schemaEvolution": "former-names-and-login-nonce-v1",
+      "patchLedger": "all-provider-patches-through-2026-08-03",
+      "startupPolicy": "no-unreviewed-patch-execution"
     }
   },
   "invocation": {

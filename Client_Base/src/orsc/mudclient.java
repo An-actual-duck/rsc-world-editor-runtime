@@ -28156,7 +28156,7 @@ public final class mudclient implements Runnable {
 			+ " magic=" + this.playerStatCurrent[6]
 			+ " woodcut=" + this.playerStatCurrent[8]
 			+ " quest1=" + this.questStages[1]
-			+ " advanced=false";
+			+ " clientAdvanced=false";
 		System.out.println(evidence);
 		ClientRuntimeLogger.log(evidence);
 		this.closeConnection(true);

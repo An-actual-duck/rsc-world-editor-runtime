@@ -154,10 +154,10 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
                 ("capped_experience", (18, 19, 20, 0)),
             ):
                 row = database.execute(
-                    f"SELECT prayer,magic,woodcut,fletching FROM {table} "
+                    f"SELECT prayer,magic,woodcut,fletching,summoning FROM {table} "
                     "WHERE playerID=41"
                 ).fetchone()
-                self.assertEqual(defaults, row)
+                self.assertEqual(defaults + (defaults[-1],), row)
             self.assertEqual((41, 10, 0), database.execute(
                 "SELECT playerID,itemID,slot FROM bank WHERE playerID=41"
             ).fetchone())
@@ -170,6 +170,9 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
             self.assertEqual(("sealed_key", "sealed_value"), database.execute(
                 "SELECT key,value FROM player_cache WHERE playerID=41"
             ).fetchone())
+            self.assertEqual(4, database.execute(
+                "SELECT COUNT(*) FROM db_patches"
+            ).fetchone()[0])
             self.assertEqual(
                 "preservation-retro-to-current-base-v1",
                 database.execute(
@@ -254,6 +257,7 @@ class CurrentBaseMariaMigrationTest(unittest.TestCase):
         )
         if started.returncode != 0:
             raise AssertionError(started.stdout + started.stderr)
+        cls.addClassCleanup(cls.stop_container)
         for _ in range(60):
             ready = subprocess.run(
                 ["docker", "exec", cls.container, "mariadb-admin", "-uroot",
@@ -311,10 +315,13 @@ class CurrentBaseMariaMigrationTest(unittest.TestCase):
             "INSERT INTO quests(playerID,id,stage) VALUES(41,1,3);"
             "INSERT INTO player_cache(playerID,type,`key`,`value`)"
             " VALUES(41,0,'sealed_key','sealed_value');"
+            "INSERT INTO db_patches(patch_name,run_date) VALUES"
+            "('2021_05_11_add_db_patches.sql','2000-01-01'),"
+            "('preservation_extension.sql','2001-02-03');"
         )
 
     @classmethod
-    def tearDownClass(cls) -> None:
+    def stop_container(cls) -> None:
         subprocess.run(
             ["docker", "stop", getattr(cls, "container", "missing")],
             capture_output=True, text=True,
@@ -367,10 +374,22 @@ class CurrentBaseMariaMigrationTest(unittest.TestCase):
         result = self.migrate("current_stage", evidence)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         row = self.sql(
-            "SELECT prayer,magic,woodcut,fletching FROM curstats WHERE playerID=41",
+            "SELECT prayer,magic,woodcut,fletching,summoning FROM curstats "
+            "WHERE playerID=41",
             "current_stage",
         )
-        self.assertEqual("18\t19\t20\t1", row)
+        self.assertEqual("18\t19\t20\t1\t1", row)
+        self.assertEqual("2000-01-01", self.sql(
+            "SELECT run_date FROM db_patches WHERE patch_name="
+            "'2021_05_11_add_db_patches.sql'", "current_stage",
+        ))
+        self.assertEqual("2001-02-03", self.sql(
+            "SELECT run_date FROM db_patches WHERE patch_name="
+            "'preservation_extension.sql'", "current_stage",
+        ))
+        self.assertEqual("12", self.sql(
+            "SELECT COUNT(*) FROM db_patches", "current_stage",
+        ))
         self.assertEqual(
             "preservation-retro-to-current-base-v1",
             self.sql("SELECT migration_row_id FROM current_base_migrations",

@@ -45,6 +45,15 @@ client themselves parse the exact composition identity and enforce its six
 fields before configuration transfer and again on every login connection;
 mismatches are refused before login state is accepted.
 
+The full runtime suite's Current Base execution gates require a working local
+Docker daemon with the already-pinned image
+`mariadb@sha256:611a2fcc5fa7c6ceb8644c6f74b25ede004ff6c3a6b38c8f8c23d3bbf6c26430`
+available, and a usable desktop X display named by `DISPLAY`. The MariaDB gate
+publishes only an ephemeral port on literal `127.0.0.1`; the desktop gate runs
+the built client against a disposable loopback server and temporary state.
+Neither gate downloads an image, uses external credentials, or touches an
+installed target.
+
 Resolve and hash the built candidate inventory:
 
 ```bash

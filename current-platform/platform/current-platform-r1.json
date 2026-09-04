@@ -46,7 +46,7 @@
     {
       "schemaId": "current-base-state-migration-v1",
       "relativePath": "schema/current-base-state-migration-v1.schema.json",
-      "sha256": "322d369bceca5ed5b0c0267cf89247e7751f4ef90d3375daf884c99f161d34b8"
+      "sha256": "367b617740502fe6ae804e12f65df6bbc795269e3efb5e4a59d0ba71f220c27c"
     },
     {
       "schemaId": "current-bundle-spec-v1",
