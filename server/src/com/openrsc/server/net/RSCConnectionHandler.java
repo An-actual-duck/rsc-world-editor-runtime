@@ -2,6 +2,7 @@ package com.openrsc.server.net;
 
 import com.google.common.base.Objects;
 import com.openrsc.server.Server;
+import com.openrsc.server.CurrentCompositionIdentity;
 import com.openrsc.server.model.entity.UnregisterForcefulness;
 import com.openrsc.server.model.entity.player.Player;
 import com.openrsc.server.net.rsc.ActionSender;
@@ -99,8 +100,30 @@ public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implement
 				}
 			}
 			if (player == null) {
+				if (packet.getID() == CurrentCompositionIdentity.HANDSHAKE_OPCODE) {
+					if (!getServer().getPacketFilter().shouldAllowPacket(ctx.channel(), false)) {
+						ctx.channel().close();
+						return;
+					}
+					try {
+						CurrentCompositionIdentity.current().requireClientHandshake(packet);
+						att.currentCompositionAccepted.set(true);
+						ActionSender.sendInitialServerConfigs(getServer(), channel);
+					} catch (IllegalArgumentException exception) {
+						LOGGER.warn("Current composition handshake refused for {}: {}",
+							channel.remoteAddress(), exception.getMessage());
+						channel.close();
+					}
+					return;
+				}
 				// Custom client sends opcode 19 to request server configs
 				if (packet.getID() == 19 && packet.getLength() < 2) {
+					if (CurrentCompositionIdentity.current().isEnabled()) {
+						LOGGER.warn("Current composition server refused an unbound client from {}",
+							channel.remoteAddress());
+						channel.close();
+						return;
+					}
 					if (!getServer().getPacketFilter().shouldAllowPacket(ctx.channel(), false)) {
 						LOGGER.info("Packet 19 with size " + packet.getLength() +  " not allowed for null player with IP " + ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress().getHostAddress() + ", closing channel");
 						ctx.channel().close();
@@ -109,6 +132,13 @@ public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implement
 
 					ActionSender.sendInitialServerConfigs(getServer(), channel);
 				} else {
+					if (CurrentCompositionIdentity.current().isEnabled()
+						&& !Boolean.TRUE.equals(att.currentCompositionAccepted.get())) {
+						LOGGER.warn("Current composition server refused login before handshake from {}",
+							channel.remoteAddress());
+						channel.close();
+						return;
+					}
 					if (packet.getLength() > 10 || (packet.getID() == 4 && packet.getLength() > 8)) {
 						loginHandler.processLogin(packet, channel, getServer());
 					}

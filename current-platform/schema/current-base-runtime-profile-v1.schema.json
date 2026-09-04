@@ -11,13 +11,12 @@
     "variantId": {"const": "current-base-v1"},
     "installabilityBlockers": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 3,
+      "maxItems": 3,
       "prefixItems": [
         {"const": "content-neutral-server-config-and-definitions-v1"},
         {"const": "transactional-state-migration-row-v1"},
-        {"const": "base-gameplay-state-runtime-execution-v1"},
-        {"const": "runtime-enforced-server-client-startup-handshake-v1"}
+        {"const": "base-gameplay-state-runtime-execution-v1"}
       ],
       "items": false
     },

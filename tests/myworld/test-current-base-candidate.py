@@ -71,7 +71,6 @@ class CurrentBaseCandidateTest(unittest.TestCase):
                 "content-neutral-server-config-and-definitions-v1",
                 "transactional-state-migration-row-v1",
                 "base-gameplay-state-runtime-execution-v1",
-                "runtime-enforced-server-client-startup-handshake-v1",
             ],
             self.profile["installabilityBlockers"],
         )

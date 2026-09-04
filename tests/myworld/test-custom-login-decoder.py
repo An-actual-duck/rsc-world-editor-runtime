@@ -87,6 +87,34 @@ public final class CustomLoginDecoderHarness {
         return result;
     }
 
+    private static byte[] compositionHandshakeFrame() {
+        String[] fields = new String[] {
+            "current-composition-handshake-v1",
+            "rsc-current-platform-r1",
+            repeat('a', 64),
+            "current-base-v1",
+            repeat('b', 64),
+            repeat('c', 64),
+            repeat('d', 64)
+        };
+        StringBuilder payload = new StringBuilder();
+        for (String field : fields) payload.append(field).append('\n');
+        byte[] value = payload.toString().getBytes(StandardCharsets.US_ASCII);
+        byte[] result = new byte[value.length + 3];
+        int length = value.length + 1;
+        result[0] = (byte)(length >>> 8);
+        result[1] = (byte)length;
+        result[2] = 18;
+        System.arraycopy(value, 0, result, 3, value.length);
+        return result;
+    }
+
+    private static String repeat(char value, int count) {
+        char[] result = new char[count];
+        java.util.Arrays.fill(result, value);
+        return new String(result);
+    }
+
     private static EmbeddedChannel channel(ConnectionAttachment attachment) {
         EmbeddedChannel result = new EmbeddedChannel(new RSCProtocolDecoder());
         result.attr(RSCProtocolDecoder.attachment).set(attachment);
@@ -333,8 +361,10 @@ public final class CustomLoginDecoderHarness {
         fragmentedAtEveryBoundary(customLoginFrame(80, 19, true), 19, "relogin");
         fragmentedAtEveryBoundary(
 			registrationFrame(false), 2, "registration without email");
-		fragmentedAtEveryBoundary(
+        fragmentedAtEveryBoundary(
 			registrationFrame(true), 2, "registration with email");
+		fragmentedAtEveryBoundary(
+			compositionHandshakeFrame(), 18, "composition handshake");
         boundaryAndOrdinaryLogins();
 		loginEncryptionVersionTwoRemainsAccepted();
         coalescedFramesAreDeliveredOnce();
@@ -346,6 +376,9 @@ public final class CustomLoginDecoderHarness {
 		coalescedUndecidedFrameIsDeliveredOnce(
 			registrationFrame(true), 2,
 			"coalesced undecided registration with email");
+		coalescedUndecidedFrameIsDeliveredOnce(
+			compositionHandshakeFrame(), 18,
+			"coalesced composition handshake");
         initialConfigAndLegacyTrafficRemainDistinct();
         malformedAndTruncatedFramesFailClosed();
         System.out.println("custom-login-decoder-ok");

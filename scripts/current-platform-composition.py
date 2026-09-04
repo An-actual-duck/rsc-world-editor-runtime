@@ -836,7 +836,7 @@ def validate_catalog(catalog: Catalog) -> None:
             "base-artifact-public-plugin-inventory-v1",
             "base-artifact-public-state-policy-v1",
             "base-artifact-advanced-exclusion-v1",
-            "base-artifact-server-client-pairing-v1",
+            "base-runtime-server-client-pairing-v1",
             "base-canonical-map-bootstrap-v1",
         }
         if not required_scenarios <= set(base_spec["requiredExecutableScenarios"]):

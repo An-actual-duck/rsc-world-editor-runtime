@@ -19,9 +19,10 @@ public class OpenRSC extends ORSCApplet {
 
 	public static void main(String[] args) {
 		try {
+			CurrentCompositionIdentity.initializeFromSystemProperties();
 			WorldBuilderClientProfile.initializeFromSystemProperties().applyConnection();
 		} catch (IllegalArgumentException exception) {
-			System.err.println("World Builder startup refused: " + exception.getMessage());
+			System.err.println("Client startup refused: " + exception.getMessage());
 			System.exit(2);
 			return;
 		}

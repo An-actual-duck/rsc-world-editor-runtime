@@ -411,6 +411,7 @@ public class Server implements Runnable {
 	public static void main(final String[] args) {
 		LOGGER.info("Launching Game Server...");
 		try {
+			CurrentCompositionIdentity.initializeFromSystemProperties();
 			List<String> configurationFiles = new ArrayList<>();
 			Optional.ofNullable(System.getProperty("conf")).ifPresent(files -> {
 				configurationFiles.addAll(

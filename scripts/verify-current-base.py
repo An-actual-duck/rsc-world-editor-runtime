@@ -134,7 +134,6 @@ def validate_profile(path: Path) -> dict:
         "content-neutral-server-config-and-definitions-v1",
         "transactional-state-migration-row-v1",
         "base-gameplay-state-runtime-execution-v1",
-        "runtime-enforced-server-client-startup-handshake-v1",
     ]:
         raise VerificationError("Current Base installability blockers are incomplete")
     if profile["pluginSourceSets"] != ["authentic", "shared"]:

@@ -27725,7 +27725,15 @@ public final class mudclient implements Runnable {
 				int port = ClientPort.loadPort(); // loads based on Cache/port.txt
 				this.packetHandler.setClientStream(new Network_Socket(this.packetHandler.openSocket(port, ip), this.packetHandler));
 			}
-			this.packetHandler.getClientStream().newPacket(19);
+			CurrentCompositionIdentity composition = CurrentCompositionIdentity.current();
+			if (composition.isEnabled()) {
+				this.packetHandler.getClientStream().newPacket(
+					CurrentCompositionIdentity.HANDSHAKE_OPCODE);
+				composition.writeHandshake(
+					this.packetHandler.getClientStream().bufferBits);
+			} else {
+				this.packetHandler.getClientStream().newPacket(19);
+			}
 			this.packetHandler.getClientStream().finishPacketAndFlush();
 			this.packetHandler.getClientStream().getUnsignedByte();
 			int len = this.packetHandler.getClientStream().getUnsignedByte();
