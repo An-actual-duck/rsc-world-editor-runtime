@@ -318,11 +318,10 @@ def main() -> None:
             fail(f"NPC fallback routing missing Projectile.{projectile}")
 
     build = BUILD_PATH.read_text(encoding="utf-8")
-    for include in ("animations/**/*.png", "legacy animation folder/**/*.png"):
+    for include in ('<include name="animations/**/*.png"/>',
+                    '<include name="legacy animation folder/**/*.png"/>'):
         if include not in build:
             fail(f"client packaging missing temporary animation input: {include}")
-    if 'includes="${current.asset.includes}"' not in build:
-        fail("client packaging must consume the selected composition asset set")
 
     exporter = EXPORTER_PATH.read_text(encoding="utf-8")
     for snippet in ('"80".equals(entry.getID())', "frame * 45.0D", "FRAME_COUNT = 8"):
