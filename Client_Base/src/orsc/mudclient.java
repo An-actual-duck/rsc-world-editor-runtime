@@ -23203,6 +23203,7 @@ public final class mudclient implements Runnable {
 							this.packetHandler.setClientStream(new Network_Socket(this.packetHandler.openSocket(port, ip), this.packetHandler));
 							this.packetHandler.getClientStream().m_d = MiscFunctions.maxReadTries;
 						}
+						requireCurrentCompositionHandshake();
 
 						Math.random();
 						Math.random();
@@ -27725,21 +27726,29 @@ public final class mudclient implements Runnable {
 				int port = ClientPort.loadPort(); // loads based on Cache/port.txt
 				this.packetHandler.setClientStream(new Network_Socket(this.packetHandler.openSocket(port, ip), this.packetHandler));
 			}
-			CurrentCompositionIdentity composition = CurrentCompositionIdentity.current();
-			if (composition.isEnabled()) {
-				this.packetHandler.getClientStream().newPacket(
-					CurrentCompositionIdentity.HANDSHAKE_OPCODE);
-				composition.writeHandshake(
-					this.packetHandler.getClientStream().bufferBits);
-			} else {
-				this.packetHandler.getClientStream().newPacket(19);
-			}
+			requireCurrentCompositionHandshake();
+			this.packetHandler.getClientStream().newPacket(19);
 			this.packetHandler.getClientStream().finishPacketAndFlush();
 			this.packetHandler.getClientStream().getUnsignedByte();
 			int len = this.packetHandler.getClientStream().getUnsignedByte();
 			this.packetHandler.handlePacket(this.packetHandler.getClientStream().getUnsignedByte(), len);
 		} catch (IOException var9) {
 			throw GenUtil.makeThrowable(var9, "client.KC()");
+		}
+	}
+
+	private void requireCurrentCompositionHandshake() throws IOException {
+		CurrentCompositionIdentity composition = CurrentCompositionIdentity.current();
+		if (!composition.isEnabled()) {
+			return;
+		}
+		this.packetHandler.getClientStream().newPacket(
+			CurrentCompositionIdentity.HANDSHAKE_OPCODE);
+		composition.writeHandshake(this.packetHandler.getClientStream().bufferBits);
+		this.packetHandler.getClientStream().finishPacketAndFlush();
+		int response = this.packetHandler.getClientStream().getUnsignedByte();
+		if (response != CurrentCompositionIdentity.HANDSHAKE_ACCEPTED) {
+			throw new IOException("server refused current composition handshake");
 		}
 	}
 

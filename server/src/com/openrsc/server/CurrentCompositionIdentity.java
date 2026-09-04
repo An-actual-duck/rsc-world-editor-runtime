@@ -25,6 +25,7 @@ public final class CurrentCompositionIdentity {
 		"openrsc.currentCompositionIdentityFile";
 	public static final String HANDSHAKE_ID = "current-composition-handshake-v1";
 	public static final int HANDSHAKE_OPCODE = 18;
+	public static final int HANDSHAKE_ACCEPTED = 67;
 	private static final String MARKER_RESOURCE =
 		"/META-INF/rsc-current-composition.properties";
 	private static final String ARTIFACT_CONTRACT =

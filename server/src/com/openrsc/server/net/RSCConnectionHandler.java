@@ -108,7 +108,9 @@ public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implement
 					try {
 						CurrentCompositionIdentity.current().requireClientHandshake(packet);
 						att.currentCompositionAccepted.set(true);
-						ActionSender.sendInitialServerConfigs(getServer(), channel);
+						channel.writeAndFlush(new PacketBuilder()
+							.writeByte(CurrentCompositionIdentity.HANDSHAKE_ACCEPTED)
+							.toPacket());
 					} catch (IllegalArgumentException exception) {
 						LOGGER.warn("Current composition handshake refused for {}: {}",
 							channel.remoteAddress(), exception.getMessage());
@@ -118,7 +120,8 @@ public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implement
 				}
 				// Custom client sends opcode 19 to request server configs
 				if (packet.getID() == 19 && packet.getLength() < 2) {
-					if (CurrentCompositionIdentity.current().isEnabled()) {
+					if (CurrentCompositionIdentity.current().isEnabled()
+						&& !Boolean.TRUE.equals(att.currentCompositionAccepted.get())) {
 						LOGGER.warn("Current composition server refused an unbound client from {}",
 							channel.remoteAddress());
 						channel.close();
