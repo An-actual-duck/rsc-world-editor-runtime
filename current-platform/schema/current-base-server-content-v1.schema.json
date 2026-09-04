@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-base-server-content-v1",
+  "title": "RSC World Editor Current Base server content",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "contentId", "variantId", "configurationEntry", "connectionsEntry", "definitionsRoot", "definitionLimits", "sourceFiles", "generatedFiles", "forbiddenPathFragments"],
+  "properties": {
+    "schemaId": {"const": "current-base-server-content-v1"},
+    "manifestType": {"const": "current-base-server-content"},
+    "contentId": {"const": "current-base-public-content-v1"},
+    "variantId": {"const": "current-base-v1"},
+    "configurationEntry": {"$ref": "#/$defs/path"},
+    "connectionsEntry": {"$ref": "#/$defs/path"},
+    "definitionsRoot": {"$ref": "#/$defs/path"},
+    "definitionLimits": {
+      "type": "object", "additionalProperties": false,
+      "required": ["boundaryMaxId", "itemMaxId", "npcMaxId", "sceneryMaxId"],
+      "properties": {
+        "boundaryMaxId": {"const": 213}, "itemMaxId": {"const": 1289},
+        "npcMaxId": {"const": 793}, "sceneryMaxId": {"const": 1189}
+      }
+    },
+    "sourceFiles": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/source"}},
+    "generatedFiles": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/generated"}},
+    "forbiddenPathFragments": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\).+$"},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourcePath", "bundlePath", "transform"],
+      "properties": {
+        "sourcePath": {"$ref": "#/$defs/path"}, "bundlePath": {"$ref": "#/$defs/path"},
+        "transform": {"enum": ["copy", "vanilla-item-array-v1", "vanilla-item-map-v1", "vanilla-npc-map-v1", "vanilla-scenery-map-v1", "vanilla-scenery-prefix-v1"]}
+      }
+    },
+    "generated": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bundlePath", "content"],
+      "properties": {"bundlePath": {"$ref": "#/$defs/path"}, "content": {"type": "string"}}
+    }
+  }
+}

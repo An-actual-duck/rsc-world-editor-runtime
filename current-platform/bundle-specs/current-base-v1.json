@@ -50,6 +50,26 @@
       "provenance": "provider-commit"
     },
     {
+      "sourcePath": "current-platform/runtime/current-base-v1/server-content.json",
+      "bundlePath": "contracts/runtime/current-base-v1/server-content.json",
+      "role": "server-content-manifest",
+      "destination": "managed-runtime/current-base-v1/server-content.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-base-server-content-v1.schema.json",
+      "bundlePath": "contracts/schema/current-base-server-content-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-base-server-content-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
       "sourcePath": "current-platform/schema/current-base-runtime-profile-v1.schema.json",
       "bundlePath": "contracts/schema/current-base-runtime-profile-v1.schema.json",
       "role": "contract-schema",
@@ -164,6 +184,16 @@
       "bundlePath": "runtime/server/plugins.jar",
       "role": "server-plugins",
       "destination": "managed-runtime/current-base-v1/server/plugins.jar",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-build"
+    },
+    {
+      "sourcePath": "output/current-platform/current-base-v1/server/content.zip",
+      "bundlePath": "runtime/server/content.zip",
+      "role": "server-content",
+      "destination": "managed-runtime/current-base-v1/server/content.zip",
       "ownership": "provider",
       "replacementPolicy": "content-addressed",
       "rollbackPolicy": "pointer-rollback",

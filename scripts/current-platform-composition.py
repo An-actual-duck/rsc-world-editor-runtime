@@ -768,6 +768,7 @@ def resolve_composition(
 def verify_schema_bindings(catalog: Catalog) -> None:
     schema_ids = {
         "current-base-runtime-profile-v1": "current-base-runtime-profile-v1.schema.json",
+        "current-base-server-content-v1": "current-base-server-content-v1.schema.json",
         "current-platform-release-v1": "current-platform-release-v1.schema.json",
         "current-variant-v1": "current-variant-v1.schema.json",
         "current-module-v1": "current-module-v1.schema.json",
@@ -824,6 +825,7 @@ def validate_catalog(catalog: Catalog) -> None:
             "server-runtime", "server-plugins", "client-runtime",
             "runtime-profile", "server-client-pairing", "build-provenance",
             "source-build-tool", "candidate-pairing-verifier",
+            "server-content-manifest", "server-content",
         }
         roles = {artifact["role"] for artifact in base_spec["artifacts"]}
         missing_roles = sorted(required_roles - roles)

@@ -13,6 +13,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import xml.etree.ElementTree as ET
 import zipfile
 
 
@@ -118,6 +119,7 @@ def validate_profile(path: Path) -> dict:
             "pluginSourceSets",
             "clientAssetSets",
             "statePolicy",
+            "serverContent",
             "requiredRuntimeClasses",
             "requiredPluginClasses",
             "advancedExclusions",
@@ -131,7 +133,6 @@ def validate_profile(path: Path) -> dict:
     if profile["variantId"] != "current-base-v1":
         raise VerificationError("Current Base profile names another variant")
     if profile["installabilityBlockers"] != [
-        "content-neutral-server-config-and-definitions-v1",
         "transactional-state-migration-row-v1",
         "base-gameplay-state-runtime-execution-v1",
     ]:
@@ -147,6 +148,14 @@ def validate_profile(path: Path) -> dict:
         "rollback": "exact-predecessor",
     }:
         raise VerificationError("Current Base public state policy is incomplete")
+    if profile["serverContent"] != {
+        "contentId": "current-base-public-content-v1",
+        "manifestRole": "server-content-manifest",
+        "archiveRole": "server-content",
+        "configurationEntry": "current-base.conf",
+        "definitionsRoot": "conf/server",
+    }:
+        raise VerificationError("Current Base server content binding is incomplete")
     exclusions = profile["advancedExclusions"]
     require_exact_keys(
         exclusions,
@@ -217,6 +226,76 @@ def inventory_path(identity: dict, role: str, payload_root: Path) -> Path:
     return payload_root / matches[0]["sourcePath"]
 
 
+def validate_server_content(manifest_path: Path, archive_path: Path,
+                            exclusions: dict[str, bool]) -> None:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise VerificationError(f"cannot read server content manifest: {error}") from error
+    require_exact_keys(
+        manifest,
+        {"schemaId", "manifestType", "contentId", "variantId",
+         "configurationEntry", "connectionsEntry", "definitionsRoot",
+         "definitionLimits", "sourceFiles", "generatedFiles",
+         "forbiddenPathFragments"},
+        "server content manifest",
+    )
+    if (manifest["schemaId"] != "current-base-server-content-v1"
+            or manifest["manifestType"] != "current-base-server-content"
+            or manifest["contentId"] != "current-base-public-content-v1"
+            or manifest["variantId"] != "current-base-v1"):
+        raise VerificationError("server content manifest has wrong identity")
+    expected = {manifest["configurationEntry"], manifest["connectionsEntry"]}
+    for record in manifest["sourceFiles"]:
+        require_exact_keys(record, {"sourcePath", "bundlePath", "transform"},
+                           "server content source")
+        expected.add(record["bundlePath"])
+    generated = {}
+    for record in manifest["generatedFiles"]:
+        require_exact_keys(record, {"bundlePath", "content"},
+                           "server generated content")
+        expected.add(record["bundlePath"])
+        generated[record["bundlePath"]] = record["content"].encode("utf-8")
+    if len(expected) != 2 + len(manifest["sourceFiles"]) + len(generated):
+        raise VerificationError("server content manifest has duplicate paths")
+    names = archive_names(archive_path)
+    if names != expected:
+        raise VerificationError("server content archive differs from its closed inventory")
+    for name in names:
+        if any(fragment.casefold() in name.casefold()
+               for fragment in manifest["forbiddenPathFragments"]):
+            raise VerificationError(f"Advanced-only server content path is present: {name}")
+    with zipfile.ZipFile(archive_path) as archive:
+        for name, payload in generated.items():
+            if archive.read(name) != payload:
+                raise VerificationError(f"generated server content differs: {name}")
+        items = json.loads(archive.read("conf/server/defs/ItemDefs.json"))["item"]
+        npcs = json.loads(archive.read("conf/server/defs/NpcDefs.json"))["npcs"]
+        limits = manifest["definitionLimits"]
+        if [row["id"] for row in items] != list(range(limits["itemMaxId"] + 1)):
+            raise VerificationError("Base item definitions are not the vanilla ID prefix")
+        if [row["id"] for row in npcs] != list(range(limits["npcMaxId"] + 1)):
+            raise VerificationError("Base NPC definitions are not the vanilla ID prefix")
+        doors = ET.fromstring(archive.read("conf/server/defs/DoorDef.xml"))
+        scenery = ET.fromstring(archive.read("conf/server/defs/GameObjectDef.xml"))
+        if len(list(doors)) != limits["boundaryMaxId"] + 1:
+            raise VerificationError("Base boundary definitions exceed the vanilla prefix")
+        if len(list(scenery)) != limits["sceneryMaxId"] + 1:
+            raise VerificationError("Base scenery definitions exceed the vanilla prefix")
+        config = archive.read(manifest["configurationEntry"]).decode("utf-8")
+    configured = {}
+    for line in config.splitlines():
+        stripped = line.split("#", 1)[0].strip()
+        if ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        if value.strip():
+            configured[key.strip()] = value.strip()
+    for key, expected_value in exclusions.items():
+        if configured.get(key) != str(expected_value).lower():
+            raise VerificationError(f"Base server content does not disable {key}")
+
+
 def verify(identity_path: Path, payload_root: Path) -> dict:
     composition = load_composition_tool()
     catalog = composition.Catalog(CATALOG_ROOT)
@@ -237,10 +316,16 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
     profile_path = inventory_path(supplied, "runtime-profile", payload_root)
     pairing_path = inventory_path(supplied, "server-client-pairing", payload_root)
     provenance_path = inventory_path(supplied, "build-provenance", payload_root)
+    content_manifest_path = inventory_path(
+        supplied, "server-content-manifest", payload_root)
+    content_path = inventory_path(supplied, "server-content", payload_root)
     server_names = archive_names(server)
     plugin_names = archive_names(plugins)
     client_names = archive_names(client)
     profile = validate_profile(profile_path)
+    validate_server_content(
+        content_manifest_path, content_path,
+        profile["advancedExclusions"]["configuration"])
 
     for required in profile["requiredRuntimeClasses"]:
         if required not in server_names:
@@ -297,6 +382,7 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
         "canonicalMapBootstrap": "verified",
         "publicPluginInventory": "verified",
         "publicStatePolicyContract": "verified",
+        "serverContent": "verified",
         "advancedArtifactEffects": "excluded",
     }
 

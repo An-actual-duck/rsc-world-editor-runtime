@@ -69,7 +69,6 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         self.assertEqual("foundation-contract-only", advanced["releaseStatus"])
         self.assertEqual(
             [
-                "content-neutral-server-config-and-definitions-v1",
                 "transactional-state-migration-row-v1",
                 "base-gameplay-state-runtime-execution-v1",
             ],
@@ -95,6 +94,7 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         self.assertEqual("verified", evidence["publicPluginInventory"])
         self.assertEqual("verified", evidence["publicStatePolicyContract"])
         self.assertEqual("excluded", evidence["advancedArtifactEffects"])
+        self.assertEqual("verified", evidence["serverContent"])
 
         with tempfile.TemporaryDirectory(prefix="current-base-mismatch-") as temporary:
             mismatch = dict(self.identity)
@@ -338,6 +338,74 @@ public final class CurrentBaseMapHarness {
                 text=True,
             )
         self.assertEqual(["true", "world-builder-installed"], executed.stdout.splitlines())
+
+    def test_provider_server_content_loads_vanilla_definition_prefixes(self) -> None:
+        core = self.output / "server/core.jar"
+        plugins = self.output / "server/plugins.jar"
+        content = self.output / "server/content.zip"
+        harness_source = r"""
+package com.openrsc.server;
+public final class CurrentBaseContentHarness {
+  public static void main(String[] args) throws Exception {
+    CurrentCompositionIdentity.initializeFromSystemProperties();
+    Server server = new Server("current-base.conf");
+    server.getEntityHandler().load();
+    ServerConfiguration config = server.getConfig();
+    boolean advanced = config.CUSTOM_IMPROVEMENTS || config.WANT_CUSTOM_LANDSCAPE
+      || config.WANT_CUSTOM_SPRITES || config.SPAWN_AUCTION_NPCS
+      || config.SPAWN_IRON_MAN_NPCS || config.WANT_BANK_PRESETS
+      || config.WANT_CLANS || config.WANT_COMBAT_ODYSSEY
+      || config.WANT_CUSTOM_BANKS || config.WANT_CUSTOM_LEATHER
+      || config.WANT_CUSTOM_QUESTS || config.WANT_CUSTOM_UI
+      || config.WANT_EQUIPMENT_TAB || config.WANT_HARVESTING
+      || config.WANT_MYWORLD || config.WANT_NEW_RARE_DROP_TABLES
+      || config.WANT_RUNECRAFT;
+    if (advanced) throw new AssertionError("Advanced configuration became active");
+    if (server.getEntityHandler().getItemDef(1289) == null
+        || server.getEntityHandler().getItemDef(1290) != null
+        || server.getEntityHandler().getNpcDef(793) == null
+        || server.getEntityHandler().getNpcDef(794) != null
+        || server.getEntityHandler().getDoorDef(213) == null
+        || server.getEntityHandler().getDoorDef(214) != null
+        || server.getEntityHandler().getGameObjectDef(1189) == null
+        || server.getEntityHandler().getGameObjectDef(1190) != null) {
+      throw new AssertionError("definition catalogs exceed vanilla prefixes");
+    }
+    System.out.println("current-base-content-loaded");
+    System.exit(0);
+  }
+}
+"""
+        with tempfile.TemporaryDirectory(prefix="current-base-content-") as temporary:
+            root = Path(temporary)
+            with zipfile.ZipFile(content) as archive:
+                archive.extractall(root)
+            (root / "plugins.jar").write_bytes(plugins.read_bytes())
+            source = root / "com/openrsc/server/CurrentBaseContentHarness.java"
+            source.parent.mkdir(parents=True)
+            source.write_text(harness_source, encoding="utf-8")
+            subprocess.run(
+                [
+                    "javac", "-source", "8", "-target", "8", "-cp", str(core),
+                    "-d", str(root), str(source),
+                ],
+                cwd=self.repo,
+                check=True,
+                capture_output=True,
+            )
+            loaded = subprocess.run(
+                [
+                    "java", "-Dopenrsc.currentCompositionIdentityFile="
+                    + str(self.identity_path), "-cp", f"{core}:{root}",
+                    "com.openrsc.server.CurrentBaseContentHarness",
+                ],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        self.assertEqual(0, loaded.returncode, loaded.stdout + loaded.stderr)
+        self.assertIn("current-base-content-loaded", loaded.stdout)
 
     def test_advanced_only_plugins_assets_and_configuration_are_absent(self) -> None:
         with zipfile.ZipFile(self.output / "server/plugins.jar") as archive:
