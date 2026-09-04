@@ -378,9 +378,11 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 				"Undecided custom-client frame has a zero length");
 		}
 		boolean initialConfigRequest = length == 1 && opcode == 19;
+		boolean compositionHandshake = opcode == 18;
 		boolean loginRequest = opcode == 0 || opcode == 19;
 		boolean registrationRequest = opcode == 2;
-		if (!initialConfigRequest && !loginRequest && !registrationRequest) {
+		if (!initialConfigRequest && !compositionHandshake
+			&& !loginRequest && !registrationRequest) {
 			return false;
 		}
 		if (length > MAX_UNDECIDED_CUSTOM_FRAME_LENGTH) {
@@ -401,7 +403,7 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 		if (available < frameLength) {
 			return true;
 		}
-		if (!initialConfigRequest) {
+		if (!initialConfigRequest && !compositionHandshake) {
 			boolean valid = loginRequest
 				? isStructurallyValidCustomLogin(buffer, readerIndex, length, opcode)
 				: isStructurallyValidCustomRegistration(buffer, readerIndex, length);
@@ -546,7 +548,7 @@ public final class RSCProtocolDecoder extends ByteToMessageDecoder implements At
 			&& (available < 4
 				|| hasCustomRegistrationPrefix(
 					buffer, readerIndex, length, available));
-		boolean candidate = (length == 1 && opcode == 19)
+		boolean candidate = (length == 1 && opcode == 19) || opcode == 18
 			|| loginCandidate || registrationCandidate;
 		if (candidate && length <= MAX_UNDECIDED_CUSTOM_FRAME_LENGTH) {
 			throw new CorruptedFrameException(

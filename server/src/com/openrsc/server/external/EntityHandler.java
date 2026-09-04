@@ -1122,12 +1122,19 @@ public final class EntityHandler {
 		}
 
 		for (Integer itemId : RangeUtils.THROWING_DARTS) {
-			items.get(itemId).setStackable(true);
-			items.get(itemId).setNoteable(false);
+			// Current Base deliberately carries only the conservative public item
+			// prefix.  Shared convenience lists also contain Advanced item IDs, so
+			// absence from this composition must remain a supported condition.
+			if (itemId >= 0 && itemId < items.size()) {
+				items.get(itemId).setStackable(true);
+				items.get(itemId).setNoteable(false);
+			}
 		}
 		for (Integer itemId : RangeUtils.THROWING_KNIVES) {
-			items.get(itemId).setStackable(true);
-			items.get(itemId).setNoteable(false);
+			if (itemId >= 0 && itemId < items.size()) {
+				items.get(itemId).setStackable(true);
+				items.get(itemId).setNoteable(false);
+			}
 		}
 
 		// This enables overrides for existing authentic items so replacement custom equipment animations may be used instead

@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 import zipfile
 
 
@@ -21,6 +22,8 @@ DEFAULT_OUTPUT = ROOT / "output/current-platform/current-base-v1"
 COMPOSITION_TOOL = ROOT / "scripts/current-platform-composition.py"
 VERIFY_TOOL = ROOT / "scripts/verify-current-base.py"
 FIXED_ZIP_TIME = (2000, 1, 1, 0, 0, 0)
+CONTENT_MANIFEST = CATALOG_ROOT / "runtime/current-base-v1/server-content.json"
+CONTENT_CONFIG_ROOT = CATALOG_ROOT / "runtime/current-base-v1/server"
 
 
 def load_composition_tool():
@@ -80,6 +83,96 @@ def tool_version(command: list[str]) -> str:
 def write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def filtered_xml(payload: bytes, transform: str, limits: dict[str, int]) -> bytes:
+    root = ET.fromstring(payload)
+    if transform == "vanilla-scenery-prefix-v1":
+        children = list(root)
+        expected = limits["sceneryMaxId"] + 1
+        if len(children) < expected:
+            raise RuntimeError("source scenery definitions do not cover vanilla IDs")
+        for child in children[expected:]:
+            root.remove(child)
+    else:
+        if transform == "vanilla-item-map-v1":
+            key_limit = limits["itemMaxId"]
+        elif transform == "vanilla-npc-map-v1":
+            key_limit = limits["npcMaxId"]
+        elif transform == "vanilla-scenery-map-v1":
+            key_limit = limits["sceneryMaxId"]
+        elif transform == "vanilla-item-array-v1":
+            key_limit = None
+        else:
+            raise RuntimeError(f"unknown Current Base content transform: {transform}")
+        for child in list(root):
+            remove = False
+            direct_key = child.find("int")
+            if key_limit is not None and direct_key is not None:
+                try:
+                    remove = int(direct_key.text or "") > key_limit
+                except ValueError as error:
+                    raise RuntimeError("definition map has a malformed numeric key") from error
+            for value in child.iter():
+                tag = value.tag.lower()
+                if not any(token in tag for token in ("itemid", "prodid", "runeid")):
+                    continue
+                try:
+                    identifier = int(value.text or "")
+                except ValueError as error:
+                    raise RuntimeError("definition table has a malformed item ID") from error
+                if identifier > limits["itemMaxId"]:
+                    remove = True
+            if remove:
+                root.remove(child)
+    return ET.tostring(root, encoding="utf-8", short_empty_elements=True) + b"\n"
+
+
+def write_server_content_archive(path: Path) -> None:
+    manifest = json.loads(CONTENT_MANIFEST.read_text(encoding="utf-8"))
+    limits = manifest["definitionLimits"]
+    records: dict[str, bytes] = {
+        manifest["configurationEntry"]: (
+            CONTENT_CONFIG_ROOT / manifest["configurationEntry"]
+        ).read_bytes(),
+        manifest["connectionsEntry"]: (
+            CONTENT_CONFIG_ROOT / manifest["connectionsEntry"]
+        ).read_bytes(),
+    }
+    for record in manifest["sourceFiles"]:
+        source = ROOT / record["sourcePath"]
+        payload = source.read_bytes()
+        transform = record["transform"]
+        if transform != "copy":
+            payload = filtered_xml(payload, transform, limits)
+        if record["bundlePath"] in records:
+            raise RuntimeError("duplicate Current Base server content path")
+        records[record["bundlePath"]] = payload
+    for record in manifest["generatedFiles"]:
+        if record["bundlePath"] in records:
+            raise RuntimeError("duplicate Current Base generated content path")
+        records[record["bundlePath"]] = record["content"].encode("utf-8")
+    folded: set[str] = set()
+    for name in records:
+        if name.startswith("/") or "\\" in name or ".." in Path(name).parts:
+            raise RuntimeError(f"unsafe Current Base server content path: {name}")
+        if name.casefold() in folded:
+            raise RuntimeError(f"case-fold Current Base content collision: {name}")
+        folded.add(name.casefold())
+        for forbidden in manifest["forbiddenPathFragments"]:
+            if forbidden.casefold() in name.casefold():
+                raise RuntimeError(f"Advanced-only path entered Current Base content: {name}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(
+        path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
+        for name, payload in sorted(records.items()):
+            info = zipfile.ZipInfo(name, FIXED_ZIP_TIME)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, payload, compress_type=zipfile.ZIP_DEFLATED,
+                             compresslevel=9)
 
 
 def source_tree_state(composition) -> tuple[str, bool, str]:
@@ -191,6 +284,8 @@ def build(output: Path, allow_dirty: bool) -> Path:
         client_output / "Open_RSC_Client.jar",
     ):
         normalize_zip(archive)
+
+    write_server_content_archive(server_output / "content.zip")
 
     shutil.copy2(CATALOG_ROOT / "runtime/current-base-v1/profile.json", runtime_output)
     shutil.copy2(marker, runtime_output / "pairing.properties")

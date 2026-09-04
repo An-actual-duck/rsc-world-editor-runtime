@@ -4,20 +4,18 @@
   "title": "RSC World Editor Current Base runtime profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "statePolicy", "requiredRuntimeClasses", "requiredPluginClasses", "advancedExclusions"],
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "statePolicy", "serverContent", "requiredRuntimeClasses", "requiredPluginClasses", "advancedExclusions"],
   "properties": {
     "schemaId": {"const": "current-base-runtime-profile-v1"},
     "manifestType": {"const": "current-base-runtime-profile"},
     "variantId": {"const": "current-base-v1"},
     "installabilityBlockers": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 2,
+      "maxItems": 2,
       "prefixItems": [
-        {"const": "content-neutral-server-config-and-definitions-v1"},
         {"const": "transactional-state-migration-row-v1"},
-        {"const": "base-gameplay-state-runtime-execution-v1"},
-        {"const": "runtime-enforced-server-client-startup-handshake-v1"}
+        {"const": "base-gameplay-state-runtime-execution-v1"}
       ],
       "items": false
     },
@@ -32,6 +30,17 @@
         "durableLocation": {"const": "outside-code-runtime"},
         "migration": {"const": "transactional"},
         "rollback": {"const": "exact-predecessor"}
+      }
+    },
+    "serverContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contentId", "manifestRole", "archiveRole", "configurationEntry", "definitionsRoot"],
+      "properties": {
+        "contentId": {"const": "current-base-public-content-v1"},
+        "manifestRole": {"const": "server-content-manifest"},
+        "archiveRole": {"const": "server-content"},
+        "configurationEntry": {"const": "current-base.conf"},
+        "definitionsRoot": {"const": "conf/server"}
       }
     },
     "requiredRuntimeClasses": {"$ref": "#/$defs/stringArray"},

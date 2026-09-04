@@ -23,7 +23,7 @@
         "payloadRelativePath": "server/conf/world-builder/host-integration/RSCProtocolDecoder.java",
         "targetScope": "target-root",
         "targetRelativePath": "server/src/com/openrsc/server/net/RSCProtocolDecoder.java",
-        "payloadSha256": "7c34f7099d6e9a57bb166696421ea39d4fe264d78dc5a5aef8c4dbc763f36a26",
+        "payloadSha256": "7a8e30916c132136433ea3ca3c85d409e6dcd4ec341876f6be1ebe373abe009a",
         "replacementPolicy": "replace-trusted-preimage-or-preserve",
         "acceptedBeforeSha256": [
           "8d247c4b1f3d7f2d41fb58b8c378894878dcf6375c05ed2d4d2c9c2aa03e336c"

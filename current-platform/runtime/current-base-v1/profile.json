@@ -3,10 +3,8 @@
   "manifestType": "current-base-runtime-profile",
   "variantId": "current-base-v1",
   "installabilityBlockers": [
-    "content-neutral-server-config-and-definitions-v1",
     "transactional-state-migration-row-v1",
-    "base-gameplay-state-runtime-execution-v1",
-    "runtime-enforced-server-client-startup-handshake-v1"
+    "base-gameplay-state-runtime-execution-v1"
   ],
   "pluginSourceSets": [
     "authentic",
@@ -20,6 +18,13 @@
     "durableLocation": "outside-code-runtime",
     "migration": "transactional",
     "rollback": "exact-predecessor"
+  },
+  "serverContent": {
+    "contentId": "current-base-public-content-v1",
+    "manifestRole": "server-content-manifest",
+    "archiveRole": "server-content",
+    "configurationEntry": "current-base.conf",
+    "definitionsRoot": "conf/server"
   },
   "requiredRuntimeClasses": [
     "com/openrsc/server/io/NativeLayeredWorldPackage.class",

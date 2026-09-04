@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import base64
 import json
 from pathlib import Path
 import subprocess
@@ -68,10 +69,8 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         self.assertEqual("foundation-contract-only", advanced["releaseStatus"])
         self.assertEqual(
             [
-                "content-neutral-server-config-and-definitions-v1",
                 "transactional-state-migration-row-v1",
                 "base-gameplay-state-runtime-execution-v1",
-                "runtime-enforced-server-client-startup-handshake-v1",
             ],
             self.profile["installabilityBlockers"],
         )
@@ -95,6 +94,7 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         self.assertEqual("verified", evidence["publicPluginInventory"])
         self.assertEqual("verified", evidence["publicStatePolicyContract"])
         self.assertEqual("excluded", evidence["advancedArtifactEffects"])
+        self.assertEqual("verified", evidence["serverContent"])
 
         with tempfile.TemporaryDirectory(prefix="current-base-mismatch-") as temporary:
             mismatch = dict(self.identity)
@@ -112,6 +112,139 @@ class CurrentBaseCandidateTest(unittest.TestCase):
             )
         self.assertNotEqual(0, refused.returncode)
         self.assertIn("differs from provider artifacts", refused.stderr)
+
+    def test_runtime_startup_and_prelogin_handshake_enforce_all_six_fields(self) -> None:
+        core = self.output / "server/core.jar"
+        client = self.output / "client/Open_RSC_Client.jar"
+        property_name = "openrsc.currentCompositionIdentityFile"
+        identity_fields = [
+            "platformReleaseId",
+            "platformManifestHash",
+            "variantId",
+            "variantManifestHash",
+            "moduleSetHash",
+            "bundleInventoryHash",
+        ]
+        for archive, entrypoint, label in (
+            (core, "com.openrsc.server.CurrentCompositionIdentity", "server"),
+            (client, "orsc.CurrentCompositionIdentity", "client"),
+        ):
+            accepted = subprocess.run(
+                [
+                    "java", f"-D{property_name}={self.identity_path}", "-cp",
+                    str(archive), entrypoint,
+                ],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, accepted.returncode, accepted.stdout + accepted.stderr)
+            self.assertIn("composition accepted", accepted.stdout)
+            missing = subprocess.run(
+                ["java", "-cp", str(archive), entrypoint],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(2, missing.returncode, label)
+            self.assertIn("startup refused", missing.stderr)
+
+        server_harness = r"""
+import com.openrsc.server.CurrentCompositionIdentity;
+import com.openrsc.server.net.Packet;
+import io.netty.buffer.Unpooled;
+import java.util.Base64;
+public final class CurrentCompositionServerHandshakeHarness {
+  public static void main(String[] args) {
+    CurrentCompositionIdentity.initializeFromSystemProperties();
+    byte[] payload = Base64.getDecoder().decode(args[0]);
+    CurrentCompositionIdentity.current().requireClientHandshake(
+      new Packet(CurrentCompositionIdentity.HANDSHAKE_OPCODE,
+        Unpooled.wrappedBuffer(payload)));
+    System.out.println("server-prelogin-composition-accepted");
+  }
+}
+"""
+        client_harness = r"""
+import orsc.CurrentCompositionIdentity;
+import orsc.buffers.RSBuffer_Bits;
+import java.util.Arrays;
+import java.util.Base64;
+public final class CurrentCompositionClientHandshakeHarness {
+  public static void main(String[] args) {
+    CurrentCompositionIdentity.initializeFromSystemProperties();
+    RSBuffer_Bits payload = new RSBuffer_Bits(512);
+    CurrentCompositionIdentity.current().writeHandshake(payload);
+    System.out.println(Base64.getEncoder().encodeToString(
+      Arrays.copyOf(payload.dataBuffer, payload.packetEnd)));
+  }
+}
+"""
+        with tempfile.TemporaryDirectory(prefix="current-base-runtime-pairing-") as temporary:
+            root = Path(temporary)
+            server_source = root / "CurrentCompositionServerHandshakeHarness.java"
+            server_source.write_text(server_harness, encoding="utf-8")
+            client_source = root / "CurrentCompositionClientHandshakeHarness.java"
+            client_source.write_text(client_harness, encoding="utf-8")
+            subprocess.run(
+                [
+                    "javac", "-source", "8", "-target", "8", "-cp", str(core),
+                    "-d", str(root), str(server_source),
+                ],
+                cwd=self.repo,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                [
+                    "javac", "-source", "8", "-target", "8", "-cp", str(client),
+                    "-d", str(root), str(client_source),
+                ],
+                cwd=self.repo,
+                check=True,
+                capture_output=True,
+            )
+            emitted = subprocess.run(
+                [
+                    "java", f"-D{property_name}={self.identity_path}", "-cp",
+                    f"{client}:{root}", "CurrentCompositionClientHandshakeHarness",
+                ],
+                cwd=self.repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            accepted = subprocess.run(
+                [
+                    "java", f"-D{property_name}={self.identity_path}", "-cp",
+                    f"{core}:{root}", "CurrentCompositionServerHandshakeHarness",
+                    emitted,
+                ],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, accepted.returncode, accepted.stdout + accepted.stderr)
+            self.assertIn("server-prelogin-composition-accepted", accepted.stdout)
+
+            for index, field in enumerate(identity_fields):
+                values = [self.identity[name] for name in identity_fields]
+                values[index] = (
+                    "0" * 64 if field.endswith("Hash") else "mismatched-composition-v1"
+                )
+                wire = "current-composition-handshake-v1\n" + "\n".join(values) + "\n"
+                refused = subprocess.run(
+                    [
+                        "java", f"-D{property_name}={self.identity_path}", "-cp",
+                        f"{core}:{root}", "CurrentCompositionServerHandshakeHarness",
+                        base64.b64encode(wire.encode("ascii")).decode("ascii"),
+                    ],
+                    cwd=self.repo,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertNotEqual(0, refused.returncode, field)
+                self.assertIn("client composition differs at " + field, refused.stderr)
 
     def test_public_plugins_and_canonical_map_bootstraps_are_executable(self) -> None:
         core = self.output / "server/core.jar"
@@ -205,6 +338,74 @@ public final class CurrentBaseMapHarness {
                 text=True,
             )
         self.assertEqual(["true", "world-builder-installed"], executed.stdout.splitlines())
+
+    def test_provider_server_content_loads_vanilla_definition_prefixes(self) -> None:
+        core = self.output / "server/core.jar"
+        plugins = self.output / "server/plugins.jar"
+        content = self.output / "server/content.zip"
+        harness_source = r"""
+package com.openrsc.server;
+public final class CurrentBaseContentHarness {
+  public static void main(String[] args) throws Exception {
+    CurrentCompositionIdentity.initializeFromSystemProperties();
+    Server server = new Server("current-base.conf");
+    server.getEntityHandler().load();
+    ServerConfiguration config = server.getConfig();
+    boolean advanced = config.CUSTOM_IMPROVEMENTS || config.WANT_CUSTOM_LANDSCAPE
+      || config.WANT_CUSTOM_SPRITES || config.SPAWN_AUCTION_NPCS
+      || config.SPAWN_IRON_MAN_NPCS || config.WANT_BANK_PRESETS
+      || config.WANT_CLANS || config.WANT_COMBAT_ODYSSEY
+      || config.WANT_CUSTOM_BANKS || config.WANT_CUSTOM_LEATHER
+      || config.WANT_CUSTOM_QUESTS || config.WANT_CUSTOM_UI
+      || config.WANT_EQUIPMENT_TAB || config.WANT_HARVESTING
+      || config.WANT_MYWORLD || config.WANT_NEW_RARE_DROP_TABLES
+      || config.WANT_RUNECRAFT;
+    if (advanced) throw new AssertionError("Advanced configuration became active");
+    if (server.getEntityHandler().getItemDef(1289) == null
+        || server.getEntityHandler().getItemDef(1290) != null
+        || server.getEntityHandler().getNpcDef(793) == null
+        || server.getEntityHandler().getNpcDef(794) != null
+        || server.getEntityHandler().getDoorDef(213) == null
+        || server.getEntityHandler().getDoorDef(214) != null
+        || server.getEntityHandler().getGameObjectDef(1189) == null
+        || server.getEntityHandler().getGameObjectDef(1190) != null) {
+      throw new AssertionError("definition catalogs exceed vanilla prefixes");
+    }
+    System.out.println("current-base-content-loaded");
+    System.exit(0);
+  }
+}
+"""
+        with tempfile.TemporaryDirectory(prefix="current-base-content-") as temporary:
+            root = Path(temporary)
+            with zipfile.ZipFile(content) as archive:
+                archive.extractall(root)
+            (root / "plugins.jar").write_bytes(plugins.read_bytes())
+            source = root / "com/openrsc/server/CurrentBaseContentHarness.java"
+            source.parent.mkdir(parents=True)
+            source.write_text(harness_source, encoding="utf-8")
+            subprocess.run(
+                [
+                    "javac", "-source", "8", "-target", "8", "-cp", str(core),
+                    "-d", str(root), str(source),
+                ],
+                cwd=self.repo,
+                check=True,
+                capture_output=True,
+            )
+            loaded = subprocess.run(
+                [
+                    "java", "-Dopenrsc.currentCompositionIdentityFile="
+                    + str(self.identity_path), "-cp", f"{core}:{root}",
+                    "com.openrsc.server.CurrentBaseContentHarness",
+                ],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+        self.assertEqual(0, loaded.returncode, loaded.stdout + loaded.stderr)
+        self.assertIn("current-base-content-loaded", loaded.stdout)
 
     def test_advanced_only_plugins_assets_and_configuration_are_absent(self) -> None:
         with zipfile.ZipFile(self.output / "server/plugins.jar") as archive:
