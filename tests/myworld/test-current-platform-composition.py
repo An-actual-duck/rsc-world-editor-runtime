@@ -14,6 +14,8 @@ import unittest
 import warnings
 import zipfile
 
+from jsonschema import Draft202012Validator
+
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "tests/myworld/fixtures/current-platform-composition-v1"
@@ -223,6 +225,24 @@ class CurrentPlatformCompositionTest(unittest.TestCase):
         variant_path.write_text(json.dumps(variant), encoding="utf-8")
         with self.assertRaisesRegex(COMPOSITION.ContractError, "unknown unknownAuthority"):
             COMPOSITION.Catalog(self.catalog_root)
+
+    def test_current_base_runtime_documents_validate_and_reject_nested_extensions(self) -> None:
+        documents = (
+            ("current-base-runtime-profile-v1.schema.json", "profile.json", "serverContent"),
+            ("current-base-server-content-v1.schema.json", "server-content.json", "definitionLimits"),
+        )
+        runtime_root = self.catalog_root / "runtime/current-base-v1"
+        schema_root = self.catalog_root / "schema"
+        for schema_name, document_name, nested_key in documents:
+            schema = json.loads((schema_root / schema_name).read_text())
+            validator = Draft202012Validator(schema)
+            document = json.loads((runtime_root / document_name).read_text())
+            validator.validate(document)
+            mutated = json.loads(json.dumps(document))
+            mutated[nested_key]["unknownCurrentBaseField"] = True
+            errors = list(validator.iter_errors(mutated))
+            self.assertTrue(errors, f"{document_name} accepted an unknown nested field")
+            self.assertIn("Additional properties are not allowed", errors[0].message)
 
     def test_base_contract_is_positive_public_and_advanced_negative(self) -> None:
         catalog = self.catalog()
