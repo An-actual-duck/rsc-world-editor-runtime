@@ -133,6 +133,41 @@ def validate_platform(value: dict) -> None:
     if not isinstance(value["platformGeneration"], int) or value["platformGeneration"] < 1:
         raise ContractError("platformGeneration must be a positive integer")
     require_id(value["platformApiVersion"], "platformApiVersion")
+    protocol = value["protocol"]
+    require_exact_keys(
+        protocol,
+        {"handshakeId", "mismatchPolicy", "identityFields"},
+        "protocol",
+    )
+    if protocol["mismatchPolicy"] != "refuse-startup":
+        raise ContractError("protocol mismatch policy must refuse startup")
+    expected_identity_fields = [
+        "platformReleaseId",
+        "platformManifestHash",
+        "variantId",
+        "variantManifestHash",
+        "moduleSetHash",
+        "bundleInventoryHash",
+    ]
+    if protocol["identityFields"] != expected_identity_fields:
+        raise ContractError("protocol must carry the canonical six-field identity")
+    schema_contracts = value["schemaContracts"]
+    if not isinstance(schema_contracts, list) or not schema_contracts:
+        raise ContractError("schemaContracts must be a non-empty array")
+    schema_ids = []
+    for record in schema_contracts:
+        if not isinstance(record, dict):
+            raise ContractError("schemaContracts entries must be objects")
+        require_exact_keys(record, {"schemaId", "relativePath", "sha256"}, "schema contract")
+        schema_ids.append(require_id(record["schemaId"], "schema contract schemaId"))
+        require_safe_relative_path(record["relativePath"], "schema contract relativePath")
+        if not isinstance(record["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"]):
+            raise ContractError("schema contract sha256 must be a lowercase SHA-256")
+    if len(schema_ids) != len(set(schema_ids)):
+        raise ContractError("schemaContracts contains duplicate schema IDs")
+    if schema_ids != sorted(schema_ids):
+        raise ContractError("schemaContracts must be ordered by schemaId")
+    require_string_list(value["mapRuntimeCapabilities"], "mapRuntimeCapabilities")
     boundary = value["inputAdapterBoundary"]
     require_exact_keys(
         boundary,
@@ -182,6 +217,18 @@ def validate_platform(value: dict) -> None:
         raise ContractError("current bundles cannot overlay old target classes")
     if bundle["activationLayout"] != "side-by-side-content-addressed":
         raise ContractError("current bundles require side-by-side activation")
+    provenance = value["provenance"]
+    require_exact_keys(
+        provenance,
+        {"repository", "authority", "historicalTargetCodeAllowed"},
+        "platform provenance",
+    )
+    if provenance != {
+        "repository": "rsc-world-editor-runtime",
+        "authority": "provider-commit",
+        "historicalTargetCodeAllowed": False,
+    }:
+        raise ContractError("platform provenance must remain provider-owned")
 
 
 def validate_variant(value: dict, platform: dict) -> None:
@@ -241,6 +288,16 @@ def validate_variant(value: dict, platform: dict) -> None:
         raise ContractError("variant must fail closed on a server/client mismatch")
     if pairing["handshakeId"] != platform["protocol"]["handshakeId"]:
         raise ContractError("variant handshake does not match the platform")
+    provenance = value["provenance"]
+    require_exact_keys(
+        provenance,
+        {"repository", "authority", "contentPolicy"},
+        "variant provenance",
+    )
+    if provenance["repository"] != "rsc-world-editor-runtime":
+        raise ContractError("variant provenance names another repository")
+    if provenance["authority"] != "provider-commit":
+        raise ContractError("variant provenance is not provider-owned")
 
 
 MODULE_KEYS = {
@@ -330,6 +387,8 @@ def validate_module(value: dict, platform: dict) -> None:
         raise ContractError("paired module is missing clientCapabilityId")
     if not pairing["required"] and pairing["clientCapabilityId"] is not None:
         raise ContractError("unpaired module must use a null clientCapabilityId")
+    if pairing["clientCapabilityId"] is not None:
+        require_id(pairing["clientCapabilityId"], "module clientCapabilityId")
     if not isinstance(value["artifacts"], list) or not value["artifacts"]:
         raise ContractError(f"module {module_id} must declare at least one artifact")
     bundle_paths = []
@@ -352,6 +411,18 @@ def validate_module(value: dict, platform: dict) -> None:
             raise ContractError(
                 f"module {module_id} configuration namespace is not owned by it: {namespace}"
             )
+    provenance = value["provenance"]
+    require_exact_keys(provenance, {"kind", "redistributable"}, "module provenance")
+    if provenance["kind"] not in (
+        "provider-commit",
+        "sealed-synthetic-fixture",
+        "target-derived-local",
+    ):
+        raise ContractError(f"module {module_id} has unknown provenance kind")
+    if not isinstance(provenance["redistributable"], bool):
+        raise ContractError(f"module {module_id} redistributable must be boolean")
+    if provenance["kind"] == "target-derived-local" and provenance["redistributable"]:
+        raise ContractError("target-derived local modules cannot be redistributable")
 
 
 def validate_bundle_spec(value: dict, platform: dict, variant: dict) -> None:
@@ -400,6 +471,18 @@ def validate_bundle_spec(value: dict, platform: dict, variant: dict) -> None:
         "targetCorePolicy": "replace-complete-runtime-no-overlay",
     }:
         raise ContractError("bundle build policy permits pinned-core or receipt authority")
+    durable = value["durableStatePolicy"]
+    require_exact_keys(
+        durable,
+        {"location", "replacementPolicy", "rollbackPolicy"},
+        "durableStatePolicy",
+    )
+    if durable != {
+        "location": "outside-code-runtime",
+        "replacementPolicy": "migrate-transactionally",
+        "rollbackPolicy": "restore-exact-predecessor",
+    }:
+        raise ContractError("bundle durable state policy is not transaction-safe")
     if not isinstance(value["artifacts"], list) or not value["artifacts"]:
         raise ContractError("bundle spec must declare artifacts")
     bundle_paths = []
@@ -532,19 +615,46 @@ def inspect_module_archive(path: Path, module_id: str) -> None:
         return
     expected = f"{MODULE_NAMESPACE_ROOT}/{module_id.replace('-', '_')}/"
     with zipfile.ZipFile(path) as archive:
-        for name in archive.namelist():
+        exact_names: set[str] = set()
+        folded_names: set[str] = set()
+        for info in archive.infolist():
+            name = info.filename
             if name.endswith("/"):
                 continue
             safe_name = require_safe_relative_path(name, f"archive entry in {path.name}")
+            if safe_name in exact_names:
+                raise ContractError(
+                    f"module {module_id} archive contains a duplicate entry: {safe_name}"
+                )
+            folded = safe_name.casefold()
+            if folded in folded_names:
+                raise ContractError(
+                    f"module {module_id} archive contains a case-fold collision: {safe_name}"
+                )
+            exact_names.add(safe_name)
+            folded_names.add(folded)
+            unix_mode = (info.external_attr >> 16) & 0xFFFF
+            if stat.S_IFMT(unix_mode) == stat.S_IFLNK:
+                raise ContractError(
+                    f"module {module_id} archive contains a symbolic link: {safe_name}"
+                )
+            if safe_name == "META-INF/MANIFEST.MF":
+                continue
+            if not safe_name.startswith(expected):
+                if safe_name.endswith(".class") and safe_name.startswith(
+                    FORBIDDEN_MODULE_CLASS_PREFIXES
+                ):
+                    raise ContractError(
+                        f"module {module_id} archive shadows a platform/dependency class: {safe_name}"
+                    )
+                raise ContractError(
+                    f"module {module_id} archive entry is outside its namespace: {safe_name}"
+                )
             if not safe_name.endswith(".class"):
                 continue
             if safe_name.startswith(FORBIDDEN_MODULE_CLASS_PREFIXES):
                 raise ContractError(
                     f"module {module_id} archive shadows a platform/dependency class: {safe_name}"
-                )
-            if not safe_name.startswith(expected):
-                raise ContractError(
-                    f"module {module_id} archive class is outside its namespace: {safe_name}"
                 )
 
 
@@ -638,6 +748,7 @@ def resolve_composition(
         "manifestType": "current-platform-composition-identity",
         "platformReleaseId": catalog.platform["platformReleaseId"],
         "platformManifestHash": canonical_hash(load_json(catalog.platform_path)),
+        "schemaSetHash": canonical_hash(catalog.platform["schemaContracts"]),
         "variantId": variant_id,
         "variantManifestHash": canonical_hash(load_json(variant_path)),
         "moduleSetHash": module_set_hash,
@@ -660,6 +771,11 @@ def verify_schema_bindings(catalog: Catalog) -> None:
         "current-bundle-spec-v1": "current-bundle-spec-v1.schema.json",
         "current-composition-identity-v1": "current-composition-identity-v1.schema.json",
     }
+    records = {
+        record["schemaId"]: record for record in catalog.platform["schemaContracts"]
+    }
+    if set(records) != set(schema_ids):
+        raise ContractError("platform schemaContracts does not name the complete schema set")
     for schema_id, filename in schema_ids.items():
         path = catalog.root / "schema" / filename
         schema = load_json(path)
@@ -667,6 +783,15 @@ def verify_schema_bindings(catalog: Catalog) -> None:
             raise ContractError(f"schema {filename} does not bind $id {schema_id}")
         if schema.get("additionalProperties") is not False:
             raise ContractError(f"schema {filename} must reject unknown top-level keys")
+        record = records[schema_id]
+        expected_path = f"schema/{filename}"
+        if record["relativePath"] != expected_path:
+            raise ContractError(f"schema {schema_id} has the wrong bound relativePath")
+        actual_hash = file_hash(path)
+        if record["sha256"] != actual_hash:
+            raise ContractError(
+                f"schema {schema_id} hash mismatch: expected {record['sha256']}, found {actual_hash}"
+            )
 
 
 def validate_catalog(catalog: Catalog) -> None:

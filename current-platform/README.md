@@ -23,9 +23,12 @@ python3 scripts/current-platform-composition.py resolve \
 
 The six-field composition identity is derived from canonical manifest content,
 the deterministic ordered module closure, and raw SHA-256 hashes of every
-closed-inventory artifact. Historical input adapters remain an Editor migration
-boundary and are never installed as runtime modules. A receipt is installation
-evidence only: it cannot suppress a source build or prove artifact identity.
+closed-inventory artifact. The resolved record also exposes `schemaSetHash`;
+the platform manifest binds every schema ID and relative path to its exact file
+SHA-256, so schema changes transitively change platform/composition identity.
+Historical input adapters remain an Editor migration boundary and are never
+installed as runtime modules. A receipt is installation evidence only: it
+cannot suppress a source build or prove artifact identity.
 
 The legacy descriptors in `server/conf/world-builder/` remain historical input
 evidence for the rejected pinned-runtime strategy. They are not members of

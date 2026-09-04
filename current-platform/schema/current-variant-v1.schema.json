@@ -4,40 +4,45 @@
   "title": "RSC World Editor current platform variant",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaId",
-    "manifestType",
-    "variantId",
-    "displayName",
-    "platformReleaseId",
-    "variantRole",
-    "releaseStatus",
-    "installable",
-    "defaultModuleIds",
-    "requiredCapabilities",
-    "forbiddenCapabilities",
-    "advancedOnlyCapabilities",
-    "inputAdapterRecommendations",
-    "serverClientPairing",
-    "retirementPath",
-    "provenance"
-  ],
+  "required": ["schemaId", "manifestType", "variantId", "displayName", "platformReleaseId", "variantRole", "releaseStatus", "installable", "defaultModuleIds", "requiredCapabilities", "forbiddenCapabilities", "advancedOnlyCapabilities", "inputAdapterRecommendations", "serverClientPairing", "retirementPath", "provenance"],
   "properties": {
     "schemaId": {"const": "current-variant-v1"},
     "manifestType": {"const": "current-platform-variant"},
-    "variantId": {"type": "string"},
-    "displayName": {"type": "string"},
-    "platformReleaseId": {"type": "string"},
+    "variantId": {"$ref": "#/$defs/id"},
+    "displayName": {"type": "string", "minLength": 1},
+    "platformReleaseId": {"$ref": "#/$defs/id"},
     "variantRole": {"enum": ["public-conservative", "first-party-advanced"]},
     "releaseStatus": {"enum": ["foundation-contract-only", "release-candidate", "released"]},
     "installable": {"type": "boolean"},
-    "defaultModuleIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-    "requiredCapabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-    "forbiddenCapabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-    "advancedOnlyCapabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-    "inputAdapterRecommendations": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-    "serverClientPairing": {"type": "object"},
+    "defaultModuleIds": {"$ref": "#/$defs/idArray"},
+    "requiredCapabilities": {"$ref": "#/$defs/idArray"},
+    "forbiddenCapabilities": {"$ref": "#/$defs/idArray"},
+    "advancedOnlyCapabilities": {"$ref": "#/$defs/idArray"},
+    "inputAdapterRecommendations": {"$ref": "#/$defs/idArray"},
+    "serverClientPairing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "handshakeId", "mismatchPolicy"],
+      "properties": {
+        "required": {"const": true},
+        "handshakeId": {"$ref": "#/$defs/id"},
+        "mismatchPolicy": {"const": "refuse-startup"}
+      }
+    },
     "retirementPath": {"type": ["string", "null"]},
-    "provenance": {"type": "object"}
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "authority", "contentPolicy"],
+      "properties": {
+        "repository": {"const": "rsc-world-editor-runtime"},
+        "authority": {"const": "provider-commit"},
+        "contentPolicy": {"enum": ["public-conservative", "reviewed-first-party-advanced"]}
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+    "idArray": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
   }
 }

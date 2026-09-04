@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "archive-entries.json",
-      "sha256": "ec309880cece417fca83d08aaca5ebec8cc12ab2aad08417ac61a35efa044998",
-      "size": 264
+      "sha256": "1ed2c1b2016aa8a2b7e5ab8a841a8003e6f0a481a06833dd5bc88eda26ef18b6",
+      "size": 752
     },
     {
       "path": "payload/fixture-addon.txt",

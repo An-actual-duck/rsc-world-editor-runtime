@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+import warnings
 import zipfile
 
 
@@ -50,11 +51,13 @@ class CurrentPlatformCompositionTest(unittest.TestCase):
 
     def write_archive(self, name: str, fixture_key: str) -> None:
         entries = json.loads((FIXTURE / "archive-entries.json").read_text())[fixture_key]
-        with zipfile.ZipFile(self.payload_root / "payload" / name, "w") as archive:
-            for entry in entries:
-                archive.writestr(entry, b"sealed synthetic class payload\n")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            with zipfile.ZipFile(self.payload_root / "payload" / name, "w") as archive:
+                for entry in entries:
+                    archive.writestr(entry, b"sealed synthetic class payload\n")
 
-    def add_module(self, module_id: str) -> None:
+    def add_module(self, module_id: str, archive_fixture: str | None = None) -> None:
         scenario = self.scenario_by_id[module_id]
         code_module = scenario["kind"] == "code-plugin"
         coordinated = scenario["kind"] == "coordinated-server-client"
@@ -63,7 +66,7 @@ class CurrentPlatformCompositionTest(unittest.TestCase):
             self.write_archive("fixture-foundation.jar", "safe")
         elif module_id == "fixture-shadow":
             source_path = "payload/fixture-shadow.jar"
-            self.write_archive("fixture-shadow.jar", "shadow")
+            self.write_archive("fixture-shadow.jar", archive_fixture or "shadow")
         else:
             source_path = f"payload/{module_id}.txt"
         namespace_id = module_id.replace("-", "_")
@@ -157,6 +160,56 @@ class CurrentPlatformCompositionTest(unittest.TestCase):
         self.assertFalse(base["installable"])
         self.assertFalse(advanced["installable"])
 
+    def test_schema_files_are_deeply_closed_contracts(self) -> None:
+        for path in sorted((ROOT / "current-platform/schema").glob("*.schema.json")):
+            schema = json.loads(path.read_text())
+            pending = [("$", schema)]
+            while pending:
+                location, value = pending.pop()
+                if isinstance(value, dict):
+                    if value.get("type") == "object":
+                        self.assertIs(
+                            False,
+                            value.get("additionalProperties"),
+                            f"open object schema at {path.name}:{location}",
+                        )
+                        self.assertIn("required", value, f"missing required at {path.name}:{location}")
+                        self.assertIn("properties", value, f"missing properties at {path.name}:{location}")
+                    pending.extend((f"{location}.{key}", child) for key, child in value.items())
+                elif isinstance(value, list):
+                    pending.extend((f"{location}[{index}]", child) for index, child in enumerate(value))
+
+    def test_schema_mutation_changes_transitive_composition_identity(self) -> None:
+        catalog = self.catalog()
+        before = COMPOSITION.resolve_composition(
+            catalog, "current-base-v1", [], self.payload_root
+        )
+        schema_path = self.catalog_root / "schema/current-variant-v1.schema.json"
+        schema_path.write_text(schema_path.read_text() + "\n", encoding="utf-8")
+        platform_path = self.catalog_root / "platform/current-platform-r1.json"
+        platform = json.loads(platform_path.read_text())
+        for record in platform["schemaContracts"]:
+            if record["schemaId"] == "current-variant-v1":
+                record["sha256"] = sha256(schema_path)
+        platform_path.write_text(
+            json.dumps(platform, indent=2, sort_keys=False) + "\n", encoding="utf-8"
+        )
+        changed_catalog = self.catalog()
+        after = COMPOSITION.resolve_composition(
+            changed_catalog, "current-base-v1", [], self.payload_root
+        )
+        self.assertNotEqual(before["schemaSetHash"], after["schemaSetHash"])
+        self.assertNotEqual(before["platformManifestHash"], after["platformManifestHash"])
+        self.assertEqual(before["variantManifestHash"], after["variantManifestHash"])
+
+    def test_unknown_nested_contract_field_fails_closed(self) -> None:
+        variant_path = self.catalog_root / "variants/current-base-v1.json"
+        variant = json.loads(variant_path.read_text())
+        variant["serverClientPairing"]["unknownAuthority"] = True
+        variant_path.write_text(json.dumps(variant), encoding="utf-8")
+        with self.assertRaisesRegex(COMPOSITION.ContractError, "unknown unknownAuthority"):
+            COMPOSITION.Catalog(self.catalog_root)
+
     def test_base_contract_is_positive_public_and_advanced_negative(self) -> None:
         catalog = self.catalog()
         base = catalog.variants["current-base-v1"][1]
@@ -224,6 +277,23 @@ class CurrentPlatformCompositionTest(unittest.TestCase):
             COMPOSITION.resolve_composition(
                 self.catalog(), "current-base-v1", ["fixture-shadow"], self.payload_root
             )
+
+    def test_module_archive_rejects_duplicate_casefold_and_foreign_entries(self) -> None:
+        for fixture_key, message in (
+            ("duplicate", "duplicate entry"),
+            ("casefold", "case-fold collision"),
+            ("foreignResource", "outside its namespace"),
+        ):
+            shutil.rmtree(self.catalog_root / "modules")
+            (self.catalog_root / "modules").mkdir()
+            self.add_module("fixture-shadow", fixture_key)
+            with self.assertRaisesRegex(COMPOSITION.ContractError, message):
+                COMPOSITION.resolve_composition(
+                    self.catalog(),
+                    "current-base-v1",
+                    ["fixture-shadow"],
+                    self.payload_root,
+                )
 
     def test_artifact_symlink_is_not_accepted_as_provider_payload(self) -> None:
         for module_id in ("fixture-foundation", "fixture-addon", "fixture-feature"):
