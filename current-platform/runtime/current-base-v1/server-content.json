@@ -44,6 +44,7 @@
     {"sourcePath": "server/database/mysql/patches/2026_08_03_add_blessing_skill.sql", "bundlePath": "database/mysql/patches/2026_08_03_add_blessing_skill.sql", "transform": "copy"},
     {"sourcePath": "server/conf/server/aliases.xml", "bundlePath": "conf/server/aliases.xml", "transform": "copy"},
     {"sourcePath": "server/conf/server/badwordsJag.txt", "bundlePath": "conf/server/badwordsJag.txt", "transform": "copy"},
+    {"sourcePath": "server/conf/server/fonts/runescape_uf.ttf", "bundlePath": "conf/server/fonts/runescape_uf.ttf", "transform": "copy"},
     {"sourcePath": "server/conf/server/log4j2.xml", "bundlePath": "conf/server/log4j2.xml", "transform": "copy"},
     {"sourcePath": "server/conf/server/words.list", "bundlePath": "conf/server/words.list", "transform": "copy"},
     {"sourcePath": "server/conf/server/wordsJag.txt", "bundlePath": "conf/server/wordsJag.txt", "transform": "copy"},
