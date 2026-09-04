@@ -145,8 +145,8 @@ def seed_retro_database(path: Path) -> None:
             (ROOT / "server/database/sqlite/retro.sqlite").read_text(encoding="utf-8")
         )
         database.execute(
-            "INSERT INTO players(id,username,pass,salt,x,y,quest_points) "
-            "VALUES(41,'sealed user','sealedpass','',120,648,2)"
+            "INSERT INTO players(id,username,pass,salt,x,y,quest_points,login_date) "
+            "VALUES(41,'sealed user','sealedpass','',120,648,2,100)"
         )
         for table in ("curstats", "maxstats", "experience", "capped_experience"):
             database.execute(
@@ -166,7 +166,7 @@ def seed_retro_database(path: Path) -> None:
         database.execute("INSERT INTO quests(playerID,id,stage) VALUES(41,1,3)")
         database.execute(
             "INSERT INTO player_cache(playerID,type,`key`,`value`) "
-            "VALUES(41,0,'sealed_key','sealed_value')"
+            "VALUES(41,0,'sealed_counter','73')"
         )
         database.execute(
             "INSERT INTO ironman(playerID,iron_man,iron_man_restriction,hc_ironman_death) "
@@ -367,7 +367,7 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                     )
                     self.assertIn("variant=current-base-v1", server_evidence)
                     self.assertIn(
-                        "Processed login request for sealed user response: 0",
+                        "Processed login request for sealed user response: 64",
                         server_evidence,
                     )
                 finally:
@@ -403,6 +403,9 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                 ).fetchone())
                 self.assertEqual((1, 3), database.execute(
                     "SELECT id,stage FROM quests WHERE playerID=41"
+                ).fetchone())
+                self.assertEqual(("sealed_counter", "73"), database.execute(
+                    "SELECT key,value FROM player_cache WHERE playerID=41"
                 ).fetchone())
                 self.assertEqual(
                     "preservation-retro-to-current-base-v1",
