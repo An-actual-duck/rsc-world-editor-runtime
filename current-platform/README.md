@@ -3,7 +3,7 @@
 This directory is the provider-owned foundation for one current managed runtime
 generation. `Current Base` is the conservative public destination and `Current
 Advanced` is a bounded first-party composition on the same platform release.
-Current Base is a buildable, non-installable `release-candidate`: its closed bundle is built
+Current Base is a buildable, non-installable `artifact-candidate`: its closed bundle is built
 from this provider's server/client sources, uses only authentic/shared plugins,
 and excludes the Advanced asset catalog. Current Advanced remains
 `foundation-contract-only` and non-installable until its separate evidence is
@@ -23,12 +23,18 @@ Build the reproducible Current Base server/client pair and its exact identity:
 python3 scripts/build-current-base.py
 ```
 
-The builder always compiles source; receipts are not an input. It normalizes
-all JAR entry order and metadata, writes provider/build provenance, resolves the
-closed artifact inventory, and invokes the fail-closed startup gate. The gate
-checks the shared pairing marker, the complete six-field identity, canonical
-map bootstrap classes, positive public plugins/state policy, and Advanced-only
-plugin/resource/configuration exclusion.
+The official builder requires a clean provider checkout and always compiles
+source; receipts and pre-existing ignored output are not inputs. Its narrow
+`--test-allow-dirty` switch records dirty state and exists only for test
+harnesses. The build provenance binds the provider commit, source-tree
+fingerprint, and clean/dirty state. The builder normalizes all JAR entry order
+and metadata, writes provider/build provenance, resolves the
+closed artifact inventory, and invokes the source-tree candidate verifier. The
+verifier checks the shared pairing marker, complete six-field artifact identity,
+canonical map bootstrap classes, public plugin inventory/state policy contract,
+and Advanced-only plugin/resource/configuration exclusion. It is not portable
+installed-runtime startup/login enforcement; that remains a machine-visible
+installability blocker.
 
 Resolve and hash the built candidate inventory:
 

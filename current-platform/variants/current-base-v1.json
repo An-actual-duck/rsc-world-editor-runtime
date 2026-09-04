@@ -5,7 +5,7 @@
   "displayName": "Current Base",
   "platformReleaseId": "rsc-current-platform-r1",
   "variantRole": "public-conservative",
-  "releaseStatus": "release-candidate",
+  "releaseStatus": "artifact-candidate",
   "installable": false,
   "defaultModuleIds": [],
   "requiredCapabilities": [

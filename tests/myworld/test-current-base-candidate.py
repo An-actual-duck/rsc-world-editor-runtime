@@ -13,18 +13,12 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
-OUTPUT = ROOT / "output/current-platform/current-base-v1"
-IDENTITY = OUTPUT / "composition-identity.json"
-BUILD = ROOT / "scripts/build-current-base.py"
-VERIFY = ROOT / "scripts/verify-current-base.py"
-
-
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def candidate_hashes() -> dict[str, str]:
-    identity = json.loads(IDENTITY.read_text(encoding="utf-8"))
+def candidate_hashes(identity_path: Path) -> dict[str, str]:
+    identity = json.loads(identity_path.read_text(encoding="utf-8"))
     return {
         record["bundlePath"]: record["sha256"]
         for record in identity["bundleInventory"]
@@ -34,22 +28,40 @@ def candidate_hashes() -> dict[str, str]:
 class CurrentBaseCandidateTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        cls.checkout = tempfile.TemporaryDirectory(prefix="current-base-clean-checkout-")
+        cls.repo = Path(cls.checkout.name) / "runtime"
         subprocess.run(
-            ["python3", str(BUILD)], cwd=ROOT, check=True, capture_output=True, text=True
+            ["git", "clone", "--shared", "--quiet", str(ROOT), str(cls.repo)],
+            cwd=ROOT,
+            check=True,
         )
-        cls.identity = json.loads(IDENTITY.read_text(encoding="utf-8"))
+        cls.output = cls.repo / "output/current-platform/current-base-v1"
+        cls.identity_path = cls.output / "composition-identity.json"
+        cls.build = cls.repo / "scripts/build-current-base.py"
+        cls.verify = cls.repo / "scripts/verify-current-base.py"
+        if cls.output.exists():
+            raise AssertionError("clean checkout unexpectedly contains ignored candidate output")
+        subprocess.run(
+            ["python3", str(cls.build)], cwd=cls.repo, check=True,
+            capture_output=True, text=True,
+        )
+        cls.identity = json.loads(cls.identity_path.read_text(encoding="utf-8"))
         cls.profile = json.loads(
-            (ROOT / "current-platform/runtime/current-base-v1/profile.json").read_text()
+            (cls.repo / "current-platform/runtime/current-base-v1/profile.json").read_text()
         )
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.checkout.cleanup()
 
     def test_candidate_is_buildable_but_not_claimed_installable_or_released(self) -> None:
         base = json.loads(
-            (ROOT / "current-platform/variants/current-base-v1.json").read_text()
+            (self.repo / "current-platform/variants/current-base-v1.json").read_text()
         )
         advanced = json.loads(
-            (ROOT / "current-platform/variants/current-advanced-v1.json").read_text()
+            (self.repo / "current-platform/variants/current-advanced-v1.json").read_text()
         )
-        self.assertEqual("release-candidate", base["releaseStatus"])
+        self.assertEqual("artifact-candidate", base["releaseStatus"])
         self.assertFalse(base["installable"])
         self.assertNotEqual("released", base["releaseStatus"])
         self.assertFalse(advanced["installable"])
@@ -58,17 +70,19 @@ class CurrentBaseCandidateTest(unittest.TestCase):
             [
                 "content-neutral-server-config-and-definitions-v1",
                 "transactional-state-migration-row-v1",
+                "base-gameplay-state-runtime-execution-v1",
+                "runtime-enforced-server-client-startup-handshake-v1",
             ],
             self.profile["installabilityBlockers"],
         )
 
-    def test_startup_gate_binds_exact_six_field_server_client_identity(self) -> None:
+    def test_candidate_verifier_binds_exact_six_field_artifact_pairing(self) -> None:
         result = subprocess.run(
             [
-                "python3", str(VERIFY), "--identity", str(IDENTITY),
-                "--payload-root", str(ROOT),
+                "python3", str(self.verify), "--identity", str(self.identity_path),
+                "--payload-root", str(self.repo),
             ],
-            cwd=ROOT,
+            cwd=self.repo,
             check=True,
             capture_output=True,
             text=True,
@@ -76,7 +90,11 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         evidence = json.loads(result.stdout)
         self.assertEqual("verified", evidence["status"])
         self.assertEqual("current-composition-handshake-v1", evidence["handshakeId"])
-        self.assertRegex(evidence["startupHandshakeSha256"], r"^[0-9a-f]{64}$")
+        self.assertRegex(evidence["artifactPairingSha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual("verified", evidence["canonicalMapBootstrap"])
+        self.assertEqual("verified", evidence["publicPluginInventory"])
+        self.assertEqual("verified", evidence["publicStatePolicyContract"])
+        self.assertEqual("excluded", evidence["advancedArtifactEffects"])
 
         with tempfile.TemporaryDirectory(prefix="current-base-mismatch-") as temporary:
             mismatch = dict(self.identity)
@@ -85,10 +103,10 @@ class CurrentBaseCandidateTest(unittest.TestCase):
             mismatch_path.write_text(json.dumps(mismatch), encoding="utf-8")
             refused = subprocess.run(
                 [
-                    "python3", str(VERIFY), "--identity", str(mismatch_path),
-                    "--payload-root", str(ROOT),
+                    "python3", str(self.verify), "--identity", str(mismatch_path),
+                    "--payload-root", str(self.repo),
                 ],
-                cwd=ROOT,
+                cwd=self.repo,
                 capture_output=True,
                 text=True,
             )
@@ -96,9 +114,9 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         self.assertIn("differs from provider artifacts", refused.stderr)
 
     def test_public_plugins_and_canonical_map_bootstraps_are_executable(self) -> None:
-        core = OUTPUT / "server/core.jar"
-        plugins = OUTPUT / "server/plugins.jar"
-        client = OUTPUT / "client/Open_RSC_Client.jar"
+        core = self.output / "server/core.jar"
+        plugins = self.output / "server/plugins.jar"
+        client = self.output / "client/Open_RSC_Client.jar"
         with zipfile.ZipFile(core) as archive:
             core_names = set(archive.namelist())
         with zipfile.ZipFile(plugins) as archive:
@@ -172,7 +190,7 @@ public final class CurrentBaseMapHarness {
                     "javac", "-source", "8", "-target", "8", "-cp", str(core),
                     "-d", str(root), str(source),
                 ],
-                cwd=ROOT,
+                cwd=self.repo,
                 check=True,
                 capture_output=True,
             )
@@ -181,7 +199,7 @@ public final class CurrentBaseMapHarness {
                     "java", "-cp", f"{root}:{core}",
                     "com.openrsc.server.io.CurrentBaseMapHarness", str(profile),
                 ],
-                cwd=ROOT,
+                cwd=self.repo,
                 check=True,
                 capture_output=True,
                 text=True,
@@ -189,9 +207,9 @@ public final class CurrentBaseMapHarness {
         self.assertEqual(["true", "world-builder-installed"], executed.stdout.splitlines())
 
     def test_advanced_only_plugins_assets_and_configuration_are_absent(self) -> None:
-        with zipfile.ZipFile(OUTPUT / "server/plugins.jar") as archive:
+        with zipfile.ZipFile(self.output / "server/plugins.jar") as archive:
             plugins = archive.namelist()
-        with zipfile.ZipFile(OUTPUT / "client/Open_RSC_Client.jar") as archive:
+        with zipfile.ZipFile(self.output / "client/Open_RSC_Client.jar") as archive:
             client = archive.namelist()
         for prefix in self.profile["advancedExclusions"]["pluginPrefixes"]:
             self.assertFalse(any(name.startswith(prefix) for name in plugins), prefix)
@@ -215,12 +233,40 @@ public final class CurrentBaseMapHarness {
         )
 
     def test_repeated_source_build_has_identical_closed_inventory(self) -> None:
-        first = candidate_hashes()
-        subprocess.run(
-            ["python3", str(BUILD)], cwd=ROOT, check=True, capture_output=True, text=True
+        first = candidate_hashes(self.identity_path)
+        provenance = json.loads(
+            (self.output / "runtime/build-provenance.json").read_text(encoding="utf-8")
         )
-        second = candidate_hashes()
+        self.assertFalse(provenance["sourceTreeDirty"])
+        self.assertRegex(provenance["sourceTreeFingerprint"], r"^[0-9a-f]{64}$")
+        subprocess.run(
+            ["python3", str(self.build)], cwd=self.repo, check=True,
+            capture_output=True, text=True,
+        )
+        second = candidate_hashes(self.identity_path)
         self.assertEqual(first, second)
+
+    def test_dirty_tracked_source_is_rejected_before_creating_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="current-base-dirty-checkout-") as temporary:
+            repo = Path(temporary) / "runtime"
+            subprocess.run(
+                ["git", "clone", "--shared", "--quiet", str(ROOT), str(repo)],
+                cwd=ROOT,
+                check=True,
+            )
+            build_file = repo / "Client_Base/build.xml"
+            build_file.write_text(build_file.read_text() + "\n", encoding="utf-8")
+            output = repo / "output/current-platform/current-base-v1"
+            self.assertFalse(output.exists())
+            refused = subprocess.run(
+                ["python3", "scripts/build-current-base.py"],
+                cwd=repo,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(2, refused.returncode)
+            self.assertIn("requires a clean provider source tree", refused.stderr)
+            self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -81,11 +82,47 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def build(output: Path) -> Path:
+def source_tree_state(composition) -> tuple[str, bool, str]:
+    source_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, text=True,
+        capture_output=True,
+    ).stdout.strip()
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=ROOT, check=True, text=True, capture_output=True,
+    ).stdout
+    listed = subprocess.run(
+        ["git", "ls-files", "-co", "--exclude-standard", "-z"],
+        cwd=ROOT, check=True, capture_output=True,
+    ).stdout.split(b"\0")
+    records = []
+    for encoded in sorted(path for path in listed if path):
+        relative = encoded.decode("utf-8")
+        path = ROOT / relative
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeError(f"candidate source must be a regular file: {relative}")
+        records.append(
+            {
+                "path": relative,
+                "mode": format(path.stat().st_mode & 0o777, "04o"),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        )
+    return source_commit, bool(status), composition.canonical_hash(records)
+
+
+def build(output: Path, allow_dirty: bool) -> Path:
     composition = load_composition_tool()
     catalog = composition.Catalog(CATALOG_ROOT)
     composition.validate_catalog(catalog)
     variant_path, variant = catalog.variants["current-base-v1"]
+    source_commit, source_tree_dirty, source_tree_fingerprint = source_tree_state(
+        composition
+    )
+    if source_tree_dirty and not allow_dirty:
+        raise RuntimeError(
+            "official Current Base candidate build requires a clean provider source tree"
+        )
 
     if output.exists():
         shutil.rmtree(output)
@@ -157,9 +194,6 @@ def build(output: Path) -> Path:
 
     shutil.copy2(CATALOG_ROOT / "runtime/current-base-v1/profile.json", runtime_output)
     shutil.copy2(marker, runtime_output / "pairing.properties")
-    source_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, text=True, capture_output=True
-    ).stdout.strip()
     write_json(
         runtime_output / "build-provenance.json",
         {
@@ -167,6 +201,8 @@ def build(output: Path) -> Path:
             "manifestType": "current-base-build-provenance",
             "sourceAuthority": "selected-current-composition-source",
             "sourceCommit": source_commit,
+            "sourceTreeDirty": source_tree_dirty,
+            "sourceTreeFingerprint": source_tree_fingerprint,
             "receiptAuthority": "never",
             "archiveNormalization": "sorted-path-fixed-2000-01-01-deflate9-v1",
             "java": tool_version(["java", "-version"]),
@@ -196,12 +232,21 @@ def build(output: Path) -> Path:
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--test-allow-dirty",
+        action="store_true",
+        help="Allow a dirty source tree while recording that fact; tests only.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
-    parse_arguments()
-    identity = build(DEFAULT_OUTPUT)
+    options = parse_arguments()
+    try:
+        identity = build(DEFAULT_OUTPUT, options.test_allow_dirty)
+    except RuntimeError as error:
+        print(f"Current Base candidate build failed: {error}", file=sys.stderr)
+        return 2
     print(f"Current Base candidate verified: {identity}")
     return 0
 

@@ -31,7 +31,7 @@
     {
       "schemaId": "current-base-runtime-profile-v1",
       "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
-      "sha256": "4708275838dd244f92cdd88ae35e2905cde72f5a5734090d5a6322bd7404dfa7"
+      "sha256": "0e02815d58e95987fd36bb5ae3a8c6f878328fb381373751439ed99cc5c62ec8"
     },
     {
       "schemaId": "current-bundle-spec-v1",
@@ -56,7 +56,7 @@
     {
       "schemaId": "current-variant-v1",
       "relativePath": "schema/current-variant-v1.schema.json",
-      "sha256": "25afff50035dacfa74b248de1efb3a85bfefe1189f1a2c241a0a9fadfc7a8490"
+      "sha256": "35151dfd3e15cf202d49abf34cc2b74220b6d94bee45bdf443ce61d10d19b6aa"
     }
   ],
   "mapRuntimeCapabilities": [

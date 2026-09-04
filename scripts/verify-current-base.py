@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Fail-closed startup gate for a resolved Current Base server/client pair."""
+"""Source-tree verifier for a resolved Current Base artifact pair.
+
+This is build/candidate evidence. It is not installed-runtime startup or login
+enforcement and intentionally refuses to describe itself as such.
+"""
 
 from __future__ import annotations
 
@@ -129,6 +133,8 @@ def validate_profile(path: Path) -> dict:
     if profile["installabilityBlockers"] != [
         "content-neutral-server-config-and-definitions-v1",
         "transactional-state-migration-row-v1",
+        "base-gameplay-state-runtime-execution-v1",
+        "runtime-enforced-server-client-startup-handshake-v1",
     ]:
         raise VerificationError("Current Base installability blockers are incomplete")
     if profile["pluginSourceSets"] != ["authentic", "shared"]:
@@ -164,6 +170,7 @@ def validate_build_provenance(path: Path, expected_pairing: dict[str, str]) -> N
         provenance,
         {
             "schemaId", "manifestType", "sourceAuthority", "sourceCommit",
+            "sourceTreeDirty", "sourceTreeFingerprint",
             "receiptAuthority", "archiveNormalization", "java", "ant", "pairing",
         },
         "build provenance",
@@ -183,6 +190,13 @@ def validate_build_provenance(path: Path, expected_pairing: dict[str, str]) -> N
         raise VerificationError("build provenance has malformed source commit")
     if not all(character in "0123456789abcdef" for character in source_commit):
         raise VerificationError("build provenance has malformed source commit")
+    if not isinstance(provenance["sourceTreeDirty"], bool):
+        raise VerificationError("build provenance lacks source tree dirty state")
+    source_tree_fingerprint = provenance["sourceTreeFingerprint"]
+    if not isinstance(source_tree_fingerprint, str) or len(source_tree_fingerprint) != 64:
+        raise VerificationError("build provenance has malformed source tree fingerprint")
+    if not all(character in "0123456789abcdef" for character in source_tree_fingerprint):
+        raise VerificationError("build provenance has malformed source tree fingerprint")
     if not isinstance(provenance["java"], str) or not provenance["java"]:
         raise VerificationError("build provenance lacks Java toolchain identity")
     if not isinstance(provenance["ant"], str) or not provenance["ant"]:
@@ -234,7 +248,7 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
             raise VerificationError(f"server lacks canonical runtime class {required}")
     for required in profile["requiredPluginClasses"]:
         if required not in plugin_names:
-            raise VerificationError(f"Base lacks positive public plugin {required}")
+            raise VerificationError(f"Base lacks declared public plugin {required}")
     for name in plugin_names:
         if name == "META-INF/MANIFEST.MF":
             continue
@@ -280,10 +294,11 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
         "status": "verified",
         "variantId": supplied["variantId"],
         "handshakeId": catalog.platform["protocol"]["handshakeId"],
-        "startupHandshakeSha256": handshake,
-        "canonicalMapRuntime": "verified",
-        "positivePublicSemantics": "verified",
-        "advancedEffects": "excluded",
+        "artifactPairingSha256": handshake,
+        "canonicalMapBootstrap": "verified",
+        "publicPluginInventory": "verified",
+        "publicStatePolicyContract": "verified",
+        "advancedArtifactEffects": "excluded",
     }
 
 
