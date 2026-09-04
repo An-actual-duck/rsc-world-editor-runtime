@@ -146,7 +146,7 @@ def seed_retro_database(path: Path) -> None:
         )
         database.execute(
             "INSERT INTO players(id,username,pass,salt,x,y,quest_points) "
-            "VALUES(41,'sealed_user','sealedpass','',120,648,2)"
+            "VALUES(41,'sealed user','sealedpass','',120,648,2)"
         )
         for table in ("curstats", "maxstats", "experience", "capped_experience"):
             database.execute(
@@ -359,7 +359,7 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                     evidence_runs.append(runtime_evidence)
                     self.assertEqual(0, client.wait(timeout=20))
                     server_evidence = wait_for_text(
-                        server_log, "Unregistered sealed_user from player list.",
+                        server_log, "Unregistered sealed user from player list.",
                         server, 20, f"Current Base logout run {run_number}",
                     )
                     self.assertIn(
@@ -367,7 +367,7 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                     )
                     self.assertIn("variant=current-base-v1", server_evidence)
                     self.assertIn(
-                        "Processed login request for sealed_user response: 0",
+                        "Processed login request for sealed user response: 0",
                         server_evidence,
                     )
                 finally:
