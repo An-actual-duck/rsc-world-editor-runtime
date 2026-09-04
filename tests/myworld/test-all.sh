@@ -95,6 +95,7 @@ python3 ./tests/myworld/test-project-scenery-model-fallback.py
 python3 ./tests/myworld/test-project-npc-animation-registry-v1.py
 python3 ./tests/myworld/test-adaptive-id-list-validation.py
 python3 ./tests/myworld/test-project-bound-placement-definitions.py
+python3 ./tests/myworld/test-host-runtime-capability.py
 python3 ./tests/myworld/test-custom-login-decoder.py
 python3 ./tests/myworld/test-world-builder-cold-start-isolation.py
 python3 ./tests/myworld/test-adaptive-builder-real-login.py
