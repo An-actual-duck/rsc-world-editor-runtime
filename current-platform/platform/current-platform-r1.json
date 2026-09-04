@@ -29,9 +29,14 @@
   },
   "schemaContracts": [
     {
+      "schemaId": "current-base-client-content-v1",
+      "relativePath": "schema/current-base-client-content-v1.schema.json",
+      "sha256": "88622ebc7430c22d8f598463cadaa4f4825857991de28a67009f3d34d5321362"
+    },
+    {
       "schemaId": "current-base-runtime-profile-v1",
       "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
-      "sha256": "2e3d0897df7ea5133f7213bbcffebfcb9156a2cf94f3fe213c9ce74811f03c51"
+      "sha256": "9c749689417517d6fc917a6e55a05465a83c4160ffa01bd1eb6f54d208c50ec0"
     },
     {
       "schemaId": "current-base-server-content-v1",

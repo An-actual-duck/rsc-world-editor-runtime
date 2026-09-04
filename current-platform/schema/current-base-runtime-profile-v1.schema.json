@@ -4,7 +4,7 @@
   "title": "RSC World Editor Current Base runtime profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "statePolicy", "serverContent", "stateMigration", "requiredRuntimeClasses", "requiredPluginClasses", "advancedExclusions"],
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "statePolicy", "serverContent", "stateMigration", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
   "properties": {
     "schemaId": {"const": "current-base-runtime-profile-v1"},
     "manifestType": {"const": "current-base-runtime-profile"},
@@ -20,6 +20,15 @@
     },
     "pluginSourceSets": {"$ref": "#/$defs/stringArray"},
     "clientAssetSets": {"$ref": "#/$defs/stringArray"},
+    "clientContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contentId", "manifestRole", "archiveRole"],
+      "properties": {
+        "contentId": {"const": "current-base-public-client-content-v1"},
+        "manifestRole": {"const": "client-content-manifest"},
+        "archiveRole": {"const": "client-content"}
+      }
+    },
     "statePolicy": {
       "type": "object",
       "additionalProperties": false,
@@ -57,6 +66,7 @@
       }
     },
     "requiredRuntimeClasses": {"$ref": "#/$defs/stringArray"},
+    "requiredClientClasses": {"$ref": "#/$defs/stringArray"},
     "requiredPluginClasses": {"$ref": "#/$defs/stringArray"},
     "advancedExclusions": {
       "type": "object",

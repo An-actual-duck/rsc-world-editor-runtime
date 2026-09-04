@@ -12,6 +12,11 @@
   "clientAssetSets": [
     "platform-world-editor-ui"
   ],
+  "clientContent": {
+    "contentId": "current-base-public-client-content-v1",
+    "manifestRole": "client-content-manifest",
+    "archiveRole": "client-content"
+  },
   "statePolicy": {
     "contractId": "canonical-public-state-v1",
     "durableLocation": "outside-code-runtime",
@@ -36,6 +41,11 @@
     "com/openrsc/server/database/CurrentBaseStateMigration.class",
     "com/openrsc/server/io/NativeLayeredWorldPackage.class",
     "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class"
+  ],
+  "requiredClientClasses": [
+    "orsc/CurrentBaseExecutionProfile.class",
+    "orsc/CurrentCompositionIdentity.class",
+    "orsc/WorldBuilderInstalledClientProfile.class"
   ],
   "requiredPluginClasses": [
     "com/openrsc/server/plugins/authentic/defaults/Default.class",

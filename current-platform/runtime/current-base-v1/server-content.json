@@ -13,6 +13,11 @@
     "sceneryMaxId": 1189
   },
   "sourceFiles": [
+    {"sourcePath": "server/alertwords.txt", "bundlePath": "alertwords.txt", "transform": "copy"},
+    {"sourcePath": "server/badwords.txt", "bundlePath": "badwords.txt", "transform": "copy"},
+    {"sourcePath": "server/goodwords.txt", "bundlePath": "goodwords.txt", "transform": "copy"},
+    {"sourcePath": "server/globalrules.txt", "bundlePath": "globalrules.txt", "transform": "copy"},
+    {"sourcePath": "server/database/sql_queries.xsd", "bundlePath": "database/sql_queries.xsd", "transform": "copy"},
     {"sourcePath": "server/database/mysql/queries/bank_presets.xml", "bundlePath": "database/mysql/queries/bank_presets.xml", "transform": "copy"},
     {"sourcePath": "server/database/mysql/queries/item.xml", "bundlePath": "database/mysql/queries/item.xml", "transform": "copy"},
     {"sourcePath": "server/database/mysql/queries/patches.xml", "bundlePath": "database/mysql/queries/patches.xml", "transform": "copy"},

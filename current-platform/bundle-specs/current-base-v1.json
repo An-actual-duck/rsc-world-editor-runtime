@@ -60,6 +60,16 @@
       "provenance": "provider-commit"
     },
     {
+      "sourcePath": "current-platform/runtime/current-base-v1/client-content.json",
+      "bundlePath": "contracts/runtime/current-base-v1/client-content.json",
+      "role": "client-content-manifest",
+      "destination": "managed-runtime/current-base-v1/client-content.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
       "sourcePath": "current-platform/runtime/current-base-v1/state-migration.json",
       "bundlePath": "contracts/runtime/current-base-v1/state-migration.json",
       "role": "state-migration-manifest",
@@ -74,6 +84,16 @@
       "bundlePath": "contracts/schema/current-base-server-content-v1.schema.json",
       "role": "contract-schema",
       "destination": "managed-runtime/contracts/schema/current-base-server-content-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-base-client-content-v1.schema.json",
+      "bundlePath": "contracts/schema/current-base-client-content-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-base-client-content-v1.schema.json",
       "ownership": "provider",
       "replacementPolicy": "content-addressed",
       "rollbackPolicy": "pointer-rollback",
@@ -224,6 +244,16 @@
       "bundlePath": "runtime/client/Open_RSC_Client.jar",
       "role": "client-runtime",
       "destination": "managed-runtime/current-base-v1/client/Open_RSC_Client.jar",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-build"
+    },
+    {
+      "sourcePath": "output/current-platform/current-base-v1/client/content.zip",
+      "bundlePath": "runtime/client/content.zip",
+      "role": "client-content",
+      "destination": "managed-runtime/current-base-v1/client/content.zip",
       "ownership": "provider",
       "replacementPolicy": "content-addressed",
       "rollbackPolicy": "pointer-rollback",
