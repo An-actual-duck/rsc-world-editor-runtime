@@ -769,6 +769,7 @@ def verify_schema_bindings(catalog: Catalog) -> None:
     schema_ids = {
         "current-base-runtime-profile-v1": "current-base-runtime-profile-v1.schema.json",
         "current-base-server-content-v1": "current-base-server-content-v1.schema.json",
+        "current-base-state-migration-v1": "current-base-state-migration-v1.schema.json",
         "current-platform-release-v1": "current-platform-release-v1.schema.json",
         "current-variant-v1": "current-variant-v1.schema.json",
         "current-module-v1": "current-module-v1.schema.json",
@@ -826,6 +827,7 @@ def validate_catalog(catalog: Catalog) -> None:
             "runtime-profile", "server-client-pairing", "build-provenance",
             "source-build-tool", "candidate-pairing-verifier",
             "server-content-manifest", "server-content",
+            "state-migration-manifest",
         }
         roles = {artifact["role"] for artifact in base_spec["artifacts"]}
         missing_roles = sorted(required_roles - roles)
@@ -840,6 +842,7 @@ def validate_catalog(catalog: Catalog) -> None:
             "base-artifact-advanced-exclusion-v1",
             "base-runtime-server-client-pairing-v1",
             "base-canonical-map-bootstrap-v1",
+            "base-preservation-state-migration-v1",
         }
         if not required_scenarios <= set(base_spec["requiredExecutableScenarios"]):
             raise ContractError("candidate Current Base lacks executable scenarios")

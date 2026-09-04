@@ -120,6 +120,7 @@ def validate_profile(path: Path) -> dict:
             "clientAssetSets",
             "statePolicy",
             "serverContent",
+            "stateMigration",
             "requiredRuntimeClasses",
             "requiredPluginClasses",
             "advancedExclusions",
@@ -133,7 +134,6 @@ def validate_profile(path: Path) -> dict:
     if profile["variantId"] != "current-base-v1":
         raise VerificationError("Current Base profile names another variant")
     if profile["installabilityBlockers"] != [
-        "transactional-state-migration-row-v1",
         "base-gameplay-state-runtime-execution-v1",
     ]:
         raise VerificationError("Current Base installability blockers are incomplete")
@@ -156,6 +156,14 @@ def validate_profile(path: Path) -> dict:
         "definitionsRoot": "conf/server",
     }:
         raise VerificationError("Current Base server content binding is incomplete")
+    if profile["stateMigration"] != {
+        "migrationRowId": "preservation-retro-to-current-base-v1",
+        "manifestRole": "state-migration-manifest",
+        "toolArtifactRole": "server-runtime",
+        "mainClass": "com.openrsc.server.database.CurrentBaseStateMigration",
+        "supportedEngines": ["sqlite", "mariadb"],
+    }:
+        raise VerificationError("Current Base state migration binding is incomplete")
     exclusions = profile["advancedExclusions"]
     require_exact_keys(
         exclusions,
@@ -296,6 +304,48 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
             raise VerificationError(f"Base server content does not disable {key}")
 
 
+def validate_state_migration(path: Path, profile: dict) -> dict:
+    try:
+        migration = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise VerificationError(f"cannot read state migration manifest: {error}") from error
+    require_exact_keys(
+        migration,
+        {"schemaId", "manifestType", "migrationRowId", "targetStateContractId",
+         "supportedEngines", "transformations", "invocation", "evidenceContract"},
+        "state migration manifest",
+    )
+    binding = profile["stateMigration"]
+    if (migration["schemaId"] != "current-base-state-migration-v1"
+            or migration["manifestType"] != "current-base-state-migration"
+            or migration["migrationRowId"] != binding["migrationRowId"]
+            or migration["targetStateContractId"] != "canonical-public-state-v1"):
+        raise VerificationError("state migration manifest has wrong identity")
+    engines = migration["supportedEngines"]
+    if [row.get("engine") for row in engines] != binding["supportedEngines"]:
+        raise VerificationError("state migration engine order differs from profile")
+    for row in engines:
+        require_exact_keys(
+            row,
+            {"engine", "sourceSchemaId", "sourceSchemaFingerprint",
+             "sourceSchemaFingerprintAlgorithm", "verificationRuntime",
+             "stageMode", "sourceMutation",
+             "rollback", "credentialPolicy"},
+            "state migration engine",
+        )
+        fingerprint = row["sourceSchemaFingerprint"]
+        if (not isinstance(fingerprint, str) or len(fingerprint) != 64
+                or any(character not in "0123456789abcdef" for character in fingerprint)):
+            raise VerificationError("state migration schema fingerprint is malformed")
+    invocation = migration["invocation"]
+    require_exact_keys(invocation, {"toolArtifactRole", "mainClass", "arguments"},
+                       "state migration invocation")
+    if (invocation["toolArtifactRole"] != binding["toolArtifactRole"]
+            or invocation["mainClass"] != binding["mainClass"]):
+        raise VerificationError("state migration invocation differs from profile")
+    return migration
+
+
 def verify(identity_path: Path, payload_root: Path) -> dict:
     composition = load_composition_tool()
     catalog = composition.Catalog(CATALOG_ROOT)
@@ -319,6 +369,8 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
     content_manifest_path = inventory_path(
         supplied, "server-content-manifest", payload_root)
     content_path = inventory_path(supplied, "server-content", payload_root)
+    migration_path = inventory_path(
+        supplied, "state-migration-manifest", payload_root)
     server_names = archive_names(server)
     plugin_names = archive_names(plugins)
     client_names = archive_names(client)
@@ -326,6 +378,7 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
     validate_server_content(
         content_manifest_path, content_path,
         profile["advancedExclusions"]["configuration"])
+    migration = validate_state_migration(migration_path, profile)
 
     for required in profile["requiredRuntimeClasses"]:
         if required not in server_names:
@@ -382,6 +435,7 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
         "canonicalMapBootstrap": "verified",
         "publicPluginInventory": "verified",
         "publicStatePolicyContract": "verified",
+        "stateMigrationContract": migration["migrationRowId"],
         "serverContent": "verified",
         "advancedArtifactEffects": "excluded",
     }

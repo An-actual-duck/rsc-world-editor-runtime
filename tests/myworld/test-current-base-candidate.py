@@ -69,7 +69,6 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         self.assertEqual("foundation-contract-only", advanced["releaseStatus"])
         self.assertEqual(
             [
-                "transactional-state-migration-row-v1",
                 "base-gameplay-state-runtime-execution-v1",
             ],
             self.profile["installabilityBlockers"],

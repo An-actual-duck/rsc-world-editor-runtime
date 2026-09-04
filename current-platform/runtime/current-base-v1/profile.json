@@ -3,7 +3,6 @@
   "manifestType": "current-base-runtime-profile",
   "variantId": "current-base-v1",
   "installabilityBlockers": [
-    "transactional-state-migration-row-v1",
     "base-gameplay-state-runtime-execution-v1"
   ],
   "pluginSourceSets": [
@@ -26,7 +25,15 @@
     "configurationEntry": "current-base.conf",
     "definitionsRoot": "conf/server"
   },
+  "stateMigration": {
+    "migrationRowId": "preservation-retro-to-current-base-v1",
+    "manifestRole": "state-migration-manifest",
+    "toolArtifactRole": "server-runtime",
+    "mainClass": "com.openrsc.server.database.CurrentBaseStateMigration",
+    "supportedEngines": ["sqlite", "mariadb"]
+  },
   "requiredRuntimeClasses": [
+    "com/openrsc/server/database/CurrentBaseStateMigration.class",
     "com/openrsc/server/io/NativeLayeredWorldPackage.class",
     "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class"
   ],

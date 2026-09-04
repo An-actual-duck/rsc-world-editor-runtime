@@ -8,9 +8,11 @@ from this provider's server/client sources, uses only authentic/shared plugins,
 includes a provider-owned conservative configuration and definition catalog,
 and excludes the Advanced asset catalog. Current Advanced remains
 `foundation-contract-only` and non-installable until its separate evidence is
-complete. Base remains non-installable until its transactional state-migration
-row and full gameplay/state runtime execution are proved. Neither status means
-released.
+complete. Base now includes the closed, compiled
+`preservation-retro-to-current-base-v1` SQLite/MariaDB migration row with
+source-preservation, staged rollback, and exact-schema execution evidence. It
+remains non-installable until full gameplay/state runtime execution is proved.
+Neither status means released.
 
 Validate the catalog:
 
@@ -34,7 +36,10 @@ closed artifact inventory, and invokes the source-tree candidate verifier. The
 verifier checks the shared pairing marker, complete six-field artifact identity,
 canonical map bootstrap classes, public plugin inventory/state policy contract,
 the conservative server-content inventory, and Advanced-only
-plugin/resource/configuration exclusion. It is still a source-tree candidate
+plugin/resource/configuration exclusion. The migration manifest binds the
+compiled main class in the `server-runtime` artifact (there is deliberately no
+unreviewed free-standing migration executable), its two exact source-schema
+fingerprints, closed invocation, and evidence contract. It is still a source-tree candidate
 verifier rather than an installed-runtime launch tool. The built server and
 client themselves parse the exact composition identity and enforce its six
 fields before configuration transfer and again on every login connection;

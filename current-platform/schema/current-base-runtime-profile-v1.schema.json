@@ -4,17 +4,16 @@
   "title": "RSC World Editor Current Base runtime profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "statePolicy", "serverContent", "requiredRuntimeClasses", "requiredPluginClasses", "advancedExclusions"],
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "statePolicy", "serverContent", "stateMigration", "requiredRuntimeClasses", "requiredPluginClasses", "advancedExclusions"],
   "properties": {
     "schemaId": {"const": "current-base-runtime-profile-v1"},
     "manifestType": {"const": "current-base-runtime-profile"},
     "variantId": {"const": "current-base-v1"},
     "installabilityBlockers": {
       "type": "array",
-      "minItems": 2,
-      "maxItems": 2,
+      "minItems": 1,
+      "maxItems": 1,
       "prefixItems": [
-        {"const": "transactional-state-migration-row-v1"},
         {"const": "base-gameplay-state-runtime-execution-v1"}
       ],
       "items": false
@@ -41,6 +40,20 @@
         "archiveRole": {"const": "server-content"},
         "configurationEntry": {"const": "current-base.conf"},
         "definitionsRoot": {"const": "conf/server"}
+      }
+    },
+    "stateMigration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["migrationRowId", "manifestRole", "toolArtifactRole", "mainClass", "supportedEngines"],
+      "properties": {
+        "migrationRowId": {"const": "preservation-retro-to-current-base-v1"},
+        "manifestRole": {"const": "state-migration-manifest"},
+        "toolArtifactRole": {"const": "server-runtime"},
+        "mainClass": {"const": "com.openrsc.server.database.CurrentBaseStateMigration"},
+        "supportedEngines": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "prefixItems": [{"const": "sqlite"}, {"const": "mariadb"}], "items": false
+        }
       }
     },
     "requiredRuntimeClasses": {"$ref": "#/$defs/stringArray"},
