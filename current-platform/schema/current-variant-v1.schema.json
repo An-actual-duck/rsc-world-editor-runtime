@@ -12,7 +12,7 @@
     "displayName": {"type": "string", "minLength": 1},
     "platformReleaseId": {"$ref": "#/$defs/id"},
     "variantRole": {"enum": ["public-conservative", "first-party-advanced"]},
-    "releaseStatus": {"enum": ["foundation-contract-only", "release-candidate", "released"]},
+    "releaseStatus": {"enum": ["foundation-contract-only", "artifact-candidate", "release-candidate", "released"]},
     "installable": {"type": "boolean"},
     "defaultModuleIds": {"$ref": "#/$defs/idArray"},
     "requiredCapabilities": {"$ref": "#/$defs/idArray"},

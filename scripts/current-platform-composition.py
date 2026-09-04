@@ -261,7 +261,9 @@ def validate_variant(value: dict, platform: dict) -> None:
     require_id(value["variantId"], "variantId")
     if value["platformReleaseId"] != platform["platformReleaseId"]:
         raise ContractError("variant platformReleaseId does not match the platform")
-    if value["releaseStatus"] not in ("foundation-contract-only", "release-candidate", "released"):
+    if value["releaseStatus"] not in (
+        "foundation-contract-only", "artifact-candidate", "release-candidate", "released"
+    ):
         raise ContractError("variant has an unknown releaseStatus")
     if not isinstance(value["installable"], bool):
         raise ContractError("variant installable must be boolean")
@@ -765,6 +767,7 @@ def resolve_composition(
 
 def verify_schema_bindings(catalog: Catalog) -> None:
     schema_ids = {
+        "current-base-runtime-profile-v1": "current-base-runtime-profile-v1.schema.json",
         "current-platform-release-v1": "current-platform-release-v1.schema.json",
         "current-variant-v1": "current-variant-v1.schema.json",
         "current-module-v1": "current-module-v1.schema.json",
@@ -813,6 +816,31 @@ def validate_catalog(catalog: Catalog) -> None:
         raise ContractError("Current Base must explicitly forbid every Advanced-only effect")
     if advanced_only & set(base_value["requiredCapabilities"]):
         raise ContractError("Current Base requires an Advanced-only effect")
+    if base_value["releaseStatus"] in (
+        "artifact-candidate", "release-candidate", "released"
+    ):
+        base_spec = catalog.bundle_specs["current-base-v1"][1]
+        required_roles = {
+            "server-runtime", "server-plugins", "client-runtime",
+            "runtime-profile", "server-client-pairing", "build-provenance",
+            "source-build-tool", "candidate-pairing-verifier",
+        }
+        roles = {artifact["role"] for artifact in base_spec["artifacts"]}
+        missing_roles = sorted(required_roles - roles)
+        if missing_roles:
+            raise ContractError(
+                "candidate Current Base lacks artifact roles: "
+                + ", ".join(missing_roles)
+            )
+        required_scenarios = {
+            "base-artifact-public-plugin-inventory-v1",
+            "base-artifact-public-state-policy-v1",
+            "base-artifact-advanced-exclusion-v1",
+            "base-artifact-server-client-pairing-v1",
+            "base-canonical-map-bootstrap-v1",
+        }
+        if not required_scenarios <= set(base_spec["requiredExecutableScenarios"]):
+            raise ContractError("candidate Current Base lacks executable scenarios")
 
 
 def parse_arguments(arguments: list[str]) -> argparse.Namespace:
