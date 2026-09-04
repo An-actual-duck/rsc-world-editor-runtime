@@ -80,6 +80,46 @@
       "provenance": "provider-commit"
     },
     {
+      "sourcePath": "current-platform/runtime/current-base-v1/installed-execution-verifier.json",
+      "bundlePath": "contracts/runtime/current-base-v1/installed-execution-verifier.json",
+      "role": "installed-execution-verifier",
+      "destination": "managed-runtime/current-base-v1/installed-execution-verifier.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/input-adapters/preservation-r64-sqlite-v1.json",
+      "bundlePath": "contracts/input-adapters/preservation-r64-sqlite-v1.json",
+      "role": "input-adapter-manifest",
+      "destination": "managed-runtime/input-adapters/preservation-r64-sqlite-v1.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "tools/layered-maps/baselines/rsc-remastered-preservation-r64-v1.json",
+      "bundlePath": "contracts/input-adapters/rsc-remastered-preservation-r64-v1.json",
+      "role": "input-adapter-baseline",
+      "destination": "managed-runtime/input-adapters/rsc-remastered-preservation-r64-v1.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "output/current-platform/current-base-v1/tools/layered-maps.jar",
+      "bundlePath": "tools/input-adapters/layered-maps.jar",
+      "role": "input-adapter-map-converter",
+      "destination": "managed-runtime/tools/input-adapters/layered-maps.jar",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-build"
+    },
+    {
       "sourcePath": "current-platform/schema/current-base-server-content-v1.schema.json",
       "bundlePath": "contracts/schema/current-base-server-content-v1.schema.json",
       "role": "contract-schema",
@@ -104,6 +144,36 @@
       "bundlePath": "contracts/schema/current-base-state-migration-v1.schema.json",
       "role": "contract-schema",
       "destination": "managed-runtime/contracts/schema/current-base-state-migration-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-base-installed-execution-v1.schema.json",
+      "bundlePath": "contracts/schema/current-base-installed-execution-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-base-installed-execution-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-base-installed-execution-evidence-v1.schema.json",
+      "bundlePath": "contracts/schema/current-base-installed-execution-evidence-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-base-installed-execution-evidence-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-preservation-r64-input-adapter-v1.schema.json",
+      "bundlePath": "contracts/schema/current-preservation-r64-input-adapter-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-preservation-r64-input-adapter-v1.schema.json",
       "ownership": "provider",
       "replacementPolicy": "content-addressed",
       "rollbackPolicy": "pointer-rollback",
@@ -287,6 +357,7 @@
     "base-runtime-server-client-pairing-v1",
     "base-canonical-map-bootstrap-v1",
     "base-preservation-state-migration-v1",
-    "base-gameplay-state-runtime-execution-v1"
+    "base-gameplay-state-runtime-execution-v1",
+    "base-installed-composition-execution-verification-v1"
   ]
 }

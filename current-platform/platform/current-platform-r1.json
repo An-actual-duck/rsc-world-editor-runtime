@@ -34,9 +34,19 @@
       "sha256": "88622ebc7430c22d8f598463cadaa4f4825857991de28a67009f3d34d5321362"
     },
     {
+      "schemaId": "current-base-installed-execution-evidence-v1",
+      "relativePath": "schema/current-base-installed-execution-evidence-v1.schema.json",
+      "sha256": "5708aa5da938fda3fd6cd138539fbee53d2a803290aa5426206b0926ed136590"
+    },
+    {
+      "schemaId": "current-base-installed-execution-v1",
+      "relativePath": "schema/current-base-installed-execution-v1.schema.json",
+      "sha256": "1d7102502cc88e8760b5210f2f53cb0a7cf8eefe2205bb83904ce9a754eb2976"
+    },
+    {
       "schemaId": "current-base-runtime-profile-v1",
       "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
-      "sha256": "60ca2f709c666e71aab1a9cd50ce0c76839889c75663a90c93aabc3cdac04ae9"
+      "sha256": "797ad6fba496671ef19c50144a8f034cf3d2e1132514ae59d3a39709f660f6a7"
     },
     {
       "schemaId": "current-base-server-content-v1",
@@ -46,7 +56,7 @@
     {
       "schemaId": "current-base-state-migration-v1",
       "relativePath": "schema/current-base-state-migration-v1.schema.json",
-      "sha256": "50cf8a58793ae89262e7add094a4578302bb35946f32c75b2f83e9f84b2985fe"
+      "sha256": "2367d97396e3b5aa21b14ef07f928996151a015815fb34df0068c544bd270609"
     },
     {
       "schemaId": "current-bundle-spec-v1",
@@ -67,6 +77,11 @@
       "schemaId": "current-platform-release-v1",
       "relativePath": "schema/current-platform-release-v1.schema.json",
       "sha256": "9c3d1898a70379f2f709091341e2d904468fe4bc26be1dd3195714ae9844a663"
+    },
+    {
+      "schemaId": "current-preservation-r64-input-adapter-v1",
+      "relativePath": "schema/current-preservation-r64-input-adapter-v1.schema.json",
+      "sha256": "95c133dc8629db9493581875782e691d3a7bcd8df6867a5fdbf215fa1f4bae5d"
     },
     {
       "schemaId": "current-variant-v1",

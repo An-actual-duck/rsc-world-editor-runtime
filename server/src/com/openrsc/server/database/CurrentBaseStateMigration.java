@@ -33,26 +33,33 @@ import java.util.regex.Pattern;
 
 /** Offline, source-preserving migration into a staged Current Base database. */
 public final class CurrentBaseStateMigration {
-	private static final String ROW_ID = "preservation-retro-to-current-base-v1";
 	private static final String CONTRACT_TYPE = "current-base-state-migration";
 	private static final String CONTRACT_SHA256 =
-		"0b653f5c2da880cc66ce3d8fc9a43fa03c89ba1d87792207c537ef59aca6ec99";
+		"30dadb10af095fa19ff39dd17d97bbf8bd69dc2888b41732ad5095b0841d7be5";
 	private static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 	private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
+	private static final long MAXIMUM_SQLITE_SOURCE_BYTES = 4294967296L;
+	private static final int MAXIMUM_ROWS_PER_TABLE = 1000000;
+	private static final long MAXIMUM_ROW_DIGEST_BYTES_PER_TABLE = 67108864L;
+	private static final long MAXIMUM_SOURCE_CELL_BYTES_PER_TABLE = 4294967296L;
 	private static final Set<String> CONTRACT_KEYS = set(
-		"schemaId", "manifestType", "migrationRowId", "targetStateContractId",
-		"supportedEngines", "transformations", "invocation", "evidenceContract");
+		"schemaId", "manifestType", "migrationRows", "targetStateContractId",
+		"supportedSources", "transformations", "resourceLimits", "invocation",
+		"evidenceContract");
 	private static final Set<String> ENGINE_KEYS = set(
-		"engine", "sourceSchemaId", "sourceSchemaFingerprint",
+		"migrationRowId", "engine", "sourceSchemaId", "sourceSchemaFingerprint",
 		"sourceSchemaFingerprintAlgorithm", "verificationRuntime", "stageMode", "sourceMutation",
-		"rollback", "credentialPolicy");
+		"rollback", "credentialPolicy", "transformationId");
 	private static final Set<String> TRANSFORM_KEYS = set(
-		"tables", "legacyColumnsRetained", "columnMappings", "newColumnDefaults",
+		"profiles", "tables", "legacyColumnsRetained", "columnMappings", "newColumnDefaults",
 		"runtimePatchState");
 	private static final Set<String> INVOCATION_KEYS = set(
 		"toolArtifactRole", "mainClass", "arguments");
 	private static final Set<String> EVIDENCE_KEYS = set(
 		"schemaId", "requiredFields", "sourceStateComparison", "stageStateComparison");
+	private static final Set<String> RESOURCE_LIMIT_KEYS = set(
+		"maximumSqliteSourceBytes", "maximumRowsPerTable",
+		"maximumEncodedRowDigestBytesPerTable", "maximumSourceCellBytesPerTable");
 	private static final Set<String> SQLITE_OPTIONS = set(
 		"contract", "engine", "evidence", "source", "stage", "fail-after-copy");
 	private static final Set<String> MARIA_OPTIONS = set(
@@ -91,17 +98,19 @@ public final class CurrentBaseStateMigration {
 
 	private static void migrateSqlite(Contract contract, Path source, Path stage,
 		Path evidence, boolean injectedFailure) throws Exception {
-		contract.requireEngine("sqlite");
 		if (source.equals(stage)) {
 			throw new IOException("SQLite stage must be a new path distinct from source");
 		}
+		if (Files.size(source) > MAXIMUM_SQLITE_SOURCE_BYTES) throw new IOException(
+			"SQLite source exceeds the reviewed four-GiB migration limit");
+		requireNoSqliteSidecars(source);
 		Files.createDirectories(stage.toAbsolutePath().normalize().getParent());
 		String sourceBytes = sha256(source);
 		boolean stageOwned = false;
 		try (Connection sourceDb = DriverManager.getConnection(
 			"jdbc:sqlite:file:" + source.toAbsolutePath() + "?mode=ro")) {
 			Schema sourceSchema = sqliteSchema(sourceDb);
-			contract.requireFingerprint("sqlite", sourceSchema.fingerprint);
+			SourceRow sourceRow = contract.matchSource("sqlite", sourceSchema.fingerprint);
 			String sourceState = stateHash(sourceDb, sourceSchema, null);
 			Files.createFile(stage);
 			stageOwned = true;
@@ -111,14 +120,14 @@ public final class CurrentBaseStateMigration {
 				"jdbc:sqlite:" + stage.toAbsolutePath())) {
 				staged.setAutoCommit(false);
 				try {
-					applyTransform(staged, "sqlite");
+					applyTransform(staged, "sqlite", sourceRow.transformationId);
 					String projected = stateHash(staged, sourceSchema, null);
 					if (!sourceState.equals(projected)) throw new SQLException(
 						"staged SQLite database did not preserve source durable rows");
 					writeRuntimePatchLedger(staged, "sqlite");
-					writeLedger(staged, contract, sourceSchema.fingerprint, sourceState);
+					writeLedger(staged, contract, sourceRow, sourceSchema.fingerprint, sourceState);
 					staged.commit();
-					writeEvidence(evidence, contract, "sqlite", sourceSchema.fingerprint,
+					writeEvidence(evidence, contract, sourceRow, sourceSchema.fingerprint,
 						sourceState, projected, sourceBytes, sha256(source), stage.toString());
 				} catch (Exception failure) {
 					staged.rollback();
@@ -133,13 +142,12 @@ public final class CurrentBaseStateMigration {
 
 	private static void migrateMaria(Contract contract, MariaTarget target,
 		Path evidence, boolean injectedFailure) throws Exception {
-		contract.requireEngine("mariadb");
 		boolean stageOwned = false;
 		try (Connection connection = target.connect()) {
 			if (schemaExists(connection, target.stageSchema)) throw new SQLException(
 				"MariaDB stage schema already exists");
 			Schema sourceSchema = mariaSchema(connection, target.sourceSchema);
-			contract.requireFingerprint("mariadb", sourceSchema.fingerprint);
+			SourceRow sourceRow = contract.matchSource("mariadb", sourceSchema.fingerprint);
 			String sourceState = stateHash(connection, sourceSchema, target.sourceSchema);
 			try (Statement statement = connection.createStatement()) {
 				statement.executeUpdate("CREATE DATABASE " + quote(target.stageSchema));
@@ -155,38 +163,56 @@ public final class CurrentBaseStateMigration {
 			}
 			if (injectedFailure) throw new SQLException("injected failure after staged copy");
 			connection.setCatalog(target.stageSchema);
-			applyTransform(connection, "mariadb");
+			applyTransform(connection, "mariadb", sourceRow.transformationId);
 			String projected = stateHash(connection, sourceSchema, target.stageSchema);
 			if (!sourceState.equals(projected)) throw new SQLException(
 				"staged MariaDB schema did not preserve source durable rows");
 			writeRuntimePatchLedger(connection, "mariadb");
-			writeLedger(connection, contract, sourceSchema.fingerprint, sourceState);
-			writeEvidence(evidence, contract, "mariadb", sourceSchema.fingerprint,
-				sourceState, projected, sourceState, sourceState, target.stageSchema);
+			writeLedger(connection, contract, sourceRow, sourceSchema.fingerprint, sourceState);
+			Schema sourceAfterSchema = mariaSchema(connection, target.sourceSchema);
+			if (!sourceSchema.fingerprint.equals(sourceAfterSchema.fingerprint)) throw new SQLException(
+				"MariaDB source schema changed during staged migration");
+			String sourceAfter = stateHash(connection, sourceAfterSchema, target.sourceSchema);
+			writeEvidence(evidence, contract, sourceRow, sourceSchema.fingerprint,
+				sourceState, projected, sourceState, sourceAfter, target.stageSchema);
 		} catch (Exception failure) {
 			if (stageOwned) target.dropOwnedStageQuietly();
 			throw failure;
 		}
 	}
 
-	private static void applyTransform(Connection connection, String engine)
+	private static void applyTransform(Connection connection, String engine,
+		String transformationId)
 		throws SQLException {
 		for (String table : Arrays.asList("curstats", "maxstats", "experience",
 			"capped_experience")) {
 			boolean levels = "curstats".equals(table) || "maxstats".equals(table);
 			int defaultValue = levels ? 1 : 0;
-			addColumn(connection, engine, table, "prayer", defaultValue);
-			addColumn(connection, engine, table, "magic", defaultValue);
-			addColumn(connection, engine, table, "woodcut", defaultValue);
-			for (String column : Arrays.asList("fletching", "fishing", "agility",
-				"harvesting", "runecraft", "summoning", "blessing")) {
-				addColumn(connection, engine, table, column, defaultValue);
-			}
-			try (Statement statement = connection.createStatement()) {
-				statement.executeUpdate("UPDATE " + quote(table)
-					+ " SET prayer=CASE WHEN praygood > prayevil THEN praygood ELSE prayevil END,"
-					+ " magic=CASE WHEN goodmagic > evilmagic THEN goodmagic ELSE evilmagic END,"
-					+ " woodcut=woodcutting");
+			if ("retro-split-skills-to-current-v1".equals(transformationId)) {
+				addColumn(connection, engine, table, "prayer", defaultValue);
+				addColumn(connection, engine, table, "magic", defaultValue);
+				addColumn(connection, engine, table, "woodcut", defaultValue);
+				for (String column : Arrays.asList("fletching", "fishing", "agility",
+					"harvesting", "runecraft", "summoning", "blessing")) {
+					addColumn(connection, engine, table, column, defaultValue);
+				}
+				try (Statement statement = connection.createStatement()) {
+					statement.executeUpdate("UPDATE " + quote(table)
+						+ " SET prayer=CASE WHEN praygood > prayevil THEN praygood ELSE prayevil END,"
+						+ " magic=CASE WHEN goodmagic > evilmagic THEN goodmagic ELSE evilmagic END,"
+						+ " woodcut=woodcutting");
+				}
+			} else if ("core-skills-to-current-v1".equals(transformationId)) {
+				if (!"sqlite".equals(engine)) throw new SQLException(
+					"core skill migration is only reviewed for SQLite");
+				addColumnIfMissing(connection, engine, table, "summoning", defaultValue);
+			} else if ("preservation-2023-skills-to-current-v1".equals(transformationId)) {
+				if (!"sqlite".equals(engine)) throw new SQLException(
+					"initialized Preservation migration is only reviewed for SQLite");
+				addColumnIfMissing(connection, engine, table, "summoning", defaultValue);
+				addColumnIfMissing(connection, engine, table, "blessing", defaultValue);
+			} else {
+				throw new SQLException("unreviewed migration transformation: " + transformationId);
 			}
 		}
 		applyCurrentRuntimeSchema(connection, engine);
@@ -196,22 +222,23 @@ public final class CurrentBaseStateMigration {
 		throws SQLException {
 		try (Statement statement = connection.createStatement()) {
 			if ("sqlite".equals(engine)) {
-				statement.executeUpdate("CREATE TABLE equipped (playerID INTEGER NOT NULL, "
+				statement.executeUpdate("CREATE TABLE IF NOT EXISTS equipped (playerID INTEGER NOT NULL, "
 					+ "itemID INTEGER NOT NULL)");
-				statement.executeUpdate("CREATE TABLE former_names (dbid INTEGER NOT NULL "
+				statement.executeUpdate("CREATE TABLE IF NOT EXISTS former_names (dbid INTEGER NOT NULL "
 					+ "PRIMARY KEY, playerId INTEGER NOT NULL, formerName VARCHAR(13) NOT NULL "
 					+ "DEFAULT '0', changeType TINYINT NOT NULL DEFAULT 0, time INTEGER NOT NULL "
 					+ "DEFAULT 0, whoChanged VARCHAR(12) NOT NULL DEFAULT '0', reason VARCHAR(120) "
 					+ "NOT NULL DEFAULT '0')");
-				statement.executeUpdate("ALTER TABLE players ADD COLUMN former_name "
-					+ "VARCHAR(13) NOT NULL DEFAULT ''");
-				statement.executeUpdate("ALTER TABLE friends ADD COLUMN friendFormerName "
-					+ "VARCHAR(13) NOT NULL DEFAULT ''");
-				statement.executeUpdate("ALTER TABLE ignores ADD COLUMN ignoreFormer "
-					+ "BIGINT(19) NOT NULL DEFAULT 0");
-				statement.executeUpdate("CREATE INDEX ignoreFormer ON ignores(ignoreFormer)");
-				statement.executeUpdate("ALTER TABLE logins ADD COLUMN nonce VARCHAR(96)");
-				statement.executeUpdate("CREATE UNIQUE INDEX nonce_index ON logins(nonce)");
+				addColumnIfMissing(connection, engine, "players", "former_name", "VARCHAR(13) NOT NULL DEFAULT ''");
+				addColumnIfMissing(connection, engine, "friends", "friendFormerName", "VARCHAR(13) NOT NULL DEFAULT ''");
+				if (!hasColumn(connection, "ignores", "ignoreFormer")) {
+					statement.executeUpdate("ALTER TABLE ignores ADD COLUMN ignoreFormer BIGINT(19) NOT NULL DEFAULT 0");
+					statement.executeUpdate("CREATE INDEX ignoreFormer ON ignores(ignoreFormer)");
+				}
+				if (!hasColumn(connection, "logins", "nonce")) {
+					statement.executeUpdate("ALTER TABLE logins ADD COLUMN nonce VARCHAR(96)");
+					statement.executeUpdate("CREATE UNIQUE INDEX nonce_index ON logins(nonce)");
+				}
 			} else {
 				statement.executeUpdate("CREATE TABLE equipped (playerID INT UNSIGNED NOT NULL, "
 					+ "itemID INT UNSIGNED NOT NULL) DEFAULT CHARSET=utf8");
@@ -271,8 +298,31 @@ public final class CurrentBaseStateMigration {
 		}
 	}
 
+	private static void addColumnIfMissing(Connection connection, String engine,
+		String table, String column, int defaultValue) throws SQLException {
+		if (!hasColumn(connection, table, column))
+			addColumn(connection, engine, table, column, defaultValue);
+	}
+
+	private static void addColumnIfMissing(Connection connection, String engine,
+		String table, String column, String declaration) throws SQLException {
+		if (hasColumn(connection, table, column)) return;
+		try (Statement statement = connection.createStatement()) {
+			statement.executeUpdate("ALTER TABLE " + quote(table) + " ADD COLUMN "
+				+ quote(column) + " " + declaration);
+		}
+	}
+
+	private static boolean hasColumn(Connection connection, String table, String column)
+		throws SQLException {
+		try (ResultSet result = connection.getMetaData().getColumns(
+			null, null, table, column)) {
+			return result.next();
+		}
+	}
+
 	private static void writeLedger(Connection connection, Contract contract,
-		String sourceSchema, String sourceState) throws SQLException {
+		SourceRow sourceRow, String sourceSchema, String sourceState) throws SQLException {
 		try (Statement statement = connection.createStatement()) {
 			statement.executeUpdate("CREATE TABLE current_base_migrations ("
 				+ "migration_row_id VARCHAR(128) NOT NULL PRIMARY KEY,"
@@ -283,7 +333,7 @@ public final class CurrentBaseStateMigration {
 		}
 		try (PreparedStatement statement = connection.prepareStatement(
 			"INSERT INTO current_base_migrations VALUES (?,?,?,?,?)")) {
-			statement.setString(1, ROW_ID);
+			statement.setString(1, sourceRow.migrationRowId);
 			statement.setString(2, contract.sha256);
 			statement.setString(3, sourceSchema);
 			statement.setString(4, sourceState);
@@ -404,18 +454,43 @@ public final class CurrentBaseStateMigration {
 				: quote(catalog) + "." + quote(table.name);
 			try (Statement statement = connection.createStatement(); ResultSet result =
 				statement.executeQuery("SELECT * FROM " + qualified)) {
-				ResultSetMetaData metadata = result.getMetaData();
 				int count = table.columns.size();
+				ResultSetMetaData metadata = result.getMetaData();
+				int rowCount = 0;
+				long encodedBytes = 0;
+				long sourceCellBytes = 0;
 				while (result.next()) {
-					StringBuilder row = new StringBuilder();
+					if (++rowCount > MAXIMUM_ROWS_PER_TABLE) throw new SQLException(
+						"table exceeds reviewed migration row limit: " + table.name);
+					MessageDigest rowDigest = MessageDigest.getInstance("SHA-256");
 					for (int index = 1; index <= count; index++) {
-						byte[] bytes = result.getBytes(index);
-						row.append(index).append('=');
-						if (bytes == null) row.append("null");
-						else row.append(hex(bytes));
-						row.append(';');
+						update(rowDigest, "cell\0" + index + "\0jdbc-type\0"
+							+ metadata.getColumnType(index) + "\0");
+						InputStream opened = result.getBinaryStream(index);
+						if (opened == null) {
+							if (!result.wasNull()) throw new SQLException(
+								"non-null state cell has no binary representation");
+							update(rowDigest, "null\0");
+						} else try (InputStream input = opened) {
+								MessageDigest cellDigest = MessageDigest.getInstance("SHA-256");
+								long cellLength = 0;
+								byte[] buffer = new byte[65536]; int read;
+								while ((read = input.read(buffer)) >= 0) if (read > 0) {
+									cellDigest.update(buffer, 0, read); cellLength += read;
+									sourceCellBytes += read;
+									if (sourceCellBytes > MAXIMUM_SOURCE_CELL_BYTES_PER_TABLE)
+										throw new SQLException("table exceeds reviewed source cell byte limit: "
+											+ table.name);
+								}
+								update(rowDigest, "value\0" + cellLength + "\0"
+									+ hex(cellDigest.digest()) + "\0");
+						}
 					}
-					rows.add(row.toString());
+					String row = hex(rowDigest.digest());
+					encodedBytes += row.length() + 1L;
+					if (encodedBytes > MAXIMUM_ROW_DIGEST_BYTES_PER_TABLE) throw new SQLException(
+						"table exceeds reviewed migration digest limit: " + table.name);
+					rows.add(row);
 				}
 			}
 			Collections.sort(rows);
@@ -436,14 +511,16 @@ public final class CurrentBaseStateMigration {
 		}
 	}
 
-	private static void writeEvidence(Path path, Contract contract, String engine,
+	private static void writeEvidence(Path path, Contract contract, SourceRow sourceRow,
 		String sourceSchema, String sourceState, String stagedProjection,
 		String sourceBefore, String sourceAfter, String stageLocation) throws Exception {
+		if (!sourceBefore.equals(sourceAfter)) throw new IOException(
+			"source changed while migration evidence was being produced");
 		JSONObject evidence = new JSONObject();
 		evidence.put("schemaId", "current-base-state-migration-evidence-v1");
 		evidence.put("manifestType", "current-base-state-migration-evidence");
-		evidence.put("migrationRowId", ROW_ID);
-		evidence.put("engine", engine);
+		evidence.put("migrationRowId", sourceRow.migrationRowId);
+		evidence.put("engine", sourceRow.engine);
 		evidence.put("contractSha256", contract.sha256);
 		evidence.put("sourceSchemaFingerprint", sourceSchema);
 		evidence.put("sourceStateSha256", sourceState);
@@ -460,6 +537,14 @@ public final class CurrentBaseStateMigration {
 			java.nio.file.StandardOpenOption.WRITE);
 	}
 
+	private static void requireNoSqliteSidecars(Path source) throws IOException {
+		for (String suffix : Arrays.asList("-wal", "-shm", "-journal")) {
+			Path sidecar = Paths.get(source.toString() + suffix);
+			if (Files.exists(sidecar, LinkOption.NOFOLLOW_LINKS)) throw new IOException(
+				"SQLite source has an active journal sidecar; stop it cleanly before migration");
+		}
+	}
+
 	private static final class Contract {
 		private final JSONObject document;
 		private final String sha256;
@@ -474,16 +559,35 @@ public final class CurrentBaseStateMigration {
 			requireKeys(value, CONTRACT_KEYS, "migration contract");
 			if (!"current-base-state-migration-v1".equals(value.getString("schemaId"))
 				|| !CONTRACT_TYPE.equals(value.getString("manifestType"))
-				|| !ROW_ID.equals(value.getString("migrationRowId"))
 				|| !"canonical-public-state-v1".equals(value.getString("targetStateContractId"))) {
 				throw new IOException("migration contract identity is unsupported");
 			}
-			JSONArray engines = value.getJSONArray("supportedEngines");
-			if (engines.length() != 2) throw new IOException("migration engine matrix is incomplete");
-			for (int index = 0; index < engines.length(); index++)
-				requireKeys(engines.getJSONObject(index), ENGINE_KEYS, "engine row");
+			JSONArray rows = value.getJSONArray("supportedSources");
+			JSONArray rowIds = value.getJSONArray("migrationRows");
+			if (rows.length() != 4 || rowIds.length() != 4) throw new IOException(
+				"migration source matrix is incomplete");
+			Set<String> expectedRows = new LinkedHashSet<String>();
+			for (int index = 0; index < rowIds.length(); index++)
+				expectedRows.add(rowIds.getString(index));
+			Set<String> actualRows = new LinkedHashSet<String>();
+			for (int index = 0; index < rows.length(); index++) {
+				JSONObject row = rows.getJSONObject(index);
+				requireKeys(row, ENGINE_KEYS, "source row");
+				actualRows.add(row.getString("migrationRowId"));
+			}
+			if (!expectedRows.equals(actualRows)) throw new IOException(
+				"migrationRows differs from the compiled source rows");
 			requireKeys(value.getJSONObject("transformations"), TRANSFORM_KEYS,
 				"transformations");
+			JSONObject limits = value.getJSONObject("resourceLimits");
+			requireKeys(limits, RESOURCE_LIMIT_KEYS, "resource limits");
+			if (limits.getLong("maximumSqliteSourceBytes") != MAXIMUM_SQLITE_SOURCE_BYTES
+				|| limits.getInt("maximumRowsPerTable") != MAXIMUM_ROWS_PER_TABLE
+				|| limits.getLong("maximumEncodedRowDigestBytesPerTable")
+					!= MAXIMUM_ROW_DIGEST_BYTES_PER_TABLE
+				|| limits.getLong("maximumSourceCellBytesPerTable")
+					!= MAXIMUM_SOURCE_CELL_BYTES_PER_TABLE) throw new IOException(
+				"migration resource limits differ from compiled limits");
 			requireKeys(value.getJSONObject("invocation"), INVOCATION_KEYS, "invocation");
 			if (!"server-runtime".equals(value.getJSONObject("invocation")
 				.getString("toolArtifactRole"))) throw new IOException(
@@ -495,18 +599,25 @@ public final class CurrentBaseStateMigration {
 				"migration contract does not match the compiled reviewed row");
 			return new Contract(value, actualHash);
 		}
-		private JSONObject requireEngine(String engine) throws IOException {
-			JSONArray engines = document.getJSONArray("supportedEngines");
-			for (int index = 0; index < engines.length(); index++) {
-				JSONObject row = engines.getJSONObject(index);
-				if (engine.equals(row.getString("engine"))) return row;
+		private SourceRow matchSource(String engine, String actual) throws IOException {
+			JSONArray rows = document.getJSONArray("supportedSources");
+			for (int index = 0; index < rows.length(); index++) {
+				JSONObject row = rows.getJSONObject(index);
+				String expected = row.getString("sourceSchemaFingerprint");
+				if (engine.equals(row.getString("engine")) && HASH.matcher(expected).matches()
+					&& expected.equals(actual)) return new SourceRow(row);
 			}
-			throw new IOException("migration engine is not contracted: " + engine);
-		}
-		private void requireFingerprint(String engine, String actual) throws IOException {
-			String expected = requireEngine(engine).getString("sourceSchemaFingerprint");
-			if (!HASH.matcher(expected).matches() || !expected.equals(actual)) throw new IOException(
+			throw new IOException(
 				"unsupported or customized " + engine + " source schema: " + actual);
+		}
+	}
+
+	private static final class SourceRow {
+		private final String migrationRowId, engine, transformationId;
+		private SourceRow(JSONObject row) {
+			this.migrationRowId = row.getString("migrationRowId");
+			this.engine = row.getString("engine");
+			this.transformationId = row.getString("transformationId");
 		}
 	}
 

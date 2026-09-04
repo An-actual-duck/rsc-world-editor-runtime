@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-base-installed-execution-evidence-v1",
+  "title": "Current Base installed execution evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "verifierId", "verifierContractSha256", "status", "composition", "source", "execution", "runs", "logs"],
+  "properties": {
+    "schemaId": {"const": "current-base-installed-execution-evidence-v1"},
+    "manifestType": {"const": "current-base-installed-execution-evidence"},
+    "verifierId": {"const": "current-base-installed-execution-v1"},
+    "verifierContractSha256": {"$ref": "#/$defs/hash"}, "status": {"const": "verified"},
+    "composition": {"type": "object", "additionalProperties": false, "required": ["platformReleaseId", "platformManifestHash", "variantId", "variantManifestHash", "moduleSetHash", "bundleInventoryHash", "identitySha256"], "properties": {
+      "platformReleaseId": {"const": "rsc-current-platform-r1"}, "platformManifestHash": {"$ref": "#/$defs/hash"},
+      "variantId": {"const": "current-base-v1"}, "variantManifestHash": {"$ref": "#/$defs/hash"},
+      "moduleSetHash": {"$ref": "#/$defs/hash"}, "bundleInventoryHash": {"$ref": "#/$defs/hash"}, "identitySha256": {"$ref": "#/$defs/hash"}
+    }},
+    "source": {"type": "object", "additionalProperties": false, "required": ["serverTreeBeforeSha256", "serverTreeAfterSha256", "clientTreeBeforeSha256", "clientTreeAfterSha256", "inputSetBeforeSha256", "inputSetAfterSha256", "unchanged"], "properties": {
+      "serverTreeBeforeSha256": {"$ref": "#/$defs/hash"}, "serverTreeAfterSha256": {"$ref": "#/$defs/hash"},
+      "clientTreeBeforeSha256": {"$ref": "#/$defs/hash"}, "clientTreeAfterSha256": {"$ref": "#/$defs/hash"},
+      "inputSetBeforeSha256": {"$ref": "#/$defs/hash"}, "inputSetAfterSha256": {"$ref": "#/$defs/hash"}, "unchanged": {"const": true}
+    }},
+    "execution": {"type": "object", "additionalProperties": false, "required": ["endpoint", "serverPort", "websocketPort", "launchCount", "mapPackageFingerprint", "disposableAccountId", "disposableUsernameSha256", "workingStateSeededSha256", "workingStateFinalSha256", "disposableStateChanged", "persistenceVerified", "credentialDeleted"], "properties": {
+      "endpoint": {"const": "127.0.0.1"}, "serverPort": {"type": "integer", "minimum": 1, "maximum": 65535},
+      "websocketPort": {"type": "integer", "minimum": 1, "maximum": 65535}, "launchCount": {"const": 2},
+      "mapPackageFingerprint": {"$ref": "#/$defs/hash"}, "disposableAccountId": {"type": "integer", "minimum": 1},
+      "disposableUsernameSha256": {"$ref": "#/$defs/hash"}, "workingStateSeededSha256": {"$ref": "#/$defs/hash"},
+      "workingStateFinalSha256": {"$ref": "#/$defs/hash"}, "disposableStateChanged": {"const": true}, "persistenceVerified": {"const": true}, "credentialDeleted": {"const": true}
+    }},
+    "runs": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["run", "handshakeAccepted", "loginAccepted", "canonicalMap", "initialRegion", "worldX", "worldY", "coins", "prayer", "magic", "woodcut", "questStage", "advancedExcluded", "logoutPersisted"], "properties": {
+      "run": {"type": "integer", "minimum": 1, "maximum": 2}, "handshakeAccepted": {"const": true}, "loginAccepted": {"const": true},
+      "canonicalMap": {"const": true}, "initialRegion": {"const": true}, "worldX": {"type": "integer"}, "worldY": {"type": "integer"},
+      "coins": {"type": "integer", "minimum": 1}, "prayer": {"type": "integer", "minimum": 1}, "magic": {"type": "integer", "minimum": 1},
+      "woodcut": {"type": "integer", "minimum": 1}, "questStage": {"type": "integer", "minimum": 1}, "advancedExcluded": {"const": true}, "logoutPersisted": {"const": true}
+    }}},
+    "logs": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "object", "additionalProperties": false, "required": ["run", "role", "sha256", "size", "truncated"], "properties": {
+      "run": {"type": "integer", "minimum": 1, "maximum": 2}, "role": {"enum": ["server", "client"]}, "sha256": {"$ref": "#/$defs/hash"},
+      "size": {"type": "integer", "minimum": 0, "maximum": 1048576}, "truncated": {"type": "boolean"}
+    }}}
+  },
+  "$defs": {"hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

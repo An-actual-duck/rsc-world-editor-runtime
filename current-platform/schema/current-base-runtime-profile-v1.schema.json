@@ -4,7 +4,7 @@
   "title": "RSC World Editor Current Base runtime profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "statePolicy", "serverContent", "stateMigration", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "statePolicy", "serverContent", "stateMigration", "installedExecutionVerifier", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
   "properties": {
     "schemaId": {"const": "current-base-runtime-profile-v1"},
     "manifestType": {"const": "current-base-runtime-profile"},
@@ -49,9 +49,17 @@
     },
     "stateMigration": {
       "type": "object", "additionalProperties": false,
-      "required": ["migrationRowId", "manifestRole", "toolArtifactRole", "mainClass", "supportedEngines"],
+      "required": ["migrationRowIds", "manifestRole", "toolArtifactRole", "mainClass", "supportedEngines"],
       "properties": {
-        "migrationRowId": {"const": "preservation-retro-to-current-base-v1"},
+        "migrationRowIds": {
+          "type": "array", "minItems": 4, "maxItems": 4,
+          "prefixItems": [
+            {"const": "preservation-retro-sqlite-to-current-base-v1"},
+            {"const": "preservation-core-sqlite-to-current-base-v1"},
+            {"const": "preservation-initialized-sqlite-to-current-base-v1"},
+            {"const": "preservation-retro-mariadb-to-current-base-v1"}
+          ], "items": false
+        },
         "manifestRole": {"const": "state-migration-manifest"},
         "toolArtifactRole": {"const": "server-runtime"},
         "mainClass": {"const": "com.openrsc.server.database.CurrentBaseStateMigration"},
@@ -59,6 +67,17 @@
           "type": "array", "minItems": 2, "maxItems": 2,
           "prefixItems": [{"const": "sqlite"}, {"const": "mariadb"}], "items": false
         }
+      }
+    },
+    "installedExecutionVerifier": {
+      "type": "object", "additionalProperties": false,
+      "required": ["verifierId", "manifestRole", "toolArtifactRole", "mainClass", "evidenceSchemaId"],
+      "properties": {
+        "verifierId": {"const": "current-base-installed-execution-v1"},
+        "manifestRole": {"const": "installed-execution-verifier"},
+        "toolArtifactRole": {"const": "server-runtime"},
+        "mainClass": {"const": "com.openrsc.server.database.CurrentBaseInstalledExecutionVerifier"},
+        "evidenceSchemaId": {"const": "current-base-installed-execution-evidence-v1"}
       }
     },
     "requiredRuntimeClasses": {"$ref": "#/$defs/stringArray"},

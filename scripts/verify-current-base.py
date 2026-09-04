@@ -36,6 +36,14 @@ class VerificationError(ValueError):
     pass
 
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def load_composition_tool():
     spec = importlib.util.spec_from_file_location("current_platform_composition", TOOL_PATH)
     if spec is None or spec.loader is None:
@@ -122,6 +130,7 @@ def validate_profile(path: Path) -> dict:
             "statePolicy",
             "serverContent",
             "stateMigration",
+            "installedExecutionVerifier",
             "requiredRuntimeClasses",
             "requiredClientClasses",
             "requiredPluginClasses",
@@ -163,13 +172,26 @@ def validate_profile(path: Path) -> dict:
     }:
         raise VerificationError("Current Base server content binding is incomplete")
     if profile["stateMigration"] != {
-        "migrationRowId": "preservation-retro-to-current-base-v1",
+        "migrationRowIds": [
+            "preservation-retro-sqlite-to-current-base-v1",
+            "preservation-core-sqlite-to-current-base-v1",
+            "preservation-initialized-sqlite-to-current-base-v1",
+            "preservation-retro-mariadb-to-current-base-v1",
+        ],
         "manifestRole": "state-migration-manifest",
         "toolArtifactRole": "server-runtime",
         "mainClass": "com.openrsc.server.database.CurrentBaseStateMigration",
         "supportedEngines": ["sqlite", "mariadb"],
     }:
         raise VerificationError("Current Base state migration binding is incomplete")
+    if profile["installedExecutionVerifier"] != {
+        "verifierId": "current-base-installed-execution-v1",
+        "manifestRole": "installed-execution-verifier",
+        "toolArtifactRole": "server-runtime",
+        "mainClass": "com.openrsc.server.database.CurrentBaseInstalledExecutionVerifier",
+        "evidenceSchemaId": "current-base-installed-execution-evidence-v1",
+    }:
+        raise VerificationError("Current Base installed verifier binding is incomplete")
     exclusions = profile["advancedExclusions"]
     require_exact_keys(
         exclusions,
@@ -317,26 +339,33 @@ def validate_state_migration(path: Path, profile: dict) -> dict:
         raise VerificationError(f"cannot read state migration manifest: {error}") from error
     require_exact_keys(
         migration,
-        {"schemaId", "manifestType", "migrationRowId", "targetStateContractId",
-         "supportedEngines", "transformations", "invocation", "evidenceContract"},
+        {"schemaId", "manifestType", "migrationRows", "targetStateContractId",
+         "supportedSources", "transformations", "resourceLimits", "invocation",
+         "evidenceContract"},
         "state migration manifest",
     )
     binding = profile["stateMigration"]
     if (migration["schemaId"] != "current-base-state-migration-v1"
             or migration["manifestType"] != "current-base-state-migration"
-            or migration["migrationRowId"] != binding["migrationRowId"]
+            or migration["migrationRows"] != binding["migrationRowIds"]
             or migration["targetStateContractId"] != "canonical-public-state-v1"):
         raise VerificationError("state migration manifest has wrong identity")
-    engines = migration["supportedEngines"]
-    if [row.get("engine") for row in engines] != binding["supportedEngines"]:
-        raise VerificationError("state migration engine order differs from profile")
-    for row in engines:
+    sources = migration["supportedSources"]
+    source_engines = []
+    for row in sources:
+        if row.get("engine") not in source_engines:
+            source_engines.append(row.get("engine"))
+    if source_engines != binding["supportedEngines"]:
+        raise VerificationError("state migration engines differ from profile")
+    if [row.get("migrationRowId") for row in sources] != binding["migrationRowIds"]:
+        raise VerificationError("state migration source rows differ from profile")
+    for row in sources:
         require_exact_keys(
             row,
-            {"engine", "sourceSchemaId", "sourceSchemaFingerprint",
+            {"migrationRowId", "engine", "sourceSchemaId", "sourceSchemaFingerprint",
              "sourceSchemaFingerprintAlgorithm", "verificationRuntime",
              "stageMode", "sourceMutation",
-             "rollback", "credentialPolicy"},
+             "rollback", "credentialPolicy", "transformationId"},
             "state migration engine",
         )
         fingerprint = row["sourceSchemaFingerprint"]
@@ -350,6 +379,56 @@ def validate_state_migration(path: Path, profile: dict) -> dict:
             or invocation["mainClass"] != binding["mainClass"]):
         raise VerificationError("state migration invocation differs from profile")
     return migration
+
+
+def validate_installed_verifier(path: Path, profile: dict) -> None:
+    try:
+        verifier = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise VerificationError(f"cannot read installed verifier contract: {error}") from error
+    require_exact_keys(
+        verifier,
+        {"schemaId", "manifestType", "verifierId", "invocation",
+         "executionPolicy", "isolationPolicy", "requiredObservations",
+         "evidenceContract", "exitSemantics"},
+        "installed verifier contract",
+    )
+    binding = profile["installedExecutionVerifier"]
+    if (verifier["schemaId"] != "current-base-installed-execution-v1"
+            or verifier["manifestType"] != "current-base-installed-execution-verifier"
+            or verifier["verifierId"] != binding["verifierId"]):
+        raise VerificationError("installed verifier contract has wrong identity")
+    invocation = verifier["invocation"]
+    if (invocation.get("toolArtifactRole") != binding["toolArtifactRole"]
+            or invocation.get("mainClass") != binding["mainClass"]):
+        raise VerificationError("installed verifier invocation differs from profile")
+    if verifier["evidenceContract"].get("schemaId") != binding["evidenceSchemaId"]:
+        raise VerificationError("installed verifier evidence differs from profile")
+
+
+def validate_input_adapter(path: Path, baseline_path: Path,
+                           converter_path: Path) -> None:
+    adapter = json.loads(path.read_text(encoding="utf-8"))
+    require_exact_keys(
+        adapter,
+        {"schemaId", "manifestType", "inputAdapterId", "inputAdapterContractId",
+         "sourceLineage", "baseline", "targetLayout", "configurationSelectors",
+         "mapConversion", "stateRows", "selectionPolicy"},
+        "input adapter",
+    )
+    if (adapter["schemaId"] != "current-preservation-r64-input-adapter-v1"
+            or adapter["manifestType"] != "current-platform-input-adapter"
+            or adapter["inputAdapterId"] != "preservation-r64-sqlite-v1"):
+        raise VerificationError("input adapter has wrong identity")
+    if file_sha256(baseline_path) != adapter["baseline"]["sha256"]:
+        raise VerificationError("input adapter baseline hash differs")
+    conversion = adapter["mapConversion"]
+    if (conversion.get("toolArtifactRole") != "input-adapter-map-converter"
+            or conversion.get("mainClass") != "com.openrsc.layeredmaps.LayeredMapsCli"
+            or conversion.get("command") != "preservation-package"):
+        raise VerificationError("input adapter map conversion is unsupported")
+    if "com/openrsc/layeredmaps/LayeredMapsCli.class" not in archive_names(converter_path):
+        raise VerificationError("input adapter converter lacks its declared main class")
 
 
 def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
@@ -416,6 +495,14 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
     content_path = inventory_path(supplied, "server-content", payload_root)
     migration_path = inventory_path(
         supplied, "state-migration-manifest", payload_root)
+    installed_verifier_path = inventory_path(
+        supplied, "installed-execution-verifier", payload_root)
+    input_adapter_path = inventory_path(
+        supplied, "input-adapter-manifest", payload_root)
+    input_baseline_path = inventory_path(
+        supplied, "input-adapter-baseline", payload_root)
+    input_converter_path = inventory_path(
+        supplied, "input-adapter-map-converter", payload_root)
     client_content_manifest_path = inventory_path(
         supplied, "client-content-manifest", payload_root)
     client_content_path = inventory_path(supplied, "client-content", payload_root)
@@ -427,6 +514,9 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
         content_manifest_path, content_path,
         profile["advancedExclusions"]["configuration"])
     migration = validate_state_migration(migration_path, profile)
+    validate_installed_verifier(installed_verifier_path, profile)
+    validate_input_adapter(
+        input_adapter_path, input_baseline_path, input_converter_path)
     validate_client_content(client_content_manifest_path, client_content_path)
 
     for required in profile["requiredRuntimeClasses"]:
@@ -487,7 +577,9 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
         "canonicalMapBootstrap": "verified",
         "publicPluginInventory": "verified",
         "publicStatePolicyContract": "verified",
-        "stateMigrationContract": migration["migrationRowId"],
+        "stateMigrationContracts": migration["migrationRows"],
+        "installedExecutionVerifier": "verified",
+        "inputAdapter": "verified",
         "serverContent": "verified",
         "clientContent": "verified",
         "advancedArtifactEffects": "excluded",

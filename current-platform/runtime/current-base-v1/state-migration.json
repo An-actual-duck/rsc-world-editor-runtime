@@ -1,10 +1,16 @@
 {
   "schemaId": "current-base-state-migration-v1",
   "manifestType": "current-base-state-migration",
-  "migrationRowId": "preservation-retro-to-current-base-v1",
+  "migrationRows": [
+    "preservation-retro-sqlite-to-current-base-v1",
+    "preservation-core-sqlite-to-current-base-v1",
+    "preservation-initialized-sqlite-to-current-base-v1",
+    "preservation-retro-mariadb-to-current-base-v1"
+  ],
   "targetStateContractId": "canonical-public-state-v1",
-  "supportedEngines": [
+  "supportedSources": [
     {
+      "migrationRowId": "preservation-retro-sqlite-to-current-base-v1",
       "engine": "sqlite",
       "sourceSchemaId": "openrsc-preservation-retro-sqlite-v1",
       "sourceSchemaFingerprint": "d7d267f1f0a8972a75f9178c89c4541c5bf59ee81b8c294d1d8a2bd8f1c4f142",
@@ -13,9 +19,37 @@
       "stageMode": "new-database-file",
       "sourceMutation": "forbidden-read-only",
       "rollback": "delete-unpromoted-stage",
-      "credentialPolicy": "none"
+      "credentialPolicy": "none",
+      "transformationId": "retro-split-skills-to-current-v1"
     },
     {
+      "migrationRowId": "preservation-core-sqlite-to-current-base-v1",
+      "engine": "sqlite",
+      "sourceSchemaId": "openrsc-preservation-core-sqlite-v1",
+      "sourceSchemaFingerprint": "8a78393ccf296f3e478f283992c0c0e99b46439790c2e1da56c5d8487af33637",
+      "sourceSchemaFingerprintAlgorithm": "sha256-ordered-table-column-default-key-and-explicit-index-v1",
+      "verificationRuntime": "bundled-sqlite-jdbc",
+      "stageMode": "new-database-file",
+      "sourceMutation": "forbidden-read-only",
+      "rollback": "delete-unpromoted-stage",
+      "credentialPolicy": "none",
+      "transformationId": "core-skills-to-current-v1"
+    },
+    {
+      "migrationRowId": "preservation-initialized-sqlite-to-current-base-v1",
+      "engine": "sqlite",
+      "sourceSchemaId": "openrsc-preservation-initialized-sqlite-2023-v1",
+      "sourceSchemaFingerprint": "d33a418d0038db4682b60e634349d01133e78383bb903c87ab69f1c249df19ff",
+      "sourceSchemaFingerprintAlgorithm": "sha256-ordered-table-column-default-key-and-explicit-index-v1",
+      "verificationRuntime": "bundled-sqlite-jdbc",
+      "stageMode": "new-database-file",
+      "sourceMutation": "forbidden-read-only",
+      "rollback": "delete-unpromoted-stage",
+      "credentialPolicy": "none",
+      "transformationId": "preservation-2023-skills-to-current-v1"
+    },
+    {
+      "migrationRowId": "preservation-retro-mariadb-to-current-base-v1",
       "engine": "mariadb",
       "sourceSchemaId": "openrsc-preservation-retro-mariadb-v1",
       "sourceSchemaFingerprint": "99b0d6622ca7f76aac4847c7982b2eecdf489c6a74f14cdd385a618e7d96a10d",
@@ -24,10 +58,12 @@
       "stageMode": "new-loopback-schema",
       "sourceMutation": "forbidden-read-only",
       "rollback": "drop-unpromoted-stage",
-      "credentialPolicy": "environment-name-reference-only"
+      "credentialPolicy": "environment-name-reference-only",
+      "transformationId": "retro-split-skills-to-current-v1"
     }
   ],
   "transformations": {
+    "profiles": ["retro-split-skills-to-current-v1", "core-skills-to-current-v1", "preservation-2023-skills-to-current-v1"],
     "tables": ["curstats", "maxstats", "experience", "capped_experience"],
     "legacyColumnsRetained": true,
     "columnMappings": {
@@ -49,6 +85,12 @@
       "patchLedger": "all-provider-patches-through-2026-08-03",
       "startupPolicy": "no-unreviewed-patch-execution"
     }
+  },
+  "resourceLimits": {
+    "maximumSqliteSourceBytes": 4294967296,
+    "maximumRowsPerTable": 1000000,
+    "maximumEncodedRowDigestBytesPerTable": 67108864,
+    "maximumSourceCellBytesPerTable": 4294967296
   },
   "invocation": {
     "toolArtifactRole": "server-runtime",
