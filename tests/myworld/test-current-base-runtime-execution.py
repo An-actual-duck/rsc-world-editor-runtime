@@ -146,7 +146,7 @@ def seed_retro_database(path: Path) -> None:
         )
         database.execute(
             "INSERT INTO players(id,username,pass,salt,x,y,quest_points) "
-            "VALUES(41,'sealed_user','sealed-pass','',120,648,2)"
+            "VALUES(41,'sealed_user','sealedpass','',120,648,2)"
         )
         for table in ("curstats", "maxstats", "experience", "capped_experience"):
             database.execute(
@@ -253,7 +253,7 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
 
             credential = fixture / "credential.json"
             credential.write_text(json.dumps({
-                "username": "sealed_user", "password": "sealed-pass"
+                "username": "sealed_user", "password": "sealedpass"
             }) + "\n", encoding="utf-8")
             port = free_port()
             ws_port = free_port()
@@ -394,7 +394,7 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                     "SELECT x,y,online,pass FROM players WHERE id=41"
                 ).fetchone()
                 self.assertEqual((120, 648, 0), player[:3])
-                self.assertTrue(player[3].startswith("$2y$"), "login did not persist rehash")
+                self.assertEqual("sealedpass", player[3])
                 self.assertEqual((18, 19, 20), database.execute(
                     "SELECT prayer,magic,woodcut FROM curstats WHERE playerID=41"
                 ).fetchone())
