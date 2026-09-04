@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-composition-identity-v1",
+  "title": "RSC World Editor resolved current composition identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaId",
+    "manifestType",
+    "platformReleaseId",
+    "platformManifestHash",
+    "variantId",
+    "variantManifestHash",
+    "moduleSetHash",
+    "bundleInventoryHash",
+    "moduleSet",
+    "bundleInventory",
+    "bundleSpecId",
+    "bundleSpecHash",
+    "inputAdapterContractId",
+    "installable"
+  ],
+  "properties": {
+    "schemaId": {"const": "current-composition-identity-v1"},
+    "manifestType": {"const": "current-platform-composition-identity"},
+    "platformReleaseId": {"type": "string"},
+    "platformManifestHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "variantId": {"type": "string"},
+    "variantManifestHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "moduleSetHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "bundleInventoryHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "moduleSet": {"type": "array"},
+    "bundleInventory": {"type": "array"},
+    "bundleSpecId": {"type": "string"},
+    "bundleSpecHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "inputAdapterContractId": {"type": "string"},
+    "installable": {"type": "boolean"}
+  }
+}

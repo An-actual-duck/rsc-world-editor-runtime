@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-platform-release-v1",
+  "title": "RSC World Editor current platform release",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaId",
+    "manifestType",
+    "platformReleaseId",
+    "platformGeneration",
+    "platformApiVersion",
+    "extensionApi",
+    "protocol",
+    "schemaContracts",
+    "mapRuntimeCapabilities",
+    "inputAdapterBoundary",
+    "bundleContract",
+    "provenance"
+  ],
+  "properties": {
+    "schemaId": {"const": "current-platform-release-v1"},
+    "manifestType": {"const": "current-platform-release"},
+    "platformReleaseId": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"},
+    "platformGeneration": {"type": "integer", "minimum": 1},
+    "platformApiVersion": {"type": "string"},
+    "extensionApi": {"type": "object"},
+    "protocol": {"type": "object"},
+    "schemaContracts": {"type": "array"},
+    "mapRuntimeCapabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "inputAdapterBoundary": {"type": "object"},
+    "bundleContract": {"type": "object"},
+    "provenance": {"type": "object"}
+  }
+}

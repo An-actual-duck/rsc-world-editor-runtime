@@ -1,0 +1,70 @@
+{
+  "schemaId": "current-platform-synthetic-fixture-v1",
+  "modules": [
+    {
+      "moduleId": "fixture-foundation",
+      "moduleVersion": "1.0.0",
+      "kind": "code-plugin",
+      "requires": [],
+      "conflicts": [],
+      "loadAfter": [],
+      "loadBefore": []
+    },
+    {
+      "moduleId": "fixture-addon",
+      "moduleVersion": "1.0.0",
+      "kind": "declarative-data",
+      "requires": [],
+      "conflicts": [],
+      "loadAfter": [],
+      "loadBefore": ["fixture-feature"]
+    },
+    {
+      "moduleId": "fixture-feature",
+      "moduleVersion": "1.0.0",
+      "kind": "coordinated-server-client",
+      "requires": [
+        {"moduleId": "fixture-foundation", "moduleVersion": "1.0.0"}
+      ],
+      "conflicts": [],
+      "loadAfter": ["fixture-foundation"],
+      "loadBefore": []
+    },
+    {
+      "moduleId": "fixture-conflict",
+      "moduleVersion": "1.0.0",
+      "kind": "declarative-data",
+      "requires": [],
+      "conflicts": ["fixture-feature"],
+      "loadAfter": [],
+      "loadBefore": []
+    },
+    {
+      "moduleId": "fixture-cycle-a",
+      "moduleVersion": "1.0.0",
+      "kind": "declarative-data",
+      "requires": [],
+      "conflicts": [],
+      "loadAfter": ["fixture-cycle-b"],
+      "loadBefore": []
+    },
+    {
+      "moduleId": "fixture-cycle-b",
+      "moduleVersion": "1.0.0",
+      "kind": "declarative-data",
+      "requires": [],
+      "conflicts": [],
+      "loadAfter": ["fixture-cycle-a"],
+      "loadBefore": []
+    },
+    {
+      "moduleId": "fixture-shadow",
+      "moduleVersion": "1.0.0",
+      "kind": "code-plugin",
+      "requires": [],
+      "conflicts": [],
+      "loadAfter": [],
+      "loadBefore": []
+    }
+  ]
+}

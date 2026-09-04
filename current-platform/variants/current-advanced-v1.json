@@ -1,0 +1,45 @@
+{
+  "schemaId": "current-variant-v1",
+  "manifestType": "current-platform-variant",
+  "variantId": "current-advanced-v1",
+  "displayName": "Current Advanced",
+  "platformReleaseId": "rsc-current-platform-r1",
+  "variantRole": "first-party-advanced",
+  "releaseStatus": "foundation-contract-only",
+  "installable": false,
+  "defaultModuleIds": [],
+  "requiredCapabilities": [
+    "canonical-public-gameplay-v1",
+    "canonical-public-state-v1",
+    "canonical-signed-layered-map-v1",
+    "current-typed-configuration-v1",
+    "current-state-migration-v1",
+    "matched-current-client-v1",
+    "advanced-gameplay-catalog-v1",
+    "advanced-client-interfaces-v1",
+    "advanced-asset-catalog-v1",
+    "advanced-database-schema-v1"
+  ],
+  "forbiddenCapabilities": [],
+  "advancedOnlyCapabilities": [
+    "advanced-gameplay-catalog-v1",
+    "advanced-client-interfaces-v1",
+    "advanced-asset-catalog-v1",
+    "advanced-database-schema-v1"
+  ],
+  "inputAdapterRecommendations": [
+    "reviewed-advanced-family-v1",
+    "generic-signed-layered-v1"
+  ],
+  "serverClientPairing": {
+    "required": true,
+    "handshakeId": "current-composition-handshake-v1",
+    "mismatchPolicy": "refuse-startup"
+  },
+  "retirementPath": "move-below-platform-behavior-to-reviewed-current-modules",
+  "provenance": {
+    "repository": "rsc-world-editor-runtime",
+    "authority": "provider-commit",
+    "contentPolicy": "reviewed-first-party-advanced"
+  }
+}

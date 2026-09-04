@@ -1,0 +1,69 @@
+{
+  "schemaId": "current-bundle-spec-v1",
+  "manifestType": "current-platform-bundle-spec",
+  "bundleSpecId": "current-base-foundation-bundle-v1",
+  "platformReleaseId": "rsc-current-platform-r1",
+  "variantId": "current-base-v1",
+  "moduleIds": [],
+  "inputAdapterContractId": "world-builder-input-adapter-v1",
+  "installable": false,
+  "buildPolicy": {
+    "sourceAuthority": "selected-current-composition-source",
+    "rebuildPolicy": "build-and-verify-before-packaging",
+    "receiptAuthority": "never",
+    "targetCorePolicy": "replace-complete-runtime-no-overlay"
+  },
+  "durableStatePolicy": {
+    "location": "outside-code-runtime",
+    "replacementPolicy": "migrate-transactionally",
+    "rollbackPolicy": "restore-exact-predecessor"
+  },
+  "artifacts": [
+    {
+      "sourcePath": "current-platform/platform/current-platform-r1.json",
+      "bundlePath": "contracts/platform/current-platform-r1.json",
+      "role": "platform-manifest",
+      "destination": "managed-runtime/contracts/platform/current-platform-r1.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/variants/current-base-v1.json",
+      "bundlePath": "contracts/variants/current-base-v1.json",
+      "role": "variant-manifest",
+      "destination": "managed-runtime/contracts/variants/current-base-v1.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-composition-identity-v1.schema.json",
+      "bundlePath": "contracts/schema/current-composition-identity-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-composition-identity-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "scripts/current-platform-composition.py",
+      "bundlePath": "tools/current-platform-composition.py",
+      "role": "composition-tool",
+      "destination": "managed-runtime/tools/current-platform-composition.py",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    }
+  ],
+  "requiredExecutableScenarios": [
+    "base-positive-public-gameplay-v1",
+    "base-positive-public-state-v1",
+    "base-advanced-negative-v1",
+    "base-server-client-handshake-v1"
+  ]
+}

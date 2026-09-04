@@ -1,0 +1,11 @@
+{
+  "safe": [
+    "META-INF/MANIFEST.MF",
+    "org/rscworld/modules/fixture_foundation/FoundationModule.class"
+  ],
+  "shadow": [
+    "META-INF/MANIFEST.MF",
+    "org/rscworld/modules/fixture_shadow/ShadowModule.class",
+    "com/openrsc/server/Server.class"
+  ]
+}

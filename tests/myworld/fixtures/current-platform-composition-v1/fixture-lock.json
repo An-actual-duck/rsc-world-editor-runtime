@@ -1,0 +1,40 @@
+{
+  "schemaId": "sealed-fixture-lock-v1",
+  "files": [
+    {
+      "path": "archive-entries.json",
+      "sha256": "ec309880cece417fca83d08aaca5ebec8cc12ab2aad08417ac61a35efa044998",
+      "size": 264
+    },
+    {
+      "path": "payload/fixture-addon.txt",
+      "sha256": "13e6cf0ab0abc21442831542e2c0cc9e40b03477d9701c04335a9793d439af58",
+      "size": 25
+    },
+    {
+      "path": "payload/fixture-conflict.txt",
+      "sha256": "d62a3b74942ad3281a1577e0001f057daa21249d03274681c51bbfcbbbb8452f",
+      "size": 28
+    },
+    {
+      "path": "payload/fixture-cycle-a.txt",
+      "sha256": "ec27ae4a6192fad4d2d8c917d3f999380dad8cb4cfd2c8e950b6f978e6d90ffe",
+      "size": 27
+    },
+    {
+      "path": "payload/fixture-cycle-b.txt",
+      "sha256": "5bdb2cb2acaad4188b9d042c8937999c6abc9714780140ad04f4d925f74b02ee",
+      "size": 27
+    },
+    {
+      "path": "payload/fixture-feature.txt",
+      "sha256": "04acc808cd4c6613496364a44de62786570f4192c9b6e0eefd8eb1e7e6ccba67",
+      "size": 41
+    },
+    {
+      "path": "scenarios.json",
+      "sha256": "49758b60cc6b2e1d0474650a8cd292089b18b06df3ac02dc01d3e06dc2dcaa34",
+      "size": 1690
+    }
+  ]
+}

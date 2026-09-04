@@ -1,0 +1,63 @@
+{
+  "schemaId": "current-platform-release-v1",
+  "manifestType": "current-platform-release",
+  "platformReleaseId": "rsc-current-platform-r1",
+  "platformGeneration": 1,
+  "platformApiVersion": "current-extension-api-v1",
+  "extensionApi": {
+    "apiId": "current-extension-api-v1",
+    "allowedModuleNamespaceRoot": "org.rscworld.modules",
+    "forbiddenClassPrefixes": [
+      "com/openrsc/",
+      "orsc/",
+      "org/apache/",
+      "com/google/"
+    ],
+    "classShadowPolicy": "forbid"
+  },
+  "protocol": {
+    "handshakeId": "current-composition-handshake-v1",
+    "mismatchPolicy": "refuse-startup",
+    "identityFields": [
+      "platformReleaseId",
+      "platformManifestHash",
+      "variantId",
+      "variantManifestHash",
+      "moduleSetHash",
+      "bundleInventoryHash"
+    ]
+  },
+  "schemaContracts": [
+    "current-platform-release-v1",
+    "current-variant-v1",
+    "current-module-v1",
+    "current-bundle-spec-v1",
+    "current-composition-identity-v1"
+  ],
+  "mapRuntimeCapabilities": [
+    "canonical-signed-layered-map-v1",
+    "all-placement-families-v4",
+    "wide-elevation-u16-v2",
+    "transactional-map-activation-v1"
+  ],
+  "inputAdapterBoundary": {
+    "contractId": "world-builder-input-adapter-v1",
+    "installedInRuntime": false,
+    "selectionAuthority": "editor-migration-boundary-only",
+    "unknownCodePolicy": "refuse-before-mutation"
+  },
+  "bundleContract": {
+    "schemaId": "current-bundle-spec-v1",
+    "closedInventoryRequired": true,
+    "artifactHashAlgorithm": "sha256",
+    "sourceAuthority": "selected-current-composition-source",
+    "receiptBuildAuthority": "never",
+    "targetOverlayPolicy": "replace-complete-runtime-no-class-overlay",
+    "activationLayout": "side-by-side-content-addressed"
+  },
+  "provenance": {
+    "repository": "rsc-world-editor-runtime",
+    "authority": "provider-commit",
+    "historicalTargetCodeAllowed": false
+  }
+}

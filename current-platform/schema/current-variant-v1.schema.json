@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-variant-v1",
+  "title": "RSC World Editor current platform variant",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaId",
+    "manifestType",
+    "variantId",
+    "displayName",
+    "platformReleaseId",
+    "variantRole",
+    "releaseStatus",
+    "installable",
+    "defaultModuleIds",
+    "requiredCapabilities",
+    "forbiddenCapabilities",
+    "advancedOnlyCapabilities",
+    "inputAdapterRecommendations",
+    "serverClientPairing",
+    "retirementPath",
+    "provenance"
+  ],
+  "properties": {
+    "schemaId": {"const": "current-variant-v1"},
+    "manifestType": {"const": "current-platform-variant"},
+    "variantId": {"type": "string"},
+    "displayName": {"type": "string"},
+    "platformReleaseId": {"type": "string"},
+    "variantRole": {"enum": ["public-conservative", "first-party-advanced"]},
+    "releaseStatus": {"enum": ["foundation-contract-only", "release-candidate", "released"]},
+    "installable": {"type": "boolean"},
+    "defaultModuleIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "requiredCapabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "forbiddenCapabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "advancedOnlyCapabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "inputAdapterRecommendations": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "serverClientPairing": {"type": "object"},
+    "retirementPath": {"type": ["string", "null"]},
+    "provenance": {"type": "object"}
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-bundle-spec-v1",
+  "title": "RSC World Editor current platform bundle specification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaId",
+    "manifestType",
+    "bundleSpecId",
+    "platformReleaseId",
+    "variantId",
+    "moduleIds",
+    "inputAdapterContractId",
+    "installable",
+    "buildPolicy",
+    "durableStatePolicy",
+    "artifacts",
+    "requiredExecutableScenarios"
+  ],
+  "properties": {
+    "schemaId": {"const": "current-bundle-spec-v1"},
+    "manifestType": {"const": "current-platform-bundle-spec"},
+    "bundleSpecId": {"type": "string"},
+    "platformReleaseId": {"type": "string"},
+    "variantId": {"type": "string"},
+    "moduleIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "inputAdapterContractId": {"type": "string"},
+    "installable": {"type": "boolean"},
+    "buildPolicy": {"type": "object"},
+    "durableStatePolicy": {"type": "object"},
+    "artifacts": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "requiredExecutableScenarios": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  }
+}
