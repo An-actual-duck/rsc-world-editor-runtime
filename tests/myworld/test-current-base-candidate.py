@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import base64
 import json
 from pathlib import Path
 import subprocess
@@ -111,6 +112,139 @@ class CurrentBaseCandidateTest(unittest.TestCase):
             )
         self.assertNotEqual(0, refused.returncode)
         self.assertIn("differs from provider artifacts", refused.stderr)
+
+    def test_runtime_startup_and_prelogin_handshake_enforce_all_six_fields(self) -> None:
+        core = self.output / "server/core.jar"
+        client = self.output / "client/Open_RSC_Client.jar"
+        property_name = "openrsc.currentCompositionIdentityFile"
+        identity_fields = [
+            "platformReleaseId",
+            "platformManifestHash",
+            "variantId",
+            "variantManifestHash",
+            "moduleSetHash",
+            "bundleInventoryHash",
+        ]
+        for archive, entrypoint, label in (
+            (core, "com.openrsc.server.CurrentCompositionIdentity", "server"),
+            (client, "orsc.CurrentCompositionIdentity", "client"),
+        ):
+            accepted = subprocess.run(
+                [
+                    "java", f"-D{property_name}={self.identity_path}", "-cp",
+                    str(archive), entrypoint,
+                ],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, accepted.returncode, accepted.stdout + accepted.stderr)
+            self.assertIn("composition accepted", accepted.stdout)
+            missing = subprocess.run(
+                ["java", "-cp", str(archive), entrypoint],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(2, missing.returncode, label)
+            self.assertIn("startup refused", missing.stderr)
+
+        server_harness = r"""
+import com.openrsc.server.CurrentCompositionIdentity;
+import com.openrsc.server.net.Packet;
+import io.netty.buffer.Unpooled;
+import java.util.Base64;
+public final class CurrentCompositionServerHandshakeHarness {
+  public static void main(String[] args) {
+    CurrentCompositionIdentity.initializeFromSystemProperties();
+    byte[] payload = Base64.getDecoder().decode(args[0]);
+    CurrentCompositionIdentity.current().requireClientHandshake(
+      new Packet(CurrentCompositionIdentity.HANDSHAKE_OPCODE,
+        Unpooled.wrappedBuffer(payload)));
+    System.out.println("server-prelogin-composition-accepted");
+  }
+}
+"""
+        client_harness = r"""
+import orsc.CurrentCompositionIdentity;
+import orsc.buffers.RSBuffer_Bits;
+import java.util.Arrays;
+import java.util.Base64;
+public final class CurrentCompositionClientHandshakeHarness {
+  public static void main(String[] args) {
+    CurrentCompositionIdentity.initializeFromSystemProperties();
+    RSBuffer_Bits payload = new RSBuffer_Bits(512);
+    CurrentCompositionIdentity.current().writeHandshake(payload);
+    System.out.println(Base64.getEncoder().encodeToString(
+      Arrays.copyOf(payload.dataBuffer, payload.packetEnd)));
+  }
+}
+"""
+        with tempfile.TemporaryDirectory(prefix="current-base-runtime-pairing-") as temporary:
+            root = Path(temporary)
+            server_source = root / "CurrentCompositionServerHandshakeHarness.java"
+            server_source.write_text(server_harness, encoding="utf-8")
+            client_source = root / "CurrentCompositionClientHandshakeHarness.java"
+            client_source.write_text(client_harness, encoding="utf-8")
+            subprocess.run(
+                [
+                    "javac", "-source", "8", "-target", "8", "-cp", str(core),
+                    "-d", str(root), str(server_source),
+                ],
+                cwd=self.repo,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                [
+                    "javac", "-source", "8", "-target", "8", "-cp", str(client),
+                    "-d", str(root), str(client_source),
+                ],
+                cwd=self.repo,
+                check=True,
+                capture_output=True,
+            )
+            emitted = subprocess.run(
+                [
+                    "java", f"-D{property_name}={self.identity_path}", "-cp",
+                    f"{client}:{root}", "CurrentCompositionClientHandshakeHarness",
+                ],
+                cwd=self.repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            accepted = subprocess.run(
+                [
+                    "java", f"-D{property_name}={self.identity_path}", "-cp",
+                    f"{core}:{root}", "CurrentCompositionServerHandshakeHarness",
+                    emitted,
+                ],
+                cwd=self.repo,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, accepted.returncode, accepted.stdout + accepted.stderr)
+            self.assertIn("server-prelogin-composition-accepted", accepted.stdout)
+
+            for index, field in enumerate(identity_fields):
+                values = [self.identity[name] for name in identity_fields]
+                values[index] = (
+                    "0" * 64 if field.endswith("Hash") else "mismatched-composition-v1"
+                )
+                wire = "current-composition-handshake-v1\n" + "\n".join(values) + "\n"
+                refused = subprocess.run(
+                    [
+                        "java", f"-D{property_name}={self.identity_path}", "-cp",
+                        f"{core}:{root}", "CurrentCompositionServerHandshakeHarness",
+                        base64.b64encode(wire.encode("ascii")).decode("ascii"),
+                    ],
+                    cwd=self.repo,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertNotEqual(0, refused.returncode, field)
+                self.assertIn("client composition differs at " + field, refused.stderr)
 
     def test_public_plugins_and_canonical_map_bootstraps_are_executable(self) -> None:
         core = self.output / "server/core.jar"
