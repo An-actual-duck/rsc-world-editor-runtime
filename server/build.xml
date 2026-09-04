@@ -3,6 +3,9 @@
     <property name="build" location="build"/>
     <property name="lib" location="lib"/>
     <property name="jar" location="core.jar"/>
+    <property name="plugin.jar" location="plugins.jar"/>
+    <property name="plugin.includes" value="**/*.java"/>
+    <property name="composition.identity.file" location="../output/current-platform-identity-disabled.properties"/>
     <property name="javac.source" value="1.8"/>
     <property name="javac.target" value="1.8"/>
     <property name="javac.lint" value="-Xlint:deprecation"/>
@@ -15,21 +18,22 @@
     </target>
 
     <target name="compile_plugins">
-        <delete file="plugins.jar"/>
+        <delete file="${plugin.jar}"/>
         <delete dir="buildplugins"/>
         <mkdir dir="buildplugins"/>
-        <javac srcdir="plugins" destdir="buildplugins" debug="on" includeantruntime="false" target="${javac.target}"
+        <javac srcdir="plugins" destdir="buildplugins" includes="${plugin.includes}" debug="on" includeantruntime="false" target="${javac.target}"
                source="${javac.source}" encoding="UTF-8">
             <classpath>
-                <pathelement location="core.jar"/>
+                <pathelement location="${jar}"/>
                 <pathelement path="${java.class.path}/"/>
                 <pathelement location="${lib}/log4j-api-2.17.0.jar"/>
                 <pathelement location="${lib}/log4j-core-2.17.0.jar"/>
                 <pathelement location="${lib}/commons-lang-2.6.jar"/>
             </classpath>
+            <compilerarg value="-implicit:none"/>
             <compilerarg line="${javac.lint} -Xmaxwarns ${javac.maxwarns}"/>
         </javac>
-        <jar basedir="buildplugins" destfile="plugins.jar"/>
+        <jar basedir="buildplugins" destfile="${plugin.jar}"/>
         <delete dir="buildplugins"/>
     </target>
 
@@ -38,6 +42,10 @@
         <delete file="${jar}"/>
         <delete dir="${build}"/>
         <mkdir dir="${build}"/>
+        <copy file="${composition.identity.file}"
+              tofile="${build}/META-INF/rsc-current-composition.properties"
+              failonerror="false"
+              quiet="true"/>
         <javac srcdir="${src}" destdir="${build}" debug="on" includeantruntime="false" target="${javac.target}"
                source="${javac.source}" encoding="UTF-8">
             <classpath>

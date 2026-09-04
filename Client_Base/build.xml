@@ -11,6 +11,8 @@
     <property name="jsonlib" location="../server/lib/json-20190722.jar"/>
     <property name="jar" location="Open_RSC_Client.jar"/>
     <property name="release.marker.file" location="../output/release-build-marker-disabled"/>
+    <property name="composition.identity.file" location="../output/current-platform-identity-disabled.properties"/>
+    <property name="current.asset.includes" value="animations/**/*.png,legacy animation folder/**/*.png,remastered-sprites/**/frames/*.png,remastered-sprites/manifest.json,sprites/**/*.png,ui/world-editor/**"/>
     <property name="javac.source" value="1.8"/>
     <property name="javac.target" value="1.8"/>
     <property name="javac.lint" value="-Xlint:unchecked"/>
@@ -39,18 +41,15 @@
               tofile="${build}/spoiled-milk-release-build.marker"
               failonerror="false"
               quiet="true"/>
+        <copy file="${composition.identity.file}"
+              tofile="${build}/META-INF/rsc-current-composition.properties"
+              failonerror="false"
+              quiet="true"/>
         <copy todir="${build}/res">
             <fileset dir="src/res"/>
         </copy>
         <copy todir="${build}/myworld-assets">
-            <fileset dir="../dev/myworld/assets">
-                <include name="animations/**/*.png"/>
-                <include name="legacy animation folder/**/*.png"/>
-                <include name="remastered-sprites/**/frames/*.png"/>
-                <include name="remastered-sprites/manifest.json"/>
-                <include name="sprites/**/*.png"/>
-                <include name="ui/world-editor/**"/>
-            </fileset>
+            <fileset dir="../dev/myworld/assets" includes="${current.asset.includes}"/>
         </copy>
         <javac srcdir="${src}:${pc_client}" destdir="${build}" debug="on" target="${javac.target}" source="${javac.source}"
                includeantruntime="false">

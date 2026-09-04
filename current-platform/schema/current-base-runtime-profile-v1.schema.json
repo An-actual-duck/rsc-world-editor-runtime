@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-base-runtime-profile-v1",
+  "title": "RSC World Editor Current Base runtime profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "statePolicy", "requiredRuntimeClasses", "requiredPluginClasses", "advancedExclusions"],
+  "properties": {
+    "schemaId": {"const": "current-base-runtime-profile-v1"},
+    "manifestType": {"const": "current-base-runtime-profile"},
+    "variantId": {"const": "current-base-v1"},
+    "installabilityBlockers": {"$ref": "#/$defs/stringArray"},
+    "pluginSourceSets": {"$ref": "#/$defs/stringArray"},
+    "clientAssetSets": {"$ref": "#/$defs/stringArray"},
+    "statePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractId", "durableLocation", "migration", "rollback"],
+      "properties": {
+        "contractId": {"const": "canonical-public-state-v1"},
+        "durableLocation": {"const": "outside-code-runtime"},
+        "migration": {"const": "transactional"},
+        "rollback": {"const": "exact-predecessor"}
+      }
+    },
+    "requiredRuntimeClasses": {"$ref": "#/$defs/stringArray"},
+    "requiredPluginClasses": {"$ref": "#/$defs/stringArray"},
+    "advancedExclusions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pluginPrefixes", "clientResourcePrefixes", "configuration"],
+      "properties": {
+        "pluginPrefixes": {"$ref": "#/$defs/stringArray"},
+        "clientResourcePrefixes": {"$ref": "#/$defs/stringArray"},
+        "configuration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["custom_improvements", "custom_landscape", "custom_sprites", "spawn_auction_npcs", "spawn_iron_man_npcs", "want_bank_presets", "want_clans", "want_combat_odyssey", "want_custom_banks", "want_custom_leather", "want_custom_quests", "want_custom_ui", "want_equipment_tab", "want_harvesting", "want_myworld", "want_new_rare_drop_tables", "want_runecraft"],
+          "properties": {
+            "custom_improvements": {"const": false},
+            "custom_landscape": {"const": false},
+            "custom_sprites": {"const": false},
+            "spawn_auction_npcs": {"const": false},
+            "spawn_iron_man_npcs": {"const": false},
+            "want_bank_presets": {"const": false},
+            "want_clans": {"const": false},
+            "want_combat_odyssey": {"const": false},
+            "want_custom_banks": {"const": false},
+            "want_custom_leather": {"const": false},
+            "want_custom_quests": {"const": false},
+            "want_custom_ui": {"const": false},
+            "want_equipment_tab": {"const": false},
+            "want_harvesting": {"const": false},
+            "want_myworld": {"const": false},
+            "want_new_rare_drop_tables": {"const": false},
+            "want_runecraft": {"const": false}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

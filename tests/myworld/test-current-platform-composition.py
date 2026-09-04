@@ -41,10 +41,24 @@ class CurrentPlatformCompositionTest(unittest.TestCase):
         self.payload_root = Path(self.temp.name)
         shutil.copytree(ROOT / "current-platform", self.payload_root / "current-platform")
         (self.payload_root / "scripts").mkdir()
-        shutil.copy2(TOOL_PATH, self.payload_root / "scripts/current-platform-composition.py")
+        for script in (
+            "current-platform-composition.py",
+            "build-current-base.py",
+            "verify-current-base.py",
+        ):
+            shutil.copy2(ROOT / "scripts" / script, self.payload_root / "scripts" / script)
         shutil.copytree(FIXTURE / "payload", self.payload_root / "payload")
         self.catalog_root = self.payload_root / "current-platform"
         (self.catalog_root / "modules").mkdir()
+        for bundle_path in sorted((self.catalog_root / "bundle-specs").glob("*.json")):
+            bundle = json.loads(bundle_path.read_text())
+            for artifact in bundle["artifacts"]:
+                source = self.payload_root / artifact["sourcePath"]
+                if not source.exists():
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    source.write_bytes(
+                        ("sealed synthetic bundle artifact: " + artifact["role"] + "\n").encode()
+                    )
 
     def tearDown(self) -> None:
         self.temp.cleanup()

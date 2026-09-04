@@ -1,0 +1,63 @@
+{
+  "schemaId": "current-base-runtime-profile-v1",
+  "manifestType": "current-base-runtime-profile",
+  "variantId": "current-base-v1",
+  "installabilityBlockers": [
+    "content-neutral-server-config-and-definitions-v1",
+    "transactional-state-migration-row-v1"
+  ],
+  "pluginSourceSets": [
+    "authentic",
+    "shared"
+  ],
+  "clientAssetSets": [
+    "platform-world-editor-ui"
+  ],
+  "statePolicy": {
+    "contractId": "canonical-public-state-v1",
+    "durableLocation": "outside-code-runtime",
+    "migration": "transactional",
+    "rollback": "exact-predecessor"
+  },
+  "requiredRuntimeClasses": [
+    "com/openrsc/server/io/NativeLayeredWorldPackage.class",
+    "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class"
+  ],
+  "requiredPluginClasses": [
+    "com/openrsc/server/plugins/authentic/defaults/Default.class",
+    "com/openrsc/server/plugins/authentic/quests/free/BlackKnightsFortress.class",
+    "com/openrsc/server/plugins/shared/PlayerLogin.class",
+    "com/openrsc/server/plugins/shared/PlayerDeath.class"
+  ],
+  "advancedExclusions": {
+    "pluginPrefixes": [
+      "com/openrsc/server/plugins/custom/",
+      "com/openrsc/server/plugins/retro/"
+    ],
+    "clientResourcePrefixes": [
+      "myworld-assets/animations/",
+      "myworld-assets/legacy animation folder/",
+      "myworld-assets/remastered-sprites/",
+      "myworld-assets/sprites/"
+    ],
+    "configuration": {
+      "custom_improvements": false,
+      "custom_landscape": false,
+      "custom_sprites": false,
+      "spawn_auction_npcs": false,
+      "spawn_iron_man_npcs": false,
+      "want_bank_presets": false,
+      "want_clans": false,
+      "want_combat_odyssey": false,
+      "want_custom_banks": false,
+      "want_custom_leather": false,
+      "want_custom_quests": false,
+      "want_custom_ui": false,
+      "want_equipment_tab": false,
+      "want_harvesting": false,
+      "want_myworld": false,
+      "want_new_rare_drop_tables": false,
+      "want_runecraft": false
+    }
+  }
+}

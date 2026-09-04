@@ -50,6 +50,16 @@
       "provenance": "provider-commit"
     },
     {
+      "sourcePath": "current-platform/schema/current-base-runtime-profile-v1.schema.json",
+      "bundlePath": "contracts/schema/current-base-runtime-profile-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-base-runtime-profile-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
       "sourcePath": "current-platform/schema/current-bundle-spec-v1.schema.json",
       "bundlePath": "contracts/schema/current-bundle-spec-v1.schema.json",
       "role": "contract-schema",

@@ -1,7 +1,7 @@
 {
   "schemaId": "current-bundle-spec-v1",
   "manifestType": "current-platform-bundle-spec",
-  "bundleSpecId": "current-base-foundation-bundle-v1",
+  "bundleSpecId": "current-base-candidate-bundle-v1",
   "platformReleaseId": "rsc-current-platform-r1",
   "variantId": "current-base-v1",
   "moduleIds": [],
@@ -44,6 +44,16 @@
       "bundlePath": "contracts/bundle-specs/current-base-v1.json",
       "role": "bundle-spec",
       "destination": "managed-runtime/contracts/bundle-specs/current-base-v1.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-base-runtime-profile-v1.schema.json",
+      "bundlePath": "contracts/schema/current-base-runtime-profile-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-base-runtime-profile-v1.schema.json",
       "ownership": "provider",
       "replacementPolicy": "content-addressed",
       "rollbackPolicy": "pointer-rollback",
@@ -108,6 +118,86 @@
       "replacementPolicy": "content-addressed",
       "rollbackPolicy": "pointer-rollback",
       "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "scripts/build-current-base.py",
+      "bundlePath": "tools/build-current-base.py",
+      "role": "source-build-tool",
+      "destination": "managed-runtime/tools/build-current-base.py",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "scripts/verify-current-base.py",
+      "bundlePath": "tools/verify-current-base.py",
+      "role": "startup-gate",
+      "destination": "managed-runtime/tools/verify-current-base.py",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/profile.json",
+      "bundlePath": "runtime/profile.json",
+      "role": "runtime-profile",
+      "destination": "managed-runtime/current-base-v1/profile.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "output/current-platform/current-base-v1/server/core.jar",
+      "bundlePath": "runtime/server/core.jar",
+      "role": "server-runtime",
+      "destination": "managed-runtime/current-base-v1/server/core.jar",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-build"
+    },
+    {
+      "sourcePath": "output/current-platform/current-base-v1/server/plugins.jar",
+      "bundlePath": "runtime/server/plugins.jar",
+      "role": "server-plugins",
+      "destination": "managed-runtime/current-base-v1/server/plugins.jar",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-build"
+    },
+    {
+      "sourcePath": "output/current-platform/current-base-v1/client/Open_RSC_Client.jar",
+      "bundlePath": "runtime/client/Open_RSC_Client.jar",
+      "role": "client-runtime",
+      "destination": "managed-runtime/current-base-v1/client/Open_RSC_Client.jar",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-build"
+    },
+    {
+      "sourcePath": "output/current-platform/current-base-v1/runtime/pairing.properties",
+      "bundlePath": "runtime/pairing.properties",
+      "role": "server-client-pairing",
+      "destination": "managed-runtime/current-base-v1/pairing.properties",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-build"
+    },
+    {
+      "sourcePath": "output/current-platform/current-base-v1/runtime/build-provenance.json",
+      "bundlePath": "runtime/build-provenance.json",
+      "role": "build-provenance",
+      "destination": "managed-runtime/current-base-v1/build-provenance.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-build"
     }
   ],
   "requiredExecutableScenarios": [

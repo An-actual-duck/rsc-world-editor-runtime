@@ -29,6 +29,11 @@
   },
   "schemaContracts": [
     {
+      "schemaId": "current-base-runtime-profile-v1",
+      "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
+      "sha256": "4708275838dd244f92cdd88ae35e2905cde72f5a5734090d5a6322bd7404dfa7"
+    },
+    {
       "schemaId": "current-bundle-spec-v1",
       "relativePath": "schema/current-bundle-spec-v1.schema.json",
       "sha256": "8cf8d090244b4b60fbe547ce10879fc5d5705bb59a24f23c1908b22dadc1e950"

@@ -765,6 +765,7 @@ def resolve_composition(
 
 def verify_schema_bindings(catalog: Catalog) -> None:
     schema_ids = {
+        "current-base-runtime-profile-v1": "current-base-runtime-profile-v1.schema.json",
         "current-platform-release-v1": "current-platform-release-v1.schema.json",
         "current-variant-v1": "current-variant-v1.schema.json",
         "current-module-v1": "current-module-v1.schema.json",
@@ -813,6 +814,28 @@ def validate_catalog(catalog: Catalog) -> None:
         raise ContractError("Current Base must explicitly forbid every Advanced-only effect")
     if advanced_only & set(base_value["requiredCapabilities"]):
         raise ContractError("Current Base requires an Advanced-only effect")
+    if base_value["releaseStatus"] in ("release-candidate", "released"):
+        base_spec = catalog.bundle_specs["current-base-v1"][1]
+        required_roles = {
+            "server-runtime", "server-plugins", "client-runtime",
+            "runtime-profile", "server-client-pairing", "build-provenance",
+            "source-build-tool", "startup-gate",
+        }
+        roles = {artifact["role"] for artifact in base_spec["artifacts"]}
+        missing_roles = sorted(required_roles - roles)
+        if missing_roles:
+            raise ContractError(
+                "candidate Current Base lacks artifact roles: "
+                + ", ".join(missing_roles)
+            )
+        required_scenarios = {
+            "base-positive-public-gameplay-v1",
+            "base-positive-public-state-v1",
+            "base-advanced-negative-v1",
+            "base-server-client-handshake-v1",
+        }
+        if not required_scenarios <= set(base_spec["requiredExecutableScenarios"]):
+            raise ContractError("candidate Current Base lacks executable scenarios")
 
 
 def parse_arguments(arguments: list[str]) -> argparse.Namespace:
