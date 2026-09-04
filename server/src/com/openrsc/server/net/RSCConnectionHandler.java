@@ -108,6 +108,9 @@ public class RSCConnectionHandler extends ChannelInboundHandlerAdapter implement
 					try {
 						CurrentCompositionIdentity.current().requireClientHandshake(packet);
 						att.currentCompositionAccepted.set(true);
+						LOGGER.info("Current composition handshake accepted for {} variant={}",
+							channel.remoteAddress(),
+							CurrentCompositionIdentity.current().value("variantId"));
 						channel.writeAndFlush(new PacketBuilder()
 							.writeByte(CurrentCompositionIdentity.HANDSHAKE_ACCEPTED)
 							.toPacket());

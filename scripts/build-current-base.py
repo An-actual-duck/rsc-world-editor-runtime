@@ -24,6 +24,7 @@ VERIFY_TOOL = ROOT / "scripts/verify-current-base.py"
 FIXED_ZIP_TIME = (2000, 1, 1, 0, 0, 0)
 CONTENT_MANIFEST = CATALOG_ROOT / "runtime/current-base-v1/server-content.json"
 CONTENT_CONFIG_ROOT = CATALOG_ROOT / "runtime/current-base-v1/server"
+CLIENT_CONTENT_MANIFEST = CATALOG_ROOT / "runtime/current-base-v1/client-content.json"
 
 
 def load_composition_tool():
@@ -175,6 +176,48 @@ def write_server_content_archive(path: Path) -> None:
                              compresslevel=9)
 
 
+def write_client_content_archive(path: Path) -> None:
+    manifest = json.loads(CLIENT_CONTENT_MANIFEST.read_text(encoding="utf-8"))
+    records: dict[str, bytes] = {}
+    for tree in manifest["sourceTrees"]:
+        source_root = ROOT / tree["sourcePath"]
+        if not source_root.is_dir() or source_root.is_symlink():
+            raise RuntimeError("Current Base client content tree is missing or unsafe")
+        for source in sorted(source_root.rglob("*")):
+            if source.is_dir():
+                continue
+            if not source.is_file() or source.is_symlink():
+                raise RuntimeError(f"unsafe Current Base client content file: {source}")
+            relative = source.relative_to(source_root).as_posix()
+            records[f'{tree["bundlePath"]}/{relative}'] = source.read_bytes()
+    for record in manifest["sourceFiles"]:
+        bundle_path = record["bundlePath"]
+        if bundle_path in records:
+            raise RuntimeError("duplicate Current Base client content path")
+        records[bundle_path] = (ROOT / record["sourcePath"]).read_bytes()
+    folded: set[str] = set()
+    for name in records:
+        if name.startswith("/") or "\\" in name or ".." in Path(name).parts:
+            raise RuntimeError(f"unsafe Current Base client content path: {name}")
+        if name.casefold() in folded:
+            raise RuntimeError(f"case-fold Current Base client content collision: {name}")
+        folded.add(name.casefold())
+        if any(fragment.casefold() in name.casefold()
+               for fragment in manifest["forbiddenPathFragments"]):
+            raise RuntimeError(f"Advanced-only path entered client content: {name}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(
+        path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
+        for name, payload in sorted(records.items()):
+            info = zipfile.ZipInfo(name, FIXED_ZIP_TIME)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, payload, compress_type=zipfile.ZIP_DEFLATED,
+                             compresslevel=9)
+
+
 def source_tree_state(composition) -> tuple[str, bool, str]:
     source_commit = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, text=True,
@@ -286,6 +329,7 @@ def build(output: Path, allow_dirty: bool) -> Path:
         normalize_zip(archive)
 
     write_server_content_archive(server_output / "content.zip")
+    write_client_content_archive(client_output / "content.zip")
 
     shutil.copy2(CATALOG_ROOT / "runtime/current-base-v1/profile.json", runtime_output)
     shutil.copy2(marker, runtime_output / "pairing.properties")

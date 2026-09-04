@@ -29,14 +29,24 @@
   },
   "schemaContracts": [
     {
+      "schemaId": "current-base-client-content-v1",
+      "relativePath": "schema/current-base-client-content-v1.schema.json",
+      "sha256": "88622ebc7430c22d8f598463cadaa4f4825857991de28a67009f3d34d5321362"
+    },
+    {
       "schemaId": "current-base-runtime-profile-v1",
       "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
-      "sha256": "95a84e7d57bddb76002038f04bc476373e59ed73a5b9ceb412ac4315d2dc1c41"
+      "sha256": "60ca2f709c666e71aab1a9cd50ce0c76839889c75663a90c93aabc3cdac04ae9"
     },
     {
       "schemaId": "current-base-server-content-v1",
       "relativePath": "schema/current-base-server-content-v1.schema.json",
       "sha256": "9d4cd12c00a740b710430a3a88b1a27438805de29e28cbd6d7135b61aba510b8"
+    },
+    {
+      "schemaId": "current-base-state-migration-v1",
+      "relativePath": "schema/current-base-state-migration-v1.schema.json",
+      "sha256": "50cf8a58793ae89262e7add094a4578302bb35946f32c75b2f83e9f84b2985fe"
     },
     {
       "schemaId": "current-bundle-spec-v1",

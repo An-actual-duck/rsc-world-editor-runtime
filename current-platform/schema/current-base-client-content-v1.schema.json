@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-base-client-content-v1",
+  "title": "Current Base public client content",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "contentId", "variantId", "sourceTrees", "sourceFiles", "forbiddenPathFragments"],
+  "properties": {
+    "schemaId": {"const": "current-base-client-content-v1"},
+    "manifestType": {"const": "current-base-client-content"},
+    "contentId": {"const": "current-base-public-client-content-v1"},
+    "variantId": {"const": "current-base-v1"},
+    "sourceTrees": {
+      "type": "array", "minItems": 1, "maxItems": 1,
+      "prefixItems": [{
+        "type": "object", "additionalProperties": false,
+        "required": ["sourcePath", "bundlePath"],
+        "properties": {
+          "sourcePath": {"const": "Client_Base/Cache/audio"},
+          "bundlePath": {"const": "Cache/audio"}
+        }
+      }],
+      "items": false
+    },
+    "sourceFiles": {
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "items": {"$ref": "#/$defs/file"}
+    },
+    "forbiddenPathFragments": {
+      "type": "array", "minItems": 4, "maxItems": 4,
+      "prefixItems": [
+        {"const": "Authentic_Landscape.orsc"},
+        {"const": "Custom_Landscape.orsc"},
+        {"const": "Custom_Sprites.osar"},
+        {"const": "myworld-assets"}
+      ],
+      "items": false
+    }
+  },
+  "$defs": {
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourcePath", "bundlePath"],
+      "properties": {
+        "sourcePath": {"type": "string", "minLength": 1},
+        "bundlePath": {"type": "string", "pattern": "^Cache/[A-Za-z0-9._/-]+$"}
+      }
+    }
+  }
+}

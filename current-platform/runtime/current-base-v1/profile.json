@@ -2,10 +2,7 @@
   "schemaId": "current-base-runtime-profile-v1",
   "manifestType": "current-base-runtime-profile",
   "variantId": "current-base-v1",
-  "installabilityBlockers": [
-    "transactional-state-migration-row-v1",
-    "base-gameplay-state-runtime-execution-v1"
-  ],
+  "installabilityBlockers": [],
   "pluginSourceSets": [
     "authentic",
     "shared"
@@ -13,6 +10,11 @@
   "clientAssetSets": [
     "platform-world-editor-ui"
   ],
+  "clientContent": {
+    "contentId": "current-base-public-client-content-v1",
+    "manifestRole": "client-content-manifest",
+    "archiveRole": "client-content"
+  },
   "statePolicy": {
     "contractId": "canonical-public-state-v1",
     "durableLocation": "outside-code-runtime",
@@ -26,9 +28,22 @@
     "configurationEntry": "current-base.conf",
     "definitionsRoot": "conf/server"
   },
+  "stateMigration": {
+    "migrationRowId": "preservation-retro-to-current-base-v1",
+    "manifestRole": "state-migration-manifest",
+    "toolArtifactRole": "server-runtime",
+    "mainClass": "com.openrsc.server.database.CurrentBaseStateMigration",
+    "supportedEngines": ["sqlite", "mariadb"]
+  },
   "requiredRuntimeClasses": [
+    "com/openrsc/server/database/CurrentBaseStateMigration.class",
     "com/openrsc/server/io/NativeLayeredWorldPackage.class",
     "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class"
+  ],
+  "requiredClientClasses": [
+    "orsc/CurrentBaseExecutionProfile.class",
+    "orsc/CurrentCompositionIdentity.class",
+    "orsc/WorldBuilderInstalledClientProfile.class"
   ],
   "requiredPluginClasses": [
     "com/openrsc/server/plugins/authentic/defaults/Default.class",

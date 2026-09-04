@@ -118,9 +118,12 @@ def validate_profile(path: Path) -> dict:
             "installabilityBlockers",
             "pluginSourceSets",
             "clientAssetSets",
+            "clientContent",
             "statePolicy",
             "serverContent",
+            "stateMigration",
             "requiredRuntimeClasses",
+            "requiredClientClasses",
             "requiredPluginClasses",
             "advancedExclusions",
         },
@@ -132,15 +135,18 @@ def validate_profile(path: Path) -> dict:
         raise VerificationError("Current Base profile has wrong manifestType")
     if profile["variantId"] != "current-base-v1":
         raise VerificationError("Current Base profile names another variant")
-    if profile["installabilityBlockers"] != [
-        "transactional-state-migration-row-v1",
-        "base-gameplay-state-runtime-execution-v1",
-    ]:
-        raise VerificationError("Current Base installability blockers are incomplete")
+    if profile["installabilityBlockers"] != []:
+        raise VerificationError("installable Current Base still declares blockers")
     if profile["pluginSourceSets"] != ["authentic", "shared"]:
         raise VerificationError("Current Base plugin source sets are not conservative")
     if profile["clientAssetSets"] != ["platform-world-editor-ui"]:
         raise VerificationError("Current Base client asset set is not conservative")
+    if profile["clientContent"] != {
+        "contentId": "current-base-public-client-content-v1",
+        "manifestRole": "client-content-manifest",
+        "archiveRole": "client-content",
+    }:
+        raise VerificationError("Current Base client content binding is incomplete")
     if profile["statePolicy"] != {
         "contractId": "canonical-public-state-v1",
         "durableLocation": "outside-code-runtime",
@@ -156,6 +162,14 @@ def validate_profile(path: Path) -> dict:
         "definitionsRoot": "conf/server",
     }:
         raise VerificationError("Current Base server content binding is incomplete")
+    if profile["stateMigration"] != {
+        "migrationRowId": "preservation-retro-to-current-base-v1",
+        "manifestRole": "state-migration-manifest",
+        "toolArtifactRole": "server-runtime",
+        "mainClass": "com.openrsc.server.database.CurrentBaseStateMigration",
+        "supportedEngines": ["sqlite", "mariadb"],
+    }:
+        raise VerificationError("Current Base state migration binding is incomplete")
     exclusions = profile["advancedExclusions"]
     require_exact_keys(
         exclusions,
@@ -296,6 +310,87 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
             raise VerificationError(f"Base server content does not disable {key}")
 
 
+def validate_state_migration(path: Path, profile: dict) -> dict:
+    try:
+        migration = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise VerificationError(f"cannot read state migration manifest: {error}") from error
+    require_exact_keys(
+        migration,
+        {"schemaId", "manifestType", "migrationRowId", "targetStateContractId",
+         "supportedEngines", "transformations", "invocation", "evidenceContract"},
+        "state migration manifest",
+    )
+    binding = profile["stateMigration"]
+    if (migration["schemaId"] != "current-base-state-migration-v1"
+            or migration["manifestType"] != "current-base-state-migration"
+            or migration["migrationRowId"] != binding["migrationRowId"]
+            or migration["targetStateContractId"] != "canonical-public-state-v1"):
+        raise VerificationError("state migration manifest has wrong identity")
+    engines = migration["supportedEngines"]
+    if [row.get("engine") for row in engines] != binding["supportedEngines"]:
+        raise VerificationError("state migration engine order differs from profile")
+    for row in engines:
+        require_exact_keys(
+            row,
+            {"engine", "sourceSchemaId", "sourceSchemaFingerprint",
+             "sourceSchemaFingerprintAlgorithm", "verificationRuntime",
+             "stageMode", "sourceMutation",
+             "rollback", "credentialPolicy"},
+            "state migration engine",
+        )
+        fingerprint = row["sourceSchemaFingerprint"]
+        if (not isinstance(fingerprint, str) or len(fingerprint) != 64
+                or any(character not in "0123456789abcdef" for character in fingerprint)):
+            raise VerificationError("state migration schema fingerprint is malformed")
+    invocation = migration["invocation"]
+    require_exact_keys(invocation, {"toolArtifactRole", "mainClass", "arguments"},
+                       "state migration invocation")
+    if (invocation["toolArtifactRole"] != binding["toolArtifactRole"]
+            or invocation["mainClass"] != binding["mainClass"]):
+        raise VerificationError("state migration invocation differs from profile")
+    return migration
+
+
+def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise VerificationError(f"cannot read client content manifest: {error}") from error
+    require_exact_keys(
+        manifest,
+        {"schemaId", "manifestType", "contentId", "variantId", "sourceTrees",
+         "sourceFiles", "forbiddenPathFragments"},
+        "client content manifest",
+    )
+    if (manifest["schemaId"] != "current-base-client-content-v1"
+            or manifest["manifestType"] != "current-base-client-content"
+            or manifest["contentId"] != "current-base-public-client-content-v1"
+            or manifest["variantId"] != "current-base-v1"):
+        raise VerificationError("client content manifest has wrong identity")
+    expected: set[str] = set()
+    for tree in manifest["sourceTrees"]:
+        require_exact_keys(tree, {"sourcePath", "bundlePath"},
+                           "client content source tree")
+        source_root = ROOT / tree["sourcePath"]
+        for source in source_root.rglob("*"):
+            if source.is_file() and not source.is_symlink():
+                expected.add(
+                    tree["bundlePath"] + "/" + source.relative_to(source_root).as_posix()
+                )
+    for record in manifest["sourceFiles"]:
+        require_exact_keys(record, {"sourcePath", "bundlePath"},
+                           "client content source file")
+        expected.add(record["bundlePath"])
+    names = archive_names(archive_path)
+    if names != expected:
+        raise VerificationError("client content archive differs from its closed inventory")
+    for name in names:
+        if any(fragment.casefold() in name.casefold()
+               for fragment in manifest["forbiddenPathFragments"]):
+            raise VerificationError(f"Advanced-only client content is present: {name}")
+
+
 def verify(identity_path: Path, payload_root: Path) -> dict:
     composition = load_composition_tool()
     catalog = composition.Catalog(CATALOG_ROOT)
@@ -307,8 +402,8 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
         raise VerificationError(f"cannot read composition identity: {error}") from error
     if supplied != expected:
         raise VerificationError("composition identity differs from provider artifacts")
-    if supplied["variantId"] != "current-base-v1" or supplied["installable"]:
-        raise VerificationError("composition is not the bounded non-installable Base candidate")
+    if supplied["variantId"] != "current-base-v1" or not supplied["installable"]:
+        raise VerificationError("composition is not the installable Current Base candidate")
 
     server = inventory_path(supplied, "server-runtime", payload_root)
     plugins = inventory_path(supplied, "server-plugins", payload_root)
@@ -319,6 +414,11 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
     content_manifest_path = inventory_path(
         supplied, "server-content-manifest", payload_root)
     content_path = inventory_path(supplied, "server-content", payload_root)
+    migration_path = inventory_path(
+        supplied, "state-migration-manifest", payload_root)
+    client_content_manifest_path = inventory_path(
+        supplied, "client-content-manifest", payload_root)
+    client_content_path = inventory_path(supplied, "client-content", payload_root)
     server_names = archive_names(server)
     plugin_names = archive_names(plugins)
     client_names = archive_names(client)
@@ -326,10 +426,15 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
     validate_server_content(
         content_manifest_path, content_path,
         profile["advancedExclusions"]["configuration"])
+    migration = validate_state_migration(migration_path, profile)
+    validate_client_content(client_content_manifest_path, client_content_path)
 
     for required in profile["requiredRuntimeClasses"]:
         if required not in server_names:
             raise VerificationError(f"server lacks canonical runtime class {required}")
+    for required in profile["requiredClientClasses"]:
+        if required not in client_names:
+            raise VerificationError(f"client lacks required runtime class {required}")
     for required in profile["requiredPluginClasses"]:
         if required not in plugin_names:
             raise VerificationError(f"Base lacks declared public plugin {required}")
@@ -382,7 +487,9 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
         "canonicalMapBootstrap": "verified",
         "publicPluginInventory": "verified",
         "publicStatePolicyContract": "verified",
+        "stateMigrationContract": migration["migrationRowId"],
         "serverContent": "verified",
+        "clientContent": "verified",
         "advancedArtifactEffects": "excluded",
     }
 

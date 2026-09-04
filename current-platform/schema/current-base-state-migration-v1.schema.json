@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-base-state-migration-v1",
+  "title": "Current Base Preservation state migration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "migrationRowId", "targetStateContractId", "supportedEngines", "transformations", "invocation", "evidenceContract"],
+  "properties": {
+    "schemaId": {"const": "current-base-state-migration-v1"},
+    "manifestType": {"const": "current-base-state-migration"},
+    "migrationRowId": {"const": "preservation-retro-to-current-base-v1"},
+    "targetStateContractId": {"const": "canonical-public-state-v1"},
+    "supportedEngines": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "prefixItems": [
+        {"$ref": "#/$defs/sqliteEngine"},
+        {"$ref": "#/$defs/mariaEngine"}
+      ],
+      "items": false
+    },
+    "transformations": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tables", "legacyColumnsRetained", "columnMappings", "newColumnDefaults", "runtimePatchState"],
+      "properties": {
+        "tables": {"type": "array", "minItems": 4, "maxItems": 4, "prefixItems": [{"const": "curstats"}, {"const": "maxstats"}, {"const": "experience"}, {"const": "capped_experience"}], "items": false},
+        "legacyColumnsRetained": {"const": true},
+        "columnMappings": {
+          "type": "object", "additionalProperties": false,
+          "required": ["prayer", "magic", "woodcut"],
+          "properties": {"prayer": {"const": "max-praygood-prayevil"}, "magic": {"const": "max-goodmagic-evilmagic"}, "woodcut": {"const": "woodcutting"}}
+        },
+        "newColumnDefaults": {
+          "type": "object", "additionalProperties": false,
+          "required": ["fletching", "fishing", "agility", "harvesting", "runecraft", "summoning", "blessing"],
+          "properties": {
+            "fletching": {"const": "level-one-experience-zero"}, "fishing": {"const": "level-one-experience-zero"},
+            "agility": {"const": "level-one-experience-zero"}, "harvesting": {"const": "level-one-experience-zero"},
+            "runecraft": {"const": "level-one-experience-zero"}, "summoning": {"const": "level-one-experience-zero"},
+            "blessing": {"const": "level-one-experience-zero"}
+          }
+        },
+        "runtimePatchState": {
+          "type": "object", "additionalProperties": false,
+          "required": ["schemaEvolution", "patchLedger", "startupPolicy"],
+          "properties": {
+            "schemaEvolution": {"const": "current-base-required-tables-and-login-v1"},
+            "patchLedger": {"const": "all-provider-patches-through-2026-08-03"},
+            "startupPolicy": {"const": "no-unreviewed-patch-execution"}
+          }
+        }
+      }
+    },
+    "invocation": {
+      "type": "object", "additionalProperties": false, "required": ["toolArtifactRole", "mainClass", "arguments"],
+      "properties": {
+        "toolArtifactRole": {"const": "server-runtime"},
+        "mainClass": {"const": "com.openrsc.server.database.CurrentBaseStateMigration"},
+        "arguments": {
+          "type": "object", "additionalProperties": false, "required": ["common", "sqlite", "mariadb"],
+          "properties": {
+            "common": {"$ref": "#/$defs/stringArray"}, "sqlite": {"$ref": "#/$defs/stringArray"}, "mariadb": {"$ref": "#/$defs/stringArray"}
+          }
+        }
+      }
+    },
+    "evidenceContract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaId", "requiredFields", "sourceStateComparison", "stageStateComparison"],
+      "properties": {
+        "schemaId": {"const": "current-base-state-migration-evidence-v1"},
+        "requiredFields": {"$ref": "#/$defs/stringArray"},
+        "sourceStateComparison": {"const": "byte-exact-sqlite-or-row-exact-mariadb"},
+        "stageStateComparison": {"const": "all-source-columns-all-rows-order-independent"}
+      }
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "stringArray": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "sqliteEngine": {
+      "type": "object", "additionalProperties": false,
+      "required": ["engine", "sourceSchemaId", "sourceSchemaFingerprint", "sourceSchemaFingerprintAlgorithm", "verificationRuntime", "stageMode", "sourceMutation", "rollback", "credentialPolicy"],
+      "properties": {
+        "engine": {"const": "sqlite"}, "sourceSchemaId": {"const": "openrsc-preservation-retro-sqlite-v1"},
+        "sourceSchemaFingerprint": {"$ref": "#/$defs/hash"},
+        "sourceSchemaFingerprintAlgorithm": {"const": "sha256-ordered-table-column-default-key-and-explicit-index-v1"},
+        "verificationRuntime": {"const": "bundled-sqlite-jdbc"},
+        "stageMode": {"const": "new-database-file"},
+        "sourceMutation": {"const": "forbidden-read-only"}, "rollback": {"const": "delete-unpromoted-stage"}, "credentialPolicy": {"const": "none"}
+      }
+    },
+    "mariaEngine": {
+      "type": "object", "additionalProperties": false,
+      "required": ["engine", "sourceSchemaId", "sourceSchemaFingerprint", "sourceSchemaFingerprintAlgorithm", "verificationRuntime", "stageMode", "sourceMutation", "rollback", "credentialPolicy"],
+      "properties": {
+        "engine": {"const": "mariadb"}, "sourceSchemaId": {"const": "openrsc-preservation-retro-mariadb-v1"},
+        "sourceSchemaFingerprint": {"$ref": "#/$defs/hash"},
+        "sourceSchemaFingerprintAlgorithm": {"const": "sha256-ordered-table-column-default-key-extra-charset-collation-and-index-v1"},
+        "verificationRuntime": {"const": "mariadb@sha256:611a2fcc5fa7c6ceb8644c6f74b25ede004ff6c3a6b38c8f8c23d3bbf6c26430"},
+        "stageMode": {"const": "new-loopback-schema"},
+        "sourceMutation": {"const": "forbidden-read-only"}, "rollback": {"const": "drop-unpromoted-stage"},
+        "credentialPolicy": {"const": "environment-name-reference-only"}
+      }
+    }
+  }
+}

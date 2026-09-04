@@ -55,24 +55,25 @@ class CurrentBaseCandidateTest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls.checkout.cleanup()
 
-    def test_candidate_is_buildable_but_not_claimed_installable_or_released(self) -> None:
+    def test_candidate_is_installable_but_not_claimed_released(self) -> None:
         base = json.loads(
             (self.repo / "current-platform/variants/current-base-v1.json").read_text()
         )
         advanced = json.loads(
             (self.repo / "current-platform/variants/current-advanced-v1.json").read_text()
         )
-        self.assertEqual("artifact-candidate", base["releaseStatus"])
-        self.assertFalse(base["installable"])
+        self.assertEqual("release-candidate", base["releaseStatus"])
+        self.assertTrue(base["installable"])
         self.assertNotEqual("released", base["releaseStatus"])
         self.assertFalse(advanced["installable"])
         self.assertEqual("foundation-contract-only", advanced["releaseStatus"])
-        self.assertEqual(
-            [
-                "transactional-state-migration-row-v1",
-                "base-gameplay-state-runtime-execution-v1",
-            ],
-            self.profile["installabilityBlockers"],
+        self.assertEqual([], self.profile["installabilityBlockers"])
+        bundle = json.loads((
+            self.repo / "current-platform/bundle-specs/current-base-v1.json"
+        ).read_text())
+        self.assertIn(
+            "base-gameplay-state-runtime-execution-v1",
+            bundle["requiredExecutableScenarios"],
         )
 
     def test_candidate_verifier_binds_exact_six_field_artifact_pairing(self) -> None:

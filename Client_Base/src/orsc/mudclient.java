@@ -912,6 +912,7 @@ public final class mudclient implements Runnable {
 	private boolean regionLoadNeedsHardPlayerReset = false;
 	private boolean hasCompletedInitialRegionLoad = false;
 	private boolean adaptiveWorldBuilderReadinessLogged = false;
+	private boolean currentBaseExecutionEvidenceLogged = false;
 	private int automatedBuilderPlacementProbeStage = 0;
 	private long automatedBuilderPlacementProbeDeadline = 0L;
 	private int automatedBuilderWideElevationProbeStage = 0;
@@ -28082,6 +28083,7 @@ public final class mudclient implements Runnable {
 				repositionCustomUI();
 			}
 			startWorldBuilderSession();
+			startCurrentBaseExecutionSession();
 		} catch (RuntimeException var9) {
 			throw GenUtil.makeThrowable(var9, "client.KC(" + var1 + ')');
 		}
@@ -28109,6 +28111,56 @@ public final class mudclient implements Runnable {
 		} else if (profile.isAdaptive()) {
 			this.sendCommandString("builderbind " + profile.runtimeBindingToken());
 		}
+	}
+
+	private void startCurrentBaseExecutionSession() {
+		CurrentBaseExecutionProfile profile = CurrentBaseExecutionProfile.current();
+		if (isAndroid() || !profile.isEnabled() || this.errorLoadingData) return;
+		this.currentBaseExecutionEvidenceLogged = false;
+		profile.applyConnection();
+		this.autoLoginTimeout = 3;
+		this.login(-12, profile.password(), profile.username(), false);
+		if (this.currentViewMode != GameMode.GAME) {
+			this.autoLoginTimeout = 0;
+			this.password = "";
+			this.setUsername(profile.username());
+			this.showLoginScreenStatus("Current Base evidence login failed.",
+				"Check the disposable runtime logs.");
+		}
+	}
+
+	private void runCurrentBaseExecutionEvidence() {
+		if (this.currentBaseExecutionEvidenceLogged
+			|| !CurrentBaseExecutionProfile.current().isEnabled()
+			|| this.currentViewMode != GameMode.GAME
+			|| !this.hasCompletedInitialRegionLoad || this.loadingArea
+			|| this.world == null || !this.world.hasNativeLayeredTerrain()
+			|| this.localPlayer == null || this.playerStatCurrent == null
+			|| this.playerStatCurrent.length <= 8) return;
+		boolean advanced = Config.S_SPAWN_AUCTION_NPCS
+			|| Config.S_SPAWN_IRON_MAN_NPCS || Config.S_WANT_BANK_PRESETS
+			|| Config.S_WANT_CLANS || Config.S_WANT_CUSTOM_BANKS
+			|| Config.S_WANT_CUSTOM_UI || Config.S_WANT_EQUIPMENT_TAB
+			|| Config.S_WANT_HARVESTING || Config.S_WANT_RUNECRAFT
+			|| Config.S_WANT_CUSTOM_LANDSCAPE || Config.S_WANT_CUSTOM_SPRITES;
+		if (advanced) throw new IllegalStateException(
+			"Current Base execution received Advanced-only configuration");
+		this.currentBaseExecutionEvidenceLogged = true;
+		String evidence = "CURRENT_BASE_RUNTIME_EXECUTION"
+			+ " variant=" + CurrentCompositionIdentity.current().value("variantId")
+			+ " canonicalMap=true initialRegion=true"
+			+ " worldX=" + getDebugPlayerWorldTileX()
+			+ " worldY=" + getDebugPlayerWorldTileZ()
+			+ " coins=" + this.getInventoryCount(10)
+			+ " prayer=" + this.playerStatCurrent[5]
+			+ " magic=" + this.playerStatCurrent[6]
+			+ " woodcut=" + this.playerStatCurrent[8]
+			+ " quest1=" + this.questStages[1]
+			+ " clientAdvanced=false";
+		System.out.println(evidence);
+		ClientRuntimeLogger.log(evidence);
+		this.closeConnection(true);
+		System.exit(0);
 	}
 
 	private void tradeOffer(int count, int slot) {
@@ -28274,6 +28326,7 @@ public final class mudclient implements Runnable {
 							if (this.currentViewMode == GameMode.GAME) {
 								++this.lastMouseAction;
 								this.handleGameInput();
+								runCurrentBaseExecutionEvidence();
 							}
 
 							this.lastMouseButtonDown = 0;

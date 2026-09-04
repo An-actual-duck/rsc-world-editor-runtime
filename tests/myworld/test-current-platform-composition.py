@@ -173,7 +173,7 @@ class CurrentPlatformCompositionTest(unittest.TestCase):
         self.assertEqual(base["platformManifestHash"], advanced["platformManifestHash"])
         self.assertNotEqual(base["variantId"], advanced["variantId"])
         self.assertNotEqual(base["variantManifestHash"], advanced["variantManifestHash"])
-        self.assertFalse(base["installable"])
+        self.assertTrue(base["installable"])
         self.assertFalse(advanced["installable"])
 
     def test_schema_files_are_deeply_closed_contracts(self) -> None:

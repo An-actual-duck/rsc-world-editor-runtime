@@ -1,0 +1,25 @@
+{
+  "schemaId": "current-base-client-content-v1",
+  "manifestType": "current-base-client-content",
+  "contentId": "current-base-public-client-content-v1",
+  "variantId": "current-base-v1",
+  "sourceTrees": [
+    {
+      "sourcePath": "Client_Base/Cache/audio",
+      "bundlePath": "Cache/audio"
+    }
+  ],
+  "sourceFiles": [
+    {"sourcePath": "Client_Base/Cache/config.txt", "bundlePath": "Cache/config.txt"},
+    {"sourcePath": "Client_Base/Cache/video/Authentic_Sprites.orsc", "bundlePath": "Cache/video/Authentic_Sprites.orsc"},
+    {"sourcePath": "Client_Base/Cache/video/library.orsc", "bundlePath": "Cache/video/library.orsc"},
+    {"sourcePath": "Client_Base/Cache/video/models.orsc", "bundlePath": "Cache/video/models.orsc"},
+    {"sourcePath": "Client_Base/Cache/video/spritepacks/Menus.osar", "bundlePath": "Cache/video/spritepacks/Menus.osar"}
+  ],
+  "forbiddenPathFragments": [
+    "Authentic_Landscape.orsc",
+    "Custom_Landscape.orsc",
+    "Custom_Sprites.osar",
+    "myworld-assets"
+  ]
+}

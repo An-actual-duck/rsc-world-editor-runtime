@@ -4,23 +4,27 @@
   "title": "RSC World Editor Current Base runtime profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "statePolicy", "serverContent", "requiredRuntimeClasses", "requiredPluginClasses", "advancedExclusions"],
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "statePolicy", "serverContent", "stateMigration", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
   "properties": {
     "schemaId": {"const": "current-base-runtime-profile-v1"},
     "manifestType": {"const": "current-base-runtime-profile"},
     "variantId": {"const": "current-base-v1"},
     "installabilityBlockers": {
       "type": "array",
-      "minItems": 2,
-      "maxItems": 2,
-      "prefixItems": [
-        {"const": "transactional-state-migration-row-v1"},
-        {"const": "base-gameplay-state-runtime-execution-v1"}
-      ],
+      "maxItems": 0,
       "items": false
     },
     "pluginSourceSets": {"$ref": "#/$defs/stringArray"},
     "clientAssetSets": {"$ref": "#/$defs/stringArray"},
+    "clientContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contentId", "manifestRole", "archiveRole"],
+      "properties": {
+        "contentId": {"const": "current-base-public-client-content-v1"},
+        "manifestRole": {"const": "client-content-manifest"},
+        "archiveRole": {"const": "client-content"}
+      }
+    },
     "statePolicy": {
       "type": "object",
       "additionalProperties": false,
@@ -43,7 +47,22 @@
         "definitionsRoot": {"const": "conf/server"}
       }
     },
+    "stateMigration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["migrationRowId", "manifestRole", "toolArtifactRole", "mainClass", "supportedEngines"],
+      "properties": {
+        "migrationRowId": {"const": "preservation-retro-to-current-base-v1"},
+        "manifestRole": {"const": "state-migration-manifest"},
+        "toolArtifactRole": {"const": "server-runtime"},
+        "mainClass": {"const": "com.openrsc.server.database.CurrentBaseStateMigration"},
+        "supportedEngines": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "prefixItems": [{"const": "sqlite"}, {"const": "mariadb"}], "items": false
+        }
+      }
+    },
     "requiredRuntimeClasses": {"$ref": "#/$defs/stringArray"},
+    "requiredClientClasses": {"$ref": "#/$defs/stringArray"},
     "requiredPluginClasses": {"$ref": "#/$defs/stringArray"},
     "advancedExclusions": {
       "type": "object",

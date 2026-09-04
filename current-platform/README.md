@@ -3,13 +3,15 @@
 This directory is the provider-owned foundation for one current managed runtime
 generation. `Current Base` is the conservative public destination and `Current
 Advanced` is a bounded first-party composition on the same platform release.
-Current Base is a buildable, non-installable `artifact-candidate`: its closed bundle is built
+Current Base is an installable `release-candidate`: its closed bundle is built
 from this provider's server/client sources, uses only authentic/shared plugins,
 includes a provider-owned conservative configuration and definition catalog,
 and excludes the Advanced asset catalog. Current Advanced remains
 `foundation-contract-only` and non-installable until its separate evidence is
-complete. Base remains non-installable until its transactional state-migration
-row and full gameplay/state runtime execution are proved. Neither status means
+complete. Base is verified by the closed compiled
+`preservation-retro-to-current-base-v1` SQLite/MariaDB migration row and the
+built server/client loopback execution scenario through login, canonical map
+load, durable gameplay state, logout, and restart. Neither status means
 released.
 
 Validate the catalog:
@@ -34,11 +36,23 @@ closed artifact inventory, and invokes the source-tree candidate verifier. The
 verifier checks the shared pairing marker, complete six-field artifact identity,
 canonical map bootstrap classes, public plugin inventory/state policy contract,
 the conservative server-content inventory, and Advanced-only
-plugin/resource/configuration exclusion. It is still a source-tree candidate
+plugin/resource/configuration exclusion. The migration manifest binds the
+compiled main class in the `server-runtime` artifact (there is deliberately no
+unreviewed free-standing migration executable), its two exact source-schema
+fingerprints, closed invocation, and evidence contract. It is still a source-tree candidate
 verifier rather than an installed-runtime launch tool. The built server and
 client themselves parse the exact composition identity and enforce its six
 fields before configuration transfer and again on every login connection;
 mismatches are refused before login state is accepted.
+
+The full runtime suite's Current Base execution gates require a working local
+Docker daemon with the already-pinned image
+`mariadb@sha256:611a2fcc5fa7c6ceb8644c6f74b25ede004ff6c3a6b38c8f8c23d3bbf6c26430`
+available, and a usable desktop X display named by `DISPLAY`. The MariaDB gate
+publishes only an ephemeral port on literal `127.0.0.1`; the desktop gate runs
+the built client against a disposable loopback server and temporary state.
+Neither gate downloads an image, uses external credentials, or touches an
+installed target.
 
 Resolve and hash the built candidate inventory:
 
