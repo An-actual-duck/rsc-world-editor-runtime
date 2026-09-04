@@ -405,7 +405,8 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                     "SELECT id,stage FROM quests WHERE playerID=41"
                 ).fetchone())
                 self.assertEqual(("sealed_counter", "73"), database.execute(
-                    "SELECT key,value FROM player_cache WHERE playerID=41"
+                    "SELECT key,value FROM player_cache WHERE playerID=41 AND key=?",
+                    ("sealed_counter",),
                 ).fetchone())
                 self.assertEqual(
                     "preservation-retro-to-current-base-v1",
