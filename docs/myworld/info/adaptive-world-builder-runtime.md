@@ -523,6 +523,16 @@ target fingerprint responsibility because no target path enters this process.
 
 ## Preservation and integration boundary
 
+The installed host capability is package-driven. Its v3 receipt names concrete
+server/client class markers for legacy terrain, unsigned-16 terrain (including
+visual and structural scene updates), and placement schemas v3/v4. Downstream
+Import verifies only the capabilities required by the selected package, while
+runtime upgrade installs the exact prebuilt host core and client. The upgrade
+also guards the target Ant `compile_core` target while the v3 receipt is
+installed, retires superseded v1/v2 receipts, and may align only a known old
+login decoder source. Missing, newer, or customized decoder source is preserved;
+the verified prebuilt artifact remains runtime-authoritative.
+
 `preservation-r64-replacement`, `spoiled-milk-replacement`,
 `spoiled-milk-builder-draft`, and `spoiled-milk-world-builder-export` retain
 their previous identities, exact content/count checks, and behavior. Adaptive

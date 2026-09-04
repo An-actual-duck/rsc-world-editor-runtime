@@ -160,6 +160,52 @@ public final class UnsignedElevationProbe {
         )
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_server_wide_full_visual_structural_and_cache_paths(self):
+        source = r'''
+import com.openrsc.server.GameStateUpdater;
+import com.openrsc.server.io.NativeLayeredTerrainSector;
+import com.openrsc.server.net.rsc.NativeLayeredTerrainWireCache;
+import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicInteger;
+public final class WideDerivedWireProbe {
+ static void ok(boolean value,String message){if(!value)throw new AssertionError(message);}
+ static byte[] invoke(String name,byte[] value)throws Exception{
+  Method method=GameStateUpdater.class.getDeclaredMethod(name,byte[].class);
+  method.setAccessible(true);
+  return (byte[])method.invoke(null,(Object)value);
+ }
+ public static void main(String[] args)throws Exception{
+  byte[] full=new byte[NativeLayeredTerrainSector.TILE_COUNT*11];
+  for(int offset=0;offset<full.length;offset+=11){
+   full[offset]=1;full[offset+1]=44;full[offset+2]=10;full[offset+3]=11;
+   full[offset+4]=12;full[offset+5]=13;full[offset+6]=14;
+   full[offset+7]=16;full[offset+8]=32;full[offset+9]=48;full[offset+10]=64;
+  }
+  byte[] visual=invoke("visualTerrainWireBytes",full);
+  byte[] structural=invoke("structuralTerrainWireBytes",full);
+  ok(visual.length==NativeLayeredTerrainSector.TILE_COUNT*4,"wide visual width");
+  ok(structural.length==NativeLayeredTerrainSector.TILE_COUNT*7,"structural width");
+  ok((visual[0]&255)==1&&(visual[1]&255)==44&&(visual[2]&255)==10
+   &&(visual[3]&255)==11,"wide visual fields");
+  ok((structural[0]&255)==12&&(structural[1]&255)==13
+   &&(structural[2]&255)==14&&(structural[6]&255)==64,"structural fields");
+  NativeLayeredTerrainWireCache cache=new NativeLayeredTerrainWireCache();
+  AtomicInteger builds=new AtomicInteger();
+  NativeLayeredTerrainWireCache.Lookup first=cache.getOrCompress(
+   "wide-slot","wide-content",visual.length,()->{builds.incrementAndGet();return visual;});
+  NativeLayeredTerrainWireCache.Lookup second=cache.getOrCompress(
+   "wide-slot","wide-content",visual.length,()->{builds.incrementAndGet();return visual;});
+  ok(!first.isCacheHit()&&second.isCacheHit(),"wide cache reference reuse");
+  ok(builds.get()==1,"wide cache supplier reuse");
+ }
+}'''
+        result = self.compile_run(source, "WideDerivedWireProbe", CORE)
+        self.assertEqual(0, result.returncode, result.stderr)
+
+        updater = (ROOT / "server/src/com/openrsc/server/GameStateUpdater.java").read_text()
+        self.assertIn("visual-layered-sector-v2-u16", updater)
+        self.assertIn("structural-layered-sector-v2-u16", updater)
+
     def test_absolute_raise_lower_and_atomic_bounds(self):
         source = r'''
 import com.openrsc.server.content.worldedit.WorldEditorTerrainStroke;

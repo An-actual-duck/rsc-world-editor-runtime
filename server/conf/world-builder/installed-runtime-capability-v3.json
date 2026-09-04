@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "manifestType": "world-builder-host-runtime-capability",
-  "capabilityId": "world-builder-host-runtime-capability-v2",
+  "capabilityId": "world-builder-host-runtime-capability-v3",
   "integrationModel": "host-integrated-core-v1",
   "profileId": "world-builder-installed",
-  "serverBuildId": "rsc-world-editor-runtime-host-server-v2",
+  "serverBuildId": "rsc-world-editor-runtime-host-server-v3",
   "clientBuildId": "rsc-world-editor-runtime-host-client-v1",
   "clientBootstrapId": "world-builder-installed-client-profile-v1",
   "serverBootstrapId": "world-builder-installed-server-profile-v1",
@@ -18,36 +18,162 @@
   "requiredHostCapabilities": [
     {
       "capabilityId": "undecided-custom-client-framing-v1",
-      "sourceIntegration": {
+      "sourceAlignment": {
+        "payloadScope": "project-runtime",
         "payloadRelativePath": "server/conf/world-builder/host-integration/RSCProtocolDecoder.java",
+        "targetScope": "target-root",
         "targetRelativePath": "server/src/com/openrsc/server/net/RSCProtocolDecoder.java",
         "payloadSha256": "7c34f7099d6e9a57bb166696421ea39d4fe264d78dc5a5aef8c4dbc763f36a26",
+        "replacementPolicy": "replace-trusted-preimage-or-preserve",
         "acceptedBeforeSha256": [
           "8d247c4b1f3d7f2d41fb58b8c378894878dcf6375c05ed2d4d2c9c2aa03e336c"
         ]
       },
-      "artifactProbe": {
-        "targetRelativePath": "server/core.jar",
-        "archiveEntryPath": "com/openrsc/server/net/RSCProtocolDecoder.class",
-        "payloadEntrySha256": "538ff8e128cc9f5fb5e79033a74619cbef5e0bca90b393744908291d833baa97",
-        "requiredClassSymbols": [
-          "decodeUndecidedCustomFrame",
-          "MAX_UNDECIDED_CUSTOM_FRAME_LENGTH",
-          "Truncated undecided custom-client frame"
-        ]
-      }
+      "artifactProbes": [
+        {
+          "archive": "server-core",
+          "archiveEntryPath": "com/openrsc/server/net/RSCProtocolDecoder.class",
+          "requiredClassMarkers": [
+            "decodeUndecidedCustomFrame",
+            "MAX_UNDECIDED_CUSTOM_FRAME_LENGTH",
+            "Truncated undecided custom-client frame"
+          ]
+        }
+      ]
+    },
+    {
+      "capabilityId": "pinned-prebuilt-host-core-v1",
+      "buildIntegration": {
+        "targetScope": "target-root",
+        "targetRelativePath": "server/build.xml",
+        "guardCapabilityRelativePath": "conf/world-builder/installed-runtime-capability-v3.json",
+        "guardProperty": "world.builder.pinned.host.runtime",
+        "guardedTarget": "compile_core",
+        "policy": "skip-obsolete-source-recompile-while-capability-installed"
+      },
+      "artifactProbes": [
+        {
+          "archive": "server-core",
+          "archiveEntryPath": "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class",
+          "requiredClassMarkers": [
+            "world-builder-configs/installed-server.json",
+            "world-builder-installed-server-profile"
+          ]
+        }
+      ]
     }
   ],
+  "packageEncodingCapabilities": [
+    {
+      "encodingVersion": 1,
+      "capabilityId": "native-layered-terrain-wire-v1",
+      "encodings": ["raw-layered-sector-v1"],
+      "artifactProbes": [
+        {
+          "archive": "server-core",
+          "archiveEntryPath": "com/openrsc/server/io/NativeLayeredTerrainChunk.class",
+          "requiredClassMarkers": ["LEGACY_TILE_WIRE_BYTES", "copyWireBytesPerTile"]
+        },
+        {
+          "archive": "client-runtime",
+          "archiveEntryPath": "orsc/NativeLayeredTerrainChunk.class",
+          "requiredClassMarkers": ["raw-layered-sector-v1", "LEGACY_TILE_WIRE_BYTES"]
+        }
+      ]
+    },
+    {
+      "encodingVersion": 2,
+      "capabilityId": "native-layered-terrain-wire-v2-u16",
+      "encodings": [
+        "raw-layered-sector-v2-u16",
+        "visual-layered-sector-v2-u16",
+        "structural-layered-sector-v2-u16"
+      ],
+      "artifactProbes": [
+        {
+          "archive": "server-core",
+          "archiveEntryPath": "com/openrsc/server/io/NativeLayeredTerrainChunk.class",
+          "requiredClassMarkers": ["WIDE_TILE_WIRE_BYTES", "copyWireBytesPerTile"]
+        },
+        {
+          "archive": "server-core",
+          "archiveEntryPath": "com/openrsc/server/GameStateUpdater.class",
+          "requiredClassMarkers": [
+            "visual-layered-sector-v2-u16",
+            "structural-layered-sector-v2-u16"
+          ]
+        },
+        {
+          "archive": "client-runtime",
+          "archiveEntryPath": "orsc/NativeLayeredTerrainChunk.class",
+          "requiredClassMarkers": [
+            "raw-layered-sector-v2-u16",
+            "visual-layered-sector-v2-u16",
+            "structural-layered-sector-v2-u16",
+            "WIDE_TILE_WIRE_BYTES"
+          ]
+        },
+        {
+          "archive": "client-runtime",
+          "archiveEntryPath": "orsc/NativeLayeredTerrainPacketDecoder.class",
+          "requiredClassMarkers": [
+            "visual-layered-sector-v2-u16",
+            "structural-layered-sector-v2-u16"
+          ]
+        }
+      ]
+    },
+    {
+      "encodingVersion": 3,
+      "capabilityId": "layered-placement-runtime-v3",
+      "encodings": ["layered-world-placements-v3"],
+      "artifactProbes": [
+        {
+          "archive": "server-core",
+          "archiveEntryPath": "com/openrsc/server/io/NativeLayeredWorldPackage.class",
+          "requiredClassMarkers": ["layered-world-placements-v3"]
+        }
+      ]
+    },
+    {
+      "encodingVersion": 4,
+      "capabilityId": "layered-placement-runtime-v4",
+      "encodings": ["layered-world-placements-v4"],
+      "artifactProbes": [
+        {
+          "archive": "server-core",
+          "archiveEntryPath": "com/openrsc/server/io/NativeLayeredWorldPackage.class",
+          "requiredClassMarkers": ["layered-world-placements-v4"]
+        }
+      ]
+    }
+  ],
+  "receiptMigration": {
+    "authoritativeTargetRelativePath": "server/conf/world-builder/installed-runtime-capability-v3.json",
+    "retiredTargetRelativePaths": [
+      "server/conf/world-builder/installed-runtime-capability-v1.json",
+      "server/conf/world-builder/installed-runtime-capability-v2.json"
+    ],
+    "requiresSingleAuthoritativeReceipt": true
+  },
   "activation": {
-    "serverProfileRelativePath": "server/world-builder-configs/installed-server.json",
-    "clientProfileRelativePaths": [
+    "serverProfile": {
+      "targetRelativePath": "server/world-builder-configs/installed-server.json",
+      "installedBy": "import-map-changes",
+      "requiredWhen": "map-package-active"
+    },
+    "clientProfileAlternatives": [
       "Client_Base/world-builder-configs/installed-client.json",
       "client/world-builder-configs/installed-client.json"
     ],
     "requiresExactManifestSha256": true,
     "requiresExactInventorySha256": false,
-    "replacesLegacyTerrain": false,
-    "replacesLegacyPlacements": false,
+    "legacyDataPolicy": {
+      "deletesLegacyTerrainFiles": false,
+      "deletesLegacyPlacementFiles": false,
+      "terrainRuntimeAuthority": "native-layered-package",
+      "placementRuntimeAuthority": "native-layered-package"
+    },
     "ordinaryImportOwnership": [
       "content-addressed-map-package",
       "world-builder-map-selection",

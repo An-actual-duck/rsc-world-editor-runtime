@@ -1830,17 +1830,20 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertEqual([1, 2, 3, 4], installed["encodingVersions"])
         self.assertEqual(
             "server/world-builder-configs/installed-server.json",
-            installed["activation"]["serverProfileRelativePath"],
+            installed["activation"]["serverProfile"]["targetRelativePath"],
         )
         self.assertEqual(
             [
                 "Client_Base/world-builder-configs/installed-client.json",
                 "client/world-builder-configs/installed-client.json",
             ],
-            installed["activation"]["clientProfileRelativePaths"],
+            installed["activation"]["clientProfileAlternatives"],
         )
-        self.assertFalse(installed["activation"]["replacesLegacyTerrain"])
-        self.assertFalse(installed["activation"]["replacesLegacyPlacements"])
+        legacy = installed["activation"]["legacyDataPolicy"]
+        self.assertFalse(legacy["deletesLegacyTerrainFiles"])
+        self.assertFalse(legacy["deletesLegacyPlacementFiles"])
+        self.assertEqual("native-layered-package", legacy["terrainRuntimeAuthority"])
+        self.assertEqual("native-layered-package", legacy["placementRuntimeAuthority"])
         self.assertEqual(
             [
                 "content-addressed-map-package",
