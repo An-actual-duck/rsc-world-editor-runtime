@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-platform-release-v1",
+  "title": "RSC World Editor current platform release",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "platformReleaseId", "platformGeneration", "platformApiVersion", "extensionApi", "protocol", "schemaContracts", "mapRuntimeCapabilities", "inputAdapterBoundary", "bundleContract", "provenance"],
+  "properties": {
+    "schemaId": {"const": "current-platform-release-v1"},
+    "manifestType": {"const": "current-platform-release"},
+    "platformReleaseId": {"$ref": "#/$defs/id"},
+    "platformGeneration": {"type": "integer", "minimum": 1},
+    "platformApiVersion": {"$ref": "#/$defs/id"},
+    "extensionApi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["apiId", "allowedModuleNamespaceRoot", "forbiddenClassPrefixes", "classShadowPolicy"],
+      "properties": {
+        "apiId": {"$ref": "#/$defs/id"},
+        "allowedModuleNamespaceRoot": {"const": "org.rscworld.modules"},
+        "forbiddenClassPrefixes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "classShadowPolicy": {"const": "forbid"}
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handshakeId", "mismatchPolicy", "identityFields"],
+      "properties": {
+        "handshakeId": {"$ref": "#/$defs/id"},
+        "mismatchPolicy": {"const": "refuse-startup"},
+        "identityFields": {"type": "array", "minItems": 6, "maxItems": 6, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "schemaContracts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/schemaBinding"}},
+    "mapRuntimeCapabilities": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "inputAdapterBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractId", "installedInRuntime", "selectionAuthority", "unknownCodePolicy"],
+      "properties": {
+        "contractId": {"$ref": "#/$defs/id"},
+        "installedInRuntime": {"const": false},
+        "selectionAuthority": {"const": "editor-migration-boundary-only"},
+        "unknownCodePolicy": {"const": "refuse-before-mutation"}
+      }
+    },
+    "bundleContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaId", "closedInventoryRequired", "artifactHashAlgorithm", "sourceAuthority", "receiptBuildAuthority", "targetOverlayPolicy", "activationLayout"],
+      "properties": {
+        "schemaId": {"const": "current-bundle-spec-v1"},
+        "closedInventoryRequired": {"const": true},
+        "artifactHashAlgorithm": {"const": "sha256"},
+        "sourceAuthority": {"const": "selected-current-composition-source"},
+        "receiptBuildAuthority": {"const": "never"},
+        "targetOverlayPolicy": {"const": "replace-complete-runtime-no-class-overlay"},
+        "activationLayout": {"const": "side-by-side-content-addressed"}
+      }
+    },
+    "provenance": {"$ref": "#/$defs/platformProvenance"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "safePath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\).+$"},
+    "schemaBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaId", "relativePath", "sha256"],
+      "properties": {
+        "schemaId": {"$ref": "#/$defs/id"},
+        "relativePath": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "platformProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "authority", "historicalTargetCodeAllowed"],
+      "properties": {
+        "repository": {"const": "rsc-world-editor-runtime"},
+        "authority": {"const": "provider-commit"},
+        "historicalTargetCodeAllowed": {"const": false}
+      }
+    }
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "schemaId": "current-bundle-spec-v1",
+  "manifestType": "current-platform-bundle-spec",
+  "bundleSpecId": "current-advanced-foundation-bundle-v1",
+  "platformReleaseId": "rsc-current-platform-r1",
+  "variantId": "current-advanced-v1",
+  "moduleIds": [],
+  "inputAdapterContractId": "world-builder-input-adapter-v1",
+  "installable": false,
+  "buildPolicy": {
+    "sourceAuthority": "selected-current-composition-source",
+    "rebuildPolicy": "build-and-verify-before-packaging",
+    "receiptAuthority": "never",
+    "targetCorePolicy": "replace-complete-runtime-no-overlay"
+  },
+  "durableStatePolicy": {
+    "location": "outside-code-runtime",
+    "replacementPolicy": "migrate-transactionally",
+    "rollbackPolicy": "restore-exact-predecessor"
+  },
+  "artifacts": [
+    {
+      "sourcePath": "current-platform/platform/current-platform-r1.json",
+      "bundlePath": "contracts/platform/current-platform-r1.json",
+      "role": "platform-manifest",
+      "destination": "managed-runtime/contracts/platform/current-platform-r1.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/variants/current-advanced-v1.json",
+      "bundlePath": "contracts/variants/current-advanced-v1.json",
+      "role": "variant-manifest",
+      "destination": "managed-runtime/contracts/variants/current-advanced-v1.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/bundle-specs/current-advanced-v1.json",
+      "bundlePath": "contracts/bundle-specs/current-advanced-v1.json",
+      "role": "bundle-spec",
+      "destination": "managed-runtime/contracts/bundle-specs/current-advanced-v1.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-bundle-spec-v1.schema.json",
+      "bundlePath": "contracts/schema/current-bundle-spec-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-bundle-spec-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-composition-identity-v1.schema.json",
+      "bundlePath": "contracts/schema/current-composition-identity-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-composition-identity-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-module-v1.schema.json",
+      "bundlePath": "contracts/schema/current-module-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-module-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-platform-release-v1.schema.json",
+      "bundlePath": "contracts/schema/current-platform-release-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-platform-release-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "current-platform/schema/current-variant-v1.schema.json",
+      "bundlePath": "contracts/schema/current-variant-v1.schema.json",
+      "role": "contract-schema",
+      "destination": "managed-runtime/contracts/schema/current-variant-v1.schema.json",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "scripts/current-platform-composition.py",
+      "bundlePath": "tools/current-platform-composition.py",
+      "role": "composition-tool",
+      "destination": "managed-runtime/tools/current-platform-composition.py",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    }
+  ],
+  "requiredExecutableScenarios": [
+    "advanced-shared-platform-v1",
+    "advanced-selected-behavior-v1",
+    "advanced-server-client-handshake-v1"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-composition-identity-v1",
+  "title": "RSC World Editor resolved current composition identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "platformReleaseId", "platformManifestHash", "schemaSetHash", "variantId", "variantManifestHash", "moduleSetHash", "bundleInventoryHash", "moduleSet", "bundleInventory", "bundleSpecId", "bundleSpecHash", "inputAdapterContractId", "installable"],
+  "properties": {
+    "schemaId": {"const": "current-composition-identity-v1"},
+    "manifestType": {"const": "current-platform-composition-identity"},
+    "platformReleaseId": {"$ref": "#/$defs/id"},
+    "platformManifestHash": {"$ref": "#/$defs/sha256"},
+    "schemaSetHash": {"$ref": "#/$defs/sha256"},
+    "variantId": {"$ref": "#/$defs/id"},
+    "variantManifestHash": {"$ref": "#/$defs/sha256"},
+    "moduleSetHash": {"$ref": "#/$defs/sha256"},
+    "bundleInventoryHash": {"$ref": "#/$defs/sha256"},
+    "moduleSet": {"type": "array", "items": {"$ref": "#/$defs/moduleRecord"}},
+    "bundleInventory": {"type": "array", "items": {"$ref": "#/$defs/inventoryRecord"}},
+    "bundleSpecId": {"$ref": "#/$defs/id"},
+    "bundleSpecHash": {"$ref": "#/$defs/sha256"},
+    "inputAdapterContractId": {"$ref": "#/$defs/id"},
+    "installable": {"type": "boolean"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "safePath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\).+$"},
+    "moduleRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestHash", "moduleId", "moduleVersion", "payloadRootHash"],
+      "properties": {
+        "manifestHash": {"$ref": "#/$defs/sha256"},
+        "moduleId": {"$ref": "#/$defs/id"},
+        "moduleVersion": {"type": "string", "minLength": 1},
+        "payloadRootHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "inventoryRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundlePath", "destination", "mode", "ownership", "provenance", "replacementPolicy", "role", "rollbackPolicy", "sha256", "size", "type"],
+      "properties": {
+        "bundlePath": {"$ref": "#/$defs/safePath"},
+        "destination": {"$ref": "#/$defs/safePath"},
+        "mode": {"type": "string", "pattern": "^[0-7]{4}$"},
+        "ownership": {"$ref": "#/$defs/id"},
+        "provenance": {"$ref": "#/$defs/id"},
+        "replacementPolicy": {"$ref": "#/$defs/id"},
+        "role": {"$ref": "#/$defs/id"},
+        "rollbackPolicy": {"$ref": "#/$defs/id"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "size": {"type": "integer", "minimum": 0},
+        "type": {"const": "file"}
+      }
+    }
+  }
+}

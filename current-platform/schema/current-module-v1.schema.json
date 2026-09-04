@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-module-v1",
+  "title": "RSC World Editor current platform module",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "moduleId", "moduleVersion", "kind", "platformReleaseId", "platformApiVersion", "providesCapabilities", "requires", "conflicts", "loadAfter", "loadBefore", "entryPoints", "configurationNamespaces", "stateMigrations", "clientPairing", "artifacts", "semanticTests", "provenance"],
+  "properties": {
+    "schemaId": {"const": "current-module-v1"},
+    "manifestType": {"const": "current-platform-module"},
+    "moduleId": {"$ref": "#/$defs/id"},
+    "moduleVersion": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["declarative-data", "code-plugin", "coordinated-server-client"]},
+    "platformReleaseId": {"$ref": "#/$defs/id"},
+    "platformApiVersion": {"$ref": "#/$defs/id"},
+    "providesCapabilities": {"$ref": "#/$defs/idArray"},
+    "requires": {"type": "array", "items": {"$ref": "#/$defs/moduleRequirement"}},
+    "conflicts": {"$ref": "#/$defs/idArray"},
+    "loadAfter": {"$ref": "#/$defs/idArray"},
+    "loadBefore": {"$ref": "#/$defs/idArray"},
+    "entryPoints": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "configurationNamespaces": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "stateMigrations": {"$ref": "#/$defs/idArray"},
+    "clientPairing": {"$ref": "#/$defs/clientPairing"},
+    "artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifactSpec"}},
+    "semanticTests": {"$ref": "#/$defs/idArray"},
+    "provenance": {"$ref": "#/$defs/moduleProvenance"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+    "idArray": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "safePath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\).+$"},
+    "moduleRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["moduleId", "moduleVersion"],
+      "properties": {
+        "moduleId": {"$ref": "#/$defs/id"},
+        "moduleVersion": {"type": "string", "minLength": 1}
+      }
+    },
+    "clientPairing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "clientCapabilityId"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "clientCapabilityId": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]}
+      }
+    },
+    "artifactSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourcePath", "bundlePath", "role", "destination", "ownership", "replacementPolicy", "rollbackPolicy", "provenance"],
+      "properties": {
+        "sourcePath": {"$ref": "#/$defs/safePath"},
+        "bundlePath": {"$ref": "#/$defs/safePath"},
+        "role": {"$ref": "#/$defs/id"},
+        "destination": {"$ref": "#/$defs/safePath"},
+        "ownership": {"$ref": "#/$defs/id"},
+        "replacementPolicy": {"$ref": "#/$defs/id"},
+        "rollbackPolicy": {"$ref": "#/$defs/id"},
+        "provenance": {"$ref": "#/$defs/id"}
+      }
+    },
+    "moduleProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "redistributable"],
+      "properties": {
+        "kind": {"enum": ["provider-commit", "sealed-synthetic-fixture", "target-derived-local"]},
+        "redistributable": {"type": "boolean"}
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "current-bundle-spec-v1",
+  "title": "RSC World Editor current platform bundle specification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaId", "manifestType", "bundleSpecId", "platformReleaseId", "variantId", "moduleIds", "inputAdapterContractId", "installable", "buildPolicy", "durableStatePolicy", "artifacts", "requiredExecutableScenarios"],
+  "properties": {
+    "schemaId": {"const": "current-bundle-spec-v1"},
+    "manifestType": {"const": "current-platform-bundle-spec"},
+    "bundleSpecId": {"$ref": "#/$defs/id"},
+    "platformReleaseId": {"$ref": "#/$defs/id"},
+    "variantId": {"$ref": "#/$defs/id"},
+    "moduleIds": {"$ref": "#/$defs/idArray"},
+    "inputAdapterContractId": {"$ref": "#/$defs/id"},
+    "installable": {"type": "boolean"},
+    "buildPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceAuthority", "rebuildPolicy", "receiptAuthority", "targetCorePolicy"],
+      "properties": {
+        "sourceAuthority": {"const": "selected-current-composition-source"},
+        "rebuildPolicy": {"const": "build-and-verify-before-packaging"},
+        "receiptAuthority": {"const": "never"},
+        "targetCorePolicy": {"const": "replace-complete-runtime-no-overlay"}
+      }
+    },
+    "durableStatePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "replacementPolicy", "rollbackPolicy"],
+      "properties": {
+        "location": {"const": "outside-code-runtime"},
+        "replacementPolicy": {"const": "migrate-transactionally"},
+        "rollbackPolicy": {"const": "restore-exact-predecessor"}
+      }
+    },
+    "artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifactSpec"}},
+    "requiredExecutableScenarios": {"$ref": "#/$defs/idArray"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"},
+    "idArray": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "safePath": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\).+$"},
+    "artifactSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourcePath", "bundlePath", "role", "destination", "ownership", "replacementPolicy", "rollbackPolicy", "provenance"],
+      "properties": {
+        "sourcePath": {"$ref": "#/$defs/safePath"},
+        "bundlePath": {"$ref": "#/$defs/safePath"},
+        "role": {"$ref": "#/$defs/id"},
+        "destination": {"$ref": "#/$defs/safePath"},
+        "ownership": {"$ref": "#/$defs/id"},
+        "replacementPolicy": {"$ref": "#/$defs/id"},
+        "rollbackPolicy": {"$ref": "#/$defs/id"},
+        "provenance": {"$ref": "#/$defs/id"}
+      }
+    }
+  }
+}

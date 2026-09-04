@@ -1,0 +1,83 @@
+{
+  "schemaId": "current-platform-release-v1",
+  "manifestType": "current-platform-release",
+  "platformReleaseId": "rsc-current-platform-r1",
+  "platformGeneration": 1,
+  "platformApiVersion": "current-extension-api-v1",
+  "extensionApi": {
+    "apiId": "current-extension-api-v1",
+    "allowedModuleNamespaceRoot": "org.rscworld.modules",
+    "forbiddenClassPrefixes": [
+      "com/openrsc/",
+      "orsc/",
+      "org/apache/",
+      "com/google/"
+    ],
+    "classShadowPolicy": "forbid"
+  },
+  "protocol": {
+    "handshakeId": "current-composition-handshake-v1",
+    "mismatchPolicy": "refuse-startup",
+    "identityFields": [
+      "platformReleaseId",
+      "platformManifestHash",
+      "variantId",
+      "variantManifestHash",
+      "moduleSetHash",
+      "bundleInventoryHash"
+    ]
+  },
+  "schemaContracts": [
+    {
+      "schemaId": "current-bundle-spec-v1",
+      "relativePath": "schema/current-bundle-spec-v1.schema.json",
+      "sha256": "8cf8d090244b4b60fbe547ce10879fc5d5705bb59a24f23c1908b22dadc1e950"
+    },
+    {
+      "schemaId": "current-composition-identity-v1",
+      "relativePath": "schema/current-composition-identity-v1.schema.json",
+      "sha256": "5b68999e17092c534c147e67bb8a9cd4c77403da61c22ba25dde034638fa05d8"
+    },
+    {
+      "schemaId": "current-module-v1",
+      "relativePath": "schema/current-module-v1.schema.json",
+      "sha256": "0a02df1fdd2b0cc65aed1b317022f93682f8fa964c3839281cf2995313cfd65b"
+    },
+    {
+      "schemaId": "current-platform-release-v1",
+      "relativePath": "schema/current-platform-release-v1.schema.json",
+      "sha256": "9c3d1898a70379f2f709091341e2d904468fe4bc26be1dd3195714ae9844a663"
+    },
+    {
+      "schemaId": "current-variant-v1",
+      "relativePath": "schema/current-variant-v1.schema.json",
+      "sha256": "25afff50035dacfa74b248de1efb3a85bfefe1189f1a2c241a0a9fadfc7a8490"
+    }
+  ],
+  "mapRuntimeCapabilities": [
+    "canonical-signed-layered-map-v1",
+    "all-placement-families-v4",
+    "wide-elevation-u16-v2",
+    "transactional-map-activation-v1"
+  ],
+  "inputAdapterBoundary": {
+    "contractId": "world-builder-input-adapter-v1",
+    "installedInRuntime": false,
+    "selectionAuthority": "editor-migration-boundary-only",
+    "unknownCodePolicy": "refuse-before-mutation"
+  },
+  "bundleContract": {
+    "schemaId": "current-bundle-spec-v1",
+    "closedInventoryRequired": true,
+    "artifactHashAlgorithm": "sha256",
+    "sourceAuthority": "selected-current-composition-source",
+    "receiptBuildAuthority": "never",
+    "targetOverlayPolicy": "replace-complete-runtime-no-class-overlay",
+    "activationLayout": "side-by-side-content-addressed"
+  },
+  "provenance": {
+    "repository": "rsc-world-editor-runtime",
+    "authority": "provider-commit",
+    "historicalTargetCodeAllowed": false
+  }
+}

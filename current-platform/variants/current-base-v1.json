@@ -1,0 +1,41 @@
+{
+  "schemaId": "current-variant-v1",
+  "manifestType": "current-platform-variant",
+  "variantId": "current-base-v1",
+  "displayName": "Current Base",
+  "platformReleaseId": "rsc-current-platform-r1",
+  "variantRole": "public-conservative",
+  "releaseStatus": "foundation-contract-only",
+  "installable": false,
+  "defaultModuleIds": [],
+  "requiredCapabilities": [
+    "canonical-public-gameplay-v1",
+    "canonical-public-state-v1",
+    "canonical-signed-layered-map-v1",
+    "current-typed-configuration-v1",
+    "current-state-migration-v1",
+    "matched-current-client-v1"
+  ],
+  "forbiddenCapabilities": [
+    "advanced-gameplay-catalog-v1",
+    "advanced-client-interfaces-v1",
+    "advanced-asset-catalog-v1",
+    "advanced-database-schema-v1"
+  ],
+  "advancedOnlyCapabilities": [],
+  "inputAdapterRecommendations": [
+    "preservation-family-v1",
+    "generic-signed-layered-v1"
+  ],
+  "serverClientPairing": {
+    "required": true,
+    "handshakeId": "current-composition-handshake-v1",
+    "mismatchPolicy": "refuse-startup"
+  },
+  "retirementPath": null,
+  "provenance": {
+    "repository": "rsc-world-editor-runtime",
+    "authority": "provider-commit",
+    "contentPolicy": "public-conservative"
+  }
+}

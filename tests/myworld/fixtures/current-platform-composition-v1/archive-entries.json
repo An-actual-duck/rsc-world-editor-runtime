@@ -1,0 +1,26 @@
+{
+  "safe": [
+    "META-INF/MANIFEST.MF",
+    "org/rscworld/modules/fixture_foundation/FoundationModule.class"
+  ],
+  "shadow": [
+    "META-INF/MANIFEST.MF",
+    "org/rscworld/modules/fixture_shadow/ShadowModule.class",
+    "com/openrsc/server/Server.class"
+  ],
+  "casefold": [
+    "META-INF/MANIFEST.MF",
+    "org/rscworld/modules/fixture_shadow/ShadowModule.class",
+    "org/rscworld/modules/fixture_shadow/shadowmodule.class"
+  ],
+  "duplicate": [
+    "META-INF/MANIFEST.MF",
+    "org/rscworld/modules/fixture_shadow/ShadowModule.class",
+    "org/rscworld/modules/fixture_shadow/ShadowModule.class"
+  ],
+  "foreignResource": [
+    "META-INF/MANIFEST.MF",
+    "org/rscworld/modules/fixture_shadow/ShadowModule.class",
+    "shared/config.json"
+  ]
+}
