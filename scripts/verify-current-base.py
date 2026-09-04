@@ -425,7 +425,9 @@ def validate_input_adapter(path: Path, baseline_path: Path,
     conversion = adapter["mapConversion"]
     if (conversion.get("toolArtifactRole") != "input-adapter-map-converter"
             or conversion.get("mainClass") != "com.openrsc.layeredmaps.LayeredMapsCli"
-            or conversion.get("command") != "preservation-package"):
+            or conversion.get("command") != "preservation-package"
+            or conversion.get("outputReviewState") != "transitions-pending"
+            or conversion.get("runtimePromotionApproved") is not False):
         raise VerificationError("input adapter map conversion is unsupported")
     if "com/openrsc/layeredmaps/LayeredMapsCli.class" not in archive_names(converter_path):
         raise VerificationError("input adapter converter lacks its declared main class")

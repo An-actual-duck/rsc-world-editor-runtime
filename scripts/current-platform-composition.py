@@ -834,6 +834,7 @@ def validate_catalog(catalog: Catalog) -> None:
             "state-migration-manifest",
             "installed-execution-verifier", "input-adapter-manifest",
             "input-adapter-baseline", "input-adapter-map-converter",
+            "input-adapter-baseline-config", "input-adapter-baseline-state",
             "client-content-manifest", "client-content",
         }
         roles = {artifact["role"] for artifact in base_spec["artifacts"]}

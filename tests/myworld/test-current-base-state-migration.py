@@ -21,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / "current-platform/runtime/current-base-v1/state-migration.json"
 SCHEMA = ROOT / "current-platform/schema/current-base-state-migration-v1.schema.json"
 SQLITE_SCHEMA = ROOT / "server/database/sqlite/retro.sqlite"
+CORE_SQLITE_SCHEMA = ROOT / "server/database/sqlite/core.sqlite"
+INITIALIZED_SQLITE = ROOT / "legacy/docs/inherited-openrsc/sqlite-seeds/preservation.db"
 MARIA_SCHEMA = ROOT / "server/database/mysql/retro.sql"
 CORE = ROOT / "server/core.jar"
 MAIN = "com.openrsc.server.database.CurrentBaseStateMigration"
@@ -124,7 +126,7 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
         )
         self.assertEqual(sha256(SCHEMA), record["sha256"])
         mutated = json.loads(json.dumps(contract))
-        mutated["supportedEngines"][0]["unexpected"] = True
+        mutated["supportedSources"][0]["unexpected"] = True
         self.assertFalse(jsonschema.Draft202012Validator(schema).is_valid(mutated))
 
     def test_sqlite_migrates_all_rows_without_mutating_source(self) -> None:
@@ -177,32 +179,46 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
                 "SELECT COUNT(*) FROM equipped"
             ).fetchone()[0])
             self.assertEqual(
-                "preservation-retro-to-current-base-v1",
+                "preservation-retro-sqlite-to-current-base-v1",
                 database.execute(
                     "SELECT migration_row_id FROM current_base_migrations"
                 ).fetchone()[0],
             )
 
     def test_sqlite_refuses_custom_schema_and_preserves_preexisting_outputs(self) -> None:
-        source = self.root / "custom.db"
-        stage = self.root / "stage.db"
-        evidence = self.root / "evidence.json"
-        schema = SQLITE_SCHEMA.read_text(encoding="utf-8").replace(
-            "`slot`     INTEGER NOT NULL DEFAULT 0,",
-            "`slot`     INTEGER NOT NULL DEFAULT 1,",
-            1,
-        )
-        create_sqlite(source, schema)
-        before = sha256(source)
-        refused = self.run_sqlite(source, stage, evidence)
-        self.assertEqual(2, refused.returncode)
-        self.assertIn("unsupported or customized sqlite source schema", refused.stderr)
-        self.assertEqual(before, sha256(source))
-        self.assertFalse(stage.exists())
-        self.assertFalse(evidence.exists())
+        original = SQLITE_SCHEMA.read_text(encoding="utf-8")
+        mutations = {
+            "default": original.replace(
+                "`slot`     INTEGER NOT NULL DEFAULT 0,",
+                "`slot`     INTEGER NOT NULL DEFAULT 1,", 1),
+            "check": original.replace(
+                "`slot`     INTEGER NOT NULL DEFAULT 0,",
+                "`slot`     INTEGER NOT NULL DEFAULT 0 CHECK (`slot` >= 0),", 1),
+            "auto-unique": original.replace(
+                "PRIMARY KEY (`playerId`, `itemId`, `slot`)",
+                "UNIQUE (`playerID`, `itemID`),\n    PRIMARY KEY (`playerId`, `itemId`, `slot`)", 1),
+            "generated": original.replace(
+                "PRIMARY KEY (`playerId`, `itemId`, `slot`)",
+                "`slot_shadow` INTEGER GENERATED ALWAYS AS (`slot`) VIRTUAL,\n    "
+                "PRIMARY KEY (`playerId`, `itemId`, `slot`)", 1),
+        }
+        for label, schema in mutations.items():
+            source = self.root / f"custom-{label}.db"
+            stage = self.root / f"stage-{label}.db"
+            evidence = self.root / f"evidence-{label}.json"
+            create_sqlite(source, schema)
+            before = sha256(source)
+            refused = self.run_sqlite(source, stage, evidence)
+            self.assertEqual(2, refused.returncode, label)
+            self.assertIn("unsupported or customized sqlite source schema", refused.stderr)
+            self.assertEqual(before, sha256(source))
+            self.assertFalse(stage.exists())
+            self.assertFalse(evidence.exists())
 
         pristine = self.root / "pristine.db"
         create_sqlite(pristine)
+        stage = self.root / "stage.db"
+        evidence = self.root / "evidence.json"
         stage.write_bytes(b"pre-existing-stage-sentinel")
         evidence.write_text("pre-existing-evidence-sentinel", encoding="utf-8")
         stage_before = stage.read_bytes()
@@ -211,6 +227,97 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
         self.assertEqual(2, refused.returncode)
         self.assertEqual(stage_before, stage.read_bytes())
         self.assertEqual(evidence_before, evidence.read_bytes())
+
+    def test_initialized_preservation_row_preserves_populated_state(self) -> None:
+        source = self.root / "initialized.db"
+        stage = self.root / "stage.db"
+        evidence = self.root / "evidence.json"
+        shutil.copy2(INITIALIZED_SQLITE, source)
+        with sqlite3.connect(source) as database:
+            database.execute(
+                "INSERT INTO players(id,username,pass,salt,creation_date,creation_ip,"
+                "banned,offences,muted,kills,npc_kills,former_name,x,y,email) "
+                "VALUES(913,'invented','fixture','',0,'0.0.0.0','0',0,'0',0,0,'',333,444,?)",
+                ("invented@example.invalid",),
+            )
+            database.execute(
+                "INSERT INTO curstats(playerID,prayer,magic,woodcut) VALUES(913,31,32,33)"
+            )
+        before = sha256(source)
+        result = self.run_sqlite(source, stage, evidence)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(before, sha256(source))
+        proof = json.loads(evidence.read_text(encoding="utf-8"))
+        self.assertEqual(
+            "preservation-initialized-sqlite-to-current-base-v1",
+            proof["migrationRowId"],
+        )
+        with sqlite3.connect(stage) as database:
+            self.assertEqual((913, "invented", "invented@example.invalid"), database.execute(
+                "SELECT id,username,email FROM players WHERE id=913"
+            ).fetchone())
+
+    def test_raw_core_row_preserves_existing_skill_values(self) -> None:
+        source = self.root / "core.db"
+        stage = self.root / "core-stage.db"
+        evidence = self.root / "core-evidence.json"
+        create_sqlite(source, CORE_SQLITE_SCHEMA.read_text(encoding="utf-8"))
+        with sqlite3.connect(source) as database:
+            database.execute(
+                "INSERT INTO players(id,username,pass,salt,creation_date,creation_ip,"
+                "banned,offences,muted,kills,npc_kills,x,y) "
+                "VALUES(77,'core_fixture','fixture','',0,'0.0.0','0',0,'0',0,0,222,333)"
+            )
+            database.execute(
+                "INSERT INTO curstats(playerID,prayer,magic,woodcut) VALUES(77,41,42,43)"
+            )
+        before = sha256(source)
+        result = self.run_sqlite(source, stage, evidence)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(before, sha256(source))
+        self.assertEqual(
+            "preservation-core-sqlite-to-current-base-v1",
+            json.loads(evidence.read_text())["migrationRowId"],
+        )
+        with sqlite3.connect(stage) as database:
+            self.assertEqual((77, "core_fixture", 222, 333), database.execute(
+                "SELECT id,username,x,y FROM players WHERE id=77").fetchone())
+            self.assertEqual((41, 42, 43, 1), database.execute(
+                "SELECT prayer,magic,woodcut,summoning FROM curstats WHERE playerID=77"
+            ).fetchone())
+            self.assertEqual((31, 32, 33, 1, 1), database.execute(
+                "SELECT prayer,magic,woodcut,summoning,blessing FROM curstats "
+                "WHERE playerID=913"
+            ).fetchone())
+
+    def test_state_hash_frames_null_empty_text_and_binary_delimiters(self) -> None:
+        hashes = []
+        for index, email in enumerate((None, "", "null", sqlite3.Binary(b";\x00value"))):
+            source = self.root / f"framed-{index}.db"
+            stage = self.root / f"framed-{index}-stage.db"
+            evidence = self.root / f"framed-{index}.json"
+            shutil.copy2(INITIALIZED_SQLITE, source)
+            with sqlite3.connect(source) as database:
+                database.execute(
+                    "INSERT INTO players(id,username,pass,salt,creation_date,creation_ip,"
+                    "banned,offences,muted,kills,npc_kills,former_name,email) "
+                    "VALUES(1,'framed','fixture','',0,'0.0.0','0',0,'0',0,0,'',?)",
+                    (email,),
+                )
+            result = self.run_sqlite(source, stage, evidence)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            hashes.append(json.loads(evidence.read_text())["sourceStateSha256"])
+        self.assertEqual(4, len(set(hashes)))
+
+    def test_sqlite_refuses_active_sidecar(self) -> None:
+        source = self.root / "sidecar.db"
+        create_sqlite(source)
+        sidecar = Path(str(source) + "-wal")
+        sidecar.write_bytes(b"sealed-active-sidecar")
+        result = self.run_sqlite(source, self.root / "stage.db", self.root / "evidence.json")
+        self.assertEqual(2, result.returncode)
+        self.assertIn("active journal sidecar", result.stderr)
+        self.assertFalse((self.root / "stage.db").exists())
 
     def test_sqlite_rollback_and_closed_cli(self) -> None:
         source = self.root / "source.db"
@@ -397,7 +504,7 @@ class CurrentBaseMariaMigrationTest(unittest.TestCase):
             "SELECT COUNT(*) FROM equipped", "current_stage",
         ))
         self.assertEqual(
-            "preservation-retro-to-current-base-v1",
+            "preservation-retro-mariadb-to-current-base-v1",
             self.sql("SELECT migration_row_id FROM current_base_migrations",
                      "current_stage"),
         )

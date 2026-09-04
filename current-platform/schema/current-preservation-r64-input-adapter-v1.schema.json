@@ -14,10 +14,14 @@
       "baselineId": {"const": "rsc-remastered-preservation-r64-v1"}, "bundleRole": {"const": "input-adapter-baseline"},
       "bundlePath": {"const": "contracts/input-adapters/rsc-remastered-preservation-r64-v1.json"}, "sha256": {"$ref": "#/$defs/hash"}, "sourceSetFingerprintSha256": {"$ref": "#/$defs/hash"}
     }},
-    "targetLayout": {"type": "object", "additionalProperties": false, "required": ["configurationCandidates", "sqliteState", "serverTerrain", "clientCacheRoot", "clientTerrain", "vanillaPlacements"], "properties": {
+    "targetLayout": {"type": "object", "additionalProperties": false, "required": ["configurationCandidates", "sqliteState", "serverTerrain", "clientCacheRoot", "clientTerrain", "legacyMapArchives", "vanillaPlacements"], "properties": {
       "configurationCandidates": {"type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{"const": "server/preservation.conf"}, {"const": "server/local.conf"}], "items": false},
       "sqliteState": {"const": "server/inc/sqlite/preservation.db"}, "serverTerrain": {"const": "server/conf/server/data/Authentic_Landscape.orsc"},
       "clientCacheRoot": {"const": "Client_Base/Cache"}, "clientTerrain": {"const": "Client_Base/Cache/video/Authentic_Landscape.orsc"},
+      "legacyMapArchives": {"type": "object", "additionalProperties": false, "required": ["serverMapFree", "serverMapMembers", "serverLandFree", "serverLandMembers"], "properties": {
+        "serverMapFree": {"const": "server/conf/server/data/maps/maps64.jag"}, "serverMapMembers": {"const": "server/conf/server/data/maps/maps64.mem"},
+        "serverLandFree": {"const": "server/conf/server/data/maps/land64.jag"}, "serverLandMembers": {"const": "server/conf/server/data/maps/land64.mem"}
+      }},
       "vanillaPlacements": {"type": "object", "additionalProperties": false, "required": ["boundaries", "scenery", "npcs", "groundItems"], "properties": {
         "boundaries": {"const": "server/conf/server/defs/locs/BoundaryLocs.json"}, "scenery": {"const": "server/conf/server/defs/locs/SceneryLocs.json"},
         "npcs": {"const": "server/conf/server/defs/locs/NpcLocs.json"}, "groundItems": {"const": "server/conf/server/defs/locs/GroundItems.json"}
@@ -26,13 +30,22 @@
     "configurationSelectors": {"type": "object", "additionalProperties": false, "required": ["basedMapData", "customLandscape", "locationData", "memberWorld", "wantMyWorld"], "properties": {
       "basedMapData": {"const": 64}, "customLandscape": {"const": false}, "locationData": {"const": 1}, "memberWorld": {"const": true}, "wantMyWorld": {"const": false}
     }},
-    "mapConversion": {"type": "object", "additionalProperties": false, "required": ["toolArtifactRole", "mainClass", "command", "arguments", "stagedBaselinePath", "outputPackagePath", "outputReportPath", "workspacePolicy", "sourceMutation"], "properties": {
+    "mapConversion": {"type": "object", "additionalProperties": false, "required": ["toolArtifactRole", "mainClass", "command", "arguments", "stagedBaselinePath", "outputPackagePath", "outputReportPath", "outputReviewState", "runtimePromotionApproved", "providerBaselineInputs", "workspacePolicy", "sourceMutation"], "properties": {
       "toolArtifactRole": {"const": "input-adapter-map-converter"},
       "mainClass": {"const": "com.openrsc.layeredmaps.LayeredMapsCli"},
       "command": {"const": "preservation-package"},
       "arguments": {"type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{"const": "--root"}, {"const": "--workspace"}], "items": false},
       "stagedBaselinePath": {"const": "tools/layered-maps/baselines/rsc-remastered-preservation-r64-v1.json"},
       "outputPackagePath": {"const": "package"}, "outputReportPath": {"const": "generation-report.json"},
+      "outputReviewState": {"const": "transitions-pending"}, "runtimePromotionApproved": {"const": false},
+      "providerBaselineInputs": {"type": "object", "additionalProperties": false, "required": ["configuration", "emptyState"], "properties": {
+        "configuration": {"type": "object", "additionalProperties": false, "required": ["bundleRole", "stagedPath"], "properties": {
+          "bundleRole": {"const": "input-adapter-baseline-config"}, "stagedPath": {"const": "legacy/docs/inherited-openrsc/server-configs/preservation.conf"}
+        }},
+        "emptyState": {"type": "object", "additionalProperties": false, "required": ["bundleRole", "stagedPath"], "properties": {
+          "bundleRole": {"const": "input-adapter-baseline-state"}, "stagedPath": {"const": "legacy/docs/inherited-openrsc/sqlite-seeds/preservation.db"}
+        }}
+      }},
       "workspacePolicy": {"const": "new-disposable-directory"}, "sourceMutation": {"const": "forbidden"}
     }},
     "stateRows": {"type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{"const": "preservation-initialized-sqlite-to-current-base-v1"}, {"const": "preservation-core-sqlite-to-current-base-v1"}], "items": false},

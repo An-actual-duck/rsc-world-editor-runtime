@@ -5,6 +5,10 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -19,6 +23,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,7 +40,7 @@ import java.util.regex.Pattern;
 public final class CurrentBaseStateMigration {
 	private static final String CONTRACT_TYPE = "current-base-state-migration";
 	private static final String CONTRACT_SHA256 =
-		"30dadb10af095fa19ff39dd17d97bbf8bd69dc2888b41732ad5095b0841d7be5";
+		"fed89bd2add4fdc064d37b28b9332d30de34ec6875f9ec5618844d167bd0974b";
 	private static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 	private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
 	private static final long MAXIMUM_SQLITE_SOURCE_BYTES = 4294967296L;
@@ -107,33 +112,40 @@ public final class CurrentBaseStateMigration {
 		Files.createDirectories(stage.toAbsolutePath().normalize().getParent());
 		String sourceBytes = sha256(source);
 		boolean stageOwned = false;
-		try (Connection sourceDb = DriverManager.getConnection(
-			"jdbc:sqlite:file:" + source.toAbsolutePath() + "?mode=ro")) {
-			Schema sourceSchema = sqliteSchema(sourceDb);
-			SourceRow sourceRow = contract.matchSource("sqlite", sourceSchema.fingerprint);
-			String sourceState = stateHash(sourceDb, sourceSchema, null);
-			Files.createFile(stage);
-			stageOwned = true;
-			Files.copy(source, stage, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-			if (injectedFailure) throw new SQLException("injected failure after staged copy");
-			try (Connection staged = DriverManager.getConnection(
-				"jdbc:sqlite:" + stage.toAbsolutePath())) {
-				staged.setAutoCommit(false);
-				try {
-					applyTransform(staged, "sqlite", sourceRow.transformationId);
-					String projected = stateHash(staged, sourceSchema, null);
-					if (!sourceState.equals(projected)) throw new SQLException(
-						"staged SQLite database did not preserve source durable rows");
-					writeRuntimePatchLedger(staged, "sqlite");
-					writeLedger(staged, contract, sourceRow, sourceSchema.fingerprint, sourceState);
-					staged.commit();
-					writeEvidence(evidence, contract, sourceRow, sourceSchema.fingerprint,
-						sourceState, projected, sourceBytes, sha256(source), stage.toString());
-				} catch (Exception failure) {
-					staged.rollback();
-					throw failure;
+		try {
+			Schema sourceSchema;
+			SourceRow sourceRow;
+			String sourceState;
+			String projected;
+			try (Connection sourceDb = DriverManager.getConnection(
+				"jdbc:sqlite:file:" + source.toAbsolutePath() + "?mode=ro")) {
+				sourceSchema = sqliteSchema(sourceDb);
+				sourceRow = contract.matchSource("sqlite", sourceSchema.fingerprint);
+				sourceState = stateHash(sourceDb, sourceSchema, null);
+				Files.createFile(stage);
+				stageOwned = true;
+				Files.copy(source, stage, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+				if (injectedFailure) throw new SQLException("injected failure after staged copy");
+				try (Connection staged = DriverManager.getConnection(
+					"jdbc:sqlite:" + stage.toAbsolutePath())) {
+					staged.setAutoCommit(false);
+					try {
+						applyTransform(staged, "sqlite", sourceRow.transformationId);
+						projected = stateHash(staged, sourceSchema, null);
+						if (!sourceState.equals(projected)) throw new SQLException(
+							"staged SQLite database did not preserve source durable rows");
+						writeRuntimePatchLedger(staged, "sqlite");
+						writeLedger(staged, contract, sourceRow, sourceSchema.fingerprint, sourceState);
+						staged.commit();
+					} catch (Exception failure) {
+						staged.rollback();
+						throw failure;
+					}
 				}
 			}
+			requireNoSqliteSidecars(source);
+			writeEvidence(evidence, contract, sourceRow, sourceSchema.fingerprint,
+				sourceState, projected, sourceBytes, sha256(source), stage.toString());
 		} catch (Exception failure) {
 			if (stageOwned) try { Files.deleteIfExists(stage); } catch (IOException ignored) { }
 			throw failure;
@@ -352,20 +364,59 @@ public final class CurrentBaseStateMigration {
 				+ result.getString(1) + ":" + result.getString(2));
 		}
 		try (Statement statement = connection.createStatement(); ResultSet result =
-			statement.executeQuery("SELECT name FROM sqlite_master WHERE type='table' "
+			statement.executeQuery("SELECT name,sql FROM sqlite_master WHERE type='table' "
 				+ "AND name NOT LIKE 'sqlite_%' ORDER BY name")) {
 			while (result.next()) {
 				String table = result.getString(1);
+				structures.add("table:" + table + ":" + normalizeSql(result.getString(2)));
 				List<String> columns = new ArrayList<String>();
 				try (Statement columnsStatement = connection.createStatement();
 					ResultSet columnResult = columnsStatement.executeQuery(
-						"PRAGMA table_info(" + quote(table) + ")")) {
-					while (columnResult.next()) columns.add(columnResult.getString("name")
+						"PRAGMA table_xinfo(" + quote(table) + ")")) {
+					while (columnResult.next()) columns.add(columnResult.getInt("cid") + ":"
+						+ columnResult.getString("name")
 						+ ":" + normalizeType(columnResult.getString("type"))
 						+ ":" + columnResult.getInt("notnull")
 						+ ":" + nullableText(columnResult.getString("dflt_value"))
-						+ ":" + columnResult.getInt("pk"));
+						+ ":" + columnResult.getInt("pk")
+						+ ":" + columnResult.getInt("hidden"));
 				}
+				List<String> tableStructures = new ArrayList<String>();
+				try (Statement foreignStatement = connection.createStatement();
+					ResultSet foreign = foreignStatement.executeQuery(
+						"PRAGMA foreign_key_list(" + quote(table) + ")")) {
+					while (foreign.next()) tableStructures.add("foreign:" + table + ":"
+						+ foreign.getInt("id") + ":" + foreign.getInt("seq") + ":"
+						+ nullableText(foreign.getString("table")) + ":"
+						+ nullableText(foreign.getString("from")) + ":"
+						+ nullableText(foreign.getString("to")) + ":"
+						+ nullableText(foreign.getString("on_update")) + ":"
+						+ nullableText(foreign.getString("on_delete")) + ":"
+						+ nullableText(foreign.getString("match")));
+				}
+				try (Statement indexStatement = connection.createStatement();
+					ResultSet indexes = indexStatement.executeQuery(
+						"PRAGMA index_list(" + quote(table) + ")")) {
+					while (indexes.next()) {
+						String index = indexes.getString("name");
+						tableStructures.add("index-list:" + table + ":" + index + ":"
+							+ indexes.getInt("unique") + ":" + indexes.getString("origin")
+							+ ":" + indexes.getInt("partial"));
+						try (Statement detailStatement = connection.createStatement();
+							ResultSet details = detailStatement.executeQuery(
+								"PRAGMA index_xinfo(" + quote(index) + ")")) {
+							while (details.next()) tableStructures.add("index-column:" + table
+								+ ":" + index + ":" + details.getInt("seqno") + ":"
+								+ details.getInt("cid") + ":"
+								+ nullableText(details.getString("name")) + ":"
+								+ details.getInt("desc") + ":"
+								+ nullableText(details.getString("coll")) + ":"
+								+ details.getInt("key"));
+						}
+					}
+				}
+				Collections.sort(tableStructures);
+				structures.addAll(tableStructures);
 				tables.add(new Table(table, columns));
 			}
 		}
@@ -466,24 +517,12 @@ public final class CurrentBaseStateMigration {
 					for (int index = 1; index <= count; index++) {
 						update(rowDigest, "cell\0" + index + "\0jdbc-type\0"
 							+ metadata.getColumnType(index) + "\0");
-						InputStream opened = result.getBinaryStream(index);
-						if (opened == null) {
-							if (!result.wasNull()) throw new SQLException(
-								"non-null state cell has no binary representation");
-							update(rowDigest, "null\0");
-						} else try (InputStream input = opened) {
-								MessageDigest cellDigest = MessageDigest.getInstance("SHA-256");
-								long cellLength = 0;
-								byte[] buffer = new byte[65536]; int read;
-								while ((read = input.read(buffer)) >= 0) if (read > 0) {
-									cellDigest.update(buffer, 0, read); cellLength += read;
-									sourceCellBytes += read;
-									if (sourceCellBytes > MAXIMUM_SOURCE_CELL_BYTES_PER_TABLE)
-										throw new SQLException("table exceeds reviewed source cell byte limit: "
-											+ table.name);
-								}
-								update(rowDigest, "value\0" + cellLength + "\0"
-									+ hex(cellDigest.digest()) + "\0");
+						CellHash cell = hashCell(result, index, metadata.getColumnType(index),
+							MAXIMUM_SOURCE_CELL_BYTES_PER_TABLE - sourceCellBytes);
+						if (cell == null) update(rowDigest, "null\0");
+						else {
+							sourceCellBytes += cell.length;
+							update(rowDigest, "value\0" + cell.length + "\0" + cell.hash + "\0");
 						}
 					}
 					String row = hex(rowDigest.digest());
@@ -498,6 +537,66 @@ public final class CurrentBaseStateMigration {
 			for (String row : rows) update(digest, row + "\n");
 		}
 		return hex(digest.digest());
+	}
+
+	private static CellHash hashCell(ResultSet result, int index, int jdbcType,
+		long remaining) throws Exception {
+		MessageDigest digest = MessageDigest.getInstance("SHA-256");
+		CountingDigestOutput sink = new CountingDigestOutput(digest, remaining);
+		if (jdbcType == Types.BINARY || jdbcType == Types.VARBINARY
+			|| jdbcType == Types.LONGVARBINARY || jdbcType == Types.BLOB) {
+			InputStream opened = result.getBinaryStream(index);
+			if (opened == null) return result.wasNull() ? null : unsupportedCell();
+			try (InputStream input = opened) {
+				byte[] buffer = new byte[65536]; int read;
+				while ((read = input.read(buffer)) >= 0) if (read > 0)
+					sink.write(buffer, 0, read);
+			}
+		} else if (jdbcType == Types.CHAR || jdbcType == Types.VARCHAR
+			|| jdbcType == Types.LONGVARCHAR || jdbcType == Types.NCHAR
+			|| jdbcType == Types.NVARCHAR || jdbcType == Types.LONGNVARCHAR
+			|| jdbcType == Types.CLOB || jdbcType == Types.NCLOB
+			|| jdbcType == Types.SQLXML) {
+			Reader opened = result.getCharacterStream(index);
+			if (opened == null) return result.wasNull() ? null : unsupportedCell();
+			try (Reader reader = opened; Writer writer = new OutputStreamWriter(
+				sink, StandardCharsets.UTF_8)) {
+				char[] buffer = new char[8192]; int read;
+				while ((read = reader.read(buffer)) >= 0) if (read > 0)
+					writer.write(buffer, 0, read);
+			}
+		} else {
+			String value = result.getString(index);
+			if (value == null) return result.wasNull() ? null : unsupportedCell();
+			byte[] encoded = value.getBytes(StandardCharsets.UTF_8);
+			sink.write(encoded, 0, encoded.length);
+		}
+		return new CellHash(sink.count, hex(digest.digest()));
+	}
+
+	private static CellHash unsupportedCell() throws SQLException {
+		throw new SQLException("non-null state cell has no stream representation");
+	}
+
+	private static final class CountingDigestOutput extends OutputStream {
+		private final MessageDigest digest; private final long maximum; private long count;
+		private CountingDigestOutput(MessageDigest digest, long maximum) {
+			this.digest = digest; this.maximum = maximum;
+		}
+		@Override public void write(int value) throws IOException {
+			if (++count > maximum) throw new IOException("table exceeds reviewed source cell byte limit");
+			digest.update((byte) value);
+		}
+		@Override public void write(byte[] value, int offset, int length) throws IOException {
+			if (length < 0 || count > maximum - length) throw new IOException(
+				"table exceeds reviewed source cell byte limit");
+			digest.update(value, offset, length); count += length;
+		}
+	}
+
+	private static final class CellHash {
+		private final long length; private final String hash;
+		private CellHash(long length, String hash) { this.length = length; this.hash = hash; }
 	}
 
 	private static boolean schemaExists(Connection connection, String schema)

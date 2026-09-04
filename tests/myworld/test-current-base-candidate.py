@@ -114,6 +114,31 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         self.assertNotEqual(0, refused.returncode)
         self.assertIn("differs from provider artifacts", refused.stderr)
 
+    def test_bundled_preservation_converter_reproduces_reviewed_map_inputs(self) -> None:
+        converter = self.output / "tools/layered-maps.jar"
+        self.assertTrue(converter.is_file())
+        with zipfile.ZipFile(converter) as archive:
+            self.assertIn(
+                "com/openrsc/layeredmaps/LayeredMapsCli.class", archive.namelist())
+        terrain = self.repo / "server/conf/server/data/Authentic_Landscape.orsc"
+        terrain_before = sha256(terrain)
+        with tempfile.TemporaryDirectory(prefix="current-base-preservation-adapter-") as temp:
+            workspace = Path(temp) / "conversion"
+            converted = subprocess.run(
+                ["java", "-jar", str(converter), "preservation-package",
+                 "--root", str(self.repo), "--workspace", str(workspace)],
+                cwd=self.repo, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(0, converted.returncode,
+                             converted.stdout + converted.stderr)
+            report = json.loads((workspace / "generation-report.json").read_text())
+            self.assertEqual(1764, report["terrainSectorCount"])
+            self.assertEqual(0, report["unconvertedPlacementRecords"])
+            self.assertEqual("transitions-pending", report["reviewState"])
+            self.assertFalse(report["runtimePromotionApproved"])
+            self.assertTrue((workspace / "package/manifest.json").is_file())
+        self.assertEqual(terrain_before, sha256(terrain))
+
     def test_runtime_startup_and_prelogin_handshake_enforce_all_six_fields(self) -> None:
         core = self.output / "server/core.jar"
         client = self.output / "client/Open_RSC_Client.jar"

@@ -120,6 +120,26 @@
       "provenance": "provider-build"
     },
     {
+      "sourcePath": "legacy/docs/inherited-openrsc/server-configs/preservation.conf",
+      "bundlePath": "contracts/input-adapters/preservation-r64/preservation.conf",
+      "role": "input-adapter-baseline-config",
+      "destination": "managed-runtime/input-adapters/preservation-r64/preservation.conf",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
+      "sourcePath": "legacy/docs/inherited-openrsc/sqlite-seeds/preservation.db",
+      "bundlePath": "contracts/input-adapters/preservation-r64/preservation.db",
+      "role": "input-adapter-baseline-state",
+      "destination": "managed-runtime/input-adapters/preservation-r64/preservation.db",
+      "ownership": "provider",
+      "replacementPolicy": "content-addressed",
+      "rollbackPolicy": "pointer-rollback",
+      "provenance": "provider-commit"
+    },
+    {
       "sourcePath": "current-platform/schema/current-base-server-content-v1.schema.json",
       "bundlePath": "contracts/schema/current-base-server-content-v1.schema.json",
       "role": "contract-schema",

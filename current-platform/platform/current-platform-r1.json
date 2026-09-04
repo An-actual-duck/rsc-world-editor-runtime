@@ -56,7 +56,7 @@
     {
       "schemaId": "current-base-state-migration-v1",
       "relativePath": "schema/current-base-state-migration-v1.schema.json",
-      "sha256": "2367d97396e3b5aa21b14ef07f928996151a015815fb34df0068c544bd270609"
+      "sha256": "8ada5187334449a5f1e791c8b7d5d87ee2668d25f474e2f80c9005ee7b989e6b"
     },
     {
       "schemaId": "current-bundle-spec-v1",
@@ -81,7 +81,7 @@
     {
       "schemaId": "current-preservation-r64-input-adapter-v1",
       "relativePath": "schema/current-preservation-r64-input-adapter-v1.schema.json",
-      "sha256": "95c133dc8629db9493581875782e691d3a7bcd8df6867a5fdbf215fa1f4bae5d"
+      "sha256": "965ba7c81d7c19802fec7217bc061b885ffc57a234d7f0e8ae1dea1d9143a180"
     },
     {
       "schemaId": "current-variant-v1",

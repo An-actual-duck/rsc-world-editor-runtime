@@ -17,6 +17,12 @@
     "serverTerrain": "server/conf/server/data/Authentic_Landscape.orsc",
     "clientCacheRoot": "Client_Base/Cache",
     "clientTerrain": "Client_Base/Cache/video/Authentic_Landscape.orsc",
+    "legacyMapArchives": {
+      "serverMapFree": "server/conf/server/data/maps/maps64.jag",
+      "serverMapMembers": "server/conf/server/data/maps/maps64.mem",
+      "serverLandFree": "server/conf/server/data/maps/land64.jag",
+      "serverLandMembers": "server/conf/server/data/maps/land64.mem"
+    },
     "vanillaPlacements": {
       "boundaries": "server/conf/server/defs/locs/BoundaryLocs.json",
       "scenery": "server/conf/server/defs/locs/SceneryLocs.json",
@@ -39,6 +45,18 @@
     "stagedBaselinePath": "tools/layered-maps/baselines/rsc-remastered-preservation-r64-v1.json",
     "outputPackagePath": "package",
     "outputReportPath": "generation-report.json",
+    "outputReviewState": "transitions-pending",
+    "runtimePromotionApproved": false,
+    "providerBaselineInputs": {
+      "configuration": {
+        "bundleRole": "input-adapter-baseline-config",
+        "stagedPath": "legacy/docs/inherited-openrsc/server-configs/preservation.conf"
+      },
+      "emptyState": {
+        "bundleRole": "input-adapter-baseline-state",
+        "stagedPath": "legacy/docs/inherited-openrsc/sqlite-seeds/preservation.db"
+      }
+    },
     "workspacePolicy": "new-disposable-directory",
     "sourceMutation": "forbidden"
   },
