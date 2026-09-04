@@ -845,6 +845,7 @@ def validate_catalog(catalog: Catalog) -> None:
             "base-runtime-server-client-pairing-v1",
             "base-canonical-map-bootstrap-v1",
             "base-preservation-state-migration-v1",
+            "base-gameplay-state-runtime-execution-v1",
         }
         if not required_scenarios <= set(base_spec["requiredExecutableScenarios"]):
             raise ContractError("candidate Current Base lacks executable scenarios")

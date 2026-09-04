@@ -135,10 +135,8 @@ def validate_profile(path: Path) -> dict:
         raise VerificationError("Current Base profile has wrong manifestType")
     if profile["variantId"] != "current-base-v1":
         raise VerificationError("Current Base profile names another variant")
-    if profile["installabilityBlockers"] != [
-        "base-gameplay-state-runtime-execution-v1",
-    ]:
-        raise VerificationError("Current Base installability blockers are incomplete")
+    if profile["installabilityBlockers"] != []:
+        raise VerificationError("installable Current Base still declares blockers")
     if profile["pluginSourceSets"] != ["authentic", "shared"]:
         raise VerificationError("Current Base plugin source sets are not conservative")
     if profile["clientAssetSets"] != ["platform-world-editor-ui"]:
@@ -404,8 +402,8 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
         raise VerificationError(f"cannot read composition identity: {error}") from error
     if supplied != expected:
         raise VerificationError("composition identity differs from provider artifacts")
-    if supplied["variantId"] != "current-base-v1" or supplied["installable"]:
-        raise VerificationError("composition is not the bounded non-installable Base candidate")
+    if supplied["variantId"] != "current-base-v1" or not supplied["installable"]:
+        raise VerificationError("composition is not the installable Current Base candidate")
 
     server = inventory_path(supplied, "server-runtime", payload_root)
     plugins = inventory_path(supplied, "server-plugins", payload_root)

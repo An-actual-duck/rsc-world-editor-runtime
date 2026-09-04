@@ -5,8 +5,8 @@
   "displayName": "Current Base",
   "platformReleaseId": "rsc-current-platform-r1",
   "variantRole": "public-conservative",
-  "releaseStatus": "artifact-candidate",
-  "installable": false,
+  "releaseStatus": "release-candidate",
+  "installable": true,
   "defaultModuleIds": [],
   "requiredCapabilities": [
     "canonical-public-gameplay-v1",

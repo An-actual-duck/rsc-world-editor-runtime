@@ -2,9 +2,7 @@
   "schemaId": "current-base-runtime-profile-v1",
   "manifestType": "current-base-runtime-profile",
   "variantId": "current-base-v1",
-  "installabilityBlockers": [
-    "base-gameplay-state-runtime-execution-v1"
-  ],
+  "installabilityBlockers": [],
   "pluginSourceSets": [
     "authentic",
     "shared"

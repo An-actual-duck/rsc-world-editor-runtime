@@ -11,11 +11,7 @@
     "variantId": {"const": "current-base-v1"},
     "installabilityBlockers": {
       "type": "array",
-      "minItems": 1,
-      "maxItems": 1,
-      "prefixItems": [
-        {"const": "base-gameplay-state-runtime-execution-v1"}
-      ],
+      "maxItems": 0,
       "items": false
     },
     "pluginSourceSets": {"$ref": "#/$defs/stringArray"},

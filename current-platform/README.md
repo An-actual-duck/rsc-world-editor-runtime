@@ -3,16 +3,16 @@
 This directory is the provider-owned foundation for one current managed runtime
 generation. `Current Base` is the conservative public destination and `Current
 Advanced` is a bounded first-party composition on the same platform release.
-Current Base is a buildable, non-installable `artifact-candidate`: its closed bundle is built
+Current Base is an installable `release-candidate`: its closed bundle is built
 from this provider's server/client sources, uses only authentic/shared plugins,
 includes a provider-owned conservative configuration and definition catalog,
 and excludes the Advanced asset catalog. Current Advanced remains
 `foundation-contract-only` and non-installable until its separate evidence is
-complete. Base now includes the closed, compiled
-`preservation-retro-to-current-base-v1` SQLite/MariaDB migration row with
-source-preservation, staged rollback, and exact-schema execution evidence. It
-remains non-installable until full gameplay/state runtime execution is proved.
-Neither status means released.
+complete. Base is verified by the closed compiled
+`preservation-retro-to-current-base-v1` SQLite/MariaDB migration row and the
+built server/client loopback execution scenario through login, canonical map
+load, durable gameplay state, logout, and restart. Neither status means
+released.
 
 Validate the catalog:
 
