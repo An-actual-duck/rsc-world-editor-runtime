@@ -36,7 +36,7 @@ public final class CurrentBaseStateMigration {
 	private static final String ROW_ID = "preservation-retro-to-current-base-v1";
 	private static final String CONTRACT_TYPE = "current-base-state-migration";
 	private static final String CONTRACT_SHA256 =
-		"06f2bca49f7e4dd653545695fd74ced91e9b306c9b7514bba114ea9361be2477";
+		"0b653f5c2da880cc66ce3d8fc9a43fa03c89ba1d87792207c537ef59aca6ec99";
 	private static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 	private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
 	private static final Set<String> CONTRACT_KEYS = set(
@@ -196,6 +196,8 @@ public final class CurrentBaseStateMigration {
 		throws SQLException {
 		try (Statement statement = connection.createStatement()) {
 			if ("sqlite".equals(engine)) {
+				statement.executeUpdate("CREATE TABLE equipped (playerID INTEGER NOT NULL, "
+					+ "itemID INTEGER NOT NULL)");
 				statement.executeUpdate("CREATE TABLE former_names (dbid INTEGER NOT NULL "
 					+ "PRIMARY KEY, playerId INTEGER NOT NULL, formerName VARCHAR(13) NOT NULL "
 					+ "DEFAULT '0', changeType TINYINT NOT NULL DEFAULT 0, time INTEGER NOT NULL "
@@ -211,6 +213,8 @@ public final class CurrentBaseStateMigration {
 				statement.executeUpdate("ALTER TABLE logins ADD COLUMN nonce VARCHAR(96)");
 				statement.executeUpdate("CREATE UNIQUE INDEX nonce_index ON logins(nonce)");
 			} else {
+				statement.executeUpdate("CREATE TABLE equipped (playerID INT UNSIGNED NOT NULL, "
+					+ "itemID INT UNSIGNED NOT NULL) DEFAULT CHARSET=utf8");
 				statement.executeUpdate("CREATE TABLE former_names (dbid INT UNSIGNED NOT NULL "
 					+ "AUTO_INCREMENT PRIMARY KEY, playerId INT UNSIGNED NULL, formerName "
 					+ "VARCHAR(13) NOT NULL DEFAULT '0', changeType TINYINT UNSIGNED NOT NULL "

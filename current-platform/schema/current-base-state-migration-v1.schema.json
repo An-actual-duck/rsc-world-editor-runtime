@@ -43,7 +43,7 @@
           "type": "object", "additionalProperties": false,
           "required": ["schemaEvolution", "patchLedger", "startupPolicy"],
           "properties": {
-            "schemaEvolution": {"const": "former-names-and-login-nonce-v1"},
+            "schemaEvolution": {"const": "current-base-required-tables-and-login-v1"},
             "patchLedger": {"const": "all-provider-patches-through-2026-08-03"},
             "startupPolicy": {"const": "no-unreviewed-patch-execution"}
           }

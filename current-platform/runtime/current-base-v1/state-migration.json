@@ -45,7 +45,7 @@
       "blessing": "level-one-experience-zero"
     },
     "runtimePatchState": {
-      "schemaEvolution": "former-names-and-login-nonce-v1",
+      "schemaEvolution": "current-base-required-tables-and-login-v1",
       "patchLedger": "all-provider-patches-through-2026-08-03",
       "startupPolicy": "no-unreviewed-patch-execution"
     }

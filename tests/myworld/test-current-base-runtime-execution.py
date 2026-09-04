@@ -322,7 +322,8 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                         server_log, "Game world is now online on", server, 60,
                         f"Current Base server run {run_number}",
                     )
-                    self.assertIn("Current server composition accepted", server_evidence)
+                    self.assertIn("PatchApplier: - Database patches are up to date", server_evidence)
+                    self.assertIn("PLAYER_ITEM_ID_AUDIT passed", server_evidence)
                     client_command = [
                         "java", "-Xms256m", "-Xmx1024m",
                         f"-Dopenrsc.currentCompositionIdentityFile={IDENTITY}",
@@ -349,6 +350,10 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                         server_log, "Unregistered sealed_user from player list.",
                         server, 20, f"Current Base logout run {run_number}",
                     )
+                    self.assertIn(
+                        "Current composition handshake accepted", server_evidence
+                    )
+                    self.assertIn("variant=current-base-v1", server_evidence)
                     self.assertIn(
                         "Processed login request for sealed_user response: 0",
                         server_evidence,

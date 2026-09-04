@@ -173,6 +173,9 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
             self.assertEqual(4, database.execute(
                 "SELECT COUNT(*) FROM db_patches"
             ).fetchone()[0])
+            self.assertEqual(0, database.execute(
+                "SELECT COUNT(*) FROM equipped"
+            ).fetchone()[0])
             self.assertEqual(
                 "preservation-retro-to-current-base-v1",
                 database.execute(
@@ -389,6 +392,9 @@ class CurrentBaseMariaMigrationTest(unittest.TestCase):
         ))
         self.assertEqual("12", self.sql(
             "SELECT COUNT(*) FROM db_patches", "current_stage",
+        ))
+        self.assertEqual("0", self.sql(
+            "SELECT COUNT(*) FROM equipped", "current_stage",
         ))
         self.assertEqual(
             "preservation-retro-to-current-base-v1",
