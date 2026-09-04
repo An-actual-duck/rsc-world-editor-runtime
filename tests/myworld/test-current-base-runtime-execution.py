@@ -340,10 +340,22 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                             client_command, cwd=client_root, stdout=client_output,
                             stderr=subprocess.STDOUT, text=True,
                         )
-                    runtime_evidence = wait_for_text(
-                        runtime_log, "CURRENT_BASE_RUNTIME_EXECUTION", client, 90,
-                        f"Current Base client run {run_number}",
-                    )
+                    try:
+                        runtime_evidence = wait_for_text(
+                            runtime_log, "CURRENT_BASE_RUNTIME_EXECUTION", client, 90,
+                            f"Current Base client run {run_number}",
+                        )
+                    except AssertionError as failure:
+                        client_text = client_log.read_text(
+                            encoding="utf-8", errors="replace"
+                        ) if client_log.is_file() else "<missing>"
+                        server_text = server_log.read_text(
+                            encoding="utf-8", errors="replace"
+                        ) if server_log.is_file() else "<missing>"
+                        raise AssertionError(
+                            f"{failure}\nCLIENT LOG:\n{client_text}\n"
+                            f"SERVER LOG:\n{server_text}"
+                        ) from failure
                     evidence_runs.append(runtime_evidence)
                     self.assertEqual(0, client.wait(timeout=20))
                     server_evidence = wait_for_text(
