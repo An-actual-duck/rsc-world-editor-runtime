@@ -76,13 +76,18 @@ public class GameObjectWallAction implements PayloadProcessor<TargetObjectStruct
 				getPlayer().resetAll();
 				String command = (getPlayer().click == 0 ? def.getCommand1() : def
 					.getCommand2()).toLowerCase();
-				Point telePoint = getPlayer().getWorld().getServer().getEntityHandler().getObjectTelePoint(
-					object.getWorldLocation(), command);
-				if (telePoint != null) {
-					getPlayer().teleportLegacyPacked(
-						telePoint.getX(), telePoint.getY(), false);
-				}
+				applyConfiguredTransition(getPlayer(), object, command);
 			}
 		});
+	}
+
+	/** The default boundary action retains command matching and explicit packed destinations. */
+	private static boolean applyConfiguredTransition(
+		final Player player, final GameObject object, final String command) {
+		Point telePoint = player.getWorld().getServer().getEntityHandler().getObjectTelePoint(
+			object.getWorldLocation(), command);
+		if (telePoint == null) return false;
+		player.teleportLegacyPacked(telePoint.getX(), telePoint.getY(), false);
+		return true;
 	}
 }

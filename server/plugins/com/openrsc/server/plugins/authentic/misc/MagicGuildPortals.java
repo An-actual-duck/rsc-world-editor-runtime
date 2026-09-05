@@ -26,11 +26,11 @@ public class MagicGuildPortals implements OpBoundTrigger {
 			}
 			player.playerServerMessage(MessageType.QUEST, "you enter the magic portal");
 			if (obj.getID() == MAGIC_PORTALS[0]) {
-				player.teleport(212, 695);
+				player.teleportLegacyPacked(212, 695, false);
 			} else if (obj.getID() == MAGIC_PORTALS[1]) {
-				player.teleport(511, 1452);
+				player.teleportLegacyPacked(511, 1452, false);
 			} else if (obj.getID() == MAGIC_PORTALS[2]) {
-				player.teleport(362, 1515);
+				player.teleportLegacyPacked(362, 1515, false);
 			}
 			delay();
 			displayTeleportBubble(player, player.getX(), player.getY(), false);

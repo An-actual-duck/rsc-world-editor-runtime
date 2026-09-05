@@ -151,24 +151,6 @@ class LayeredNativePackageFoundationTest(unittest.TestCase):
             workspace = Path(temp) / "report"
             result = self.run_command("preservation-transitions", workspace)
 
-            if result.returncode == 3:
-                self.assertIn(
-                    "Preservation transition compatibility sources no longer "
-                    "reproduce the accepted frozen inventory",
-                    result.stderr,
-                )
-                lock = json.loads(TRANSITION_LOCK.read_text(encoding="utf-8"))
-                self.assertEqual(
-                    20, lock["explicitTransitionSource"]["edgeCount"]
-                )
-                self.assertEqual(
-                    0, lock["explicitTransitionSource"]["unresolvedEdgeCount"]
-                )
-                self.assertEqual(
-                    107, lock["scriptedSourceSet"]["sourceFileCount"]
-                )
-                return
-
             self.assertEqual(0, result.returncode, result.stderr)
             report = json.loads(
                 (workspace / "transition-compatibility.json").read_text(
