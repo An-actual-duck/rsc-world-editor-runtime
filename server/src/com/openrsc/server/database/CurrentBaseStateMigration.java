@@ -118,7 +118,7 @@ public final class CurrentBaseStateMigration {
 			String sourceState;
 			String projected;
 			try (Connection sourceDb = DriverManager.getConnection(
-				"jdbc:sqlite:file:" + source.toAbsolutePath() + "?mode=ro")) {
+				"jdbc:sqlite:" + source.toUri().toASCIIString() + "?mode=ro")) {
 				sourceSchema = sqliteSchema(sourceDb);
 				sourceRow = contract.matchSource("sqlite", sourceSchema.fingerprint);
 				sourceState = stateHash(sourceDb, sourceSchema, null);
@@ -127,7 +127,7 @@ public final class CurrentBaseStateMigration {
 				Files.copy(source, stage, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 				if (injectedFailure) throw new SQLException("injected failure after staged copy");
 				try (Connection staged = DriverManager.getConnection(
-					"jdbc:sqlite:" + stage.toAbsolutePath())) {
+					"jdbc:sqlite:" + stage.toUri().toASCIIString() + "?mode=rw")) {
 					staged.setAutoCommit(false);
 					try {
 						applyTransform(staged, "sqlite", sourceRow.transformationId);

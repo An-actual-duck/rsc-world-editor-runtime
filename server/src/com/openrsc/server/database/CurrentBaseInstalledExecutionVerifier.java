@@ -293,7 +293,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 		private void seedDisposableAccount() throws Exception {
 			Class.forName("org.sqlite.JDBC");
 			try (Connection database = DriverManager.getConnection(
-				"jdbc:sqlite:" + workingState.toAbsolutePath())) {
+				"jdbc:sqlite:" + workingState.toUri().toASCIIString() + "?mode=rw")) {
 				database.setAutoCommit(false);
 				try {
 					accountId = scalar(database, "SELECT COALESCE(MAX(id),0)+1 FROM players");

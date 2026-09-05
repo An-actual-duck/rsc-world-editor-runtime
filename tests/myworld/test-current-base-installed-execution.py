@@ -184,7 +184,7 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
             before = {str(path): sha256(path) for path in inputs if path.is_file()}
             before.update({str(server): tree_hash(server), str(client): tree_hash(client),
                            str(package): tree_hash(package)})
-            workspace = root / "verification-workspace"
+            workspace = root / "verification workspace #?é"
             evidence_path = root / "installed-evidence.json"
             command = [
                 "java", "-cp", str(core), VERIFIER_MAIN,

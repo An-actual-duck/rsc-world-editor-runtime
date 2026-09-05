@@ -129,6 +129,22 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
         mutated["supportedSources"][0]["unexpected"] = True
         self.assertFalse(jsonschema.Draft202012Validator(schema).is_valid(mutated))
 
+    def test_sqlite_paths_are_literal_even_with_uri_metacharacters(self) -> None:
+        source = self.root / "source #?mode=rw&é.db"
+        stage = self.root / "stage #?mode=ro&é.db"
+        evidence_path = self.root / "evidence.json"
+        create_sqlite(source)
+        seed_sqlite(source)
+        before = sha256(source)
+        result = self.run_sqlite(source, stage, evidence_path)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(before, sha256(source))
+        evidence = json.loads(evidence_path.read_text())
+        self.assertTrue(evidence["sourceUnchanged"])
+        self.assertEqual(evidence["sourceStateSha256"], evidence["stagedSourceProjectionSha256"])
+        self.assertEqual({source.name, stage.name, evidence_path.name},
+                         {path.name for path in self.root.iterdir()})
+
     def test_sqlite_migrates_all_rows_without_mutating_source(self) -> None:
         source = self.root / "source.db"
         stage = self.root / "stage.db"
