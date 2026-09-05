@@ -409,7 +409,7 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                     ("sealed_counter",),
                 ).fetchone())
                 self.assertEqual(
-                    "preservation-retro-to-current-base-v1",
+                    "preservation-retro-sqlite-to-current-base-v1",
                     database.execute(
                         "SELECT migration_row_id FROM current_base_migrations"
                     ).fetchone()[0],
