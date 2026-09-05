@@ -485,6 +485,12 @@ public final class CurrentBaseContentHarness {
             },
             self.profile["statePolicy"],
         )
+        self.assertEqual({
+            "rootProperty": "openrsc.worldBuilderInstalledMapRoot",
+            "externalRootPolicy": "canonical-absolute-directory-disjoint-from-runtime",
+            "profileBinding": "manifest-sha256-and-package-identity",
+            "defaultLocation": "profile-relative-package",
+        }, self.profile["mapPolicy"])
 
     def test_repeated_source_build_has_identical_closed_inventory(self) -> None:
         first = candidate_hashes(self.identity_path)

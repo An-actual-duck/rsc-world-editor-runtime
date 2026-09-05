@@ -75,6 +75,21 @@ configuration, logs, caches, map pointers, Editor activation/recovery binding,
 and the public transition matrix still require integration. No production
 release or real-target upgrade is authorized by these component checks.
 
+Both installed-profile loaders accept the explicit launch property
+`openrsc.worldBuilderInstalledMapRoot=/absolute/map/package`. When selected,
+the map directory must be canonical, real and disjoint from the JVM working
+directory and code-artifact directory. The active installed profile still binds
+the manifest SHA-256 and package identity; missing/inactive profiles, empty
+overrides, aliases, overlap and mismatches refuse without falling back to the
+profile-relative package. Omitting the property retains the generic installed
+profile's existing relative layout. This is a runtime launch capability, not an
+Editor map-pointer transaction or permission to modify a running map.
+The installed-execution verifier now runs both cycles against one copied map at
+`workspace/maps/package`, outside both copied runtime trees, and proves that it
+remains byte-identical. Closed evidence records `mapOutsideRuntimeRoots:true`
+and `mapUnchanged:true`. Map-pointer activation and live-instance recovery still
+belong to the unfinished Editor integration.
+
 Resolve and hash the built candidate inventory:
 
 ```bash

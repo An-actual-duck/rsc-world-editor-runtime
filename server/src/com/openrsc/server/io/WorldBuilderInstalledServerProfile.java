@@ -18,6 +18,7 @@ import java.util.TreeSet;
 
 /** Loads the World Builder-owned server activation descriptor, when present. */
 public final class WorldBuilderInstalledServerProfile {
+	public static final String MAP_ROOT_PROPERTY = "openrsc.worldBuilderInstalledMapRoot";
 	public static final String PROFILE_PROPERTY =
 		"openrsc.worldBuilderInstalledServerProfile";
 	public static final String DEFAULT_PROFILE =
@@ -44,7 +45,11 @@ public final class WorldBuilderInstalledServerProfile {
 		if (configured.isEmpty()) throw new IOException(
 			"Installed server profile path is empty");
 		Path profile = Paths.get(configured).toAbsolutePath().normalize();
-		if (!Files.exists(profile, LinkOption.NOFOLLOW_LINKS)) return;
+		if (!Files.exists(profile, LinkOption.NOFOLLOW_LINKS)) {
+			if (System.getProperty(MAP_ROOT_PROPERTY) != null)
+				throw new IOException("External installed map requires an active installed profile");
+			return;
+		}
 		requireRegular(profile, "installed server profile");
 		Path profileDirectory = profile.getParent();
 		if (profileDirectory == null || profileDirectory.getParent() == null) {
@@ -60,7 +65,11 @@ public final class WorldBuilderInstalledServerProfile {
 		Object rawActive = document.opt("active");
 		if (!(rawActive instanceof Boolean)) throw new IOException(
 			"Installed server profile active flag is invalid");
-		if (!((Boolean)rawActive).booleanValue()) return;
+		if (!((Boolean)rawActive).booleanValue()) {
+			if (System.getProperty(MAP_ROOT_PROPERTY) != null)
+				throw new IOException("External installed map requires an active installed profile");
+			return;
+		}
 		String packageId = identifier(document, "packageId");
 		String packageVersion = identifier(document, "packageVersion");
 		String packageFingerprint = hash(document, "packageFingerprintSha256");
@@ -75,9 +84,8 @@ public final class WorldBuilderInstalledServerProfile {
 			|| !relativePath.toString().replace('\\', '/').equals(relative)) {
 			throw new IOException("Installed server package path is unsafe");
 		}
-		Path packageRoot = serverRoot.resolve(relativePath).normalize();
-		if (!packageRoot.startsWith(serverRoot)
-			|| !Files.isDirectory(packageRoot, LinkOption.NOFOLLOW_LINKS)
+		Path packageRoot = resolvePackageRoot(serverRoot.resolve(relativePath).normalize());
+		if (!Files.isDirectory(packageRoot, LinkOption.NOFOLLOW_LINKS)
 			|| Files.isSymbolicLink(packageRoot)) {
 			throw new IOException("Installed server package root is missing or unsafe");
 		}
@@ -107,11 +115,35 @@ public final class WorldBuilderInstalledServerProfile {
 		configuration.WANT_LAYERED_NATIVE_TERRAIN_PREDICTION = true;
 		configuration.WANT_LAYERED_NATIVE_TERRAIN_SYMMETRIC_RESIDENCY = true;
 		configuration.WANT_LAYERED_NATIVE_TERRAIN_ATOMIC_ACTIVATION = true;
-		configuration.LAYERED_NATIVE_TERRAIN_PACKAGE_PATH = relative;
+		configuration.LAYERED_NATIVE_TERRAIN_PACKAGE_PATH =
+			System.getProperty(MAP_ROOT_PROPERTY) == null ? relative : packageRoot.toString();
 		configuration.LAYERED_NATIVE_TERRAIN_MANIFEST_SHA256 = manifestHash;
 		configuration.LAYERED_NATIVE_TERRAIN_INVENTORY_SHA256 = "";
 		configuration.LAYERED_NATIVE_WORLD_RUNTIME_PROFILE =
 			NativeLayeredWorldRuntimeProfile.WORLD_BUILDER_INSTALLED.getId();
+	}
+
+	private static Path resolvePackageRoot(Path profileRelativeRoot) throws IOException {
+		String configured = System.getProperty(MAP_ROOT_PROPERTY);
+		if (configured == null) return profileRelativeRoot;
+		if (configured.isEmpty()) throw new IOException("External installed map root is empty");
+		Path root = Paths.get(configured);
+		if (!root.isAbsolute() || !root.equals(root.normalize())
+			|| !Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)
+			|| !root.equals(root.toRealPath()))
+			throw new IOException("External installed map root must be an existing canonical absolute directory");
+		Path artifact;
+		try {
+			artifact = Paths.get(WorldBuilderInstalledServerProfile.class.getProtectionDomain()
+				.getCodeSource().getLocation().toURI()).toRealPath();
+		} catch (Exception invalid) {
+			throw new IOException("Cannot establish installed runtime artifact location", invalid);
+		}
+		if (Files.isRegularFile(artifact, LinkOption.NOFOLLOW_LINKS)) artifact = artifact.getParent();
+		for (Path runtime : new Path[] {artifact, Paths.get("").toRealPath()})
+			if (root.startsWith(runtime) || runtime.startsWith(root))
+				throw new IOException("External installed map root must be disjoint from runtime artifacts and working directory");
+		return root;
 	}
 
 	private static JSONObject object(Path path, String label) throws IOException {

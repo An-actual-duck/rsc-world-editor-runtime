@@ -4,7 +4,7 @@
   "title": "RSC World Editor Current Base runtime profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "statePolicy", "serverContent", "stateMigration", "installedExecutionVerifier", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "statePolicy", "mapPolicy", "serverContent", "stateMigration", "installedExecutionVerifier", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
   "properties": {
     "schemaId": {"const": "current-base-runtime-profile-v1"},
     "manifestType": {"const": "current-base-runtime-profile"},
@@ -38,6 +38,16 @@
         "sqliteFile": {"const": "current_base.db"},
         "sqliteRootPolicy": {"const": "required-canonical-private-directory-disjoint-from-runtime"},
         "sqliteOpenPolicy": {"const": "existing-private-file-read-write-no-create"}
+      }
+    },
+    "mapPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rootProperty", "externalRootPolicy", "profileBinding", "defaultLocation"],
+      "properties": {
+        "rootProperty": {"const": "openrsc.worldBuilderInstalledMapRoot"},
+        "externalRootPolicy": {"const": "canonical-absolute-directory-disjoint-from-runtime"},
+        "profileBinding": {"const": "manifest-sha256-and-package-identity"},
+        "defaultLocation": {"const": "profile-relative-package"}
       }
     },
     "serverContent": {

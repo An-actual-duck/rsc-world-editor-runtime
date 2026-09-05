@@ -23,6 +23,7 @@ import org.json.JSONObject;
  * without opening {@code Custom_Landscape.orsc}.</p>
  */
 public final class WorldBuilderInstalledClientProfile {
+	public static final String MAP_ROOT_PROPERTY = "openrsc.worldBuilderInstalledMapRoot";
 	public static final String PROFILE_PROPERTY =
 		"openrsc.worldBuilderInstalledClientProfile";
 	public static final String DEFAULT_PROFILE =
@@ -111,7 +112,11 @@ public final class WorldBuilderInstalledClientProfile {
 		if (configured.isEmpty()) throw new IOException(
 			"Installed client profile path is empty");
 		Path profile = Paths.get(configured).toAbsolutePath().normalize();
-		if (!Files.exists(profile, LinkOption.NOFOLLOW_LINKS)) return disabled();
+		if (!Files.exists(profile, LinkOption.NOFOLLOW_LINKS)) {
+			if (System.getProperty(MAP_ROOT_PROPERTY) != null)
+				throw new IOException("External installed map requires an active installed profile");
+			return disabled();
+		}
 		requireRegular(profile, "installed client profile");
 		Path profileDirectory = profile.getParent();
 		if (profileDirectory == null || profileDirectory.getParent() == null) {
@@ -127,7 +132,11 @@ public final class WorldBuilderInstalledClientProfile {
 		Object rawActive = document.opt("active");
 		if (!(rawActive instanceof Boolean)) throw new IOException(
 			"Installed client profile active flag is invalid");
-		if (!((Boolean)rawActive).booleanValue()) return disabled();
+		if (!((Boolean)rawActive).booleanValue()) {
+			if (System.getProperty(MAP_ROOT_PROPERTY) != null)
+				throw new IOException("External installed map requires an active installed profile");
+			return disabled();
+		}
 		String packageId = identifier(document, "packageId");
 		String packageVersion = identifier(document, "packageVersion");
 		String packageFingerprint = hash(document, "packageFingerprintSha256");
@@ -142,9 +151,8 @@ public final class WorldBuilderInstalledClientProfile {
 			|| !relativePath.toString().replace('\\', '/').equals(relative)) {
 			throw new IOException("Installed client package path is unsafe");
 		}
-		Path packageRoot = clientRoot.resolve(relativePath).normalize();
-		if (!packageRoot.startsWith(clientRoot)
-			|| !Files.isDirectory(packageRoot, LinkOption.NOFOLLOW_LINKS)
+		Path packageRoot = resolvePackageRoot(clientRoot.resolve(relativePath).normalize());
+		if (!Files.isDirectory(packageRoot, LinkOption.NOFOLLOW_LINKS)
 			|| Files.isSymbolicLink(packageRoot)) {
 			throw new IOException("Installed client package root is missing or unsafe");
 		}
@@ -170,6 +178,29 @@ public final class WorldBuilderInstalledClientProfile {
 	private static WorldBuilderInstalledClientProfile disabled() {
 		return new WorldBuilderInstalledClientProfile(
 			false, "", "", "", "", null);
+	}
+
+	private static Path resolvePackageRoot(Path profileRelativeRoot) throws IOException {
+		String configured = System.getProperty(MAP_ROOT_PROPERTY);
+		if (configured == null) return profileRelativeRoot;
+		if (configured.isEmpty()) throw new IOException("External installed map root is empty");
+		Path root = Paths.get(configured);
+		if (!root.isAbsolute() || !root.equals(root.normalize())
+			|| !Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)
+			|| !root.equals(root.toRealPath()))
+			throw new IOException("External installed map root must be an existing canonical absolute directory");
+		Path artifact;
+		try {
+			artifact = Paths.get(WorldBuilderInstalledClientProfile.class.getProtectionDomain()
+				.getCodeSource().getLocation().toURI()).toRealPath();
+		} catch (Exception invalid) {
+			throw new IOException("Cannot establish installed runtime artifact location", invalid);
+		}
+		if (Files.isRegularFile(artifact, LinkOption.NOFOLLOW_LINKS)) artifact = artifact.getParent();
+		for (Path runtime : new Path[] {artifact, Paths.get("").toRealPath()})
+			if (root.startsWith(runtime) || runtime.startsWith(root))
+				throw new IOException("External installed map root must be disjoint from runtime artifacts and working directory");
+		return root;
 	}
 
 	private static JSONObject object(Path path, String label) throws IOException {
