@@ -389,8 +389,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			execution.put("disposableUsernameSha256", sha256(username.getBytes(StandardCharsets.UTF_8)));
 			execution.put("workingStateSeededSha256", workingSeeded);
 			execution.put("workingStateFinalSha256", workingFinal);
-				execution.put("disposableStateChanged", true);
-				execution.put("stateOutsideRuntimeRoots", true);
+			execution.put("disposableStateChanged", true);
+			execution.put("stateOutsideRuntimeRoots", true);
 			execution.put("persistenceVerified", true); execution.put("credentialDeleted", true);
 			JSONObject evidence = new JSONObject();
 			evidence.put("schemaId", "current-base-installed-execution-evidence-v1");
