@@ -81,7 +81,7 @@
     {
       "schemaId": "current-preservation-r64-input-adapter-v1",
       "relativePath": "schema/current-preservation-r64-input-adapter-v1.schema.json",
-      "sha256": "965ba7c81d7c19802fec7217bc061b885ffc57a234d7f0e8ae1dea1d9143a180"
+      "sha256": "6f70a4b6b52534ef648722b9dc5f59c000f5fb76e00d87d2f7abfea9c3405b39"
     },
     {
       "schemaId": "current-variant-v1",

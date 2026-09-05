@@ -60,6 +60,79 @@
     "workspacePolicy": "new-disposable-directory",
     "sourceMutation": "forbidden"
   },
+  "legacyMapDecoding": {
+    "decoderId": "preservation-r64-jag-decode-v1",
+    "toolArtifactRole": "server-runtime",
+    "mainClass": "com.openrsc.server.io.PreservationJagDecode",
+    "arguments": [
+      "--contract",
+      "--maps-free",
+      "--maps-members",
+      "--land-free",
+      "--land-members",
+      "--output",
+      "--evidence"
+    ],
+    "sourceArchives": [
+      {
+        "role": "maps-free",
+        "size": 37613,
+        "sha256": "7e85a47c95ba690187ad10d8218f9b4e327b54c27e6f3da18229b061de35a2d1"
+      },
+      {
+        "role": "maps-members",
+        "size": 60002,
+        "sha256": "6a43ffc81a5d95fe392a27fed347eea1c27ac87d11c5670b9e3f0dfe4a8fc7f7"
+      },
+      {
+        "role": "land-free",
+        "size": 142219,
+        "sha256": "6f0720a29d40f5dfcd477049d014b41422742d2e3a9900144287f835cc99813b"
+      },
+      {
+        "role": "land-members",
+        "size": 155110,
+        "sha256": "c38cfcb1e8dddb17afd3ec9d0e8f0cdb076df2caf40a648bf6dd8ea400a55df0"
+      }
+    ],
+    "decodingPolicy": {
+      "basedMapData": 64,
+      "memberWorld": true,
+      "alternateFormat": false,
+      "planes": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "archiveXMinimum": 48,
+      "archiveXMaximum": 68,
+      "archiveYMinimum": 37,
+      "archiveYMaximum": 56,
+      "probeCount": 1680,
+      "sectorEncoding": "legacy-sector-raw-v1",
+      "sectorBytes": 23040,
+      "memberPrecedence": "jm-dat-hei-member-before-free-loc-free-only",
+      "jmPrecedence": "jm-overwrites-dat-hei-after-decoding",
+      "tileDirection": "decoded-and-discarded-by-historical-sector",
+      "overlay250Normalization": "not-applied",
+      "staticPlacements": "not-applied",
+      "absentSector": "record-only-no-synthetic-sector",
+      "runtimePromotionApproved": false
+    },
+    "limits": {
+      "maximumArchiveBytes": 1048576,
+      "maximumExpandedArchiveBytes": 16777216,
+      "maximumEntryBytes": 65536,
+      "maximumArchiveEntries": 4096,
+      "maximumOutputBytes": 38707200,
+      "maximumEvidenceBytes": 2097152
+    },
+    "outputPolicy": "new-disjoint-directory-raw-sectors",
+    "failurePolicy": "retain-new-partial-output-no-force",
+    "sourceMutation": "forbidden-hash-before-and-after",
+    "evidenceSchemaRef": "current-preservation-r64-input-adapter-v1#/$defs/jagDecodeEvidence"
+  },
   "stateRows": [
     "preservation-initialized-sqlite-to-current-base-v1",
     "preservation-core-sqlite-to-current-base-v1"
