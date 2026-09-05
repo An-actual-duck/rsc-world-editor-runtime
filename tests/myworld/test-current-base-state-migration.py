@@ -256,6 +256,10 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
             self.assertEqual((913, "invented", "invented@example.invalid"), database.execute(
                 "SELECT id,username,email FROM players WHERE id=913"
             ).fetchone())
+            self.assertEqual((31, 32, 33, 1, 1), database.execute(
+                "SELECT prayer,magic,woodcut,summoning,blessing FROM curstats "
+                "WHERE playerID=913"
+            ).fetchone())
 
     def test_raw_core_row_preserves_existing_skill_values(self) -> None:
         source = self.root / "core.db"
@@ -284,10 +288,6 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
                 "SELECT id,username,x,y FROM players WHERE id=77").fetchone())
             self.assertEqual((41, 42, 43, 1), database.execute(
                 "SELECT prayer,magic,woodcut,summoning FROM curstats WHERE playerID=77"
-            ).fetchone())
-            self.assertEqual((31, 32, 33, 1, 1), database.execute(
-                "SELECT prayer,magic,woodcut,summoning,blessing FROM curstats "
-                "WHERE playerID=913"
             ).fetchone())
 
     def test_state_hash_frames_null_empty_text_and_binary_delimiters(self) -> None:
