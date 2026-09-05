@@ -36,14 +36,14 @@ final class PreservationTransitionCompatibilityInventory {
 		"tools/layered-maps/baselines/"
 			+ "preservation-transition-compatibility-v1.json";
 	private static final Pattern TELEPORT_CALL =
-		Pattern.compile("\\.teleport\\s*\\(");
+		Pattern.compile("\\.teleport(?:LegacyPacked|Layered|RelativeLayer)?\\s*\\(");
 	private static final Pattern LOCATION_CALL =
 		Pattern.compile("\\.set(?:World)?Location\\s*\\(");
 	private static final Pattern TELEPOINT_REFERENCE =
 		Pattern.compile("\\bTelePoint\\b");
 	private static final Pattern OWNER_SIGNAL =
 		Pattern.compile(
-			"(?i)\\b(?:teleport|telepoint)\\b|\\.set(?:World)?Location\\s*\\(");
+			"(?i)\\b(?:teleport(?:LegacyPacked|Layered|RelativeLayer)?|telepoint)\\b|\\.set(?:World)?Location\\s*\\(");
 	private static final List<String> BRIDGE_SOURCES =
 		Collections.unmodifiableList(Arrays.asList(
 			"server/src/com/openrsc/server/external/EntityHandler.java",
@@ -272,7 +272,9 @@ final class PreservationTransitionCompatibilityInventory {
 			throw new PreflightException(
 				"Preservation transition compatibility sources no longer "
 					+ "reproduce the accepted frozen inventory; regenerate and "
-					+ "review the inventory before runtime promotion.");
+					+ "review the inventory before runtime promotion. "
+					+ "The following source inventory is unaccepted review evidence, "
+					+ "not runtime promotion approval:\n" + JsonDocuments.pretty(actual));
 		}
 	}
 

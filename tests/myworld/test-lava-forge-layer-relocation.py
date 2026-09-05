@@ -130,8 +130,8 @@ class LavaForgeLayerRelocationTest(unittest.TestCase):
                 "LavaForgeLocation.entrance()",
                 "LavaForgeLocation.isExitLadder",
                 "LavaForgeLocation.dwarvenMineReturn()",
-                "player.teleport(329, 3419, false)",
-                "player.teleport(271, 3339, false)",
+                "player.teleportLegacyPacked(329, 3419, false)",
+                "player.teleportLegacyPacked(271, 3339, false)",
             ),
             "server/src/com/openrsc/server/service/PlayerService.java": (
                 "LavaForgeLocation.relocateLegacyComponentCandidate",

@@ -172,6 +172,41 @@ classified as compatibility-runtime behavior rather than guessed into a
 declarative graph. The report is execution provenance supplementary to the
 12-file map baseline, not an expansion rewrite policy.
 
+The current transition lock records the observed provider source and map-input
+fingerprint, including the already tracked boundary/ground-item differences from
+the original frozen map. It does not change the original map seal or approve
+those differences as Preservation input. Stale transition source hashes now fail
+the foundation test; the refusal includes candidate inventory metadata for
+explicit review. The lexical inventory includes `teleportLegacyPacked`,
+`teleportLayered`, and `teleportRelativeLayer` calls as well as `teleport`.
+
+`tests/myworld/test-preservation-transition-execution.py` builds Current Base and
+executes its actual `Server`, `Player`, `RegionManager`, Magic Guild portal,
+ladder/stair, and default boundary transition code against the converted frozen
+1,764-sector map. Only the twelve hash-checked provider baseline inputs are
+materialized in a temporary directory. Two changed placement inputs are obtained
+from provider history commit `19d819b3649dfb8401836d649d7f218c8d347577` and checked
+against the original baseline hashes, so this test requires that historical
+commit to be available. It does not read another checkout or user data.
+
+The reviewed ladder and Magic Guild consumers distinguish explicit packed
+destinations from geographically relative movement. Absolute destinations and
+source tests use the packed adapter; generic ladders retain signed relative
+movement, and existing named Advanced relocations retain their explicit layered
+destinations. This fixes the vanilla Magic Guild upper-floor portal incorrectly
+retaining level 2 when its intended surface destination also has upper-floor
+terrain. The integration test additionally checks all twenty explicit data
+edges, their command gate, and exact native package ownership.
+
+This is bounded server/plugin evidence. It does not establish a complete review
+of all scripted quests, transports, cached return coordinates, or direct
+location mutations in the lexical inventory. Other consumers, including
+`ExitPortal`, retain two-coordinate calls that still need semantic review.
+Network click dispatch, client scenes, persisted transition destinations after
+restart, and full-world population activation are not proved by this test.
+The generated Preservation package consequently remains `transitions-pending`
+with `runtimePromotionApproved=false`.
+
 ## Native package check
 
 `layered-world-package-v1` declares terrain with explicit
