@@ -19,7 +19,11 @@
     "contractId": "canonical-public-state-v1",
     "durableLocation": "outside-code-runtime",
     "migration": "transactional",
-    "rollback": "exact-predecessor"
+    "rollback": "exact-predecessor",
+    "sqliteRootProperty": "openrsc.currentBaseStateRoot",
+    "sqliteFile": "current_base.db",
+    "sqliteRootPolicy": "required-canonical-private-directory-disjoint-from-runtime",
+    "sqliteOpenPolicy": "existing-private-file-read-write-no-create"
   },
   "serverContent": {
     "contentId": "current-base-public-content-v1",
@@ -48,6 +52,7 @@
     "evidenceSchemaId": "current-base-installed-execution-evidence-v1"
   },
   "requiredRuntimeClasses": [
+    "com/openrsc/server/database/impl/sqlite/CurrentBaseStateLocation.class",
     "com/openrsc/server/database/CurrentBaseInstalledExecutionVerifier.class",
     "com/openrsc/server/database/CurrentBaseStateMigration.class",
     "com/openrsc/server/io/NativeLayeredWorldPackage.class",

@@ -20,12 +20,12 @@
       "clientTreeBeforeSha256": {"$ref": "#/$defs/hash"}, "clientTreeAfterSha256": {"$ref": "#/$defs/hash"},
       "inputSetBeforeSha256": {"$ref": "#/$defs/hash"}, "inputSetAfterSha256": {"$ref": "#/$defs/hash"}, "unchanged": {"const": true}
     }},
-    "execution": {"type": "object", "additionalProperties": false, "required": ["endpoint", "serverPort", "websocketPort", "launchCount", "mapPackageFingerprint", "disposableAccountId", "disposableUsernameSha256", "workingStateSeededSha256", "workingStateFinalSha256", "disposableStateChanged", "persistenceVerified", "credentialDeleted"], "properties": {
+    "execution": {"type": "object", "additionalProperties": false, "required": ["endpoint", "serverPort", "websocketPort", "launchCount", "mapPackageFingerprint", "disposableAccountId", "disposableUsernameSha256", "workingStateSeededSha256", "workingStateFinalSha256", "disposableStateChanged", "stateOutsideRuntimeRoots", "persistenceVerified", "credentialDeleted"], "properties": {
       "endpoint": {"const": "127.0.0.1"}, "serverPort": {"type": "integer", "minimum": 1, "maximum": 65535},
       "websocketPort": {"type": "integer", "minimum": 1, "maximum": 65535}, "launchCount": {"const": 2},
       "mapPackageFingerprint": {"$ref": "#/$defs/hash"}, "disposableAccountId": {"type": "integer", "minimum": 1},
       "disposableUsernameSha256": {"$ref": "#/$defs/hash"}, "workingStateSeededSha256": {"$ref": "#/$defs/hash"},
-      "workingStateFinalSha256": {"$ref": "#/$defs/hash"}, "disposableStateChanged": {"const": true}, "persistenceVerified": {"const": true}, "credentialDeleted": {"const": true}
+      "workingStateFinalSha256": {"$ref": "#/$defs/hash"}, "disposableStateChanged": {"const": true}, "stateOutsideRuntimeRoots": {"const": true}, "persistenceVerified": {"const": true}, "credentialDeleted": {"const": true}
     }},
     "runs": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "object", "additionalProperties": false, "required": ["run", "handshakeAccepted", "loginAccepted", "canonicalMap", "initialRegion", "worldX", "worldY", "coins", "prayer", "magic", "woodcut", "questStage", "advancedExcluded", "logoutPersisted"], "properties": {
       "run": {"type": "integer", "minimum": 1, "maximum": 2}, "handshakeAccepted": {"const": true}, "loginAccepted": {"const": true},

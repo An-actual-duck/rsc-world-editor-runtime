@@ -478,6 +478,10 @@ public final class CurrentBaseContentHarness {
                 "durableLocation": "outside-code-runtime",
                 "migration": "transactional",
                 "rollback": "exact-predecessor",
+                "sqliteRootProperty": "openrsc.currentBaseStateRoot",
+                "sqliteFile": "current_base.db",
+                "sqliteRootPolicy": "required-canonical-private-directory-disjoint-from-runtime",
+                "sqliteOpenPolicy": "existing-private-file-read-write-no-create",
             },
             self.profile["statePolicy"],
         )

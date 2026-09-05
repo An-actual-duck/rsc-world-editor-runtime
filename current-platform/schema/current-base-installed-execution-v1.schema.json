@@ -43,7 +43,7 @@
       "properties": {
         "workspace": {"const": "new-provider-owned-disposable-directory"},
         "sourceMutation": {"const": "forbidden-hash-before-and-after"},
-        "runtimeRoots": {"const": "copied-under-workspace"}, "state": {"const": "copied-sqlite-database"},
+        "runtimeRoots": {"const": "copied-under-workspace"}, "state": {"const": "copied-sqlite-database-outside-runtime-roots"},
         "account": {"const": "generated-disposable-account-only"},
         "credential": {"const": "generated-inside-workspace-delete-always"},
         "workspacePermissions": {"const": "owner-only-0700-and-state-0600"},

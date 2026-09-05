@@ -209,9 +209,11 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
             self.assertNotEqual(evidence["execution"]["workingStateSeededSha256"],
                                 evidence["execution"]["workingStateFinalSha256"])
             self.assertEqual([1, 2], [row["run"] for row in evidence["runs"]])
+            self.assertTrue(evidence["execution"]["stateOutsideRuntimeRoots"])
+            self.assertFalse((workspace / "execution/server/inc/sqlite/current_base.db").exists())
             self.assertNotIn("existing", evidence_path.read_text(encoding="utf-8"))
             self.assertFalse((workspace / "execution/credential.json").exists())
-            with sqlite3.connect(workspace / "execution/server/inc/sqlite/current_base.db") as db:
+            with sqlite3.connect(workspace / "state/current_base.db") as db:
                 self.assertEqual((913, "existing"), db.execute(
                     "SELECT id,username FROM players WHERE id=913").fetchone())
             after = {str(path): sha256(path) for path in inputs if path.is_file()}

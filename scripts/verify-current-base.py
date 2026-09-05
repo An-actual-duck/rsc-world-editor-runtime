@@ -161,6 +161,10 @@ def validate_profile(path: Path) -> dict:
         "durableLocation": "outside-code-runtime",
         "migration": "transactional",
         "rollback": "exact-predecessor",
+        "sqliteRootProperty": "openrsc.currentBaseStateRoot",
+        "sqliteFile": "current_base.db",
+        "sqliteRootPolicy": "required-canonical-private-directory-disjoint-from-runtime",
+        "sqliteOpenPolicy": "existing-private-file-read-write-no-create",
     }:
         raise VerificationError("Current Base public state policy is incomplete")
     if profile["serverContent"] != {

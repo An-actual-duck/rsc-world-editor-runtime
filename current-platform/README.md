@@ -9,7 +9,7 @@ includes a provider-owned conservative configuration and definition catalog,
 and excludes the Advanced asset catalog. Current Advanced remains
 `foundation-contract-only` and non-installable until its separate evidence is
 complete. Base is verified by the closed compiled
-`preservation-retro-to-current-base-v1` SQLite/MariaDB migration row and the
+retro/core/initialized SQLite rows and separate retro MariaDB row, and the
 built server/client loopback execution scenario through login, canonical map
 load, durable gameplay state, logout, and restart. Neither status means
 released.
@@ -38,7 +38,7 @@ canonical map bootstrap classes, public plugin inventory/state policy contract,
 the conservative server-content inventory, and Advanced-only
 plugin/resource/configuration exclusion. The migration manifest binds the
 compiled main class in the `server-runtime` artifact (there is deliberately no
-unreviewed free-standing migration executable), its two exact source-schema
+unreviewed free-standing migration executable), its four exact source-schema
 fingerprints, closed invocation, and evidence contract. It is still a source-tree candidate
 verifier rather than an installed-runtime launch tool. The built server and
 client themselves parse the exact composition identity and enforce its six
@@ -53,6 +53,27 @@ publishes only an ephemeral port on literal `127.0.0.1`; the desktop gate runs
 the built client against a disposable loopback server and temporary state.
 Neither gate downloads an image, uses external credentials, or touches an
 installed target.
+
+Current Base requires `-Dopenrsc.currentBaseStateRoot=/absolute/private/state`
+on the server JVM. This is a provider-owned launch input, not a legacy database
+name override. The directory must already exist, be canonical and unlinked,
+have mode `0700`, and be disjoint from both the server working directory and
+the runtime artifact directory. It contains the already-migrated
+`current_base.db` with mode `0600`; safe private SQLite recovery sidecars remain
+alongside it. Missing databases, symlinks, hard-link aliases, non-private modes,
+noncanonical names, and runtime-directory overlap are refused before opening.
+The JDBC connection uses an escaped file URI in existing-file read/write mode;
+it never creates a replacement database or silently falls back to `inc/sqlite`.
+An unbound historical runtime keeps its ordinary location and cannot opt into
+this Current Base property. Unsupported non-POSIX permission checks fail closed.
+
+The separate installed-execution verifier now runs both server/client cycles
+against `workspace/state/current_base.db`, outside its copied runtime roots,
+and records `stateOutsideRuntimeRoots:true` in closed evidence. This proves
+SQLite placement and persistence, not a complete immutable-release launcher:
+configuration, logs, caches, map pointers, Editor activation/recovery binding,
+and the public transition matrix still require integration. No production
+release or real-target upgrade is authorized by these component checks.
 
 Resolve and hash the built candidate inventory:
 
