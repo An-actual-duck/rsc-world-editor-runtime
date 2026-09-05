@@ -408,7 +408,7 @@ public class StringUtil {
 
 		// BADWORDS
 		try {
-			lines = Files.readAllLines(Paths.get(System.getProperty("user.dir") + File.separator + "conf" + File.separator + "server" + File.separator + "badwordsJag.txt"));
+			lines = Files.readAllLines(com.openrsc.server.CurrentInstalledLaunch.content("conf/server/badwordsJag.txt"));
 			badwordsJag = new String[lines.size()];
 
 			for (String line : lines) {
@@ -424,7 +424,7 @@ public class StringUtil {
 
 		// GOODWORDS
 		try {
-			lines = Files.readAllLines(Paths.get(System.getProperty("user.dir") + File.separator + "conf" + File.separator + "server" + File.separator + "wordsJag.txt"));
+			lines = Files.readAllLines(com.openrsc.server.CurrentInstalledLaunch.content("conf/server/wordsJag.txt"));
 			goodwordsJag = new String[lines.size()];
 
 			for (String line : lines) {

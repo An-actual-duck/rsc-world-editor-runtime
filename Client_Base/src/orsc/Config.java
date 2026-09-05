@@ -165,7 +165,11 @@ public class Config {
 
 	static void initConfig() {
 		if (!F_ANDROID_BUILD) {
-			if (CUSTOM_CACHE_DIR_ENABLED) {
+			if (CurrentInstalledLaunch.current() != null) {
+				F_CACHE_DIR = CurrentInstalledLaunch.content("Cache").toString();
+				if (!java.nio.file.Files.isDirectory(java.nio.file.Paths.get(F_CACHE_DIR), java.nio.file.LinkOption.NOFOLLOW_LINKS))
+					throw new IllegalStateException("Installed client cache is missing; fallback is forbidden");
+			} else if (CUSTOM_CACHE_DIR_ENABLED) {
 				F_CACHE_DIR = CUSTOM_CACHE_DIR;
 			} else {
 				F_CACHE_DIR = "Cache";

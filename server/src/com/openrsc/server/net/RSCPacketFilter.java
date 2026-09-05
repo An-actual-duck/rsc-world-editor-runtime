@@ -85,7 +85,7 @@ public class RSCPacketFilter {
 	public void loadIpBans() {
 		synchronized (ipBans) {
 			int counter = 0;
-			File ipBansFile = new File(BAN_FILE_PATH);
+			File ipBansFile = com.openrsc.server.CurrentInstalledLaunch.sideState(BAN_FILE_PATH).toFile();
 			try {
 				// creates new file only if ipbans.txt file doesn't already exist.
 				boolean newFile = ipBansFile.createNewFile();
@@ -93,7 +93,7 @@ public class RSCPacketFilter {
 					LOGGER.info("Created new IP bans file at " + ipBansFile.getAbsolutePath());
 					return;
 				}
-				BufferedReader reader = new BufferedReader(new FileReader(BAN_FILE_PATH));
+				BufferedReader reader = new BufferedReader(new FileReader(ipBansFile));
 				String line;
 				while ((line = reader.readLine()) != null) {
 					counter++;
@@ -162,8 +162,8 @@ public class RSCPacketFilter {
 			}
 			return;
 		}
-		Path filePath = Paths.get(BAN_FILE_PATH);
-		Path tempFilePath = Paths.get(BAN_TEMPFILE_PATH);
+		Path filePath = com.openrsc.server.CurrentInstalledLaunch.sideState(BAN_FILE_PATH);
+		Path tempFilePath = com.openrsc.server.CurrentInstalledLaunch.sideState(BAN_TEMPFILE_PATH);
 		synchronized(ipBans) {
 			if (until == -1 && (!ipBans.containsKey(hostAddress) || ipBans.get(hostAddress) == 0)) { // Perm ban
 				try {

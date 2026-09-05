@@ -75,9 +75,10 @@ public interface ClientPort {
 	void setIconImage(String serverName);
 
 	static boolean saveHideIp(int preference) {
-		FileOutputStream fileout;
+		java.io.OutputStream fileout;
 		try {
-			fileout = new FileOutputStream(Config.F_CACHE_DIR + File.separator + "hideIp.txt");
+			fileout = orsc.CurrentInstalledLaunch.current() == null
+				? new FileOutputStream(new File(Config.F_CACHE_DIR, "hideIp.txt")) : orsc.CurrentInstalledLaunch.openSideStateOutput("hideIp.txt");
 
 			OutputStreamWriter outputWriter = new OutputStreamWriter(fileout);
 			outputWriter.write("" + preference);
@@ -90,7 +91,8 @@ public interface ClientPort {
 
 	static int loadHideIp() {
 		try {
-			FileInputStream in = new FileInputStream(Config.F_CACHE_DIR + File.separator + "hideIp.txt");
+			FileInputStream in = new FileInputStream(orsc.CurrentInstalledLaunch.current() == null
+				? new File(Config.F_CACHE_DIR, "hideIp.txt") : orsc.CurrentInstalledLaunch.sideState("hideIp.txt").toFile());
 			InputStreamReader inputStreamReader = new InputStreamReader(in);
 			BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
 			StringBuilder sb = new StringBuilder();
@@ -107,9 +109,10 @@ public interface ClientPort {
 	}
 
 	static boolean saveCredentials(String creds) {
-		FileOutputStream fileout;
+		java.io.OutputStream fileout;
 		try {
-			fileout = new FileOutputStream(Config.F_CACHE_DIR + File.separator + "credentials.txt");
+			fileout = orsc.CurrentInstalledLaunch.current() == null
+				? new FileOutputStream(new File(Config.F_CACHE_DIR, "credentials.txt")) : orsc.CurrentInstalledLaunch.openSideStateOutput("credentials.txt");
 
 			OutputStreamWriter outputWriter = new OutputStreamWriter(fileout);
 			outputWriter.write(creds);
@@ -122,7 +125,8 @@ public interface ClientPort {
 
 	static String loadCredentials() {
 		try {
-			FileInputStream in = new FileInputStream(Config.F_CACHE_DIR + File.separator + "credentials.txt");
+			FileInputStream in = new FileInputStream(orsc.CurrentInstalledLaunch.current() == null
+				? new File(Config.F_CACHE_DIR, "credentials.txt") : orsc.CurrentInstalledLaunch.sideState("credentials.txt").toFile());
 			InputStreamReader inputStreamReader = new InputStreamReader(in);
 			BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
 			StringBuilder sb = new StringBuilder();

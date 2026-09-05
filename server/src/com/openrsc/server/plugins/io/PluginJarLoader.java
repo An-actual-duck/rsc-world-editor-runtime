@@ -33,11 +33,12 @@ public class PluginJarLoader {
     }
 
     public void loadJar() throws Exception {
-        final String pathToJar = "./plugins.jar";
+        final String pathToJar = com.openrsc.server.CurrentInstalledLaunch.current() == null ? "./plugins.jar"
+            : com.openrsc.server.CurrentInstalledLaunch.content("plugins.jar").toString();
         final boolean jarExists = new File(pathToJar).isFile();
         if (jarExists) {
             final JarFile jarFile = new JarFile(pathToJar);
-            final URL[] urls = {new URL("jar:file:" + pathToJar + "!/")};
+            final URL[] urls = {new File(pathToJar).toURI().toURL()};
             urlClassLoader = URLClassLoader.newInstance(urls, getClass().getClassLoader());
 
             final Enumeration<JarEntry> enumeration = jarFile.entries();

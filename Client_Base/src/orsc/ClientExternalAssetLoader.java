@@ -71,6 +71,13 @@ final class ClientExternalAssetLoader {
 	Path[] getAssetCandidateBases(String... relativePaths) {
 		ArrayList<Path> candidates = new ArrayList<Path>();
 		for (String relativePath : relativePaths) {
+			if (CurrentInstalledLaunch.current() != null) {
+				Path bound = CurrentInstalledLaunch.content(relativePath).normalize();
+				if (!bound.startsWith(CurrentInstalledLaunch.content("")))
+					throw new IllegalArgumentException("Installed asset path escapes immutable content");
+				candidates.add(bound);
+				continue;
+			}
 			candidates.add(this.userDirectory.resolve(relativePath).normalize());
 			candidates.add(this.userDirectory.resolve("../").resolve(relativePath).normalize());
 			candidates.add(this.userDirectory.resolve("../Core-Framework").resolve(relativePath).normalize());

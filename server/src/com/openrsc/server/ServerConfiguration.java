@@ -445,6 +445,12 @@ public class ServerConfiguration {
 	private final YMLReader serverProps = new YMLReader();
 
 	void initConfig(String defaultFile) throws IOException {
+		if (CurrentInstalledLaunch.current() != null) {
+			// Managed configuration is complete and reviewed. Never consult local overrides.
+			serverProps.loadFromYML(defaultFile);
+			configFile = defaultFile;
+			CONFIG_DIR = CurrentInstalledLaunch.content("conf/server").toString();
+		} else {
 		// Try to load the connections.conf
 		try {
 			serverProps.loadFromYML("connections.conf");
@@ -455,6 +461,7 @@ public class ServerConfiguration {
 		}
 
 		configFile = ServerConfiguration.loadServerProps(serverProps, defaultFile);
+		}
 
 		notifyDeprecated();
 
@@ -486,6 +493,8 @@ public class ServerConfiguration {
 		ENFORCE_CUSTOM_CLIENT_VERSION = tryReadBool("enforce_custom_client_version").orElse(true);
 		SERVER_BIND_ADDRESS = tryReadString("server_bind_address").orElse("0.0.0.0");
 		SERVER_PORT = tryReadInt("server_port").orElse(43594);
+		if (CurrentInstalledLaunch.current() != null && SERVER_PORT != CurrentInstalledLaunch.current().port())
+			throw new IOException("Managed server endpoint differs from reviewed configuration");
 		WS_SERVER_PORT = tryReadInt("ws_server_port").orElse(43494);
 		WANT_FEATURE_WEBSOCKETS = tryReadBool("want_feature_websockets").orElse(true);
 		if (WS_SERVER_PORT == SERVER_PORT) {

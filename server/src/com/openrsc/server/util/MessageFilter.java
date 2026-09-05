@@ -37,7 +37,7 @@ public class MessageFilter {
 
 		// BADWORDS
 		try {
-			lines = Files.readAllLines(Paths.get("badwords.txt"));
+			lines = Files.readAllLines(com.openrsc.server.CurrentInstalledLaunch.sideState("badwords.txt"));
 
 			for (String line : lines) {
 				line = line.trim().toLowerCase();
@@ -59,7 +59,7 @@ public class MessageFilter {
 
 		// GOODWORDS
 		try {
-			lines = Files.readAllLines(Paths.get("goodwords.txt"));
+			lines = Files.readAllLines(com.openrsc.server.CurrentInstalledLaunch.sideState("goodwords.txt"));
 
 			for (String line : lines) {
 				line = line.trim().toLowerCase();
@@ -81,7 +81,7 @@ public class MessageFilter {
 
 		// ALERTWORDS
 		try {
-			lines = Files.readAllLines(Paths.get("alertwords.txt"));
+			lines = Files.readAllLines(com.openrsc.server.CurrentInstalledLaunch.sideState("alertwords.txt"));
 
 			for (String line : lines) {
 				line = line.trim().toLowerCase();
@@ -410,7 +410,7 @@ public class MessageFilter {
 	}
 
 	public static void syncBadwordsToDisk() {
-		Path out = Paths.get("badwords.txt");
+		Path out = com.openrsc.server.CurrentInstalledLaunch.sideState("badwords.txt");
 		try {
 			Files.write(out, badwords, Charset.defaultCharset());
 		} catch (IOException ex) {
@@ -419,7 +419,7 @@ public class MessageFilter {
 	}
 
 	public static void syncGoodwordsToDisk() {
-		Path out = Paths.get("goodwords.txt");
+		Path out = com.openrsc.server.CurrentInstalledLaunch.sideState("goodwords.txt");
 		try {
 			Files.write(out, goodwords, Charset.defaultCharset());
 		} catch (IOException ex) {
@@ -428,7 +428,7 @@ public class MessageFilter {
 	}
 
 	public static void syncAlertwordsToDisk() {
-		Path out = Paths.get("alertwords.txt");
+		Path out = com.openrsc.server.CurrentInstalledLaunch.sideState("alertwords.txt");
 		try {
 			Files.write(out, alertwords, Charset.defaultCharset());
 		} catch (IOException ex) {

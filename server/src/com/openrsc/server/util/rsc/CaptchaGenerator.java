@@ -22,9 +22,9 @@ public class CaptchaGenerator {
 
 	private static List<Color> colors = new ArrayList<>();
 	private static List<String> words = new ArrayList<>();
-	private static String fontFolder = "." + File.separator + "conf" + File.separator + "server" + File.separator + "fonts" + File.separator;
-    private static String sleepwordsFolder = "." + File.separator + "conf" + File.separator + "server" + File.separator + "data" + File.separator + "sleepwords" + File.separator;
-	private static String specialSleepwordsFolder = "." + File.separator + "conf" + File.separator + "server" + File.separator + "data" + File.separator + "specialsleepwords" + File.separator;
+	private static String fontFolder = com.openrsc.server.CurrentInstalledLaunch.content("conf/server/fonts").toString() + File.separator;
+    private static String sleepwordsFolder = com.openrsc.server.CurrentInstalledLaunch.content("conf/server/data/sleepwords").toString() + File.separator;
+	private static String specialSleepwordsFolder = com.openrsc.server.CurrentInstalledLaunch.content("conf/server/data/specialsleepwords").toString() + File.separator;
 	private static Font loadedFonts[];
 	public static int prerenderedSleepwordsSize = 0;
 	public static int prerenderedSleepwordsSpecialSize = 0;
@@ -367,7 +367,7 @@ public class CaptchaGenerator {
 	private static void loadFonts() {
 		words.clear();
 		try (final BufferedReader br = new BufferedReader(new FileReader(
-			new File(System.getProperty("user.dir") + File.separator + "conf" + File.separator + "server" + File.separator + "words.list")))) {
+			com.openrsc.server.CurrentInstalledLaunch.content("conf/server/words.list").toFile()))) {
 			for (String line; (line = br.readLine()) != null; )
 				words.add(line);
 		} catch (final IOException e1) {

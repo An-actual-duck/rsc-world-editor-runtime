@@ -36,7 +36,8 @@ public class Discord {
 	 */
 	public static void setInUse(final boolean inuse) {
 		try {
-			Files.write(Paths.get(Config.F_CACHE_DIR + File.separator + "discord_inuse.txt"), (inuse ? "1" : "0").getBytes());
+			Files.write(CurrentInstalledLaunch.current() == null ? Paths.get(Config.F_CACHE_DIR + File.separator + "discord_inuse.txt")
+				: Paths.get("discord_inuse.txt"), (inuse ? "1" : "0").getBytes());
 		} catch (Exception e) {
 		}
 	}
@@ -47,7 +48,8 @@ public class Discord {
 	 */
 	public static boolean getInUse() {
 		try {
-			final String read = Files.readAllLines(Paths.get(Config.F_CACHE_DIR + File.separator + "discord_inuse.txt")).get(0);
+			final String read = Files.readAllLines(CurrentInstalledLaunch.current() == null ? Paths.get(Config.F_CACHE_DIR + File.separator + "discord_inuse.txt")
+				: Paths.get("discord_inuse.txt")).get(0);
 			return read.equals("1");
 		} catch (Exception e) {
 			setInUse(true);

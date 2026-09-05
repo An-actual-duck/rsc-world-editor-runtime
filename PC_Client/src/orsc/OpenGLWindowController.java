@@ -88,6 +88,7 @@ final class OpenGLWindowController {
 		syncWindowMode(width, height);
 		gl.glfwShowWindow(window);
 		WorldBuilderClientWindowReady.signalWindowShown();
+		CurrentInstalledLaunch.signalWindowShown();
 	}
 
 	long window() {

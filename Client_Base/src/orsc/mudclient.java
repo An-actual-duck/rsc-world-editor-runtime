@@ -1412,7 +1412,7 @@ public final class mudclient implements Runnable {
 
 	private static Properties loadClientSettings() {
 		Properties props = new Properties();
-		try (FileInputStream in = new FileInputStream("./clientSettings.conf")) {
+		try (FileInputStream in = new FileInputStream(CurrentInstalledLaunch.sideState("clientSettings.conf").toFile())) {
 			props.load(in);
 		} catch (FileNotFoundException e) {
 			// Missing local settings are fine; callers will create the file on save.
@@ -1424,7 +1424,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private static void saveClientSettings(Properties props) {
-		try (FileOutputStream out = new FileOutputStream("./clientSettings.conf")) {
+		try (FileOutputStream out = new FileOutputStream(CurrentInstalledLaunch.sideState("clientSettings.conf").toFile())) {
 			props.store(out, "Client settings");
 		} catch (IOException e) {
 			System.out.println("Something went wrong saving client settings");
@@ -20685,7 +20685,8 @@ public final class mudclient implements Runnable {
     }*/
 
 	private long getUID() {
-		File uID = new File(F_CACHE_DIR + File.separator + "uid.dat");
+		File uID = CurrentInstalledLaunch.current() == null ? new File(F_CACHE_DIR + File.separator + "uid.dat")
+			: CurrentInstalledLaunch.sideState("uid.dat").toFile();
 		try {
 			if (uID.exists()) {
 				try (BufferedReader buffer = new BufferedReader(new FileReader(uID))) {

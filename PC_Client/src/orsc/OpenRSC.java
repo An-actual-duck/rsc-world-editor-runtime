@@ -22,6 +22,10 @@ public class OpenRSC extends ORSCApplet {
 			CurrentCompositionIdentity.initializeFromSystemProperties();
 			WorldBuilderClientProfile.initializeFromSystemProperties().applyConnection();
 			CurrentBaseExecutionProfile.initializeFromSystemProperties().applyConnection();
+			if (CurrentInstalledLaunch.current() != null) {
+				Config.SERVER_IP = CurrentInstalledLaunch.current().host();
+				Config.SERVER_PORT = CurrentInstalledLaunch.current().port();
+			}
 		} catch (IllegalArgumentException exception) {
 			System.err.println("Client startup refused: " + exception.getMessage());
 			System.exit(2);
@@ -52,7 +56,7 @@ public class OpenRSC extends ORSCApplet {
 			System.setProperty("apple.awt.application.appearance", "system");
 		}
 
-		File scalingSettings = new File("./clientSettings.conf");
+		File scalingSettings = CurrentInstalledLaunch.sideState("clientSettings.conf").toFile();
 		if (scalingSettings.exists()) {
 			Properties props = new Properties();
 
