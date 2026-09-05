@@ -419,13 +419,13 @@ def validate_installed_verifier(path: Path, profile: dict) -> None:
 
 
 def validate_input_adapter(path: Path, baseline_path: Path,
-                           converter_path: Path) -> None:
+                           converter_path: Path, server_path: Path) -> None:
     adapter = json.loads(path.read_text(encoding="utf-8"))
     require_exact_keys(
         adapter,
         {"schemaId", "manifestType", "inputAdapterId", "inputAdapterContractId",
          "sourceLineage", "baseline", "targetLayout", "configurationSelectors",
-         "mapConversion", "stateRows", "selectionPolicy"},
+         "mapConversion", "legacyMapDecoding", "stateRows", "selectionPolicy"},
         "input adapter",
     )
     if (adapter["schemaId"] != "current-preservation-r64-input-adapter-v1"
@@ -443,6 +443,14 @@ def validate_input_adapter(path: Path, baseline_path: Path,
         raise VerificationError("input adapter map conversion is unsupported")
     if "com/openrsc/layeredmaps/LayeredMapsCli.class" not in archive_names(converter_path):
         raise VerificationError("input adapter converter lacks its declared main class")
+    decoding = adapter["legacyMapDecoding"]
+    if (decoding.get("toolArtifactRole") != "server-runtime"
+            or decoding.get("mainClass") != "com.openrsc.server.io.PreservationJagDecode"
+            or decoding["decodingPolicy"].get("runtimePromotionApproved") is not False):
+        raise VerificationError("historical JAG decoding contract is unsupported")
+    for required in ("PreservationJagDecode", "BoundedJagArchive", "HistoricalJagSectorDecoder"):
+        if f"com/openrsc/server/io/{required}.class" not in archive_names(server_path):
+            raise VerificationError(f"server lacks input-adapter decoder class {required}")
 
 
 def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
@@ -530,7 +538,7 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
     migration = validate_state_migration(migration_path, profile)
     validate_installed_verifier(installed_verifier_path, profile)
     validate_input_adapter(
-        input_adapter_path, input_baseline_path, input_converter_path)
+        input_adapter_path, input_baseline_path, input_converter_path, server)
     validate_client_content(client_content_manifest_path, client_content_path)
 
     for required in profile["requiredRuntimeClasses"]:

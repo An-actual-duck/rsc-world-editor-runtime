@@ -18,6 +18,11 @@ public class JContentFile {
 		return m_position;
 	}
 
+    public void requireFullyRead() {
+        if (m_position != m_data.length) throw new IllegalArgumentException(
+            "historical sector stream has trailing data");
+    }
+
     public byte readByte() {
         return m_data[m_position++];
     }

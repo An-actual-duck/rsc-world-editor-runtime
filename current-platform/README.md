@@ -14,6 +14,52 @@ built server/client loopback execution scenario through login, canonical map
 load, durable gameplay state, logout, and restart. Neither status means
 released.
 
+## Historical Preservation JAG decoding
+
+Default r64 Preservation server terrain comes from the four reviewed
+`maps64.jag`, `maps64.mem`, `land64.jag`, and `land64.mem` archives—not from
+the client's `Authentic_Landscape.orsc` ZIP. The input-adapter manifest now
+binds a decode-only tool in the existing `server-runtime` artifact:
+`com.openrsc.server.io.PreservationJagDecode`. Its exact seven option/value
+pairs are `--contract`, `--maps-free`, `--maps-members`, `--land-free`,
+`--land-members`, `--output`, and `--evidence`. Every path is absolute and
+canonical; the two output paths must be new, disjoint, and have existing
+parents. The contract is the complete shipped Preservation input-adapter
+manifest, not an arbitrary decoder description.
+
+The tool accepts only the contract-bound four public archive sizes/hashes.
+It validates archive framing, complete bounded decompression, CRCs, entry
+tables, duplicate hashes, stream consumption and resource limits before
+creating output. Generic WorldLoader delegates to the same extracted pure
+sector algorithm, preserving alternate/member behavior; migration uses only
+the reviewed non-alternate member r64 policy. All 1,680 historical probes
+(planes 0–3, archive X 48–68, archive Y 37–56) are recorded. Present sectors
+are exactly 23,040 native bytes; absent sectors remain absent, not synthesized.
+Evidence binds source and complete output inventories, confirms unchanged
+inputs, and identifies selected free/member streams. Existing outputs and
+aliases are refused. Failure retains any newly created partial output for
+explicit recovery; it never force-cleans or overwrites another workspace.
+
+This is raw decoding, not full WorldLoader behavior: the historical signed
+short-to-int diagonal conversion is retained, discarded tile directions are
+counted and hashed, and neither subsequent overlay processing nor static
+placements are applied. In particular, WorldLoader copies the raw overlay
+into its tile before using 250→2 for subsequent collision lookup; globally
+rewriting raw overlays would not preserve that behavior.
+
+Complete tests against the frozen original method establish byte/null parity
+for all probes. The reviewed archives produce 352 sectors and 1,328 absent
+probes, discarding 15,468 nonzero tile-direction values. Against all 1,764
+client ZIP entries, 276 server sectors are byte-identical and 76 differ; no
+server sector is missing from that ZIP. Its 1,412 additional entries comprise
+1,328 absent server probes and 84 coordinates outside the server probe range.
+Differences include 162,324 elevation values, 291 diagonal markers, and one
+each of colour, overlay and roof. Client ZIP substitution is therefore not
+an evidence-backed preservation strategy. This tool does not establish
+client reconciliation, complete map conversion, gameplay parity, or runtime
+promotion approval. Its closed evidence schema lives in the existing input
+adapter schema's `jagDecodeEvidence` definition.
+
 Validate the catalog:
 
 ```bash
