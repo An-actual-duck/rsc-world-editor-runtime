@@ -48,6 +48,16 @@
     "network": "literal-ipv4-loopback-only",
     "processes": "bounded-and-terminated-always"
   },
+  "supervisionPolicy": {
+    "stdin": "parent-held-open-pipe-until-verifier-exit",
+    "cancellation": "stdin-eof-or-unexpected-data-before-success-publication",
+    "cleanup": "terminate-owned-server-client-processes-and-delete-credential",
+    "cancellationExitCode": 2,
+    "forcedTerminationWaitSeconds": 10,
+    "logDrainWaitSeconds": 5,
+    "maximumCancellationSeconds": 90,
+    "hardKill": "unsupported-requires-disposable-workspace-recovery"
+  },
   "requiredObservations": [
     "six-field-composition-handshake",
     "successful-normal-login",

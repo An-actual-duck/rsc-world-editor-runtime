@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  */
 public final class CurrentBaseInstalledExecutionVerifier {
 	private static final String CONTRACT_SHA256 =
-		"61c5608d03bac2201c7d19a19a2bbe3a7431e677636ba706ad6e933f50e8d30f";
+		"b13aaa9f247dbcfd8c5cb55ea2535f07f76400ae9d12d1cf654197be1b3afe55";
 	private static final int MAX_LOG_BYTES = 1048576;
 	private static final int MAX_MAP_MANIFEST_BYTES = 16777216;
 	private static final int MAX_SOURCE_FILES = 20000;
@@ -70,29 +70,94 @@ public final class CurrentBaseInstalledExecutionVerifier {
 
 	public static void main(String[] arguments) {
 		Map<String,String> parsed = null;
+		Supervision supervision = new Supervision();
+		supervision.start();
 		try {
 			Map<String,String> options = options(arguments); parsed = options;
 			if (!options.keySet().equals(OPTIONS)) throw new IOException(
 				"arguments differ from the closed installed-execution invocation");
 			Contract contract = Contract.load(regular(options, "contract"));
-			Verification verification = new Verification(options, contract);
+			Verification verification = new Verification(options, contract, supervision);
 			JSONObject evidence = verification.execute();
 			Path output = newOutput(options, "evidence");
-			Files.createDirectories(output.getParent());
-			Files.write(output, (evidence.toString(2) + "\n").getBytes(StandardCharsets.UTF_8),
-				StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+			supervision.publish(output, evidence);
 			System.out.println("Current Base installed execution verified");
 		} catch (Exception failure) {
+			supervision.cancel();
+			supervision.cleanup();
 			System.err.println("Current Base installed execution refused: "
 				+ safeMessage(failure, parsed));
 			System.exit(2);
 		}
 	}
 
+	/** The parent's pipe is a capability, not a supplied PID or a guessed process group. */
+	private static final class Supervision {
+		private final List<BoundedProcess> children = new ArrayList<BoundedProcess>();
+		private boolean cancelled, published;
+		private Path credential;
+
+		private void start() {
+			Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+				public void run() { cancel(); cleanup(); }
+			}, "current-base-verifier-shutdown"));
+			Thread watcher = new Thread(new Runnable() { public void run() {
+				try { System.in.read(); } catch (IOException ignored) { }
+				if (cancel()) {
+					cleanup();
+					System.err.println("Current Base installed execution refused: supervisor pipe closed or received data");
+					System.exit(2);
+				}
+			} }, "current-base-verifier-supervisor-pipe");
+			watcher.setDaemon(true); watcher.start();
+		}
+
+		private synchronized boolean cancel() {
+			if (published) return false;
+			cancelled = true; return true;
+		}
+		private synchronized void requireActive() throws IOException {
+			if (cancelled) throw new IOException("installed execution was cancelled");
+		}
+		private synchronized BoundedProcess startChild(List<String> command, Path root,
+			Path log) throws IOException {
+			requireActive();
+			BoundedProcess child = BoundedProcess.start(command, root, log);
+			children.add(child); return child;
+		}
+		private synchronized void writeCredential(Path path, byte[] bytes) throws Exception {
+			requireActive(); credential = path;
+			Files.createDirectories(path.getParent());
+			try {
+				Set<PosixFilePermission> mode = PosixFilePermissions.fromString("rw-------");
+				Files.createFile(path, PosixFilePermissions.asFileAttribute(mode));
+			} catch (UnsupportedOperationException unsupported) { Files.createFile(path); }
+			Files.write(path, bytes, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+		}
+		private void cleanup() {
+			List<BoundedProcess> active;
+			Path secret;
+			synchronized (this) { active = new ArrayList<BoundedProcess>(children); secret = credential; }
+			// Close each client before its server, including cancellation during login.
+			Collections.reverse(active);
+			for (BoundedProcess child : active) child.closeQuietly();
+			if (secret != null) try { Files.deleteIfExists(secret); } catch (IOException failure) {
+				System.err.println("Disposable credential cleanup failed; workspace recovery required");
+			}
+		}
+		private synchronized void publish(Path output, JSONObject evidence) throws Exception {
+			requireActive();
+			Files.createDirectories(output.getParent());
+			Files.write(output, (evidence.toString(2) + "\n").getBytes(StandardCharsets.UTF_8),
+				StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+			published = true;
+		}
+	}
+
 	private static final class Verification {
 		private final Map<String,String> options;
 		private final Contract contract;
-		private final List<BoundedProcess> children = new ArrayList<BoundedProcess>();
+		private final Supervision supervision;
 		private final JSONArray logs = new JSONArray();
 		private final JSONArray runs = new JSONArray();
 		private Path workspace, serverRoot, clientRoot, workingState, workingMap, credential;
@@ -101,8 +166,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 		private String mapFingerprint, workingMapBefore, username, password;
 		private int accountId, x, y, coins, prayer, magic, woodcut, questStage;
 
-		private Verification(Map<String,String> options, Contract contract) {
-			this.options = options; this.contract = contract;
+		private Verification(Map<String,String> options, Contract contract, Supervision supervision) {
+			this.options = options; this.contract = contract; this.supervision = supervision;
 		}
 
 		private JSONObject execute() throws Exception {
@@ -159,6 +224,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			int[] coordinate = mapCoordinate(mapPackage);
 			x = coordinate[0]; y = coordinate[1];
 
+			supervision.requireActive();
 			createPrivateDirectory(workspace);
 			serverRoot = workspace.resolve("execution/server");
 			clientRoot = workspace.resolve("execution/client");
@@ -191,10 +257,10 @@ public final class CurrentBaseInstalledExecutionVerifier {
 				for (int run = 1; run <= 2; run++)
 					runCycle(run, identityCopy, serverPort, websocketPort);
 			} finally {
-				for (BoundedProcess child : children) child.closeQuietly();
-				children.clear();
+				supervision.cleanup();
 				if (credential != null) Files.deleteIfExists(credential);
 			}
+			supervision.requireActive();
 			verifyPersistentState();
 			if (!workingMapBefore.equals(treeHash(workingMap))) throw new IOException(
 				"external installed map changed during runtime execution");
@@ -228,9 +294,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 						+ serverRoot.resolve("world-builder-configs/installed-server.json"),
 					"-cp", "core.jar" + java.io.File.pathSeparator + "plugins.jar",
 					"com.openrsc.server.Server", "current-base.conf");
-				server = BoundedProcess.start(serverCommand, serverRoot,
+				server = supervision.startChild(serverCommand, serverRoot,
 					workspace.resolve("logs/server-" + run + ".log"));
-				children.add(server);
 				server.awaitText("Game world is now online on", 60, "server startup");
 
 				List<String> clientCommand = Arrays.asList(javaCommand(), "-Xms256m", "-Xmx1024m",
@@ -243,9 +308,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 					"-Dopenrsc.currentBasePort=" + serverPort,
 					"-Dopenrsc.currentBaseCredentialFile=" + credential,
 					"-Dsun.java2d.opengl=false", "-jar", "Open_RSC_Client.jar");
-				client = BoundedProcess.start(clientCommand, clientRoot,
+				client = supervision.startChild(clientCommand, clientRoot,
 					workspace.resolve("logs/client-" + run + ".log"));
-				children.add(client);
 				String marker = client.awaitText("CURRENT_BASE_RUNTIME_EXECUTION", 90,
 					"client evidence");
 				if (!client.waitFor(20) || client.exitValue() != 0) throw new IOException(
@@ -268,8 +332,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 				logs.put(server.logRecord(run, "server"));
 				logs.put(client.logRecord(run, "client"));
 			} finally {
-				if (client != null) { client.closeQuietly(); children.remove(client); }
-				if (server != null) { server.closeQuietly(); children.remove(server); }
+				if (client != null) client.closeQuietly();
+				if (server != null) server.closeQuietly();
 			}
 		}
 
@@ -425,13 +489,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 
 		private void writeCredential() throws Exception {
 			JSONObject value = new JSONObject(); value.put("username", username); value.put("password", password);
-			Files.createDirectories(credential.getParent());
-			try {
-				Set<PosixFilePermission> mode = PosixFilePermissions.fromString("rw-------");
-				Files.createFile(credential, PosixFilePermissions.asFileAttribute(mode));
-			} catch (UnsupportedOperationException unsupported) { Files.createFile(credential); }
-			Files.write(credential, (value.toString() + "\n").getBytes(StandardCharsets.UTF_8),
-				StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+			supervision.writeCredential(credential, (value.toString() + "\n").getBytes(StandardCharsets.UTF_8));
 		}
 
 		private String uniqueUsername(Connection database) throws Exception {
@@ -458,7 +516,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 				new String(bytes, StandardCharsets.UTF_8));
 			requireKeys(value, set("schemaId", "manifestType", "verifierId", "invocation",
 				"executionPolicy", "isolationPolicy", "requiredObservations", "evidenceContract",
-				"exitSemantics"), "verifier contract");
+				"exitSemantics", "supervisionPolicy"), "verifier contract");
 			if (!"current-base-installed-execution-v1".equals(value.getString("schemaId"))
 				|| !"current-base-installed-execution-verifier".equals(value.getString("manifestType"))
 				|| !"current-base-installed-execution-v1".equals(value.getString("verifierId")))
@@ -533,7 +591,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			return process.waitFor(seconds, TimeUnit.SECONDS);
 		}
 		private int exitValue() { return process.exitValue(); }
-		private void close() throws Exception {
+		private synchronized void close() throws Exception {
 			if (!closed) {
 				if (process.isAlive()) { process.destroy(); if (!process.waitFor(20, TimeUnit.SECONDS)) {
 					process.destroyForcibly(); process.waitFor(10, TimeUnit.SECONDS);
