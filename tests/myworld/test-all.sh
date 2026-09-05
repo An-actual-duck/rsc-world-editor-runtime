@@ -100,6 +100,7 @@ python3 ./tests/myworld/test-current-platform-composition.py
 python3 ./tests/myworld/test-current-base-candidate.py
 python3 ./tests/myworld/test-current-base-state-migration.py
 python3 ./tests/myworld/test-current-base-runtime-execution.py
+python3 ./tests/myworld/test-current-base-installed-execution.py
 python3 ./tests/myworld/test-custom-login-decoder.py
 python3 ./tests/myworld/test-world-builder-cold-start-isolation.py
 python3 ./tests/myworld/test-adaptive-builder-real-login.py

@@ -265,9 +265,11 @@ def build(output: Path, allow_dirty: bool) -> Path:
     server_output = output / "server"
     client_output = output / "client"
     runtime_output = output / "runtime"
+    tools_output = output / "tools"
     server_output.mkdir(parents=True)
     client_output.mkdir(parents=True)
     runtime_output.mkdir(parents=True)
+    tools_output.mkdir(parents=True)
 
     pairing = {
         "artifactContract": "current-platform-runtime-artifact-v1",
@@ -321,10 +323,16 @@ def build(output: Path, allow_dirty: bool) -> Path:
         ],
         ROOT / "Client_Base",
     )
+    run(ant_prefix + ["clean", "jar"], ROOT / "tools/layered-maps")
+    shutil.copy2(
+        ROOT / "tools/layered-maps/build/layered-maps.jar",
+        tools_output / "layered-maps.jar",
+    )
     for archive in (
         server_output / "core.jar",
         server_output / "plugins.jar",
         client_output / "Open_RSC_Client.jar",
+        tools_output / "layered-maps.jar",
     ):
         normalize_zip(archive)
 

@@ -1,21 +1,55 @@
 {
   "schemaId": "current-base-state-migration-v1",
   "manifestType": "current-base-state-migration",
-  "migrationRowId": "preservation-retro-to-current-base-v1",
+  "migrationRows": [
+    "preservation-retro-sqlite-to-current-base-v1",
+    "preservation-core-sqlite-to-current-base-v1",
+    "preservation-initialized-sqlite-to-current-base-v1",
+    "preservation-retro-mariadb-to-current-base-v1"
+  ],
   "targetStateContractId": "canonical-public-state-v1",
-  "supportedEngines": [
+  "supportedSources": [
     {
+      "migrationRowId": "preservation-retro-sqlite-to-current-base-v1",
       "engine": "sqlite",
       "sourceSchemaId": "openrsc-preservation-retro-sqlite-v1",
-      "sourceSchemaFingerprint": "d7d267f1f0a8972a75f9178c89c4541c5bf59ee81b8c294d1d8a2bd8f1c4f142",
-      "sourceSchemaFingerprintAlgorithm": "sha256-ordered-table-column-default-key-and-explicit-index-v1",
+      "sourceSchemaFingerprint": "e5e320d210ec34e832650e50c23d3aef787c47798afe79cfe061d5cf4c1a6657",
+      "sourceSchemaFingerprintAlgorithm": "sha256-sqlite-table-ddl-xinfo-foreign-key-and-index-v2",
       "verificationRuntime": "bundled-sqlite-jdbc",
       "stageMode": "new-database-file",
       "sourceMutation": "forbidden-read-only",
       "rollback": "delete-unpromoted-stage",
-      "credentialPolicy": "none"
+      "credentialPolicy": "none",
+      "transformationId": "retro-split-skills-to-current-v1"
     },
     {
+      "migrationRowId": "preservation-core-sqlite-to-current-base-v1",
+      "engine": "sqlite",
+      "sourceSchemaId": "openrsc-preservation-core-sqlite-v1",
+      "sourceSchemaFingerprint": "373648e4f9192ca29d0dda613b6807724776299e5919d93d8af894289ae67296",
+      "sourceSchemaFingerprintAlgorithm": "sha256-sqlite-table-ddl-xinfo-foreign-key-and-index-v2",
+      "verificationRuntime": "bundled-sqlite-jdbc",
+      "stageMode": "new-database-file",
+      "sourceMutation": "forbidden-read-only",
+      "rollback": "delete-unpromoted-stage",
+      "credentialPolicy": "none",
+      "transformationId": "core-skills-to-current-v1"
+    },
+    {
+      "migrationRowId": "preservation-initialized-sqlite-to-current-base-v1",
+      "engine": "sqlite",
+      "sourceSchemaId": "openrsc-preservation-initialized-sqlite-2023-v1",
+      "sourceSchemaFingerprint": "71a3804a2482a78fc96f79c0a3082e38a28d4098748160c9d7bff81ab6bdfe00",
+      "sourceSchemaFingerprintAlgorithm": "sha256-sqlite-table-ddl-xinfo-foreign-key-and-index-v2",
+      "verificationRuntime": "bundled-sqlite-jdbc",
+      "stageMode": "new-database-file",
+      "sourceMutation": "forbidden-read-only",
+      "rollback": "delete-unpromoted-stage",
+      "credentialPolicy": "none",
+      "transformationId": "preservation-2023-skills-to-current-v1"
+    },
+    {
+      "migrationRowId": "preservation-retro-mariadb-to-current-base-v1",
       "engine": "mariadb",
       "sourceSchemaId": "openrsc-preservation-retro-mariadb-v1",
       "sourceSchemaFingerprint": "99b0d6622ca7f76aac4847c7982b2eecdf489c6a74f14cdd385a618e7d96a10d",
@@ -24,10 +58,12 @@
       "stageMode": "new-loopback-schema",
       "sourceMutation": "forbidden-read-only",
       "rollback": "drop-unpromoted-stage",
-      "credentialPolicy": "environment-name-reference-only"
+      "credentialPolicy": "environment-name-reference-only",
+      "transformationId": "retro-split-skills-to-current-v1"
     }
   ],
   "transformations": {
+    "profiles": ["retro-split-skills-to-current-v1", "core-skills-to-current-v1", "preservation-2023-skills-to-current-v1"],
     "tables": ["curstats", "maxstats", "experience", "capped_experience"],
     "legacyColumnsRetained": true,
     "columnMappings": {
@@ -49,6 +85,12 @@
       "patchLedger": "all-provider-patches-through-2026-08-03",
       "startupPolicy": "no-unreviewed-patch-execution"
     }
+  },
+  "resourceLimits": {
+    "maximumSqliteSourceBytes": 4294967296,
+    "maximumRowsPerTable": 1000000,
+    "maximumEncodedRowDigestBytesPerTable": 67108864,
+    "maximumSourceCellBytesPerTable": 4294967296
   },
   "invocation": {
     "toolArtifactRole": "server-runtime",

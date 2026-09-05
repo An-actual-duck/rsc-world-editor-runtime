@@ -14,6 +14,7 @@ import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
+REVIEWED_PRESERVATION_MAP_COMMIT = "d0670a2453c64566b57e13b79e1bb701b368e697"
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -113,6 +114,53 @@ class CurrentBaseCandidateTest(unittest.TestCase):
             )
         self.assertNotEqual(0, refused.returncode)
         self.assertIn("differs from provider artifacts", refused.stderr)
+
+    def test_bundled_preservation_converter_reproduces_reviewed_map_inputs(self) -> None:
+        converter = self.output / "tools/layered-maps.jar"
+        self.assertTrue(converter.is_file())
+        with zipfile.ZipFile(converter) as archive:
+            self.assertIn(
+                "com/openrsc/layeredmaps/LayeredMapsCli.class", archive.namelist())
+        terrain = self.repo / "server/conf/server/data/Authentic_Landscape.orsc"
+        terrain_before = sha256(terrain)
+        with tempfile.TemporaryDirectory(prefix="current-base-preservation-adapter-") as temp:
+            staged_root = Path(temp) / "staged-intake"
+            workspace = Path(temp) / "conversion"
+            baseline_path = self.repo / (
+                "tools/layered-maps/baselines/"
+                "rsc-remastered-preservation-r64-v1.json")
+            baseline = json.loads(baseline_path.read_text())
+            staged_baseline = staged_root / baseline_path.relative_to(self.repo)
+            staged_baseline.parent.mkdir(parents=True)
+            staged_baseline.write_bytes(baseline_path.read_bytes())
+            provider_roles = {"preservation-configuration", "preservation-sqlite-seed"}
+            for record in baseline["files"]:
+                destination = staged_root / record["path"]
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if record["role"] in provider_roles:
+                    payload = (self.repo / record["path"]).read_bytes()
+                else:
+                    payload = subprocess.run(
+                        ["git", "show", REVIEWED_PRESERVATION_MAP_COMMIT
+                         + ":" + record["path"]], cwd=self.repo, check=True,
+                        capture_output=True,
+                    ).stdout
+                self.assertEqual(record["sha256"], hashlib.sha256(payload).hexdigest())
+                destination.write_bytes(payload)
+            converted = subprocess.run(
+                ["java", "-jar", str(converter), "preservation-package",
+                 "--root", str(staged_root), "--workspace", str(workspace)],
+                cwd=self.repo, capture_output=True, text=True, timeout=120,
+            )
+            self.assertEqual(0, converted.returncode,
+                             converted.stdout + converted.stderr)
+            report = json.loads((workspace / "generation-report.json").read_text())
+            self.assertEqual(1764, report["terrainSectorCount"])
+            self.assertEqual(0, report["unconvertedPlacementRecords"])
+            self.assertEqual("transitions-pending", report["reviewState"])
+            self.assertFalse(report["runtimePromotionApproved"])
+            self.assertTrue((workspace / "package/manifest.json").is_file())
+        self.assertEqual(terrain_before, sha256(terrain))
 
     def test_runtime_startup_and_prelogin_handshake_enforce_all_six_fields(self) -> None:
         core = self.output / "server/core.jar"

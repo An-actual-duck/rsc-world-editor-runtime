@@ -1,0 +1,69 @@
+{
+  "schemaId": "current-base-installed-execution-v1",
+  "manifestType": "current-base-installed-execution-verifier",
+  "verifierId": "current-base-installed-execution-v1",
+  "invocation": {
+    "toolArtifactRole": "server-runtime",
+    "mainClass": "com.openrsc.server.database.CurrentBaseInstalledExecutionVerifier",
+    "arguments": [
+      "--contract",
+      "--composition-identity",
+      "--runtime-profile",
+      "--installed-server-root",
+      "--installed-client-root",
+      "--server-config",
+      "--server-profile",
+      "--client-profile",
+      "--map-package",
+      "--state-db",
+      "--workspace",
+      "--server-port",
+      "--websocket-port",
+      "--evidence"
+    ]
+  },
+  "executionPolicy": {
+    "engine": "sqlite",
+    "endpoint": "127.0.0.1",
+    "launchCount": 2,
+    "serverReadyTimeoutSeconds": 60,
+    "clientEvidenceTimeoutSeconds": 90,
+    "shutdownTimeoutSeconds": 20,
+    "maximumLogBytesPerProcess": 1048576,
+    "maximumMapManifestBytes": 16777216,
+    "maximumSourceFilesPerRoot": 20000,
+    "maximumSourceBytesPerRoot": 1073741824,
+    "graphicalClientPrerequisite": "java-awt-non-headless",
+    "mapSpawnSelection": "global-level-zero-sector-center-coverage-only"
+  },
+  "isolationPolicy": {
+    "workspace": "new-provider-owned-disposable-directory",
+    "sourceMutation": "forbidden-hash-before-and-after",
+    "runtimeRoots": "copied-under-workspace",
+    "state": "copied-sqlite-database",
+    "account": "generated-disposable-account-only",
+    "credential": "generated-inside-workspace-delete-always",
+    "workspacePermissions": "owner-only-0700-and-state-0600",
+    "network": "literal-ipv4-loopback-only",
+    "processes": "bounded-and-terminated-always"
+  },
+  "requiredObservations": [
+    "six-field-composition-handshake",
+    "successful-normal-login",
+    "canonical-installed-map",
+    "representative-disposable-state",
+    "normal-logout",
+    "second-launch-restart-persistence",
+    "advanced-configuration-excluded"
+  ],
+  "evidenceContract": {
+    "schemaId": "current-base-installed-execution-evidence-v1",
+    "outputPolicy": "create-new-regular-file",
+    "credentialDisclosure": "forbidden",
+    "sourcePathDisclosure": "forbidden"
+  },
+  "exitSemantics": {
+    "verified": 0,
+    "refused": 2
+  }
+}

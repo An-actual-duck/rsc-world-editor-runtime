@@ -29,13 +29,26 @@
     "definitionsRoot": "conf/server"
   },
   "stateMigration": {
-    "migrationRowId": "preservation-retro-to-current-base-v1",
+    "migrationRowIds": [
+      "preservation-retro-sqlite-to-current-base-v1",
+      "preservation-core-sqlite-to-current-base-v1",
+      "preservation-initialized-sqlite-to-current-base-v1",
+      "preservation-retro-mariadb-to-current-base-v1"
+    ],
     "manifestRole": "state-migration-manifest",
     "toolArtifactRole": "server-runtime",
     "mainClass": "com.openrsc.server.database.CurrentBaseStateMigration",
     "supportedEngines": ["sqlite", "mariadb"]
   },
+  "installedExecutionVerifier": {
+    "verifierId": "current-base-installed-execution-v1",
+    "manifestRole": "installed-execution-verifier",
+    "toolArtifactRole": "server-runtime",
+    "mainClass": "com.openrsc.server.database.CurrentBaseInstalledExecutionVerifier",
+    "evidenceSchemaId": "current-base-installed-execution-evidence-v1"
+  },
   "requiredRuntimeClasses": [
+    "com/openrsc/server/database/CurrentBaseInstalledExecutionVerifier.class",
     "com/openrsc/server/database/CurrentBaseStateMigration.class",
     "com/openrsc/server/io/NativeLayeredWorldPackage.class",
     "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class"

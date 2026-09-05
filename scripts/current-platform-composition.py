@@ -768,9 +768,12 @@ def resolve_composition(
 def verify_schema_bindings(catalog: Catalog) -> None:
     schema_ids = {
         "current-base-client-content-v1": "current-base-client-content-v1.schema.json",
+        "current-base-installed-execution-evidence-v1": "current-base-installed-execution-evidence-v1.schema.json",
+        "current-base-installed-execution-v1": "current-base-installed-execution-v1.schema.json",
         "current-base-runtime-profile-v1": "current-base-runtime-profile-v1.schema.json",
         "current-base-server-content-v1": "current-base-server-content-v1.schema.json",
         "current-base-state-migration-v1": "current-base-state-migration-v1.schema.json",
+        "current-preservation-r64-input-adapter-v1": "current-preservation-r64-input-adapter-v1.schema.json",
         "current-platform-release-v1": "current-platform-release-v1.schema.json",
         "current-variant-v1": "current-variant-v1.schema.json",
         "current-module-v1": "current-module-v1.schema.json",
@@ -829,6 +832,9 @@ def validate_catalog(catalog: Catalog) -> None:
             "source-build-tool", "candidate-pairing-verifier",
             "server-content-manifest", "server-content",
             "state-migration-manifest",
+            "installed-execution-verifier", "input-adapter-manifest",
+            "input-adapter-baseline", "input-adapter-map-converter",
+            "input-adapter-baseline-config", "input-adapter-baseline-state",
             "client-content-manifest", "client-content",
         }
         roles = {artifact["role"] for artifact in base_spec["artifacts"]}
@@ -846,6 +852,7 @@ def validate_catalog(catalog: Catalog) -> None:
             "base-canonical-map-bootstrap-v1",
             "base-preservation-state-migration-v1",
             "base-gameplay-state-runtime-execution-v1",
+            "base-installed-composition-execution-verification-v1",
         }
         if not required_scenarios <= set(base_spec["requiredExecutableScenarios"]):
             raise ContractError("candidate Current Base lacks executable scenarios")
