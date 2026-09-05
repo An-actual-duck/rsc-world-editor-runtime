@@ -28,12 +28,16 @@
     "statePolicy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contractId", "durableLocation", "migration", "rollback"],
+      "required": ["contractId", "durableLocation", "migration", "rollback", "sqliteRootProperty", "sqliteFile", "sqliteRootPolicy", "sqliteOpenPolicy"],
       "properties": {
         "contractId": {"const": "canonical-public-state-v1"},
         "durableLocation": {"const": "outside-code-runtime"},
         "migration": {"const": "transactional"},
-        "rollback": {"const": "exact-predecessor"}
+        "rollback": {"const": "exact-predecessor"},
+        "sqliteRootProperty": {"const": "openrsc.currentBaseStateRoot"},
+        "sqliteFile": {"const": "current_base.db"},
+        "sqliteRootPolicy": {"const": "required-canonical-private-directory-disjoint-from-runtime"},
+        "sqliteOpenPolicy": {"const": "existing-private-file-read-write-no-create"}
       }
     },
     "serverContent": {

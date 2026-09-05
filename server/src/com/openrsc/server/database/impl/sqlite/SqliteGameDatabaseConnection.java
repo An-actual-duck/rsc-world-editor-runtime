@@ -8,6 +8,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -20,6 +22,7 @@ public class SqliteGameDatabaseConnection extends JDBCDatabaseConnection {
     private Statement statement;
     private boolean connected;
     private final Server server;
+    private String selectedDatabaseUrl;
 
     public SqliteGameDatabaseConnection(Server server) {
         this.server = server;
@@ -35,14 +38,27 @@ public class SqliteGameDatabaseConnection extends JDBCDatabaseConnection {
         close();
 
         final String dbName = server.getConfig().DB_NAME;
-        File dbFile = new File(getDBPath(dbName));
+        final Path managed;
+        final String databaseUrl;
+        try {
+            managed = CurrentBaseStateLocation.resolve(dbName);
+            databaseUrl = managed == null ? "jdbc:sqlite:" + getDBPath(dbName)
+                : "jdbc:sqlite:" + managed.toUri().toASCIIString() + "?mode=rw";
+            if (selectedDatabaseUrl != null && !selectedDatabaseUrl.equals(databaseUrl)) {
+                throw new IOException("SQLite location changed across reconnect");
+            }
+        } catch (IOException | IllegalArgumentException unsafe) {
+            throw new IllegalStateException("SQLite state location refused", unsafe);
+        }
+        File dbFile = managed == null ? new File(getDBPath(dbName)) : managed.toFile();
         if(!dbFile.exists()) {
             LOGGER.error("Database file {} does not exist.", dbFile.getAbsolutePath());
             SystemUtil.exit(1);
         }
 
         try {
-            connection = DriverManager.getConnection("jdbc:sqlite:" + getDBPath(dbName));
+            connection = DriverManager.getConnection(databaseUrl);
+            selectedDatabaseUrl = databaseUrl;
             statement = getConnection().createStatement();
             connected = checkConnection();
         } catch (final SQLException e) {
@@ -51,7 +67,9 @@ public class SqliteGameDatabaseConnection extends JDBCDatabaseConnection {
         }
 
         if(isConnected()) {
-            LOGGER.info(server.getName() + " : " + server.getName() + " - Connected to SQLite @ " + getDBPath(dbName) + "!");
+            LOGGER.info(managed == null
+                ? server.getName() + " : " + server.getName() + " - Connected to SQLite @ " + getDBPath(dbName) + "!"
+                : "Connected to private external Current Base SQLite state");
         } else {
             LOGGER.error("Unable to connect to SQLite");
             SystemUtil.exit(1);

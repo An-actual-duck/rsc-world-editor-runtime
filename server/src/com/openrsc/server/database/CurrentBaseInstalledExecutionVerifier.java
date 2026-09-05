@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  */
 public final class CurrentBaseInstalledExecutionVerifier {
 	private static final String CONTRACT_SHA256 =
-		"c278743f7a0bf5e3e1f4ed8962d06b0943d933f34beb905f95ab168ce1afa929";
+		"f63d54f671033c19fdc525c067641cab456022c51feca06f6d21fad2e3a56ef9";
 	private static final int MAX_LOG_BYTES = 1048576;
 	private static final int MAX_MAP_MANIFEST_BYTES = 16777216;
 	private static final int MAX_SOURCE_FILES = 20000;
@@ -174,7 +174,9 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			Path relative = safeRelative(packageRelative);
 			replaceTree(mapPackage, serverRoot.resolve(relative));
 			replaceTree(mapPackage, clientRoot.resolve(relative));
-			workingState = serverRoot.resolve("inc/sqlite/current_base.db");
+			Path stateRoot = workspace.resolve("state");
+			createPrivateDirectory(stateRoot);
+			workingState = stateRoot.resolve("current_base.db");
 			copyFile(state, workingState);
 			setOwnerOnly(workingState, false);
 			Path identityCopy = workspace.resolve("composition-identity.json");
@@ -216,6 +218,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			BoundedProcess server = null, client = null;
 			try {
 				List<String> serverCommand = Arrays.asList(javaCommand(), "-Xms128m", "-Xmx768m",
+					"-Dopenrsc.currentBaseStateRoot=" + workingState.getParent(),
 					"-Dopenrsc.currentCompositionIdentityFile=" + identityPath,
 					"-Dopenrsc.worldBuilderInstalledServerProfile="
 						+ serverRoot.resolve("world-builder-configs/installed-server.json"),
@@ -247,6 +250,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 					+ " from player list.", 20, "normal logout");
 				if (!serverText.contains("Current composition handshake accepted")
 					|| !serverText.contains("variant=current-base-v1")
+					|| !serverText.contains("Connected to private external Current Base SQLite state")
 					|| !serverText.contains("Processed login request for " + username
 						+ " response: 64")) throw new IOException(
 					"server did not record handshake and successful normal login");
@@ -386,6 +390,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			execution.put("workingStateSeededSha256", workingSeeded);
 			execution.put("workingStateFinalSha256", workingFinal);
 			execution.put("disposableStateChanged", true);
+			execution.put("stateOutsideRuntimeRoots", true);
 			execution.put("persistenceVerified", true); execution.put("credentialDeleted", true);
 			JSONObject evidence = new JSONObject();
 			evidence.put("schemaId", "current-base-installed-execution-evidence-v1");

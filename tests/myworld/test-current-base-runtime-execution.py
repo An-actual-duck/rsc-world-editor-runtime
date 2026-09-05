@@ -236,8 +236,8 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                 }, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
             source_db = fixture / "preservation-source.db"
-            stage_db = server_root / "inc/sqlite/current_base.db"
-            stage_db.parent.mkdir(parents=True)
+            stage_db = fixture / "private state #?é/current_base.db"
+            stage_db.parent.mkdir(mode=0o700)
             seed_retro_database(source_db)
             source_before = hashlib.sha256(source_db.read_bytes()).hexdigest()
             migrated = subprocess.run(
@@ -249,6 +249,7 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                 cwd=ROOT, capture_output=True, text=True,
             )
             self.assertEqual(0, migrated.returncode, migrated.stdout + migrated.stderr)
+            stage_db.chmod(0o600)
             self.assertEqual(source_before, hashlib.sha256(source_db.read_bytes()).hexdigest())
 
             credential = fixture / "credential.json"
@@ -306,6 +307,7 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                 runtime_log = fixture / f"client-runtime-{run_number}.log"
                 server_command = [
                     "java", "-Xms128m", "-Xmx768m",
+                    f"-Dopenrsc.currentBaseStateRoot={stage_db.parent}",
                     f"-Dopenrsc.currentCompositionIdentityFile={IDENTITY}",
                     f"-Dopenrsc.worldBuilderInstalledServerProfile={server_profile}",
                     "-cp", os.pathsep.join(("core.jar", "plugins.jar")),

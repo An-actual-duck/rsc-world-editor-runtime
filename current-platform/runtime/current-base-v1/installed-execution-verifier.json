@@ -40,7 +40,7 @@
     "workspace": "new-provider-owned-disposable-directory",
     "sourceMutation": "forbidden-hash-before-and-after",
     "runtimeRoots": "copied-under-workspace",
-    "state": "copied-sqlite-database",
+    "state": "copied-sqlite-database-outside-runtime-roots",
     "account": "generated-disposable-account-only",
     "credential": "generated-inside-workspace-delete-always",
     "workspacePermissions": "owner-only-0700-and-state-0600",
