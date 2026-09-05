@@ -41,7 +41,7 @@
     {
       "schemaId": "current-base-installed-execution-v1",
       "relativePath": "schema/current-base-installed-execution-v1.schema.json",
-      "sha256": "434abff224107fd24f407a9f4f174a3041c723861556a6423f6984ac8f8a1a8e"
+      "sha256": "0cfe33f45066f7f4bde174b8cc91bae433ce29c7ee696120d70031aeca74bb18"
     },
     {
       "schemaId": "current-base-runtime-profile-v1",

@@ -4,7 +4,7 @@
   "title": "Current Base installed execution verifier contract",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "verifierId", "invocation", "executionPolicy", "isolationPolicy", "requiredObservations", "evidenceContract", "exitSemantics"],
+  "required": ["schemaId", "manifestType", "verifierId", "invocation", "executionPolicy", "isolationPolicy", "supervisionPolicy", "requiredObservations", "evidenceContract", "exitSemantics"],
   "properties": {
     "schemaId": {"const": "current-base-installed-execution-v1"},
     "manifestType": {"const": "current-base-installed-execution-verifier"},
@@ -49,6 +49,20 @@
         "credential": {"const": "generated-inside-workspace-delete-always"},
         "workspacePermissions": {"const": "owner-only-0700-and-state-0600"},
         "network": {"const": "literal-ipv4-loopback-only"}, "processes": {"const": "bounded-and-terminated-always"}
+      }
+    },
+    "supervisionPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stdin", "cancellation", "cleanup", "cancellationExitCode", "forcedTerminationWaitSeconds", "logDrainWaitSeconds", "maximumCancellationSeconds", "hardKill"],
+      "properties": {
+        "stdin": {"const": "parent-held-open-pipe-until-verifier-exit"},
+        "cancellation": {"const": "stdin-eof-or-unexpected-data-before-success-publication"},
+        "cleanup": {"const": "terminate-owned-server-client-processes-and-delete-credential"},
+        "cancellationExitCode": {"const": 2},
+        "forcedTerminationWaitSeconds": {"const": 10},
+        "logDrainWaitSeconds": {"const": 5},
+        "maximumCancellationSeconds": {"const": 90},
+        "hardKill": {"const": "unsupported-requires-disposable-workspace-recovery"}
       }
     },
     "requiredObservations": {"type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": {"enum": ["six-field-composition-handshake", "successful-normal-login", "canonical-installed-map", "representative-disposable-state", "normal-logout", "second-launch-restart-persistence", "advanced-configuration-excluded"]}},

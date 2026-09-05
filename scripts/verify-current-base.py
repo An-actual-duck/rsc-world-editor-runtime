@@ -401,7 +401,7 @@ def validate_installed_verifier(path: Path, profile: dict) -> None:
     require_exact_keys(
         verifier,
         {"schemaId", "manifestType", "verifierId", "invocation",
-         "executionPolicy", "isolationPolicy", "requiredObservations",
+         "executionPolicy", "isolationPolicy", "supervisionPolicy", "requiredObservations",
          "evidenceContract", "exitSemantics"},
         "installed verifier contract",
     )

@@ -67,6 +67,18 @@ it never creates a replacement database or silently falls back to `inc/sqlite`.
 An unbound historical runtime keeps its ordinary location and cannot opt into
 this Current Base property. Unsupported non-POSIX permission checks fail closed.
 
+The installed-execution caller must start the verifier with its own stdin pipe,
+keep the write end open without sending bytes until the verifier exits, and
+close it to cancel. Pipe EOF (including loss of the parent process), unexpected
+data, and ordinary JVM shutdown terminate the owned server/client Java processes
+and remove the disposable credential. Child creation and credential publication
+are synchronized with cancellation; cancelled work cannot publish verified
+evidence. The caller allows the contract's 90-second cancellation cleanup budget
+and retains the workspace as recovery-required if the process cannot exit.
+Logs remain bounded. Direct hard-kill of the verifier, OS failure, blocked OS
+operations, and arbitrary descendants not launched by this verifier are not a
+portable cleanup guarantee; do not claim that SIGKILL completed recovery.
+
 The separate installed-execution verifier now runs both server/client cycles
 against `workspace/state/current_base.db`, outside its copied runtime roots,
 and records `stateOutsideRuntimeRoots:true` in closed evidence. This proves

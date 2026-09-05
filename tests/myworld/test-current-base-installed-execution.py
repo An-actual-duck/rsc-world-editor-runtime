@@ -11,7 +11,9 @@ import shutil
 import socket
 import sqlite3
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 import zipfile
 
@@ -52,6 +54,47 @@ def option(command: list[str], name: str, value: Path | str) -> list[str]:
     index = changed.index(name)
     changed[index + 1] = str(value)
     return changed
+
+
+def run_supervised(command: list[str], timeout: int = 240) -> subprocess.CompletedProcess:
+    # communicate() would close stdin before waiting and therefore cancel the verifier.
+    with tempfile.TemporaryFile(mode="w+") as stdout, tempfile.TemporaryFile(mode="w+") as stderr:
+        process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.PIPE,
+                                   stdout=stdout, stderr=stderr, text=True)
+        try:
+            process.wait(timeout=timeout)
+        finally:
+            process.stdin.close()
+            process.wait(timeout=90)
+        stdout.seek(0)
+        stderr.seek(0)
+        return subprocess.CompletedProcess(command, process.returncode,
+                                           stdout.read(), stderr.read())
+
+
+def process_running(pid: int) -> bool:
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().split(")", 1)[1].split()[0] != "Z"
+    except FileNotFoundError:
+        return False
+
+
+def direct_children(pid: int) -> list[int]:
+    # These are the actual children of this test's verifier, never guessed game PIDs.
+    try:
+        return sorted({int(value) for task in Path(f"/proc/{pid}/task").glob("*/children")
+                       for value in task.read_text().split()})
+    except FileNotFoundError:
+        return []
+
+
+def await_condition(condition, seconds: int, label: str) -> None:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if condition():
+            return
+        time.sleep(0.02)
+    raise AssertionError(f"Timed out waiting for {label}")
 
 
 def write_package(root: Path) -> None:
@@ -198,8 +241,7 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
                 "--workspace", str(workspace), "--server-port", str(free_port()),
                 "--websocket-port", str(free_port()), "--evidence", str(evidence_path),
             ]
-            verified = subprocess.run(
-                command, cwd=ROOT, capture_output=True, text=True, timeout=240)
+            verified = run_supervised(command)
             self.assertEqual(0, verified.returncode, verified.stdout + verified.stderr)
             evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
             jsonschema.Draft202012Validator(
@@ -226,14 +268,51 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
                           str(package): tree_hash(package)})
             self.assertEqual(before, after)
 
+            for mode, child_count in (("eof", 1), ("data", 2), ("term", 2),
+                                      ("parent-loss", 1), ("parent-loss", 2)):
+                with self.subTest(supervision=mode, active_children=child_count):
+                    self.assert_supervised_cancellation(
+                        command, root, mode, child_count)
+                    after_cancel = {str(path): sha256(path) for path in inputs if path.is_file()}
+                    after_cancel.update({str(server): tree_hash(server),
+                                         str(client): tree_hash(client),
+                                         str(package): tree_hash(package)})
+                    self.assertEqual(before, after_cancel)
+
+            closed_workspace = root / "closed-pipe-workspace"
+            closed_evidence = root / "closed-pipe-evidence.json"
+            closed = subprocess.run(
+                option(option(command, "--workspace", closed_workspace),
+                       "--evidence", closed_evidence),
+                cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                timeout=90,
+            )
+            self.assertEqual(2, closed.returncode)
+            self.assertFalse(closed_evidence.exists())
+            self.assertFalse((closed_workspace / "execution/credential.json").exists())
+
+            changed_contract = json.loads(VERIFIER.read_text())
+            changed_contract["supervisionPolicy"]["stdin"] = "unreviewed-no-supervisor"
+            changed_contract_path = root / "unreviewed-supervision.json"
+            changed_contract_path.write_text(json.dumps(changed_contract), encoding="utf-8")
+            policy_workspace = root / "unreviewed-policy-workspace"
+            policy_evidence = root / "unreviewed-policy-evidence.json"
+            refused = run_supervised(option(option(option(command,
+                "--contract", changed_contract_path), "--workspace", policy_workspace),
+                "--evidence", policy_evidence), timeout=30)
+            self.assertEqual(2, refused.returncode)
+            self.assertIn("compiled reviewed contract", refused.stderr)
+            self.assertFalse(policy_workspace.exists())
+            self.assertFalse(policy_evidence.exists())
+
             alias = root / "server-alias"
             alias.symlink_to(server, target_is_directory=True)
             aliased_workspace = alias / "must-not-be-created"
             aliased_evidence = root / "aliased-refusal.json"
-            refused = subprocess.run(
+            refused = run_supervised(
                 option(option(command, "--workspace", aliased_workspace),
                        "--evidence", aliased_evidence),
-                cwd=ROOT, capture_output=True, text=True, timeout=30,
+                timeout=30,
             )
             self.assertEqual(2, refused.returncode)
             self.assertIn("disjoint from every supplied input", refused.stderr)
@@ -244,16 +323,91 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
                 stream.write(b"sealed-binary-mismatch")
             mismatch_workspace = root / "mismatch-workspace"
             mismatch_evidence = root / "mismatch-evidence.json"
-            refused = subprocess.run(
+            refused = run_supervised(
                 option(option(command, "--workspace", mismatch_workspace),
                        "--evidence", mismatch_evidence),
-                cwd=ROOT, capture_output=True, text=True, timeout=30,
+                timeout=30,
             )
             self.assertEqual(2, refused.returncode)
             self.assertIn("installed artifact hash differs for role client-runtime",
                           refused.stderr)
             self.assertFalse(mismatch_workspace.exists())
             self.assertFalse(mismatch_evidence.exists())
+
+    def assert_supervised_cancellation(self, command: list[str], root: Path,
+                                      mode: str, child_count: int) -> None:
+        self.assertTrue(Path("/proc/self/task").is_dir(),
+                        "Cancellation process-evidence lane requires Linux /proc")
+        workspace = root / f"cancel-{mode}-{child_count}"
+        evidence = root / f"cancel-{mode}-{child_count}.json"
+        selected = option(option(command, "--workspace", workspace), "--evidence", evidence)
+        selected = option(option(selected, "--server-port", str(free_port())),
+                          "--websocket-port", str(free_port()))
+        with tempfile.TemporaryFile(mode="w+") as output:
+            if mode == "parent-loss":
+                # Only this parent owns the write end. Its hard exit must produce EOF in
+                # the still-running verifier without killing the verifier itself.
+                parent_source = (
+                    "import subprocess,sys,time\n"
+                    "child=subprocess.Popen(sys.argv[1:],stdin=subprocess.PIPE,"
+                    "stdout=sys.stderr,stderr=sys.stderr,close_fds=True)\n"
+                    "print(child.pid,flush=True)\n"
+                    "time.sleep(240)\n"
+                )
+                process = subprocess.Popen([sys.executable, "-c", parent_source, *selected],
+                                           cwd=ROOT, stdout=subprocess.PIPE, stderr=output,
+                                           text=True)
+                verifier_pid = int(process.stdout.readline().strip())
+            else:
+                process = subprocess.Popen(selected, cwd=ROOT, stdin=subprocess.PIPE,
+                                           stdout=output, stderr=output, text=True)
+                verifier_pid = process.pid
+            observed_children: list[int] = []
+            try:
+                def ready() -> bool:
+                    if not process_running(verifier_pid):
+                        output.seek(0)
+                        self.fail("Verifier exited before cancellation probe: " + output.read())
+                    observed_children[:] = direct_children(verifier_pid)
+                    return len(observed_children) >= child_count and all(
+                        process_running(pid) for pid in observed_children)
+                await_condition(ready, 90, "owned active server/client processes")
+                self.assertTrue((workspace / "execution/credential.json").exists())
+                if mode == "parent-loss":
+                    process.kill()
+                    process.wait(timeout=10)
+                elif mode == "term":
+                    process.terminate()
+                elif mode == "data":
+                    process.stdin.write("unexpected\n")
+                    process.stdin.flush()
+                else:
+                    process.stdin.close()
+                await_condition(lambda: not process_running(verifier_pid), 90,
+                                "verifier cancellation cleanup and exit")
+                if mode != "parent-loss":
+                    process.wait(timeout=5)
+                    self.assertNotEqual(0, process.returncode)
+                    if mode != "term":
+                        self.assertEqual(2, process.returncode)
+                self.assertTrue(all(not process_running(pid) for pid in observed_children))
+                self.assertFalse((workspace / "execution/credential.json").exists())
+                self.assertFalse(evidence.exists())
+                self.assertTrue((workspace / "logs/server-1.log").is_file())
+                if child_count == 2:
+                    self.assertTrue((workspace / "logs/client-1.log").is_file())
+                for log in (workspace / "logs").glob("*.log"):
+                    self.assertLessEqual(log.stat().st_size, 1048576)
+            finally:
+                if process.stdin and not process.stdin.closed:
+                    process.stdin.close()
+                if mode == "parent-loss" and process.poll() is None:
+                    process.kill()
+                process.wait(timeout=90)
+                if process.stdout:
+                    process.stdout.close()
+                await_condition(lambda: not process_running(verifier_pid), 90,
+                                "final verifier cleanup")
 
 
 def tree_hash(root: Path) -> str:
