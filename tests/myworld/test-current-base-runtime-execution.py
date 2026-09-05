@@ -372,6 +372,16 @@ class CurrentBaseRuntimeExecutionTest(unittest.TestCase):
                         "Processed login request for sealed user response: 64",
                         server_evidence,
                     )
+                    # Unregistration queues the database update; the log is not a commit acknowledgement.
+                    deadline = time.monotonic() + 20
+                    while True:
+                        with sqlite3.connect(stage_db.as_uri() + "?mode=ro", uri=True, timeout=0.5) as persisted:
+                            online = persisted.execute("SELECT online FROM players WHERE id=41").fetchone()
+                        if online == (0,):
+                            break
+                        if server.poll() is not None or time.monotonic() >= deadline:
+                            self.fail("normal logout did not commit before the bounded shutdown deadline")
+                        time.sleep(0.05)
                 finally:
                     if client is not None and client.poll() is None:
                         client.terminate()

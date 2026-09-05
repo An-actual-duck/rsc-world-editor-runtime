@@ -255,6 +255,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 						+ " response: 64")) throw new IOException(
 					"server did not record handshake and successful normal login");
 				JSONObject observation = parseMarker(marker, run);
+				awaitPersistentState(server);
 				server.close();
 				verifyPersistentState();
 				observation.put("logoutPersisted", true);
@@ -340,9 +341,22 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			}
 		}
 
+		private void awaitPersistentState(BoundedProcess server) throws Exception {
+			long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+			Exception last = null;
+			do {
+				if (!server.process.isAlive()) throw new IOException(
+					"server exited before normal logout persistence was verified");
+				try { verifyPersistentState(); return; }
+				catch (IOException | java.sql.SQLException pending) { last = pending; }
+				Thread.sleep(50L);
+			} while (System.nanoTime() < deadline);
+			throw new IOException("normal logout persistence did not complete within its bound", last);
+		}
+
 		private void verifyPersistentState() throws Exception {
 			try (Connection database = DriverManager.getConnection(
-				"jdbc:sqlite:" + workingState.toAbsolutePath())) {
+				"jdbc:sqlite:" + workingState.toUri().toASCIIString() + "?mode=ro&busy_timeout=500")) {
 				try (PreparedStatement statement = database.prepareStatement(
 					"SELECT x,y,online FROM players WHERE id=?")) {
 					statement.setInt(1, accountId);
