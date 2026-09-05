@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -116,13 +117,16 @@ class InstalledWorldBuilderClientBootstrapTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
-    def run_profile(self, profile: Path) -> subprocess.CompletedProcess[str]:
+    def run_profile(self, profile: Path, map_root: str | None = None,
+                    working: Path | None = None) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
-                "java", "-cp", f"{self.classes}:{JSON_JAR}",
+                "java", *([] if map_root is None else [
+                    "-Dopenrsc.worldBuilderInstalledMapRoot=" + map_root]),
+                "-cp", f"{self.classes}:{JSON_JAR}",
                 "orsc.InstalledClientProfileHarness", str(profile),
             ],
-            cwd=ROOT,
+            cwd=working or ROOT,
             text=True,
             capture_output=True,
         )
@@ -138,6 +142,53 @@ class InstalledWorldBuilderClientBootstrapTest(unittest.TestCase):
         self.assertEqual("1.0.0", lines[3])
         self.assertEqual("a" * 64, lines[4])
         self.assertEqual(str(self.package.resolve()), lines[5])
+
+    def test_external_map_root_is_cwd_independent_and_remains_profile_bound(self) -> None:
+        external = Path(self.temp.name) / "external map #?é"
+        shutil.copytree(self.package, external)
+        working = Path(self.temp.name) / "independent-working-directory"
+        working.mkdir()
+        before = (external / "manifest.json").read_bytes()
+        result = self.run_profile(self.profile, str(external), working)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(str(external), result.stdout.splitlines()[5])
+        self.assertEqual(before, (external / "manifest.json").read_bytes())
+        # A matching legacy copy cannot rescue an explicitly selected bad root.
+        (external / "manifest.json").write_text("{}", encoding="utf-8")
+        refused = self.run_profile(self.profile, str(external), working)
+        self.assertNotEqual(0, refused.returncode)
+        self.assertIn("SHA-256", refused.stderr)
+
+    def test_external_map_rejects_missing_alias_and_runtime_overlap_without_fallback(self) -> None:
+        external = Path(self.temp.name) / "external-map"
+        shutil.copytree(self.package, external)
+        alias = Path(self.temp.name) / "map-alias"
+        alias.symlink_to(external, target_is_directory=True)
+        parent_alias = Path(self.temp.name) / "parent-alias"
+        parent_alias.symlink_to(external.parent, target_is_directory=True)
+        for value in (
+            "", "relative-map", str(external / "missing"), str(alias),
+            str(parent_alias / external.name), str(external) + "/../external-map",
+            str(ROOT), str(self.classes),
+        ):
+            with self.subTest(root=value):
+                refused = self.run_profile(self.profile, value)
+                self.assertNotEqual(0, refused.returncode)
+                self.assertIn("External installed map root", refused.stderr)
+        self.assertTrue((self.package / "manifest.json").is_file())
+
+    def test_external_map_cannot_silently_disable_a_missing_or_inactive_profile(self) -> None:
+        external = Path(self.temp.name) / "external-map"
+        shutil.copytree(self.package, external)
+        missing = self.run_profile(self.profile.with_name("missing.json"), str(external))
+        self.assertNotEqual(0, missing.returncode)
+        self.assertIn("requires an active installed profile", missing.stderr)
+        document = json.loads(self.profile.read_text())
+        document["active"] = False
+        self.profile.write_text(json.dumps(document))
+        inactive = self.run_profile(self.profile, str(external))
+        self.assertNotEqual(0, inactive.returncode)
+        self.assertIn("requires an active installed profile", inactive.stderr)
 
     def test_absent_profile_preserves_legacy_client_behavior(self) -> None:
         result = self.run_profile(self.client / "world-builder-configs/missing.json")

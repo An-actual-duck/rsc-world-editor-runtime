@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  */
 public final class CurrentBaseInstalledExecutionVerifier {
 	private static final String CONTRACT_SHA256 =
-		"f63d54f671033c19fdc525c067641cab456022c51feca06f6d21fad2e3a56ef9";
+		"61c5608d03bac2201c7d19a19a2bbe3a7431e677636ba706ad6e933f50e8d30f";
 	private static final int MAX_LOG_BYTES = 1048576;
 	private static final int MAX_MAP_MANIFEST_BYTES = 16777216;
 	private static final int MAX_SOURCE_FILES = 20000;
@@ -95,10 +95,10 @@ public final class CurrentBaseInstalledExecutionVerifier {
 		private final List<BoundedProcess> children = new ArrayList<BoundedProcess>();
 		private final JSONArray logs = new JSONArray();
 		private final JSONArray runs = new JSONArray();
-		private Path workspace, serverRoot, clientRoot, workingState, credential;
+		private Path workspace, serverRoot, clientRoot, workingState, workingMap, credential;
 		private JSONObject identity;
 		private String sourceServerBefore, sourceClientBefore, inputsBefore;
-		private String mapFingerprint, username, password;
+		private String mapFingerprint, workingMapBefore, username, password;
 		private int accountId, x, y, coins, prayer, magic, woodcut, questStage;
 
 		private Verification(Map<String,String> options, Contract contract) {
@@ -171,9 +171,10 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			renderVerificationConfig(renderedConfig, serverPort, websocketPort);
 			copyFile(serverProfile, serverRoot.resolve("world-builder-configs/installed-server.json"));
 			copyFile(clientProfile, clientRoot.resolve("world-builder-configs/installed-client.json"));
-			Path relative = safeRelative(packageRelative);
-			replaceTree(mapPackage, serverRoot.resolve(relative));
-			replaceTree(mapPackage, clientRoot.resolve(relative));
+			safeRelative(packageRelative);
+			workingMap = workspace.resolve("maps/package");
+			copyTree(mapPackage, workingMap);
+			workingMapBefore = treeHash(workingMap);
 			Path stateRoot = workspace.resolve("state");
 			createPrivateDirectory(stateRoot);
 			workingState = stateRoot.resolve("current_base.db");
@@ -195,6 +196,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 				if (credential != null) Files.deleteIfExists(credential);
 			}
 			verifyPersistentState();
+			if (!workingMapBefore.equals(treeHash(workingMap))) throw new IOException(
+				"external installed map changed during runtime execution");
 			String workingFinal = sha256(workingState);
 			if (workingSeeded.equals(workingFinal)) throw new IOException(
 				"disposable state did not record runtime execution changes");
@@ -218,6 +221,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			BoundedProcess server = null, client = null;
 			try {
 				List<String> serverCommand = Arrays.asList(javaCommand(), "-Xms128m", "-Xmx768m",
+					"-Dopenrsc.worldBuilderInstalledMapRoot=" + workingMap,
 					"-Dopenrsc.currentBaseStateRoot=" + workingState.getParent(),
 					"-Dopenrsc.currentCompositionIdentityFile=" + identityPath,
 					"-Dopenrsc.worldBuilderInstalledServerProfile="
@@ -230,6 +234,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 				server.awaitText("Game world is now online on", 60, "server startup");
 
 				List<String> clientCommand = Arrays.asList(javaCommand(), "-Xms256m", "-Xmx1024m",
+					"-Dopenrsc.worldBuilderInstalledMapRoot=" + workingMap,
 					"-Dopenrsc.currentCompositionIdentityFile=" + identityPath,
 					"-Dopenrsc.worldBuilderInstalledClientProfile="
 						+ clientRoot.resolve("world-builder-configs/installed-client.json"),
@@ -405,6 +410,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			execution.put("workingStateFinalSha256", workingFinal);
 			execution.put("disposableStateChanged", true);
 			execution.put("stateOutsideRuntimeRoots", true);
+			execution.put("mapOutsideRuntimeRoots", true);
+			execution.put("mapUnchanged", true);
 			execution.put("persistenceVerified", true); execution.put("credentialDeleted", true);
 			JSONObject evidence = new JSONObject();
 			evidence.put("schemaId", "current-base-installed-execution-evidence-v1");

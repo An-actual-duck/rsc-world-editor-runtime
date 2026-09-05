@@ -25,6 +25,12 @@
     "sqliteRootPolicy": "required-canonical-private-directory-disjoint-from-runtime",
     "sqliteOpenPolicy": "existing-private-file-read-write-no-create"
   },
+  "mapPolicy": {
+    "rootProperty": "openrsc.worldBuilderInstalledMapRoot",
+    "externalRootPolicy": "canonical-absolute-directory-disjoint-from-runtime",
+    "profileBinding": "manifest-sha256-and-package-identity",
+    "defaultLocation": "profile-relative-package"
+  },
   "serverContent": {
     "contentId": "current-base-public-content-v1",
     "manifestRole": "server-content-manifest",

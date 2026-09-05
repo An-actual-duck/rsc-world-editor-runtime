@@ -128,6 +128,7 @@ def validate_profile(path: Path) -> dict:
             "clientAssetSets",
             "clientContent",
             "statePolicy",
+            "mapPolicy",
             "serverContent",
             "stateMigration",
             "installedExecutionVerifier",
@@ -167,6 +168,13 @@ def validate_profile(path: Path) -> dict:
         "sqliteOpenPolicy": "existing-private-file-read-write-no-create",
     }:
         raise VerificationError("Current Base public state policy is incomplete")
+    if profile["mapPolicy"] != {
+        "rootProperty": "openrsc.worldBuilderInstalledMapRoot",
+        "externalRootPolicy": "canonical-absolute-directory-disjoint-from-runtime",
+        "profileBinding": "manifest-sha256-and-package-identity",
+        "defaultLocation": "profile-relative-package",
+    }:
+        raise VerificationError("Current Base installed map location policy is incomplete")
     if profile["serverContent"] != {
         "contentId": "current-base-public-content-v1",
         "manifestRole": "server-content-manifest",
