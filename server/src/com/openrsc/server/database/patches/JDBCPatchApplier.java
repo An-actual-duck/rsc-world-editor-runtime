@@ -106,6 +106,7 @@ public class JDBCPatchApplier extends PatchApplier {
 
     @Override
     protected URI getPatchDirectory() {
-        return new File("database/" + databaseType.name().toLowerCase() + "/patches").toURI();
+        return com.openrsc.server.CurrentInstalledLaunch.content(
+            "database/" + databaseType.name().toLowerCase() + "/patches").toUri();
     }
 }

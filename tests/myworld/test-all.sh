@@ -103,6 +103,8 @@ python3 ./tests/myworld/test-current-base-state-location.py
 python3 ./tests/myworld/test-current-base-runtime-execution.py
 python3 ./tests/myworld/test-current-base-installed-execution.py
 python3 ./tests/myworld/test-preservation-jag-decode.py
+python3 ./tests/myworld/test-current-base-installed-launch.py
+python3 ./tests/myworld/test-installed-shutdown-drain.py
 python3 ./tests/myworld/test-preservation-transition-execution.py
 python3 ./tests/myworld/test-custom-login-decoder.py
 python3 ./tests/myworld/test-world-builder-cold-start-isolation.py

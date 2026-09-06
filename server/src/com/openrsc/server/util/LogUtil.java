@@ -54,7 +54,8 @@ public class LogUtil {
             	fileUse = "log4j2b.xml";
 			}
 
-            System.setProperty("log4j.configurationFile", "conf/server/" + fileUse);
+            System.setProperty("log4j.configurationFile",
+                com.openrsc.server.CurrentInstalledLaunch.content("conf/server/" + fileUse).toString());
             System.setProperty(
                     "Log4jContextSelector",
                     "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector"

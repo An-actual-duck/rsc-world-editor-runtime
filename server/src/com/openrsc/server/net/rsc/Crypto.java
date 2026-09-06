@@ -47,6 +47,15 @@ public class Crypto {
     private static final int XTEA_DELTA = 0x9e3779b9;
 
     public static void init() {
+        if (com.openrsc.server.CurrentInstalledLaunch.current() != null) {
+            // Key generation is an explicit installer operation, never a startup side effect.
+            loadRSAKeys();
+            if (publicKey == null || privateKey == null || !publicKey.getModulus().equals(privateKey.getModulus()))
+                throw new IllegalStateException("Installed RSA key pair is invalid or mismatched");
+            com.openrsc.server.CurrentInstalledLaunch.current().requirePublicKey(
+                publicKey.getPublicExponent(), publicKey.getModulus());
+            return;
+        }
         generateRSAKeys();
         loadRSAKeys();
     }
@@ -120,8 +129,10 @@ public class Crypto {
 
     public static void loadRSAKeys() {
         try {
-            publicKey = (RSAPublicKey)KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pemParser("client.pem")));
-            privateKey = (RSAPrivateKey)KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(pemParser("server.pem")));
+            publicKey = (RSAPublicKey)KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(pemParser(
+                com.openrsc.server.CurrentInstalledLaunch.sideState("client.pem").toString())));
+            privateKey = (RSAPrivateKey)KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(pemParser(
+                com.openrsc.server.CurrentInstalledLaunch.sideState("server.pem").toString())));
         } catch (Exception e) {
             e.printStackTrace();
         }

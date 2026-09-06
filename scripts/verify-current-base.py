@@ -132,6 +132,7 @@ def validate_profile(path: Path) -> dict:
             "serverContent",
             "stateMigration",
             "installedExecutionVerifier",
+            "installedLaunch",
             "requiredRuntimeClasses",
             "requiredClientClasses",
             "requiredPluginClasses",

@@ -1412,7 +1412,7 @@ public final class mudclient implements Runnable {
 
 	private static Properties loadClientSettings() {
 		Properties props = new Properties();
-		try (FileInputStream in = new FileInputStream("./clientSettings.conf")) {
+		try (FileInputStream in = new FileInputStream(CurrentInstalledLaunch.sideState("clientSettings.conf").toFile())) {
 			props.load(in);
 		} catch (FileNotFoundException e) {
 			// Missing local settings are fine; callers will create the file on save.
@@ -1424,7 +1424,8 @@ public final class mudclient implements Runnable {
 	}
 
 	private static void saveClientSettings(Properties props) {
-		try (FileOutputStream out = new FileOutputStream("./clientSettings.conf")) {
+		try (java.io.OutputStream out = CurrentInstalledLaunch.current() == null
+			? new FileOutputStream("clientSettings.conf") : CurrentInstalledLaunch.openSideStateOutput("clientSettings.conf")) {
 			props.store(out, "Client settings");
 		} catch (IOException e) {
 			System.out.println("Something went wrong saving client settings");
@@ -20685,7 +20686,8 @@ public final class mudclient implements Runnable {
     }*/
 
 	private long getUID() {
-		File uID = new File(F_CACHE_DIR + File.separator + "uid.dat");
+		File uID = CurrentInstalledLaunch.current() == null ? new File(F_CACHE_DIR + File.separator + "uid.dat")
+			: CurrentInstalledLaunch.sideState("uid.dat").toFile();
 		try {
 			if (uID.exists()) {
 				try (BufferedReader buffer = new BufferedReader(new FileReader(uID))) {
@@ -20706,13 +20708,14 @@ public final class mudclient implements Runnable {
 				generatedUID = new SecureRandom().nextLong();
 			} while (generatedUID == 0L);
 
-			if (uID.exists() && !uID.canWrite()) {
+			if (CurrentInstalledLaunch.current() == null && uID.exists() && !uID.canWrite()) {
 				uID.setWritable(true);
 			}
-			try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(uID), true)) {
+			try (PrintWriter printWriter = new PrintWriter(CurrentInstalledLaunch.current() == null
+				? new FileOutputStream(uID) : CurrentInstalledLaunch.openSideStateOutput("uid.dat"), true)) {
 				printWriter.println(generatedUID);
 			}
-			uID.setReadOnly();
+			if (CurrentInstalledLaunch.current() == null) uID.setReadOnly();
 			return generatedUID;
 		} catch (Exception e) {
 			//e.printStackTrace(); // Localhost often causes an error to be printed, not important to see

@@ -305,7 +305,8 @@ def build_report(require_artifacts: bool) -> tuple[dict, list[str]]:
 
     loader = SERVER / "src/com/openrsc/server/plugins/io/PluginJarLoader.java"
     loader_text = loader.read_text(encoding="utf-8")
-    if 'final String pathToJar = "./plugins.jar";' not in loader_text:
+    if ('CurrentInstalledLaunch.current() == null ? "./plugins.jar"' not in loader_text
+            or 'CurrentInstalledLaunch.content("plugins.jar")' not in loader_text):
         errors.append("plugin discovery no longer loads ./plugins.jar; review build authority documentation")
 
     report = {

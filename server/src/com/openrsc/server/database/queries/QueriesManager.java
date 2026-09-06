@@ -24,7 +24,8 @@ public class QueriesManager {
     private final String namespace;
     private final String tablePrefix;
 
-    public static final String DATABASE_DIRECTORY = "database/";
+    public static final String DATABASE_DIRECTORY =
+        com.openrsc.server.CurrentInstalledLaunch.content("database").toString() + File.separator;
 
     static {
 		X_STREAM.addPermission(AnyTypePermission.ANY);

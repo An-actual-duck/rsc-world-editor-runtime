@@ -443,6 +443,9 @@ public class PacketHandler {
 	}
 
 	public final Socket openSocket(int port, String host) throws IOException {
+		CurrentInstalledLaunch installed = CurrentInstalledLaunch.current();
+		if (installed != null && (!installed.host().equals(host) || installed.port() != port))
+			throw new IOException("Connection endpoint differs from installed descriptor");
 		Socket s = new Socket(InetAddress.getByName(host), port);
 		//s.setSendBufferSize(25000);
 		//s.setReceiveBufferSize(25000);
@@ -2338,6 +2341,8 @@ public class PacketHandler {
 			prideMonth = this.getClientStream().getUnsignedByte(); // 86
 			MiscFunctions.RSA_EXPONENT = new BigInteger(this.getClientStream().readString()); // 87
 			MiscFunctions.RSA_MODULUS = new BigInteger(this.getClientStream().readString()); // 88
+			if (CurrentInstalledLaunch.current() != null) CurrentInstalledLaunch.current().requirePublicKey(
+				MiscFunctions.RSA_EXPONENT, MiscFunctions.RSA_MODULUS);
 			groundItemNames = this.getClientStream().getUnsignedByte(); // 89
 			wantNatureRuneProtection = this.getClientStream().getUnsignedByte(); // 90
 			wantHiscores = this.getClientStream().getUnsignedByte(); // 91
@@ -2430,6 +2435,8 @@ public class PacketHandler {
 			prideMonth = packetsIncoming.getUnsignedByte(); // 86
 			MiscFunctions.RSA_EXPONENT = new BigInteger(packetsIncoming.readString()); // 87
 			MiscFunctions.RSA_MODULUS = new BigInteger(packetsIncoming.readString()); // 88
+			if (CurrentInstalledLaunch.current() != null) CurrentInstalledLaunch.current().requirePublicKey(
+				MiscFunctions.RSA_EXPONENT, MiscFunctions.RSA_MODULUS);
 			groundItemNames = packetsIncoming.getUnsignedByte(); // 89
 			wantNatureRuneProtection = packetsIncoming.getUnsignedByte(); // 90
 			wantHiscores = packetsIncoming.getUnsignedByte(); // 91
