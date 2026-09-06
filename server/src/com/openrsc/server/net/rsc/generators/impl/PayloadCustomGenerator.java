@@ -406,8 +406,10 @@ public class PayloadCustomGenerator implements PayloadGenerator<OpcodeOut> {
 					if (player.getConfig().WANT_HARVESTING) {
 						builder.writeByte((byte) si.currentHarvesting);
 					}
-					builder.writeByte((byte) si.currentSummoning);
-					builder.writeByte((byte) si.currentBlessing);
+					if (!com.openrsc.server.CurrentBaseSkillContract.selected()) {
+						builder.writeByte((byte) si.currentSummoning);
+						builder.writeByte((byte) si.currentBlessing);
+					}
 
 					// 18 skills minimum - max level
 					builder.writeByte((byte) si.maxAttack);
@@ -434,8 +436,10 @@ public class PayloadCustomGenerator implements PayloadGenerator<OpcodeOut> {
 					if (player.getConfig().WANT_HARVESTING) {
 						builder.writeByte((byte) si.maxHarvesting);
 					}
-					builder.writeByte((byte) si.maxSummoning);
-					builder.writeByte((byte) si.maxBlessing);
+					if (!com.openrsc.server.CurrentBaseSkillContract.selected()) {
+						builder.writeByte((byte) si.maxSummoning);
+						builder.writeByte((byte) si.maxBlessing);
+					}
 
 					// 18 skills minimum - experiences
 					builder.writeInt(si.experienceAttack);
@@ -462,8 +466,10 @@ public class PayloadCustomGenerator implements PayloadGenerator<OpcodeOut> {
 					if (player.getConfig().WANT_HARVESTING) {
 						builder.writeInt(si.experienceHarvesting);
 					}
-					builder.writeInt(si.experienceSummoning);
-					builder.writeInt(si.experienceBlessing);
+					if (!com.openrsc.server.CurrentBaseSkillContract.selected()) {
+						builder.writeInt(si.experienceSummoning);
+						builder.writeInt(si.experienceBlessing);
+					}
 
 					// Quest Points is not a skill slot. Keep it after every maintained
 					// custom-client skill field so appending a skill cannot consume it.

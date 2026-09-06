@@ -209,7 +209,12 @@ public class Skills {
 		skills = new ArrayList<SkillDef>();
 		int skillIndex = 0;
 
-		if (constants.getServer().getConfig().INFLUENCE_INSTEAD_QP) {
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) {
+			for (String name : com.openrsc.server.CurrentBaseSkillContract.names()) {
+				skills.add(new SkillDef(name, "Woodcutting".equals(name) ? "Woodcut" : name,
+					"Hits".equals(name) ? 10 : 1, 99, SkillDef.EXP_CURVE.ORIGINAL, skillIndex++));
+			}
+		} else if (constants.getServer().getConfig().INFLUENCE_INSTEAD_QP) {
 				skills.add(new SkillDef("Melee", "Melee", 1, 99, SkillDef.EXP_CURVE.ORIGINAL, skillIndex++));
 			skills.add(new SkillDef("Defense", "Defense", 1, 99, SkillDef.EXP_CURVE.ORIGINAL, skillIndex++));
 			skills.add(new SkillDef("Strength", "Strength", 1, 99, SkillDef.EXP_CURVE.ORIGINAL, skillIndex++));

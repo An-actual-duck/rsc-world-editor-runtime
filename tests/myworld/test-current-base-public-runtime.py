@@ -21,7 +21,7 @@ class PublicRuntimeTest(unittest.TestCase):
             if result.returncode:
                 raise AssertionError('Base build failed:\n' + result.stdout[-12000:] + result.stderr[-12000:])
 
-    def probe(self, role, probe='PublicDefinitionProbe'):
+    def probe(self, role, probe='PublicDefinitionProbe', selection_control=False):
         with tempfile.TemporaryDirectory(prefix='current-base-public-runtime-') as tmp:
             root = Path(tmp)
             with zipfile.ZipFile(OUTPUT / role / 'content.zip') as archive:
@@ -41,9 +41,12 @@ class PublicRuntimeTest(unittest.TestCase):
                 str(ROOT / 'current-platform/runtime/current-base-v1/public-definitions')]
             if probe == 'PublicGenericDispatchProbe':
                 command = [arg for arg in command if not arg.startswith('-Dopenrsc.currentCompositionIdentityFile=')]
+            if selection_control:
+                command.insert(1, '-DpublicSkillSelectionControl=true')
             result = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=45)
             self.assertEqual(result.returncode, 0, result.stdout[-6000:] + result.stderr[-12000:])
             self.assertIn('PUBLIC_GENERIC_CONTROL_VERIFIED' if probe == 'PublicGenericDispatchProbe' else
+                          'PUBLIC_CLIENT_SKILLS_VERIFIED' if probe == 'PublicClientSkillProbe' else
                           'PUBLIC_MODELS_VERIFIED' if probe == 'PublicModelsProbe' else
                           'PUBLIC_MAGIC_VERIFIED' if probe == 'PublicMagicProbe' else
                           'PUBLIC_GATHERING_VERIFIED' if probe == 'PublicGatheringProbe'
@@ -57,6 +60,12 @@ class PublicRuntimeTest(unittest.TestCase):
 
     def test_actual_public_models_and_authored_override(self):
         self.probe('client', 'PublicModelsProbe')
+
+    def test_actual_public_client_skill_registry_packets_and_controls(self):
+        self.probe('client', 'PublicClientSkillProbe')
+
+    def test_client_non_base_selection_preserves_existing_registry(self):
+        self.probe('client', 'PublicClientSkillProbe', selection_control=True)
 
     def test_actual_public_inventory_tools_curves_and_timing(self):
         self.probe('server', 'PublicGatheringProbe')

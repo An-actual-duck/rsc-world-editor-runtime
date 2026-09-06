@@ -41,3 +41,21 @@ Genuine imported map gameplay, ladder removal and client void-boundary checks
 also remain separate verification work. The packaged effective policy states
 these limits explicitly; content availability is not a gameplay approval.
 Generic and Advanced content sources remain independent.
+
+The separately hash-bound `skill-policy.json` records the public 18-skill
+numeric identity and XP/style oracle from exact historical source blobs. Bound
+Base keeps Attack, Defense, Strength and Firemaking current/max/XP independent;
+the shared `Melee` code alias refers only to Attack, never a migrated combined
+stat. Base's full stats payload contains exactly 18 current bytes, 18 maximum
+bytes, 18 fixed-point XP integers, then quest points. The matching client keeps
+all 18 skills visible in numeric order and sends classic style values 0–3.
+
+Headless packaged probes cover constructor/load/setter paths, real private
+SQLite save/reopen/load with boosted and drained current values, equipment
+eligibility, actual NPC weakening, NPC partial-damage and PvP death XP dispatch,
+public configured XP rates, magic cast versus kill XP, outbound server packets,
+and client packet consumers/control dispatch. The PvP victim is deliberately
+not logged in, so its existing death-world side-effect guard remains active.
+These are not GUI, player death/inventory, complete combat balancing, hiscores,
+or full imported-map acceptance claims. Generic/unselected Firemaking hiding,
+20-skill packet shape and combined-melee behavior remain covered controls.

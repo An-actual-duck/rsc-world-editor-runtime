@@ -124,8 +124,12 @@ public class CombatEvent extends GameTickEvent {
 			Player playerKilled = (Player) killed;
 
 			int exp = Formulae.combatExperience(playerKilled);
-				skillsDist[Skill.MELEE.id()] = 3;
-				skillsDist[Skill.HITS.id()] = 1;
+				if (com.openrsc.server.CurrentBaseSkillContract.selected()) {
+					skillsDist = com.openrsc.server.CurrentBaseSkillContract.meleeExperienceWeights(playerKiller.getCombatStyle());
+				} else {
+					skillsDist[Skill.MELEE.id()] = 3;
+					skillsDist[Skill.HITS.id()] = 1;
+				}
 				playerKiller.incExp(skillsDist, exp, true);
 			}
 

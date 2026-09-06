@@ -1194,6 +1194,7 @@ public class Npc extends Mob {
 
 	private int getGroupCombatExperience(final ArrayList<UUID> damageDealerIds) {
 		final int baseCombatXP = Formulae.combatExperience(this);
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) return baseCombatXP;
 		final int contributorCount = getOnlineCombatContributorCount(damageDealerIds);
 		if (contributorCount < 2) {
 			return baseCombatXP;
@@ -1251,7 +1252,11 @@ public class Npc extends Mob {
 			return;
 		}
 
-		awardCombatXpWithHitsFocus(player, Skill.MELEE, meleeXpShare * 4);
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) {
+			player.incExp(com.openrsc.server.CurrentBaseSkillContract.meleeExperienceWeights(player.getCombatStyle()), meleeXpShare, true);
+		} else {
+			awardCombatXpWithHitsFocus(player, Skill.MELEE, meleeXpShare * 4);
+		}
 	}
 
 	private void awardRangedDamageShareXp(final Player player, final int damage, final int totalCombatXP) {
@@ -1263,12 +1268,15 @@ public class Npc extends Mob {
 		int alreadyGivenXp = getWorld().getServer().getConfig().RANGED_GIVES_XP_HIT ? 16 * damage / 3 : 0;
 		int remainderXP = rangedXpShare - alreadyGivenXp;
 		if (remainderXP > 0) {
-			awardCombatXpWithHitsFocus(player, Skill.RANGED, remainderXP);
+			if (com.openrsc.server.CurrentBaseSkillContract.selected()) player.incExp(Skill.RANGED.id(), remainderXP, true);
+			else awardCombatXpWithHitsFocus(player, Skill.RANGED, remainderXP);
 			ActionSender.sendStat(player, Skill.RANGED.id());
 		}
 	}
 
 	private void awardMagicDamageShareXp(final Player player, final int damage, final int totalCombatXP) {
+		// Public magic XP is granted by successful cast finalization, never again on NPC death.
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) return;
 		int magicXpShare = getDamageShareXp(totalCombatXP * 4, damage);
 		if (magicXpShare <= 0) {
 			return;

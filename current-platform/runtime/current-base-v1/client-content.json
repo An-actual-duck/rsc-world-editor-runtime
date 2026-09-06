@@ -10,6 +10,7 @@
     }
   ],
   "sourceFiles": [
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/skill-policy.json","bundlePath":"Cache/current-base-definitions/provenance/skill-policy.json","transform":"copy"},
     {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/scenery-visuals.json","bundlePath":"Cache/current-base-definitions/scenery-visuals.json","transform":"copy"},
     {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/provenance.json","bundlePath":"Cache/current-base-definitions/provenance/provenance.json","transform":"copy"},
     {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/gameplay-provenance.json","bundlePath":"Cache/current-base-definitions/provenance/gameplay-provenance.json","transform":"copy"},

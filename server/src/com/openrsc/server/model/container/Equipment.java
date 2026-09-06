@@ -1080,7 +1080,7 @@ public class Equipment {
 
 		int requiredLevel = hasRequirement ? item.getDef(player.getWorld()).getRequiredLevel() : 1;
 		int requiredSkillIndex = remapLegacyMeleeRequirementSkill(item.getDef(player.getWorld()).getRequiredSkillIndex());
-		if (isArmorItem(item)) {
+		if (!com.openrsc.server.CurrentBaseSkillContract.selected() && isArmorItem(item)) {
 			requiredLevel = 1;
 			requiredSkillIndex = -1;
 		}
@@ -1097,13 +1097,13 @@ public class Equipment {
 
 		// Spears are melee weapons.
 		if (itemLower.endsWith("spear")) {
-			optionalLevel = Optional.of(requiredLevel);
+			optionalLevel = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() && requiredLevel > 10 ? requiredLevel + 5 : requiredLevel);
 			optionalSkillIndex = Optional.of(Skill.MELEE.id());
 		}
 		// Throwing knives are ranged-only weapons in MyWorld.
 		if (itemLower.endsWith("throwing knife")) {
-			optionalLevel = Optional.of(requiredLevel);
-			optionalSkillIndex = Optional.of(Skill.RANGED.id());
+			optionalLevel = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() && requiredLevel > 10 ? requiredLevel + 5 : requiredLevel);
+			optionalSkillIndex = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() ? Skill.ATTACK.id() : Skill.RANGED.id());
 		}
 		// Staff of iban (usable)
 		if (item.getCatalogId() == ItemId.STAFF_OF_IBAN.id()) {
@@ -1116,11 +1116,11 @@ public class Equipment {
 			optionalLevel = Optional.of(requiredLevel);
 			optionalSkillIndex = Optional.of(Skill.MELEE.id());
 		}
-		if (isBlessedStaff(item.getCatalogId())) {
+		if (!com.openrsc.server.CurrentBaseSkillContract.selected() && isBlessedStaff(item.getCatalogId())) {
 			optionalLevel = Optional.of(requiredLevel);
 			optionalSkillIndex = Optional.of(Skill.MAGIC.id());
 		}
-		if (isGodStaff(item.getCatalogId())) {
+		if (!com.openrsc.server.CurrentBaseSkillContract.selected() && isGodStaff(item.getCatalogId())) {
 			optionalLevel = Optional.of(requiredLevel);
 			optionalSkillIndex = Optional.of(Skill.PRAYER.id());
 		}
@@ -1265,6 +1265,7 @@ public class Equipment {
 	}
 
 	private int remapLegacyMeleeRequirementSkill(int skillIndex) {
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) return skillIndex;
 		if (skillIndex == Skill.ATTACK.id() || skillIndex == Skill.DEFENSE.id() || skillIndex == Skill.STRENGTH.id()) {
 			return Skill.MELEE.id();
 		}
