@@ -31,6 +31,13 @@ public final class BlockedVoidRoamHarness {
       NativeLayeredWorldPackage source = NativeLayeredWorldPackage.load(root);
       NativeLayeredWorldRuntimeProfile.WORLD_BUILDER_INSTALLED.validate(
         NativeLayeredWorldPackageCatalog.of(Collections.singletonList(source)));
+      if (args[0].equals("composition")) {
+        Method writer=AdaptiveWorldBuilderRuntimeSession.class.getDeclaredMethod(
+          "writeComposition",Path.class,NativeLayeredWorldPackage.class,String.class);
+        writer.setAccessible(true);
+        writer.invoke(null,Paths.get(args[2]),source,
+          AdaptiveWorldBuilderPackageGuard.requireClosedPackage(root).getFingerprint());
+      }
       if (args[0].equals("save")) {
         // Exercise the actual session snapshot and atomic publisher, not a v5 test writer.
         WorldEditorSessionManager sessions = new WorldEditorSessionManager();
@@ -169,7 +176,7 @@ class BlockedVoidRoamTest(unittest.TestCase):
                 lambda p: p.update(schemaVersion=4),
                 lambda p: p["npcs"][0]["start"].update(x=48),
                 lambda p: p["npcs"][0]["start"].update(level=1),
-                lambda p: p["npcs"][0]["roamBounds"]["maximum"].update(x=176),
+                lambda p: p["npcs"][0]["roamBounds"]["maximum"].update(x=175),
                 lambda p: p["npcs"][0]["roamBounds"]["minimum"].update(x=51),
                 lambda p: p["npcs"][0]["roamBounds"]["minimum"].update(x=46.5),
                 lambda p: p["npcs"].append(copy.deepcopy(p["npcs"][0])),
@@ -182,6 +189,12 @@ class BlockedVoidRoamTest(unittest.TestCase):
                     with self.subTest(index=index, reader=reader):
                         result = self.run_harness(reader, root)
                         self.assertNotEqual(0, result.returncode, result.stdout)
+            boundary = copy.deepcopy(original)
+            boundary["npcs"][0]["roamBounds"]["maximum"]["x"] = 174
+            update(root, boundary)
+            for reader in ("tools", "native"):
+                result = self.run_harness(reader, root)
+                self.assertEqual(0, result.returncode, result.stderr)
 
     def test_actual_session_snapshot_atomic_publish_keeps_v5_without_terrain_growth(self):
         with tempfile.TemporaryDirectory(prefix="blocked-void-save-") as temporary:
@@ -203,6 +216,34 @@ class BlockedVoidRoamTest(unittest.TestCase):
                 payload = json.loads((root / declaration["path"]).read_text())
                 self.assertEqual("blocked-void", payload["npcRoamCoverage"])
                 self.assertEqual(original["npcs"], payload["npcs"])
+            composition = Path(temporary) / "effective-composition.json"
+            result = self.run_harness("composition", root, composition)
+            self.assertEqual(0, result.returncode, result.stderr)
+            evidence = json.loads(composition.read_text())
+            self.assertEqual(hashlib.sha256((root / "manifest.json").read_bytes()).hexdigest(), evidence["manifestSha256"])
+            selected = evidence["placementSets"][0]
+            self.assertEqual("layered-world-placements-v5", selected["encoding"])
+            self.assertEqual("blocked-void", selected["npcRoamCoverage"])
+            self.assertEqual(original["npcs"], selected["npcs"])
+
+    def test_empty_v5_levels_survive_save_and_v4_remains_default(self):
+        with tempfile.TemporaryDirectory(prefix="blocked-void-empty-save-") as temporary:
+            for version in (4, 5):
+                root = Path(temporary) / f"working-{version}"
+                payload = package(root, version)
+                payload["npcs"] = []
+                update(root, payload)
+                baseline = Path(temporary) / f"baseline-{version}"
+                shutil.copytree(root, baseline)
+                result = self.run_harness("save", root, baseline)
+                self.assertEqual(0, result.returncode, result.stderr)
+                manifest = json.loads((root / "manifest.json").read_text())
+                declaration = manifest["placementSets"][0]
+                self.assertEqual(f"layered-world-placements-v{version}", declaration["encoding"])
+                saved = json.loads((root / declaration["path"]).read_text())
+                self.assertEqual(version, saved["schemaVersion"])
+                self.assertEqual(version == 5, "npcRoamCoverage" in saved)
+                self.assertEqual([], saved["npcs"])
 
     def test_mixed_v5_and_older_payloads_are_rejected_even_when_empty(self):
         with tempfile.TemporaryDirectory(prefix="blocked-void-mixed-") as temporary:

@@ -21,6 +21,8 @@ package com.openrsc.server;
 import com.openrsc.server.model.*;
 import com.openrsc.server.model.Path.PathType;
 import com.openrsc.server.model.entity.npc.Npc;
+import com.openrsc.server.model.entity.player.Player;
+import com.openrsc.server.content.worldedit.WorldEditorSessionManager;
 import com.openrsc.server.model.world.coordinate.*;
 import com.openrsc.server.model.world.region.*;
 import com.openrsc.server.model.world.World;
@@ -86,6 +88,22 @@ public final class BlockedVoidMovementHarness {
     check(npc.getLoc().minX() == 46 && npc.getLoc().maxX() == 50
       && npc.getLoc().minY() == 22 && npc.getLoc().maxY() == 26, "authoritative bounds changed");
     check(regions.getNativeLayeredWorldPackage().getTerrainSectorCount() == 1, "terrain grew");
+    Player editor = new Player(server.getWorld(),12345L);
+    editor.setInitialLayeredLocation(at(47,24));
+    WorldEditorSessionManager sessions=new WorldEditorSessionManager();
+    java.lang.reflect.Method coverage=sessions.getClass().getDeclaredMethod(
+      "requireNativeNpcTerrainCoverage",Player.class,WorldLocation.class,
+      int.class,int.class,int.class,int.class);
+    coverage.setAccessible(true);
+    coverage.invoke(sessions,editor,at(47,24),46,22,50,26);
+    for(int[] invalid:new int[][]{{48,24,46,22,50,26},{47,24,46,22,175,26},{47,24,48,22,50,26}}) {
+      try {
+        coverage.invoke(sessions,editor,at(invalid[0],invalid[1]),invalid[2],invalid[3],invalid[4],invalid[5]);
+        throw new AssertionError("live NPC coverage guard accepted invalid start/bounds");
+      } catch(java.lang.reflect.InvocationTargetException rejected) {
+        check(rejected.getCause() instanceof IllegalArgumentException,"unexpected live guard failure");
+      }
+    }
     for (int dy = -1; dy <= 1; dy++) {
       WorldLocation missing = at(48, 24 + dy);
       check(!regions.hasNativeLayeredTerrain(missing), "absent sector activated");
