@@ -372,6 +372,20 @@ public final class GameTickEventRestorationCollisionFootprintPlanner {
 						name, width, height, projectileClipAllowedNames));
 		}
 
+		/** Selected only by the composition-bound Current Base world adapter. */
+		public static Definition publicBaseScenery(
+			final int collisionType,
+			final int width,
+			final int height,
+			final String name,
+			final String[] projectileClipAllowedNames) {
+			return new Definition(
+				ConstructorState.SCENERY, collisionType, width, height,
+				LegacyObjectProjectileCollisionPolicy
+					.allowsPublicBaseSceneryProjectileClip(
+						name, width, height, projectileClipAllowedNames));
+		}
+
 		public static Definition boundary(
 			final int doorType,
 			final String name,
