@@ -942,7 +942,7 @@ public abstract class Mob extends Entity {
 	public void startCombat(final Mob victim) {
 		Mob lock = this.getUUID().compareTo(victim.getUUID()) > 0 ? this : victim;
 		synchronized (lock) {
-			if (this.isPlayer() && victim.isPlayer()) {
+			if (com.openrsc.server.CurrentBaseCombatContract.selected() || (this.isPlayer() && victim.isPlayer())) {
 				if (this.inCombat() || victim.inCombat()) return;
 				startReciprocalCombat(victim);
 				return;
@@ -1692,7 +1692,7 @@ public abstract class Mob extends Entity {
 		if (appliedDamage > 0 && this.isPlayer()) {
 			Player player = (Player) this;
 			player.setAttribute("last_damage_taken_at", System.currentTimeMillis());
-			appliedDamage = player.applyGoblinTenacity(appliedDamage);
+			if (!com.openrsc.server.CurrentBaseCombatContract.selected()) appliedDamage = player.applyGoblinTenacity(appliedDamage);
 		}
 		final int currentHp = Math.max(0, skills.getLevel(Skill.HITS.id()));
 		final int actualDamage = Math.min(Math.max(0, appliedDamage), currentHp);

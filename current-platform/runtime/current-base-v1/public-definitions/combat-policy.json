@@ -4,6 +4,10 @@
   "contractId": "current-base-public-combat-v1",
   "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
   "sourceFiles": [
+    {"path":"server/src/com/openrsc/server/event/rsc/impl/combat/scripts/all/PlayerPoisonScript.java","sha256":"bad0317e93e0120c6428799c3d8d6bf78d8f97fbb7602e837f4c4dba8b608495"},
+    {"path":"server/src/com/openrsc/server/net/rsc/ActionSender.java","sha256":"c63972ad4875112cc68fa16223c1c898f4025eae369c42884684625d757d7a22"},
+    {"path":"server/src/com/openrsc/server/event/rsc/impl/PoisonEvent.java","sha256":"c5192dba45b5695e0ec28d7230eb71870d99c1e93baea0e8d1180277cd1317cc"},
+    {"path":"server/src/com/openrsc/server/model/entity/Mob.java","sha256":"a77f87ceaf815e2adb84fcac329cb6ca3784efc19d9e04e939e0bc02bbe6861b"},
     {"path":"server/src/com/openrsc/server/net/rsc/handlers/PrayerHandler.java","sha256":"b2ebc9950bb47931249062ca302417b76e6d0a07085075148ba18209e8bf88e0"},
     {"path":"server/src/com/openrsc/server/model/entity/player/Prayers.java","sha256":"54492468ce4d2180fa021caea738a7c86016ccb10c448362afcdda58fe771f4e"},
     {"path":"server/src/com/openrsc/server/event/rsc/impl/PrayerDrainEvent.java","sha256":"022472531a73d09b0e4635c034888245c298cf1ab5651b8c675298b2a86cbe0b"},
@@ -48,12 +52,16 @@
   ],
   "selection": "enabled-current-base-v1-only",
   "equipment": "player-max1-of-1-plus-all-worn-public-fields-NPC-equipment0-no-devotion-growth-no-owner-hand-filter",
+  "equipmentPresentation": "legacy-armour-aim-power-magic-prayer-numeric-fields-and-labels-no-owner-extra-power-values-no-stat-sync-side-effects",
   "melee": "classic-accuracy-vs-defense-roll-then-nextInt(maxRoll)-plus320-div640-independent-Attack-Defense-Strength-style-prayer",
+  "meleeEntry": "Base-player-NPC-and-PvP-startCombat-select-retained-reciprocal-CombatEvent-nonBase-PvM-event-unchanged",
+  "pvpPoison": "existing-stock-one-in-four-poisoned-worn-item-script-antidote-and-duel-guards-reset48-no-owner-stacking",
   "ranged": "classic-bow-aim-ammunition-power-separate-no-owner-offense-mitigation-or-procs",
   "magic": "public-modern-spell-power-floor-uniform-cast-failure-uses-level-and-equipment-godspell-charge-and-cape",
   "prayers": "14-public-definitions-max-level-eligibility-positive-current-points-exclusive-defense-strength-attack-tiers-classic-drain-no-owner-reservation-or-devotion-growth",
   "timing": "retain-classic-melee-round-and-ranged-base-delays-no-owner-equipment-potion-elemental-speed-multipliers",
   "effects": "single-target-standard-impact-no-owner-AoE-lifesteal-elemental-debuffs-or-damage-procs-public-godspell-drains-and-chaos-gauntlet-bolt-plus1",
+  "poison": "stock-ammunition-probabilities-player1of8-power20-NPC1of50-power60-if-below10-config-gated-32tick-floor-power-div10-damage-2power-decay-no-owner-cleansing-leach-or-tenacity",
   "rings": {
     "recoil": {
       "id": 1314,

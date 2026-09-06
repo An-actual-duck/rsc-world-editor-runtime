@@ -110,8 +110,8 @@ def main():
 
     require("PRAYERS_PER_BOOK = 16" in catalog,
             "Server prayer catalog should reserve the special-prayer slot")
-    require('new boolean[PrayerCatalog.PRAYERS_PER_BOOK]' in prayers,
-            "Server prayer state should track the current 16-slot god line")
+    require('CurrentBaseCombatContract.selected() ? 14 : PrayerCatalog.PRAYERS_PER_BOOK' in prayers,
+            "Base uses 14 classic prayers while owner prayer state retains its 16-slot god line")
     require('"Saving Grace"' in catalog and '"Divine Grace"' not in catalog and '"Divine Retribution"' in catalog,
             "Prayer catalog should include the Saradomin and Zamorak special prayers")
     require('"Corrosive Aura"' in catalog and "GodLine.GUTHIX" in catalog,

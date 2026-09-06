@@ -16,7 +16,12 @@ public class PlayerPoisonScript implements CombatSideEffectScript {
 			if (player.isAntidoteProtected()) {
 				return;
 			}
-			player.applyPoison(48);
+			if (com.openrsc.server.CurrentBaseCombatContract.selected()) {
+				player.setPoisonDamage(48);
+				player.startPoisonEvent();
+			} else {
+				player.applyPoison(48);
+			}
 		}
 	}
 

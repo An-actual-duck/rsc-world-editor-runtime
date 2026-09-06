@@ -23,7 +23,7 @@ public class PoisonEvent extends GameTickEvent {
 	private UUID poisonOwnerId;
 
 	public PoisonEvent(World world, Mob owner, int poisonPower, UUID poisonOwnerId) {
-		super(world, owner, TICK_DELAY, "Poison Event", DuplicationStrategy.ALLOW_MULTIPLE);
+		super(world, owner, com.openrsc.server.CurrentBaseCombatContract.selected() ? 32 : TICK_DELAY, "Poison Event", DuplicationStrategy.ALLOW_MULTIPLE);
 		this.mob = owner;
 		this.poisonPower = poisonPower;
 		this.poisonOwnerId = poisonOwnerId;
@@ -36,8 +36,8 @@ public class PoisonEvent extends GameTickEvent {
 			return;
 		}
 		int damage = (int) Math.round((poisonPower / 10));
-		int poisonDrain = POWER_DRAIN_PER_TICK;
-		if (mob.isPlayer()) {
+		int poisonDrain = com.openrsc.server.CurrentBaseCombatContract.selected() ? 2 : POWER_DRAIN_PER_TICK;
+		if (!com.openrsc.server.CurrentBaseCombatContract.selected() && mob.isPlayer()) {
 			Player player = (Player) mob;
 			poisonDrain += player.getCarriedItems().getEquipment().getNatureCleansingPoisonDecayBonus();
 		}
@@ -55,6 +55,7 @@ public class PoisonEvent extends GameTickEvent {
 	}
 
 	private void applyLeach(final int damage) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return;
 		if (poisonOwnerId == null) {
 			return;
 		}

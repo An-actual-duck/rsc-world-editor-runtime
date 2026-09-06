@@ -81,10 +81,126 @@ public final class PublicCombatProbe {
     check(!player.checkRingOfLife(npc),"life above threshold refusal");
     player.getSkills().setTemporaryLevelAndMaxStat(3,0,100,false);check(!player.checkRingOfLife(npc),"life cannot resurrect");
     player.getSkills().setTemporaryLevelAndMaxStat(3,10,100,false);
-    check(player.checkRingOfLife(npc),"living ten percent life trigger");
+    player.setLocation(Point.location(120,247),true);
+    check(player.getLocation().wildernessLevel()==31&&!player.checkRingOfLife(npc),"life wilderness31 refusal");
+    player.setLocation(Point.location(120,253),true);
+    check(player.getLocation().wildernessLevel()==30,"life wilderness30 fixture");
+    player.getSkills().setTemporaryLevelAndMaxStat(3,11,100,false);
+    npc.startCombat(player);check(npc.getCombatEvent()!=null,"life fixture active reciprocal combat");
+    com.openrsc.server.event.rsc.impl.combat.CombatEvent lifeCombat=npc.getCombatEvent();
+    new com.openrsc.server.event.rsc.impl.projectile.ProjectileEvent(server.getWorld(),npc,player,1,1,false).action();
+    check(player.getSkills().getLevel(3)==10,"life follows living ten-percent impact");
+    check(player.getCombatEvent()==null&&npc.getCombatEvent()==null&&!lifeCombat.isRunning(),"actual ring-triggered reciprocal cleanup");
+    server.getGameEventHandler().remove(lifeCombat);
     check(!player.getCarriedItems().getEquipment().hasEquipped(1317),"life always shatters");
     check(player.getX()==server.getConfig().RESPAWN_LOCATION_X&&player.getY()==server.getConfig().RESPAWN_LOCATION_Y,"actual life destination");
     clear();player.setLocation(Point.location(120,648),true);
+    npc.setLocation(player.getLocation(),true);
+    player.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);npc.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);
+    field(Player.class,"loggedIn").setBoolean(player,true);
+    wear(1314);
+    npc.getSkills().setTemporaryLevelAndMaxStat(2,90,90,false);
+    npc.getSkills().setTemporaryLevelAndMaxStat(0,90,90,false);
+    int actual=0;
+    for(int seed=0;seed<100;seed++) {
+      DataConversions.getRandom().setSeed(seed);int expected=(int)formula("calculateMeleeDamage",npc);
+      if(expected>0) {
+        DataConversions.getRandom().setSeed(seed);
+        npc.startCombat(player);
+        com.openrsc.server.event.rsc.impl.combat.CombatEvent actualEvent=npc.getCombatEvent();
+        check(actualEvent!=null&&actualEvent==player.getCombatEvent()&&npc.getPvmMeleeEvent()==null,"actual Base entry selects reciprocal event");
+        actualEvent.run();
+        actual=99-player.getSkills().getLevel(3);
+        check(actual==0||actual==expected,"actual melee run classic roll or accuracy miss");
+        check(npc.getSkills().getLevel(3)==99-(actual>0?actual/10+1:0),"actual melee run recoil");
+        npc.resetCombatEvent();player.resetCombatEvent();server.getGameEventHandler().remove(actualEvent);
+        check(npc.getCombatEvent()==null&&player.getCombatEvent()==null&&!actualEvent.isRunning(),"actual reciprocal reset terminates without recursive resetAll");
+        if(actual>0)break;
+      }
+    }
+    check(actual>0,"actual melee positive hit");field(Player.class,"loggedIn").setBoolean(player,false);
+    clear();player.getCache().remove("ringofrecoil");
+    player.applyEarthAttackSpeedDebuff(80);
+    check(com.openrsc.server.event.rsc.impl.projectile.RangeUtils.getAdjustedRangeDelayTicks(player,3)==3,"public ranged no owner slow");
+    player.clearEarthAttackSpeedDebuff();
+    npc.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);
+    server.getConfig().WANT_POISON_NPCS=true;
+    for(int seed=0;seed<1000 && npc.getCurrentPoisonPower()<10;seed++) {
+      DataConversions.getRandom().setSeed(seed);
+      new com.openrsc.server.event.rsc.impl.projectile.ProjectileEvent(server.getWorld(),player,npc,0,2,false,ItemId.POISONED_RUNE_THROWING_DART.id()).action();
+    }
+    check(npc.getCurrentPoisonPower()==60,"actual stock poisoned ammunition dispatch");
+    com.openrsc.server.event.rsc.impl.PoisonEvent poison=npc.getAttribute("poisonEvent",null);
+    check(poison!=null&&poison.getDelayTicks()==32,"public poison32tick cadence");
+    poison.run();check(poison.getPoisonPower()==58&&npc.getSkills().getLevel(3)==93,"public poison6damage and2decay");
+    poison.run();check(poison.getPoisonPower()==56&&npc.getSkills().getLevel(3)==88,"public poison floor division");
+    poison.setPoisonPower(9);poison.run();check(npc.getCurrentPoisonPower()<10,"public poison exhaustion");
+    player.setPoisonDamage(60);player.startPoisonEvent();
+    new com.openrsc.server.event.rsc.impl.combat.scripts.all.PlayerPoisonScript().executeScript(player,player);
+    check(player.getCurrentPoisonPower()==48,"public PvP poison resets48, no owner stacking");player.curePoison();
+  }
+  static void hostileMagic(Npc npc)throws Exception {
+    clear();player.setCastTimer(0);player.getSkills().setTemporaryLevelAndMaxStat(6,99,99,false);
+    player.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);npc.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);
+    npc.setLocation(player.getLocation(),true);
+    for(boolean gauntlets:new boolean[]{false,true}) {
+      clear();player.setCastTimer(0);
+      if(gauntlets) {wear(ItemId.GAUNTLETS_OF_CHAOS.id());player.getCache().set("famcrest_gauntlets",com.openrsc.server.external.Gauntlets.CHAOS.id());}
+      SpellDef spell=server.getEntityHandler().getSpellDef(Spells.WIND_BOLT);
+      for(Map.Entry<Integer,Integer> rune:spell.getRunesRequired())check(player.getCarriedItems().getInventory().add(new Item(rune.getKey(),rune.getValue()),false),"spell fixture runes");
+      java.util.List<com.openrsc.server.event.rsc.GameTickEvent> before=server.getGameEventHandler().getEvents();
+      invoke(SpellHandler.class,new SpellHandler(),"handleMobCast",new Class<?>[]{Player.class,Mob.class,Spells.class,int.class},player,npc,Spells.WIND_BOLT,2);
+      Object action=player.getWalkToAction();check(action!=null,"actual hostile spell walk action");
+      check(player.checkAttack(npc,true),"hostile fixture attackable");
+      check((Boolean)invoke(SpellHandler.class,null,"canCast",new Class<?>[]{Player.class},player),"hostile fixture timer");
+      DataConversions.getRandom().setSeed(501);
+      Method execute=action.getClass().getDeclaredMethod("executeInternal");execute.setAccessible(true);execute.invoke(action);
+      com.openrsc.server.event.rsc.impl.projectile.ProjectileEvent projectile=null;
+      for(com.openrsc.server.event.rsc.GameTickEvent event:server.getGameEventHandler().getEvents())
+        if(before.stream().noneMatch(previous->previous==event)&&event instanceof com.openrsc.server.event.rsc.impl.projectile.ProjectileEvent) {
+          check(projectile==null,"one public projectile");projectile=(com.openrsc.server.event.rsc.impl.projectile.ProjectileEvent)event;
+        }
+      check(projectile!=null,"actual hostile dispatch queues projectile gauntlets="+gauntlets+" before="+before.size()+" after="+server.getGameEventHandler().getEvents().size());
+      int damage=field(projectile.getClass(),"damage").getInt(projectile);
+      check(damage==new Random(501).nextInt(gauntlets?6:5),"actual bolt public power and gauntlets plus1");
+      for(String effect:new String[]{"windAccuracyDebuffPercent","waterMaxHitDebuffPercent","earthAttackSpeedDebuffPercent","fireDefenseDebuffPercent"})check(field(projectile.getClass(),effect).getInt(projectile)==0,"no owner spell debuff "+effect);
+      for(Map.Entry<Integer,Integer> rune:spell.getRunesRequired())check(player.getCarriedItems().getInventory().countId(rune.getKey())==0,"actual spell reagent consumption");
+      int hits=npc.getSkills().getLevel(3);projectile.action();check(npc.getSkills().getLevel(3)==hits-damage,"actual queued magic impact");
+      projectile.stop();server.getGameEventHandler().remove(projectile);
+    }
+    clear();
+    for(Spells spell:new Spells[]{Spells.CLAWS_OF_GUTHIX,Spells.SARADOMIN_STRIKE,Spells.FLAMES_OF_ZAMORAK}) {
+      int skill=spell==Spells.CLAWS_OF_GUTHIX?1:spell==Spells.SARADOMIN_STRIKE?5:6;
+      npc.getSkills().setTemporaryLevelAndMaxStat(skill,60,60,false);
+      invoke(SpellHandler.class,new SpellHandler(),"applyPublicGodSpellDrain",new Class<?>[]{Player.class,Mob.class,Spells.class},player,npc,spell);
+      check(npc.getSkills().getLevel(skill)==(skill==5?59:56),"public god spell affected numeric skill");
+      invoke(SpellHandler.class,new SpellHandler(),"applyPublicGodSpellDrain",new Class<?>[]{Player.class,Mob.class,Spells.class},player,npc,spell);
+      check(npc.getSkills().getLevel(skill)==(skill==5?58:56),"public god spell repeated drain policy");
+    }
+  }
+  static void equipmentPacket()throws Exception {
+    player.getSkills().setTemporaryLevelAndMaxStat(0,99,99,false);
+    player.getSkills().setTemporaryLevelAndMaxStat(1,59,59,false);
+    check(!player.getCarriedItems().getEquipment().ableToEquip(new Item(1430)),"public skirt needs Defense60 despite Attack99");
+    player.getSkills().setTemporaryLevelAndMaxStat(1,60,60,false);
+    check(player.getCarriedItems().getEquipment().ableToEquip(new Item(1430)),"public skirt accepts Defense60");
+    clear();wear(1430);wear(317);
+    io.netty.channel.embedded.EmbeddedChannel channel=new io.netty.channel.embedded.EmbeddedChannel();
+    field(Player.class,"channel").set(player,channel);field(Player.class,"loggedIn").setBoolean(player,true);
+    java.util.List<com.openrsc.server.net.Packet> packets=(java.util.List<com.openrsc.server.net.Packet>)field(Player.class,"outgoingPackets").get(player);
+    for(com.openrsc.server.net.Packet packet:packets)packet.getBuffer().release();packets.clear();
+    int hits=player.getSkills().getLevel(3),maxHits=player.getSkills().getMaxStat(3);
+    com.openrsc.server.net.rsc.ActionSender.sendEquipmentStats(player);
+    check(packets.size()==1,"actual public equipment packet");
+    io.netty.buffer.ByteBuf bytes=packets.remove(0).getBuffer();
+    int[] expected={83,7,7,7,1};
+    check(bytes.readableBytes()==37,"stable equipment packet extent");
+    for(int value:expected)check(bytes.readUnsignedByte()==value,"public byte equipment field");
+    for(int value:expected)check(bytes.readInt()==value,"public full-width equipment field");
+    for(int i=0;i<3;i++)check(bytes.readInt()==0,"no owner extended equipment power");
+    bytes.release();
+    check(player.getSkills().getLevel(3)==hits&&player.getSkills().getMaxStat(3)==maxHits,"packet does not alter Hits");
+    field(Player.class,"loggedIn").setBoolean(player,false);field(Player.class,"channel").set(player,null);channel.finishAndReleaseAll();clear();
   }
   public static void main(String[] args) {
     try {run(args);System.exit(0);}catch(Throwable failure){failure.printStackTrace();System.exit(1);}
@@ -166,6 +282,8 @@ public final class PublicCombatProbe {
     player.getSkills().setTemporaryLevelAndMaxStat(6,99,99,false);
     check((Boolean)invoke(SpellHandler.class,new SpellHandler(),"spellSuccessCheck",new Class<?>[]{Player.class,SpellDef.class},player,spell),"actual public cast success");
     prayerAndEffects(npc);
+    hostileMagic(npc);
+    equipmentPacket();
     // Owner selection control is an injected dispatch unit, never an Advanced launch claim.
     Constructor<CurrentCompositionIdentity> constructor=CurrentCompositionIdentity.class.getDeclaredConstructor(boolean.class,Map.class);constructor.setAccessible(true);
     Map<String,String> fields=new HashMap<>();fields.put("variantId","current-advanced-v1");
@@ -174,6 +292,13 @@ public final class PublicCombatProbe {
     check(server.getConstants().getSpellDamages().getSpellDamage(Spells.WIND_STRIKE,EntityType.NPC,SpellDamages.MagicType.MODERNMAGIC)==4.0,"owner spell power unchanged");
     player.getSkills().setTemporaryLevelAndMaxStat(6,1,99,false);
     check((Boolean)invoke(SpellHandler.class,new SpellHandler(),"spellSuccessCheck",new Class<?>[]{Player.class,SpellDef.class},player,spell),"owner cast no-failure unchanged");
-    System.out.println("PUBLIC_COMBAT_VERIFIED initialEquipmentAndFormulaSlice=true");
+    Prayers ownerPrayers=new Prayers(player);check(ownerPrayers.getActivePrayers().length==16,"owner prayer registry unchanged");
+    com.openrsc.server.event.rsc.impl.PoisonEvent ownerPoison=new com.openrsc.server.event.rsc.impl.PoisonEvent(server.getWorld(),npc,60,null);
+    check(ownerPoison.getDelayTicks()==8,"owner poison cadence unchanged");ownerPoison.run();check(ownerPoison.getPoisonPower()==57,"owner poison decay unchanged");
+    player.applyEarthAttackSpeedDebuff(80);
+    check(com.openrsc.server.event.rsc.impl.projectile.RangeUtils.getAdjustedRangeDelayTicks(player,3)>3,"owner ranged slow unchanged");
+    player.resetCombatEvent();npc.resetCombatEvent();
+    player.startCombat(npc);check(player.getPvmMeleeEvent()!=null&&player.getCombatEvent()==null,"non-Base actual entry retains owner PvM event");
+    System.out.println("PUBLIC_COMBAT_VERIFIED equipmentFormulasImpactsPrayersRingsPoison=true");
   }
 }

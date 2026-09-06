@@ -437,8 +437,11 @@ public final class mudclient implements Runnable {
 	public final int[] bankItemOnTab = new int[500];
 	public final int[] equipIconXLocations = new int[]{98, 98, 98, 153, 43, 43, 98, 98, 43, 153, 153, 43};
 	public final int[] equipIconYLocations = new int[]{5, 85, 125, 85, 85, 165, 165, 45, 45, 45, 165, 125};
-	public final String[] equipmentStatNames = new String[]{"Rng. Def", "Mag. Def", "Mel. Def", "Mel. Pow",
-		"Prayer", "Rng. Pow", "Mag. Pow", "Holy Pow"};
+	private static String[] createEquipmentStatNames() {
+		return CurrentBaseSkillContract.selected() ? new String[]{"Armour", "Aim", "Power", "Magic", "Prayer", "", "", ""}
+			: new String[]{"Rng. Def", "Mag. Def", "Mel. Def", "Mel. Pow", "Prayer", "Rng. Pow", "Mag. Pow", "Holy Pow"};
+	}
+	public final String[] equipmentStatNames = createEquipmentStatNames();
 	public final int[] playerStatEquipment = new int[equipmentStatNames.length];
 	private final int[] mouseClickX = new int[8192];
 	private final int[] mouseClickY = new int[8192];
@@ -12851,7 +12854,8 @@ public final class mudclient implements Runnable {
 						this.drawEquipmentStatusValue(currSkill, xOffset + 42,
 							yOffset + 243 + currSkill * 13, 0xFFFFFF);
 					}
-					this.drawEquipmentStatusValue(currSkill == 0 ? 3 : currSkill + 4, 244 / 2 + xOffset + 35,
+					if (!CurrentBaseSkillContract.selected() || currSkill < 2)
+					this.drawEquipmentStatusValue(CurrentBaseSkillContract.selected() ? 3 + currSkill : currSkill == 0 ? 3 : currSkill + 4, 244 / 2 + xOffset + 35,
 						yOffset + 243 + currSkill * 13, 0xFFFFFF);
 				}
 
@@ -16895,7 +16899,8 @@ public final class mudclient implements Runnable {
 					if (currSkill < 3) {
 						this.drawEquipmentStatusValue(currSkill, 5 + x, yOffset, textColour);
 					}
-					this.drawEquipmentStatusValue(currSkill == 0 ? 3 : currSkill + 4, x + width / 2 - 5, yOffset, textColour);
+					if (!CurrentBaseSkillContract.selected() || currSkill < 2)
+					this.drawEquipmentStatusValue(CurrentBaseSkillContract.selected() ? 3 + currSkill : currSkill == 0 ? 3 : currSkill + 4, x + width / 2 - 5, yOffset, textColour);
 					yOffset += 13;
 				}
 				yOffset -= 2;

@@ -213,7 +213,7 @@ def validate_profile(path: Path) -> dict:
         "contractId": "current-base-public-combat-v1",
         "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
         "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/combat-policy.json",
-        "sha256": "c2a7e61e9977dc7b04ed1587c22b351580310bb5546e0dc3e2d708afb9498e05",
+        "sha256": "4c0adebfbdc677a4cd6cc259a0596f7d56b20aa095080810230eb58cf55d955d",
         "serverBundlePath": "conf/server/current-base-public-provenance/combat-policy.json",
         "clientBundlePath": "Cache/current-base-definitions/provenance/combat-policy.json"
     }

@@ -860,6 +860,11 @@ public class CombatEvent extends GameTickEvent {
 	}
 
 	public void resetCombat() {
+		if (CurrentBaseCombatContract.selected()) {
+			// resetAll may call resetCombatEvent again; detach this exact shared event first.
+			if (defenderMob != null && defenderMob.getCombatEvent() == this) defenderMob.setCombatEvent(null);
+			if (attackerMob != null && attackerMob.getCombatEvent() == this) attackerMob.setCombatEvent(null);
+		}
 		if (running) {
 			if (defenderMob != null) {
 				if (defenderMob.isPlayer()) {

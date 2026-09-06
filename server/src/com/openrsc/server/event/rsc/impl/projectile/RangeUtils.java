@@ -375,7 +375,8 @@ public class RangeUtils {
         // Poison Arrows/Bolts Ability to Poison an NPC
         if (player.getConfig().WANT_POISON_NPCS) {
             if (isWeaponPoisoned && target.isNpc()) {
-                if (DataConversions.random(1, 50) == 1) {
+                if ((!com.openrsc.server.CurrentBaseCombatContract.selected() || target.getCurrentPoisonPower() < 10)
+                        && DataConversions.random(1, 50) == 1) {
                     poisonTarget(player, target, 60);
                 }
             }

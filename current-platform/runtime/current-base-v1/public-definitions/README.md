@@ -44,9 +44,13 @@ controls use the 14 public definitions, required levels and current points,
 not owner reservation costs. Generic and Advanced dispatch remains independent.
 
 Packaged headless probes exercise actual equipment reads, formula dispatch,
-projectile and melee impacts, prayer packets/drain, and state-changing rings.
-These are bounded contract proofs, not a claim of every plugin, poison tick,
-NPC attack profile, death/inventory interaction, or complete gameplay parity.
+projectile and melee impacts through the Base reciprocal combat entrypoint,
+prayer/equipment packets and client decoding, prayer drain, state-changing rings,
+and stock poisoned-ammunition dispatch with its 32-tick cadence and 2-power
+decay. Reciprocal cleanup detaches the exact shared event before resetting
+players, avoiding recursive combat cleanup. These are bounded contract proofs,
+not a claim of every plugin, NPC attack profile, death/inventory interaction,
+or complete gameplay parity.
 The original `effective-policy.json` records the older definition-only scope;
 the separately bound skill/combat policies and tests define these later slices.
 Genuine imported-map acceptance has its own independent verification document.

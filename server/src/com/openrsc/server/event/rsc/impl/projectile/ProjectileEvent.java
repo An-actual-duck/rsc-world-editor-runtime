@@ -973,6 +973,7 @@ public class ProjectileEvent extends SingleTickEvent {
 	}
 
 	private void publicProjectileDamage() {
+		if (caster.isPlayer() && (type == 2 || type == 5)) RangeUtils.applyPoison((Player) caster, opponent, poisonWeaponId);
 		if (caster.isPlayer() && opponent.isRemoved() && type == 2) caster.resetRange();
 		int previousHits = opponent.getLevel(Skill.HITS.id());
 		opponent.getSkills().subtractLevel(Skill.HITS.id(), damage, false);
