@@ -25,6 +25,7 @@ public final class VerifierLifetime {
     private boolean supervisorOwned, closed;
     private String intentHash;
     private String childIntentHash;
+    private String supervisorIntentHash;
 
     public static final class Busy extends IOException {
         public Busy() { super("Verifier invocation still has an owned process lease"); }
@@ -119,6 +120,7 @@ public final class VerifierLifetime {
         writeEmpty(checkAnchor("intent"), encoded);
         syncDirectory(control);
         intentHash = hash(encoded);
+        supervisorIntentHash = intentHash;
         requireOpen();
         writeEmpty(slot, bytes);
         syncDirectory(slot.getParent());
@@ -137,6 +139,8 @@ public final class VerifierLifetime {
         for (String role : Arrays.asList("supervisor", "server", "client", "intent")) checkAnchor(role);
         if (childIntentHash != null)
             require(childIntentHash.equals(hash(read(checkAnchor("intent")))), "Sealed child intent changed before effects");
+        if (supervisorIntentHash != null)
+            require(supervisorIntentHash.equals(hash(read(checkAnchor("intent")))), "Supervisor sealed intent changed");
     }
 
     /** Acquire both actual-child leases before sealing; no PID or free-port substitutes. */
@@ -182,6 +186,7 @@ public final class VerifierLifetime {
 
     public void publish(Path output, JSONObject value) throws Exception {
         require(closed, "Success requires permanent invocation closure");
+        require(intentHash != null && intentHash.matches("[0-9a-f]{64}"), "Success requires a populated sealed intent");
         validateOutput(output); create(output, encode(value));
     }
 
@@ -195,6 +200,8 @@ public final class VerifierLifetime {
 
     private JSONObject intent() throws Exception {
         byte[] bytes = read(checkAnchor("intent"));
+        if (supervisorIntentHash != null)
+            require(supervisorIntentHash.equals(hash(bytes)), "Supervisor sealed intent changed");
         intentHash = bytes.length == 0 ? "" : hash(bytes);
         if (bytes.length == 0) return null;
         JSONObject value = object(bytes);

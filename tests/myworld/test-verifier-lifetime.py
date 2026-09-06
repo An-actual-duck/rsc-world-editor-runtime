@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+import jsonschema
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("installed_fixture", ROOT / "tests/myworld/test-current-base-installed-execution.py")
@@ -61,7 +62,10 @@ public class Probe {
         owner.credential("invented-private-credential".getBytes("UTF-8"));
       }
       System.out.println("OWNED"); System.out.flush();
-      if (System.in.read() == 'f') owner.finish();
+      int action = System.in.read();
+      if (action == 'f') owner.finish();
+      if (action == 'c') owner.childArguments();
+      if (action == 'p') { owner.finish(); owner.publish(Paths.get(options.get("evidence")), new JSONObject()); }
     } catch (VerifierLifetime.Busy busy) { System.exit(3); }
       catch (Exception failure) { System.err.println(failure.getMessage()); System.exit(2); }
   }
@@ -264,6 +268,44 @@ public class OpenRSC {
         server = (ROOT / "server/src/com/openrsc/server/VerifierLifetime.java").read_text().split("\n", 1)[1]
         client = (ROOT / "Client_Base/src/orsc/VerifierLifetime.java").read_text().split("\n", 1)[1]
         self.assertEqual(server, client)
+
+    def test_live_supervisor_rejects_same_inode_otherwise_bound_intent_rewrite(self):
+        self.assert_intent_drift_refused("c")
+
+    def test_live_supervisor_rejects_intent_rewrite_during_closure(self):
+        self.assert_intent_drift_refused("f")
+
+    def assert_intent_drift_refused(self, action):
+        supervisor = self.supervisor()
+        intent = self.control / "intent.json"
+        original_inode = intent.stat().st_ino
+        changed = json.loads(intent.read_text())
+        changed["nonce"] = "0" * 64
+        intent.write_bytes(FIXTURE.canonical_json(changed))
+        self.assertEqual(original_inode, intent.stat().st_ino)
+        supervisor.stdin.write(action); supervisor.stdin.flush()
+        self.assertEqual(2, supervisor.wait(timeout=10))
+        self.assertIn("Supervisor sealed intent changed", supervisor.stderr.read())
+        self.assertTrue((self.workspace / "execution/credential.json").exists())
+        self.assertFalse((self.control / "revocation.json").exists())
+
+    def test_empty_intent_can_recover_but_cannot_publish_verified_success(self):
+        supervisor = self.supervisor(empty=True)
+        supervisor.stdin.write("p"); supervisor.stdin.flush()
+        self.assertEqual(2, supervisor.wait(timeout=10))
+        self.assertFalse((self.root / "evidence.json").exists())
+        self.assertEqual(0, self.recovery().returncode)
+        schema = json.loads((ROOT / "current-platform/schema/current-base-installed-execution-evidence-v1.schema.json").read_text())
+        recovery = json.loads((self.root / "recovery.json").read_text())
+        jsonschema.Draft202012Validator({**schema["$defs"]["recoveryEvidence"], "$defs": schema["$defs"]}).validate(recovery)
+        self.assertEqual("", recovery["intentSha256"])
+        normal = {key: recovery[key] for key in ("invocationId", "supervisionSha256", "invocationSha256",
+            "intentSha256", "revocationSha256")}
+        normal["closed"] = True
+        validator = jsonschema.Draft202012Validator({**schema["properties"]["supervision"], "$defs": schema["$defs"]})
+        with self.assertRaises(jsonschema.ValidationError): validator.validate(normal)
+        normal["intentSha256"] = "0" * 64
+        validator.validate(normal)
 
 
 if __name__ == "__main__":

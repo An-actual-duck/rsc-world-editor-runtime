@@ -317,8 +317,7 @@
           "$ref": "#/$defs/hash"
         },
         "intentSha256": {
-          "type": "string",
-          "pattern": "^([0-9a-f]{64})?$"
+          "$ref": "#/$defs/hash"
         },
         "revocationSha256": {
           "$ref": "#/$defs/hash"
