@@ -71,7 +71,9 @@ class PublicDefinitionSnapshotTest(unittest.TestCase):
                 payloads = {name: source.read(name) for name in source.namelist()}
             audio = next(name for name in payloads if name.startswith('Cache/audio/'))
             for name in ['Cache/video/CurrentBase_Public_Sprites.osar',
-                         'Cache/current-base-definitions/ItemDefs.json', audio]:
+                         'Cache/current-base-definitions/ItemDefs.json',
+                         'Cache/current-base-definitions/scenery-visuals.json',
+                         'Cache/video/models.orsc', audio]:
                 changed = root / 'changed.zip'
                 with zipfile.ZipFile(changed, 'w', compression=zipfile.ZIP_DEFLATED) as output:
                     for path, payload in payloads.items():
@@ -85,6 +87,12 @@ class PublicDefinitionSnapshotTest(unittest.TestCase):
             with self.assertRaisesRegex(verify.VerificationError, 'duplicate'):
                 verify.validate_client_content(forged, archive)
             manifest['sourceFiles'].pop()
+            model = next(row for row in manifest['sourceFiles'] if row['bundlePath'] == 'Cache/video/models.orsc')
+            model['transform'] = 'copy'
+            forged.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(verify.VerificationError, 'scenery/model selection'):
+                verify.validate_client_content(forged, archive)
+            model['transform'] = 'public-models-empty-211-v1'
             invalid = root / 'invalid.base64'
             invalid.write_bytes(b'not%%%base64')
             next(row for row in manifest['sourceFiles'] if row['transform'] == 'base64')['sourcePath'] = str(invalid)
@@ -127,6 +135,65 @@ class PublicDefinitionSnapshotTest(unittest.TestCase):
                 module.Literals(bad).arguments()
         with self.assertRaises(ValueError):
             module.derive(b'not-the-reviewed-source')
+
+    def test_exact_public_scenery_models_and_bounded_augmentation(self):
+        spec = importlib.util.spec_from_file_location('public_models', ROOT / 'scripts/current-base-public-models.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        provenance = json.loads((SNAPSHOT / 'visual-provenance.json').read_bytes())
+        visual = provenance['sceneryVisuals']
+        payload = (SNAPSHOT / visual['path']).read_bytes()
+        self.assertEqual(hashlib.sha256(payload).hexdigest(), visual['sha256'])
+        self.assertEqual(len(payload), visual['size'])
+        document = json.loads(payload)
+        self.assertEqual(set(document), {'schemaVersion', 'manifestType', 'sourceSha256', 'scenery'})
+        self.assertEqual(document['sourceSha256'], visual['sourceSha256'])
+        rows = document['scenery']
+        self.assertEqual([row['id'] for row in rows], list(range(1296)))
+        self.assertTrue(all(set(row) == {'id', 'objectModel'} for row in rows))
+        server = records('GameObjectDef.xml')
+        differences = [row['id'] for row in rows if row['objectModel'] != server[row['id']]['objectModel']]
+        self.assertEqual(differences, [1147,1191,1193,1195,1197,1199,1201,1203,1205,1207,1209,1211,1213,1236,1237,1241,1275])
+        original = (ROOT / provenance['models']['sourcePath']).read_bytes()
+        derived = module.transform(original)
+        self.assertEqual(hashlib.sha256(original).hexdigest(), provenance['models']['sourceSha256'])
+        self.assertEqual(hashlib.sha256(derived).hexdigest(), provenance['models']['sha256'])
+        self.assertEqual(len(derived), provenance['models']['size'])
+        # Independent table walker checks exact entry headers/name hashes and payloads, not transform's own parser.
+        def inventory(data):
+            count = int.from_bytes(data[6:8], 'big')
+            offset = 8 + 10 * count
+            result = []
+            for i in range(count):
+                header = data[8 + 10*i:18 + 10*i]
+                size = int.from_bytes(header[7:10], 'big')
+                result.append((header, data[offset:offset + size]))
+                offset += size
+            self.assertEqual(offset, len(data))
+            return result
+        before, after = inventory(original), inventory(derived)
+        self.assertEqual(len(before), 501)
+        self.assertEqual(after[:-1], before)
+        self.assertEqual(after[-1][1], bytes(4))
+        self.assertEqual(hashlib.sha256(after[-1][1]).hexdigest(), provenance['models']['generatedEntry']['sha256'])
+        hashes = {int.from_bytes(row[0][:4], 'big') for row in before}
+        missing = [row['id'] for row in rows if module.name_hash(row['objectModel'] + '.ob3') not in hashes]
+        self.assertEqual(missing, [211])
+        self.assertEqual(module.name_hash('runiteruck1.ob3'), module.name_hash('RUNITERUCK1.OB3'))
+        for bad in (original + b'X', b'', bytes(2 * 1024 * 1024 + 1), original[:-1] + b'X'):
+            with self.assertRaises(ValueError):
+                module.transform(bad)
+        duplicate = bytearray(derived)
+        duplicate[18:22] = duplicate[8:12]
+        with self.assertRaisesRegex(ValueError, 'duplicate/case-alias'):
+            module.entries(duplicate)
+        with self.assertRaises(ValueError):
+            module.entries(derived + b'X')
+        parser_spec = importlib.util.spec_from_file_location('public_scenery_literals', ROOT / 'scripts/derive-current-base-public-scenery-visuals.py')
+        parser = importlib.util.module_from_spec(parser_spec)
+        parser_spec.loader.exec_module(parser)
+        with self.assertRaises(ValueError):
+            parser.derive(b'unreviewed-source')
 
     def test_exact_public_visual_inputs(self):
         provenance = json.loads((SNAPSHOT / 'visual-provenance.json').read_bytes())

@@ -24,5 +24,40 @@
     "sourceSha256": "cf861efa7307556b5e5ba4c20b838f17753faba8b530f85dca38e8c2839d5e69",
     "disposition": "provider-tracked-byte-identical-source"
   },
+  "sceneryVisuals": {
+    "sourcePath": "Client_Base/src/com/openrsc/client/entityhandling/EntityHandler.java",
+    "sourceSha256": "25f7c54a8d4f8fb76ed2a680538404f4e80ccf764451cd9d84c1313e761e2b62",
+    "derivation": "closed-literal-parser-contiguous-scenery-model-names-only-v1",
+    "path": "scenery-visuals.json",
+    "sha256": "efcbf00c6f3f6ac743e0ee37755b302365286c43319036f1668e0d26585820ad",
+    "size": 50566,
+    "recordCount": 1296,
+    "clientOnlyModelCorrections": 17,
+    "serverGeometryDisposition": "unchanged-public-server-definitions"
+  },
+  "models": {
+    "sourcePath": "Client_Base/Cache/video/models.orsc",
+    "sourceSha256": "0041565749f14b211d6eabc5750b01d7ee168de148dae85d463356620d08c010",
+    "sourceSize": 1127184,
+    "sourceEntryCount": 501,
+    "transform": "public-models-empty-211-v1",
+    "bundlePath": "Cache/video/models.orsc",
+    "sha256": "fcde7214b1730d50d840767a9af0448d683b544ef94fa011380e358c3680d23f",
+    "size": 1127198,
+    "entryCount": 502,
+    "originalEntries": "all-original-hashes-headers-and-payload-bytes-unchanged",
+    "generatedEntry": {
+      "name": "runiteruck1.ob3",
+      "sceneryId": 211,
+      "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+      "size": 4,
+      "encoding": "ob3-big-endian-u16-zero-vertices-u16-zero-faces",
+      "historicalSourcePath": "Client_Base/src/orsc/mudclient.java",
+      "historicalSourceSha256": "bddd7630f4988b4402f88b0552ffbc3ea2a9db7496145bf90de50df5a46093ca",
+      "historicalBehavior": "loadModels-absent-offset-zero-new-RSModel-1-1-zero-active-geometry",
+      "genuineSceneryPlacements": 0,
+      "disposition": "explicit-stock-placeholder-not-a-general-missing-model-exemption"
+    }
+  },
   "precedence": "base-default-only-project-authored-bundle-and-spritepack-remain-later-overrides"
 }

@@ -201,6 +201,13 @@ def write_client_content_archive(path: Path) -> None:
         payload = (ROOT / record["sourcePath"]).read_bytes()
         if record["transform"] == "base64":
             payload = base64.b64decode(b"".join(payload.split()), validate=True)
+        elif record["transform"] == "public-models-empty-211-v1":
+            if record["sourcePath"] != "Client_Base/Cache/video/models.orsc" or bundle_path != "Cache/video/models.orsc":
+                raise RuntimeError("public model transform is bound to the Base model archive")
+            spec = importlib.util.spec_from_file_location("base_public_models", ROOT / "scripts/current-base-public-models.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            payload = module.transform(payload)
         elif record["transform"] != "copy":
             raise RuntimeError("unknown Current Base client content transform")
         records[bundle_path] = payload

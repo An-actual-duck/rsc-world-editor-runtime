@@ -9830,7 +9830,11 @@ public class EntityHandler {
 			certificateDef = new ItemDef("", "", "", 0, 180, "items:180", true, false, 0, 0, false, false, false, 0);
 			loadProjectTiles(root.resolve("TileDef.xml"));
 			loadProjectDoors(root.resolve("DoorDef.xml"));
-			loadProjectScenery(root.resolve("GameObjectDef.xml"));
+			JSONObject sceneryVisuals = json(root.resolve("scenery-visuals.json"));
+			if (sceneryVisuals.getInt("schemaVersion") != 1
+				|| !"current-base-public-scenery-visuals".equals(sceneryVisuals.getString("manifestType")))
+				throw new IllegalArgumentException("invalid public Base scenery visual identity");
+			loadProjectScenery(root.resolve("GameObjectDef.xml"), sceneryVisuals.getJSONArray("scenery"));
 			NodeList spellRows = projectXml(root.resolve("SpellDef.xml"), "SpellDef-array")
 				.getElementsByTagName("SpellDef");
 			spells.clear();
@@ -10059,7 +10063,13 @@ public class EntityHandler {
 	}
 
 	private static void loadProjectScenery(Path path) throws Exception {
+		loadProjectScenery(path, null);
+	}
+
+	private static void loadProjectScenery(Path path, JSONArray publicVisuals) throws Exception {
 		NodeList rows = projectXml(path, "GameObjectDef-array").getElementsByTagName("GameObjectDef");
+		if (publicVisuals != null && (publicVisuals.length() != 1296 || rows.getLength() != 1296))
+			throw new IllegalArgumentException("incomplete public Base scenery visuals");
 		int packagedCount = objects.size();
 		LinkedHashMap<Integer, String> packagedModels = new LinkedHashMap<>();
 		for (int id = 0; id < packagedCount; id++) {
@@ -10071,10 +10081,16 @@ public class EntityHandler {
 		objects.clear();
 		for (int id = 0; id < rows.getLength(); id++) {
 			Element row = (Element) rows.item(id);
+			String model = xmlText(row, "objectModel", "");
+			if (publicVisuals != null) {
+				JSONObject visual = publicVisuals.getJSONObject(id);
+				if (visual.getInt("id") != id) throw new IllegalArgumentException("non-contiguous public scenery visual ID");
+				model = visual.getString("objectModel");
+			}
 			GameObjectDef value = new GameObjectDef(xmlText(row, "name", ""), xmlText(row, "description", ""),
 				xmlText(row, "command1", ""), xmlText(row, "command2", ""),
 				xmlInt(row, "type", 0), xmlInt(row, "width", 1), xmlInt(row, "height", 1),
-				xmlInt(row, "groundItemVar", 0), xmlText(row, "objectModel", ""), id);
+				xmlInt(row, "groundItemVar", 0), model, id);
 			objects.add(value);
 			if (id >= packagedCount) {
 				PROJECT_REQUIRED_MODELS.add(value.getObjectModel());

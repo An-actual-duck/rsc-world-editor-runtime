@@ -265,6 +265,10 @@ public final class PublicDefinitionProbe {
           }
         }
       }
+      if (client && file.equals("GameObjectDef.xml")) {
+        JSONObject visuals = new JSONObject(new String(Files.readAllBytes(definitions.resolve("scenery-visuals.json")), "UTF-8"));
+        fields.put("objectModel", visuals.getJSONArray("scenery").getJSONObject(id).getString("objectModel"));
+      }
       compare(definition(method, id), fields, file + id, names,
         client && file.equals("SpellDef.xml") ? skip("members", "evil", "exp") : skip());
       if (file.equals("SpellDef.xml")) {

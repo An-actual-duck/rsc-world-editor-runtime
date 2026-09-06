@@ -178,7 +178,7 @@ def validate_profile(path: Path) -> dict:
         "provenanceSha256": {
             "provenance.json": "c5923ef6fc5b30b533a0652aa79bfca13d79c46eec95aa739e0faa15920bea0b",
             "gameplay-provenance.json": "e6a858676e05b48f202a829bafc41dcc30bf0defe7490f6646433f03365c1d51",
-            "visual-provenance.json": "ab395bcfa425fe5a92d691888ea1c2b5aa65153b359f32206d876613b274ec1d",
+            "visual-provenance.json": "4eef5878ae3b1ab4e13f6d1cb2f583da2bde076ed8dd1de60f8d5c94656a0ce1",
             "effective-policy.json": "b70f38f94b8c7b3a2cdaa86428fd2f3a8c6c2438badbd884024e3819c4a3908e"
         }
     }
@@ -524,6 +524,13 @@ def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
             or manifest["variantId"] != "current-base-v1"):
         raise VerificationError("client content manifest has wrong identity")
     validate_public_provenance_selection(manifest, "client")
+    selections = manifest["sourceFiles"]
+    for required in (
+        {"sourcePath": "Client_Base/Cache/video/models.orsc", "bundlePath": "Cache/video/models.orsc", "transform": "public-models-empty-211-v1"},
+        {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/scenery-visuals.json", "bundlePath": "Cache/current-base-definitions/scenery-visuals.json", "transform": "copy"},
+    ):
+        if required not in selections:
+            raise VerificationError("public scenery/model selection differs from reviewed Base policy")
     expected: dict[str, bytes] = {}
     folded: set[str] = set()
     def add(name: str, payload: bytes) -> None:
@@ -547,7 +554,7 @@ def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
     for record in manifest["sourceFiles"]:
         require_exact_keys(record, {"sourcePath", "bundlePath", "transform"},
                            "client content source file")
-        if record["transform"] not in ("copy", "base64"):
+        if record["transform"] not in ("copy", "base64", "public-models-empty-211-v1"):
             raise VerificationError("unsupported client content transform")
         source = ROOT / record["sourcePath"]
         if not source.is_file() or source.is_symlink():
@@ -558,6 +565,18 @@ def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
                 payload = base64.b64decode(b"".join(payload.split()), validate=True)
             except binascii.Error as error:
                 raise VerificationError("invalid Base client asset base64") from error
+        elif record["transform"] == "public-models-empty-211-v1":
+            if record["sourcePath"] != "Client_Base/Cache/video/models.orsc" or record["bundlePath"] != "Cache/video/models.orsc":
+                raise VerificationError("public model transform is bound to the Base model archive")
+            spec = importlib.util.spec_from_file_location("base_public_models_verify", ROOT / "scripts/current-base-public-models.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            try:
+                payload = module.transform(payload)
+            except ValueError as error:
+                raise VerificationError("public model source or augmentation differs") from error
+            if hashlib.sha256(payload).hexdigest() != "fcde7214b1730d50d840767a9af0448d683b544ef94fa011380e358c3680d23f":
+                raise VerificationError("public model augmentation differs from reviewed bytes")
         add(record["bundlePath"], payload)
     names = archive_names(archive_path)
     if names != set(expected):

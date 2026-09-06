@@ -44,6 +44,7 @@ class PublicRuntimeTest(unittest.TestCase):
             result = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=45)
             self.assertEqual(result.returncode, 0, result.stdout[-6000:] + result.stderr[-12000:])
             self.assertIn('PUBLIC_GENERIC_CONTROL_VERIFIED' if probe == 'PublicGenericDispatchProbe' else
+                          'PUBLIC_MODELS_VERIFIED' if probe == 'PublicModelsProbe' else
                           'PUBLIC_MAGIC_VERIFIED' if probe == 'PublicMagicProbe' else
                           'PUBLIC_GATHERING_VERIFIED' if probe == 'PublicGatheringProbe'
                           else 'PUBLIC_DEFINITIONS_VERIFIED role=' + role, result.stdout)
@@ -53,6 +54,9 @@ class PublicRuntimeTest(unittest.TestCase):
 
     def test_actual_public_client_definitions(self):
         self.probe('client')
+
+    def test_actual_public_models_and_authored_override(self):
+        self.probe('client', 'PublicModelsProbe')
 
     def test_actual_public_inventory_tools_curves_and_timing(self):
         self.probe('server', 'PublicGatheringProbe')
