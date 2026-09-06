@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "current-base-public-definition-snapshot",
+  "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+  "sourceTree": "6db5536d795abf34f303bb03b20c43b8cfb9e3fe",
+  "encoding": "utf-8",
+  "normalization": "xml-lf-with-final-newline-json-byte-identical",
+  "files": [
+    {
+      "path": "DoorDef.xml",
+      "sourcePath": "server/conf/server/defs/DoorDef.xml",
+      "sourceSha256": "086ae534ea3bcc5ef47ae806ea0f9239632a2dfbb42493da18a0ce8644a1007b",
+      "sourceSize": 66822,
+      "sourceLineEndings": "crlf-no-final-newline",
+      "sha256": "445237b36a1c3b47d0204c817a520a61309d702985c79f0f5001b87330b4bdb1",
+      "size": 64468,
+      "recordCount": 214
+    },
+    {
+      "path": "GameObjectDef.xml",
+      "sourcePath": "server/conf/server/defs/GameObjectDef.xml",
+      "sourceSha256": "11ad1bce81c57f95020a5b977bb8fbcd5e4fb3215384a362a385247bad934202",
+      "sourceSize": 425647,
+      "sourceLineEndings": "lf-no-final-newline",
+      "sha256": "05a757bfa40fa1b5aaf87045f0860c1eb9e734d5656171319c563ef36a108a0f",
+      "size": 425648,
+      "recordCount": 1296
+    },
+    {
+      "path": "ItemDefs.json",
+      "sourcePath": "server/conf/server/defs/ItemDefs.json",
+      "sourceSha256": "fa09a749ecfe8f2cea5a01ac9d908af5bd39a748136acd17d917b7c7cc5b801b",
+      "sourceSize": 891244,
+      "sourceLineEndings": "unchanged",
+      "sha256": "fa09a749ecfe8f2cea5a01ac9d908af5bd39a748136acd17d917b7c7cc5b801b",
+      "size": 891244,
+      "recordCount": 1290
+    },
+    {
+      "path": "ItemDefsCustom.json",
+      "sourcePath": "server/conf/server/defs/ItemDefsCustom.json",
+      "sourceSha256": "9b997565965b7bbec5bdbce49249fcae58bab8ba1facf1e5a284646b3b24666a",
+      "sourceSize": 212411,
+      "sourceLineEndings": "unchanged",
+      "sha256": "9b997565965b7bbec5bdbce49249fcae58bab8ba1facf1e5a284646b3b24666a",
+      "size": 212411,
+      "recordCount": 303
+    },
+    {
+      "path": "NpcDefs.json",
+      "sourcePath": "server/conf/server/defs/NpcDefs.json",
+      "sourceSha256": "21a1e0c6c48e3e8681ae16e59cf5ed48671db8a98b1d5aac806633546738c9fa",
+      "sourceSize": 772373,
+      "sourceLineEndings": "unchanged",
+      "sha256": "21a1e0c6c48e3e8681ae16e59cf5ed48671db8a98b1d5aac806633546738c9fa",
+      "size": 772373,
+      "recordCount": 794
+    },
+    {
+      "path": "NpcDefsCustom.json",
+      "sourcePath": "server/conf/server/defs/NpcDefsCustom.json",
+      "sourceSha256": "3d41de3b35ce579eb158a5ba27fe7f6a8613c437875c7b3f3db1eaaae07e366c",
+      "sourceSize": 34565,
+      "sourceLineEndings": "unchanged",
+      "sha256": "3d41de3b35ce579eb158a5ba27fe7f6a8613c437875c7b3f3db1eaaae07e366c",
+      "size": 34565,
+      "recordCount": 42
+    },
+    {
+      "path": "TileDef.xml",
+      "sourcePath": "server/conf/server/defs/TileDef.xml",
+      "sourceSha256": "f5df462fbedaf9cb3769e4573d16457c1d8f13a3da876c502d7067ff90a0ceda",
+      "sourceSize": 2817,
+      "sourceLineEndings": "crlf-no-final-newline",
+      "sha256": "eb993b4db6d1913f36d259abc9c9b29a04738f57a5fb9d6c0d551f94e166ce7a",
+      "size": 2692,
+      "recordCount": 25
+    }
+  ]
+}
