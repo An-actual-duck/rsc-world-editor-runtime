@@ -9741,6 +9741,9 @@ public class EntityHandler {
 	public static void load(boolean loadMembers) {
 		// Each function should contain only 250 definitions,
 		// otherwise they get too big to compile.
+		boolean publicBase = orsc.CurrentCompositionIdentity.current().isEnabled()
+			&& "current-base-v1".equals(orsc.CurrentCompositionIdentity.current().value("variantId"));
+		if (!publicBase) {
 		loadNpcDefinitions1();
 		loadNpcDefinitions2();
 			loadNPCDefinitions3();
@@ -9749,15 +9752,20 @@ public class EntityHandler {
 			loadItemDefinitions();
 			MyWorldItemOverrides.apply(items);
 			applyBangleVisuals();
+		}
 		loadTextureDefinitions();
 		loadAnimationDefinitions();
 		loadSpellDefinitions();
 		loadPrayerDefinitions();
-		loadTileDefinitions();
-		loadDoorDefinitions();
+		if (!publicBase) {
+			loadTileDefinitions();
+			loadDoorDefinitions();
+			loadGameObjectDefinitionsA();
+			loadGameObjectDefinitionsB();
+		} else {
+			loadCurrentBasePublicDefinitions();
+		}
 		loadElevationDefinitions();
-		loadGameObjectDefinitionsA();
-		loadGameObjectDefinitionsB();
 		loadProjectiles();
 		loadGUIParts();
 		loadCrowns();
@@ -9785,6 +9793,47 @@ public class EntityHandler {
 				.getObjectModel());
 		}
 
+	}
+
+	/** Packaged public Base data; project-authored definitions are applied afterwards. */
+	private static void loadCurrentBasePublicDefinitions() {
+		try {
+			Path root = java.nio.file.Paths.get(Config.F_CACHE_DIR, "current-base-definitions");
+			npcs.clear();
+			appendProjectNpcs(firstArray(json(root.resolve("NpcDefs.json"))));
+			appendProjectNpcs(firstArray(json(root.resolve("NpcDefsCustom.json"))));
+			JSONObject visuals = json(root.resolve("item-visuals.json"));
+			if (visuals.getInt("schemaVersion") != 1
+				|| !"current-base-public-item-visuals".equals(visuals.getString("manifestType"))) {
+				throw new IllegalArgumentException("invalid public Base item visual identity");
+			}
+			JSONArray rows = visuals.getJSONArray("items");
+			if (rows.length() != 1593 || npcs.size() != 836) {
+				throw new IllegalArgumentException("incomplete public Base registry");
+			}
+			ItemDef[] visualDefinitions = new ItemDef[rows.length()];
+			for (int id = 0; id < rows.length(); id++) {
+				JSONObject row = rows.getJSONObject(id);
+				if (row.getInt("id") != id) throw new IllegalArgumentException("non-contiguous public Base visual IDs");
+				visualDefinitions[id] = new ItemDef("", "", "", 0,
+					row.getInt("authenticSpriteId"), row.getString("spriteLocation"),
+					false, false, 0, row.getInt("pictureMask"), row.getInt("blueMask"),
+					false, false, false, id);
+			}
+			items.clear();
+			applyProjectItems(firstArray(json(root.resolve("ItemDefs.json"))), visualDefinitions, false);
+			applyProjectItems(firstArray(json(root.resolve("ItemDefsCustom.json"))), visualDefinitions, false);
+			noteDef = new ItemDef("", "", "", 0, 438, "items:438", true, false, 0, 0, false, false, false, 0);
+			certificateDef = new ItemDef("", "", "", 0, 180, "items:180", true, false, 0, 0, false, false, false, 0);
+			loadProjectTiles(root.resolve("TileDef.xml"));
+			loadProjectDoors(root.resolve("DoorDef.xml"));
+			loadProjectScenery(root.resolve("GameObjectDef.xml"));
+			if (items.size() != 1593 || objects.size() != 1296 || doors.size() != 214 || tiles.size() != 25) {
+				throw new IllegalArgumentException("incomplete public Base definitions");
+			}
+		} catch (Exception failure) {
+			throw new IllegalStateException("Unable to load packaged public Base definitions", failure);
+		}
 	}
 
 	private static void applyProjectContentBundle(ProjectContentBundle bundle) {

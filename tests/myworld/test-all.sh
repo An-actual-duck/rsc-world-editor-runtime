@@ -98,6 +98,7 @@ python3 ./tests/myworld/test-project-bound-placement-definitions.py
 python3 ./tests/myworld/test-host-runtime-capability.py
 python3 ./tests/myworld/test-current-platform-composition.py
 python3 ./tests/myworld/test-current-base-candidate.py
+python3 ./tests/myworld/test-current-base-public-definitions.py
 python3 ./tests/myworld/test-current-base-state-migration.py
 python3 ./tests/myworld/test-current-base-state-location.py
 python3 ./tests/myworld/test-current-base-runtime-execution.py

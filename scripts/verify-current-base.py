@@ -317,13 +317,15 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
         for name, payload in generated.items():
             if archive.read(name) != payload:
                 raise VerificationError(f"generated server content differs: {name}")
-        items = json.loads(archive.read("conf/server/defs/ItemDefs.json"))["item"]
-        npcs = json.loads(archive.read("conf/server/defs/NpcDefs.json"))["npcs"]
+        items = (json.loads(archive.read("conf/server/defs/ItemDefs.json"))["item"]
+                 + json.loads(archive.read("conf/server/defs/ItemDefsCustom.json"))["items"])
+        npcs = (json.loads(archive.read("conf/server/defs/NpcDefs.json"))["npcs"]
+                + json.loads(archive.read("conf/server/defs/NpcDefsCustom.json"))["npcs"])
         limits = manifest["definitionLimits"]
         if [row["id"] for row in items] != list(range(limits["itemMaxId"] + 1)):
-            raise VerificationError("Base item definitions are not the vanilla ID prefix")
+            raise VerificationError("Base items do not preserve the complete public registry")
         if [row["id"] for row in npcs] != list(range(limits["npcMaxId"] + 1)):
-            raise VerificationError("Base NPC definitions are not the vanilla ID prefix")
+            raise VerificationError("Base NPCs do not preserve the complete public registry")
         doors = ET.fromstring(archive.read("conf/server/defs/DoorDef.xml"))
         scenery = ET.fromstring(archive.read("conf/server/defs/GameObjectDef.xml"))
         if len(list(doors)) != limits["boundaryMaxId"] + 1:
@@ -480,8 +482,10 @@ def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
                     tree["bundlePath"] + "/" + source.relative_to(source_root).as_posix()
                 )
     for record in manifest["sourceFiles"]:
-        require_exact_keys(record, {"sourcePath", "bundlePath"},
+        require_exact_keys(record, {"sourcePath", "bundlePath", "transform"},
                            "client content source file")
+        if record["transform"] not in ("copy", "base64"):
+            raise VerificationError("unsupported client content transform")
         expected.add(record["bundlePath"])
     names = archive_names(archive_path)
     if names != expected:

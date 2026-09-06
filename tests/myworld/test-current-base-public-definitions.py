@@ -2,6 +2,10 @@
 """Positive, reference-checkout-independent integrity for public Base data."""
 
 import hashlib
+import base64
+import gzip
+import importlib.util
+import io
 import json
 from pathlib import Path
 import unittest
@@ -22,6 +26,45 @@ def records(name):
 
 
 class PublicDefinitionSnapshotTest(unittest.TestCase):
+    def test_closed_visual_derivation_literals_reject_code(self):
+        spec = importlib.util.spec_from_file_location('public_visuals',
+            ROOT / 'scripts/derive-current-base-public-item-visuals.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(module.Literals('Config.S_WANT_CUSTOM_SPRITES ? 9 : -1, "items:7", 0xff').arguments(),
+                         [-1, 'items:7', 255])
+        for bad in ['Runtime.exec("x")', 'Config.UNREVIEWED ? 1 : 2', 'foo()', '1; 2']:
+            with self.assertRaises(ValueError):
+                module.Literals(bad).arguments()
+        with self.assertRaises(ValueError):
+            module.derive(b'not-the-reviewed-source')
+
+    def test_exact_public_visual_inputs(self):
+        provenance = json.loads((SNAPSHOT / 'visual-provenance.json').read_bytes())
+        visual = provenance['itemVisuals']
+        payload = (SNAPSHOT / visual['path']).read_bytes()
+        self.assertEqual(len(payload), visual['size'])
+        self.assertEqual(hashlib.sha256(payload).hexdigest(), visual['sha256'])
+        document = json.loads(payload)
+        self.assertEqual(set(document), {'schemaVersion', 'manifestType', 'sourceSha256', 'flags', 'items'})
+        self.assertEqual(document['sourceSha256'], visual['sourceSha256'])
+        self.assertEqual(list(row['id'] for row in document['items']), list(range(1593)))
+        self.assertTrue(all(value is False for value in document['flags'].values()))
+        for row in document['items']:
+            self.assertEqual(set(row), {'id', 'authenticSpriteId', 'spriteLocation', 'pictureMask', 'blueMask'})
+            self.assertTrue(row['spriteLocation'].startswith('items:'))
+        stock = provenance['stockSprites']
+        archive = base64.b64decode(b''.join((SNAPSHOT / stock['path']).read_bytes().split()), validate=True)
+        self.assertEqual(len(archive), stock['sourceSize'])
+        self.assertEqual(hashlib.sha256(archive).hexdigest(), stock['sourceSha256'])
+        with gzip.GzipFile(fileobj=io.BytesIO(archive)) as stream:
+            unpacked = stream.read(16000001)
+            self.assertLessEqual(len(unpacked), 16000000)
+            self.assertEqual(stream.read(1), b'')
+        authentic = provenance['authenticSprites']
+        self.assertEqual(hashlib.sha256((ROOT / authentic['sourcePath']).read_bytes()).hexdigest(),
+                         authentic['sourceSha256'])
+
     def test_closed_provenance_and_reconstruct_original_bytes(self):
         manifest = json.loads((SNAPSHOT / 'provenance.json').read_bytes())
         self.assertEqual(set(manifest), {'schemaVersion', 'manifestType', 'sourceCommit',

@@ -8,9 +8,9 @@
   "definitionsRoot": "conf/server",
   "definitionLimits": {
     "boundaryMaxId": 213,
-    "itemMaxId": 1289,
-    "npcMaxId": 793,
-    "sceneryMaxId": 1189
+    "itemMaxId": 1592,
+    "npcMaxId": 835,
+    "sceneryMaxId": 1295
   },
   "sourceFiles": [
     {"sourcePath": "server/alertwords.txt", "bundlePath": "alertwords.txt", "transform": "copy"},
@@ -53,13 +53,15 @@
     {"sourcePath": "server/conf/server/languages/AuthenticMessages_en_UK_female_no_misgender.properties", "bundlePath": "conf/server/languages/AuthenticMessages_en_UK_female_no_misgender.properties", "transform": "copy"},
     {"sourcePath": "server/conf/server/languages/AuthenticMessages_en_UK_gender_neutral.properties", "bundlePath": "conf/server/languages/AuthenticMessages_en_UK_gender_neutral.properties", "transform": "copy"},
     {"sourcePath": "server/conf/server/languages/AuthenticMessages_en_UK_male.properties", "bundlePath": "conf/server/languages/AuthenticMessages_en_UK_male.properties", "transform": "copy"},
-    {"sourcePath": "server/conf/server/defs/ItemDefs.json", "bundlePath": "conf/server/defs/ItemDefs.json", "transform": "copy"},
-    {"sourcePath": "server/conf/server/defs/NpcDefs.json", "bundlePath": "conf/server/defs/NpcDefs.json", "transform": "copy"},
-    {"sourcePath": "server/conf/server/defs/DoorDef.xml", "bundlePath": "conf/server/defs/DoorDef.xml", "transform": "copy"},
-    {"sourcePath": "server/conf/server/defs/GameObjectDef.xml", "bundlePath": "conf/server/defs/GameObjectDef.xml", "transform": "vanilla-scenery-prefix-v1"},
+    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/ItemDefsCustom.json", "bundlePath": "conf/server/defs/ItemDefsCustom.json", "transform": "copy"},
+    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/NpcDefsCustom.json", "bundlePath": "conf/server/defs/NpcDefsCustom.json", "transform": "copy"},
+    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/ItemDefs.json", "bundlePath": "conf/server/defs/ItemDefs.json", "transform": "copy"},
+    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/NpcDefs.json", "bundlePath": "conf/server/defs/NpcDefs.json", "transform": "copy"},
+    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/DoorDef.xml", "bundlePath": "conf/server/defs/DoorDef.xml", "transform": "copy"},
+    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/GameObjectDef.xml", "bundlePath": "conf/server/defs/GameObjectDef.xml", "transform": "copy"},
     {"sourcePath": "server/conf/server/defs/PrayerDef.xml", "bundlePath": "conf/server/defs/PrayerDef.xml", "transform": "copy"},
     {"sourcePath": "server/conf/server/defs/SpellDef.xml", "bundlePath": "conf/server/defs/SpellDef.xml", "transform": "copy"},
-    {"sourcePath": "server/conf/server/defs/TileDef.xml", "bundlePath": "conf/server/defs/TileDef.xml", "transform": "copy"},
+    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/TileDef.xml", "bundlePath": "conf/server/defs/TileDef.xml", "transform": "copy"},
     {"sourcePath": "server/conf/server/defs/extras/FiremakingDef.xml", "bundlePath": "conf/server/defs/extras/FiremakingDef.xml", "transform": "vanilla-item-map-v1"},
     {"sourcePath": "server/conf/server/defs/extras/ItemAffectedTypes.xml", "bundlePath": "conf/server/defs/extras/ItemAffectedTypes.xml", "transform": "copy"},
     {"sourcePath": "server/conf/server/defs/extras/ItemArrowHeadDef.xml", "bundlePath": "conf/server/defs/extras/ItemArrowHeadDef.xml", "transform": "vanilla-item-map-v1"},
@@ -83,8 +85,6 @@
     {"sourcePath": "server/conf/server/defs/extras/ObjectWoodcutting.xml", "bundlePath": "conf/server/defs/extras/ObjectWoodcutting.xml", "transform": "vanilla-scenery-map-v1"}
   ],
   "generatedFiles": [
-    {"bundlePath": "conf/server/defs/ItemDefsCustom.json", "content": "{\"items\":[]}"},
-    {"bundlePath": "conf/server/defs/NpcDefsCustom.json", "content": "{\"npcs\":[]}"},
     {"bundlePath": "conf/server/defs/extras/ObjectHarvesting.xml", "content": "<map/>"},
     {"bundlePath": "conf/server/defs/extras/ObjectRunecraft.xml", "content": "<map/>"},
     {"bundlePath": "conf/server/languages/CustomMessages_en_UK.properties", "content": ""},

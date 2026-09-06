@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -194,7 +195,12 @@ def write_client_content_archive(path: Path) -> None:
         bundle_path = record["bundlePath"]
         if bundle_path in records:
             raise RuntimeError("duplicate Current Base client content path")
-        records[bundle_path] = (ROOT / record["sourcePath"]).read_bytes()
+        payload = (ROOT / record["sourcePath"]).read_bytes()
+        if record["transform"] == "base64":
+            payload = base64.b64decode(b"".join(payload.split()), validate=True)
+        elif record["transform"] != "copy":
+            raise RuntimeError("unknown Current Base client content transform")
+        records[bundle_path] = payload
     folded: set[str] = set()
     for name in records:
         if name.startswith("/") or "\\" in name or ".." in Path(name).parts:

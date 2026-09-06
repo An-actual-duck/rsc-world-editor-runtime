@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "current-base-public-visual-provenance",
+  "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+  "itemVisuals": {
+    "sourcePath": "Client_Base/src/com/openrsc/client/entityhandling/EntityHandler.java",
+    "sourceSha256": "25f7c54a8d4f8fb76ed2a680538404f4e80ccf764451cd9d84c1313e761e2b62",
+    "derivation": "closed-literal-parser-four-false-flags-21-unconditional-sprite-location-mutations-v1",
+    "path": "item-visuals.json",
+    "sha256": "ac804f37ebbf70e1c3e7af8010fc9ed0e73188787faa9d9395ad0bf4c1a26274",
+    "size": 154340,
+    "recordCount": 1593
+  },
+  "stockSprites": {
+    "sourcePath": "Client_Base/Cache/video/Custom_Sprites.osar",
+    "sourceSha256": "ca5874de69a03382bfdc113f69a369260cf9da9525004dcdd840662c29bb9abf",
+    "sourceSize": 923865,
+    "path": "stock-sprites.osar.base64",
+    "encoding": "base64-original-bytes",
+    "bundlePath": "Cache/video/CurrentBase_Public_Sprites.osar"
+  },
+  "authenticSprites": {
+    "sourcePath": "Client_Base/Cache/video/Authentic_Sprites.orsc",
+    "sourceSha256": "cf861efa7307556b5e5ba4c20b838f17753faba8b530f85dca38e8c2839d5e69",
+    "disposition": "provider-tracked-byte-identical-source"
+  },
+  "precedence": "base-default-only-project-authored-bundle-and-spritepack-remain-later-overrides"
+}
