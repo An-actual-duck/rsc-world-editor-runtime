@@ -28,6 +28,31 @@ def records(name):
 
 
 class PublicDefinitionSnapshotTest(unittest.TestCase):
+    def test_closed_profile_provenance_binding_and_forgery_refusal(self):
+        spec = importlib.util.spec_from_file_location('public_policy_verify', ROOT / 'scripts/verify-current-base.py')
+        verify = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(verify)
+        profile = verify.validate_profile(SNAPSHOT.parent / 'profile.json')
+        policy = profile['definitionPolicy']
+        for name, expected_hash in policy['provenanceSha256'].items():
+            self.assertEqual(hashlib.sha256((SNAPSHOT / name).read_bytes()).hexdigest(), expected_hash)
+        with tempfile.TemporaryDirectory(prefix='public-policy-forgery-') as tmp:
+            forged = Path(tmp) / 'profile.json'
+            for field, value in [('sourceCommit', '0' * 40), ('registryCounts', {'items': 1290}),
+                                 ('provenanceSha256', {}), ('unknown', True)]:
+                altered = json.loads(json.dumps(profile))
+                altered['definitionPolicy'][field] = value
+                forged.write_text(json.dumps(altered))
+                with self.assertRaisesRegex(verify.VerificationError, 'definition policy'):
+                    verify.validate_profile(forged)
+        for role in ('server', 'client'):
+            manifest = json.loads((SNAPSHOT.parent / (role + '-content.json')).read_bytes())
+            verify.validate_public_provenance_selection(manifest, role)
+            manifest['sourceFiles'] = [row for row in manifest['sourceFiles']
+                                       if not row['bundlePath'].endswith('/effective-policy.json')]
+            with self.assertRaisesRegex(verify.VerificationError, 'provenance selection'):
+                verify.validate_public_provenance_selection(manifest, role)
+
     def test_client_content_payload_tampering_and_duplicate_paths_refused(self):
         def module(name, filename):
             spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts' / filename)

@@ -104,6 +104,15 @@ public final class PublicMagicProbe {
       clear(); player.getCache().set("mage_arena", 4);
       arena.onOpLoc(player, stone, "chant");
       check(count(capes[i]) == 1 && player.getCache().getInt("mage_arena") == 4, "replacement cape changed progression");
+      clear(); player.getBank().getItems().add(new Item(capes[i]));
+      arena.onOpLoc(player, stone, "chant");
+      check(player.getCarriedItems().getInventory().size() == 0, "bank-owned cape did not prevent reward");
+      player.getBank().getItems().clear();
+      player.getCache().set("mage_arena", 2);
+      for (int slot = 0; slot < 30; slot++) add(611, 1);
+      arena.onOpLoc(player, stone, "chant");
+      check(count(capes[i]) == 0 && count(611) == 30 && player.getCache().getInt("mage_arena") == 2,
+        "full inventory stone changed items or progression");
     }
     System.out.println("PUBLIC_MAGIC_VERIFIED staffDispatch=" + staffChecks + " orbDispatch=4 stoneDispatch=3");
   }

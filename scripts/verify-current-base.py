@@ -314,7 +314,7 @@ def validate_public_provenance_selection(manifest: dict, role: str) -> None:
             "transform": "copy",
         }
         if manifest["sourceFiles"].count(expected) != 1:
-            raise VerificationError("Current Base must package its exact public provenance: " + name)
+            raise VerificationError("missing or duplicate Current Base public provenance selection: " + name)
 
 
 def validate_server_content(manifest_path: Path, archive_path: Path,

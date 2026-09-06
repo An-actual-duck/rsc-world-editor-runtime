@@ -23,7 +23,7 @@
       "items": false
     },
     "sourceFiles": {
-      "type": "array", "minItems": 5, "maxItems": 5,
+      "type": "array", "minItems": 20, "maxItems": 20,
       "items": {"$ref": "#/$defs/file"}
     },
     "forbiddenPathFragments": {
@@ -40,9 +40,10 @@
   "$defs": {
     "file": {
       "type": "object", "additionalProperties": false,
-      "required": ["sourcePath", "bundlePath"],
+      "required": ["sourcePath", "bundlePath", "transform"],
       "properties": {
         "sourcePath": {"type": "string", "minLength": 1},
+        "transform": {"enum": ["copy", "base64"]},
         "bundlePath": {"type": "string", "pattern": "^Cache/[A-Za-z0-9._/-]+$"}
       }
     }
