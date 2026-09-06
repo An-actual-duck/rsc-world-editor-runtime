@@ -112,6 +112,7 @@ python3 ./tests/myworld/test-current-base-installed-launch.py
 python3 ./tests/myworld/test-installed-shutdown-drain.py
 python3 ./tests/myworld/test-verifier-lifetime.py
 python3 ./tests/myworld/test-preservation-transition-execution.py
+python3 ./tests/myworld/test-preservation-genuine-map-semantics.py
 python3 ./tests/myworld/test-custom-login-decoder.py
 python3 ./tests/myworld/test-world-builder-cold-start-isolation.py
 python3 ./tests/myworld/test-adaptive-builder-real-login.py
