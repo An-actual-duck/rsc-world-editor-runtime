@@ -6329,18 +6329,7 @@ public final class mudclient implements Runnable {
 					if (row > 0 && sx < this.mouseX && this.mouseX < width + sx && this.mouseY > row * 20 + sy
 						&& row * 20 + sy + 20 > this.mouseY) {
 						this.mouseButtonClick = 0;
-						boolean hitsXpFocusMenu = shouldDrawHitsXpFocusMenu();
-						int selectedStyle = row - 1;
-						if (hitsXpFocusMenu) {
-							this.hitsXpFocus = selectedStyle;
-						} else {
-							this.combatStyle = selectedStyle;
-							this.proposedStyle = this.combatStyle;
-						}
-						this.packetHandler.getClientStream().newPacket(29);
-						this.packetHandler.getClientStream().bufferBits.putByte(hitsXpFocusMenu ? selectedStyle + 4 : selectedStyle);
-						this.packetHandler.getClientStream().finishPacket();
-						this.extendGatheringFocusMenuLinger();
+						selectCombatStyleMenuRow(row - 1);
 						break;
 					}
 				}
@@ -6370,6 +6359,20 @@ public final class mudclient implements Runnable {
 		} catch (RuntimeException var7) {
 			throw GenUtil.makeThrowable(var7, "client.TB(" + "dummy" + ')');
 		}
+	}
+
+	private void selectCombatStyleMenuRow(int selectedStyle) {
+		if (selectedStyle < 0 || selectedStyle > 3) throw new IllegalArgumentException("invalid combat menu row");
+		boolean hitsXpFocusMenu = shouldDrawHitsXpFocusMenu();
+		if (hitsXpFocusMenu) this.hitsXpFocus = selectedStyle;
+		else {
+			this.combatStyle = selectedStyle;
+			this.proposedStyle = selectedStyle;
+		}
+		this.packetHandler.getClientStream().newPacket(29);
+		this.packetHandler.getClientStream().bufferBits.putByte(hitsXpFocusMenu ? selectedStyle + 4 : selectedStyle);
+		this.packetHandler.getClientStream().finishPacket();
+		if (!CurrentBaseSkillContract.selected()) this.extendGatheringFocusMenuLinger();
 	}
 
 	private void drawDialogDuel() {

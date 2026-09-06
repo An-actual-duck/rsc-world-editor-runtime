@@ -131,6 +131,7 @@ def validate_profile(path: Path) -> dict:
             "clientContent",
             "statePolicy",
             "definitionPolicy",
+            "skillPolicy",
             "mapPolicy",
             "serverContent",
             "stateMigration",
@@ -189,6 +190,24 @@ def validate_profile(path: Path) -> dict:
         source = ROOT / "current-platform/runtime/current-base-v1/public-definitions" / name
         if source.is_symlink() or not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest() != digest:
             raise VerificationError("Current Base public provenance differs from the reviewed contract: " + name)
+    expected_skill_policy = {
+        "contractId": "current-base-public-skills-v1",
+        "skillCount": 18,
+        "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+        "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/skill-policy.json",
+        "sha256": "964af6e051d6011a6a85a5d1316d885cd1b1d6a1406345fb22249b1bda8bce76",
+        "serverBundlePath": "conf/server/current-base-public-provenance/skill-policy.json",
+        "clientBundlePath": "Cache/current-base-definitions/provenance/skill-policy.json"
+    }
+    if profile["skillPolicy"] != expected_skill_policy:
+        raise VerificationError("Current Base public skill policy differs from its reviewed contract")
+    skill_source = ROOT / expected_skill_policy["sourcePath"]
+    if (skill_source.is_symlink() or not skill_source.is_file()
+            or hashlib.sha256(skill_source.read_bytes()).hexdigest() != expected_skill_policy["sha256"]):
+        raise VerificationError("Current Base public skill policy source differs from its reviewed contract")
+    if ("com/openrsc/server/CurrentBaseSkillContract.class" not in profile["requiredRuntimeClasses"]
+            or "orsc/CurrentBaseSkillContract.class" not in profile["requiredClientClasses"]):
+        raise VerificationError("Current Base skill policy implementation classes are required")
     if profile["statePolicy"] != {
         "contractId": "canonical-public-state-v1",
         "durableLocation": "outside-code-runtime",
@@ -307,7 +326,12 @@ def inventory_path(identity: dict, role: str, payload_root: Path) -> Path:
 
 
 def validate_public_provenance_selection(manifest: dict, role: str) -> None:
-    policy = validate_profile(ROOT / "current-platform/runtime/current-base-v1/profile.json")["definitionPolicy"]
+    profile = validate_profile(ROOT / "current-platform/runtime/current-base-v1/profile.json")
+    skill = profile["skillPolicy"]
+    expected_skill = {"sourcePath": skill["sourcePath"], "bundlePath": skill[role + "BundlePath"], "transform": "copy"}
+    if manifest["sourceFiles"].count(expected_skill) != 1:
+        raise VerificationError("missing or duplicate Current Base public skill provenance selection")
+    policy = profile["definitionPolicy"]
     for name in policy["provenanceSha256"]:
         expected = {
             "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/" + name,

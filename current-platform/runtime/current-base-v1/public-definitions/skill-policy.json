@@ -217,6 +217,7 @@
   "requirementPolicy": "public-definition-skill-and-level-no-armor-exemption-secondary-Attack-for-spear-knife-Iban-battlestaff",
   "secondarySpearKnifeLevel": "primary-level-up-to10-otherwise-primary-plus5",
   "presentation": "all18-in-numeric-order-classic-style-packet29-values0-through3-no-owner-XP-focus-controls",
+  "statsProtocol": "18-current-u8-then18-max-u8-then18-XP-i32-then-quest-points-u8-no-owner-skill-tail",
   "oracleVectors": {
     "baseCombatXp": 23,
     "fullDamageMeleeXp": [
@@ -246,6 +247,8 @@
       ]
     ],
     "fullDamageRangedXpWithoutPerHit": 92,
+    "partialDamageMeleeXp": {"baseCombatXp": 23, "npcDefinitionHits": 5, "damage": 2, "truncatedShare": 9, "aggressive": [0, 0, 27, 9]},
+    "serverRates": {"inputXp": 20, "combatRate": 2.5, "combatXp": 50, "skillingRate": 3, "firemakingXp": 60},
     "magicKillXp": 0,
     "windStrikeSuccessfulCastXp": 88,
     "defenseShield": {

@@ -31,7 +31,7 @@
     {
       "schemaId": "current-base-client-content-v1",
       "relativePath": "schema/current-base-client-content-v1.schema.json",
-      "sha256": "6a83dc40499125ab697642ea53eadc2aac82ae4de28c33768053f62711fb78ad"
+      "sha256": "c168d85f2dfec00a8e680950bc4c60cc17322ae93b860446b2ba575534caf9fc"
     },
     {
       "schemaId": "current-base-installed-execution-evidence-v1",
@@ -46,7 +46,7 @@
     {
       "schemaId": "current-base-runtime-profile-v1",
       "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
-      "sha256": "67f615c2ad804923e03953d51b19b930b58af9fc03ecf8acec25aef8b0d1cf63"
+      "sha256": "8d9e4e0a23c4513ebc1197518aee2dc3ca4244d3e575af23d800aafa5f0cd63b"
     },
     {
       "schemaId": "current-base-server-content-v1",

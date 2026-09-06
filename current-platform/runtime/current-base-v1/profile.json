@@ -37,6 +37,15 @@
       "effective-policy.json": "b70f38f94b8c7b3a2cdaa86428fd2f3a8c6c2438badbd884024e3819c4a3908e"
     }
   },
+  "skillPolicy": {
+    "contractId": "current-base-public-skills-v1",
+    "skillCount": 18,
+    "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+    "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/skill-policy.json",
+    "sha256": "964af6e051d6011a6a85a5d1316d885cd1b1d6a1406345fb22249b1bda8bce76",
+    "serverBundlePath": "conf/server/current-base-public-provenance/skill-policy.json",
+    "clientBundlePath": "Cache/current-base-definitions/provenance/skill-policy.json"
+  },
   "statePolicy": {
     "contractId": "canonical-public-state-v1",
     "durableLocation": "outside-code-runtime",
@@ -116,6 +125,7 @@
     "pendingCutover": "installationRoot/pending-cutover.json-any-entry-refuses-after-lease-before-effects"
   },
   "requiredRuntimeClasses": [
+    "com/openrsc/server/CurrentBaseSkillContract.class",
     "com/openrsc/server/VerifierLifetime.class",
     "com/openrsc/server/CurrentBaseVerifierServer.class",
     "com/openrsc/server/database/CurrentBaseVerifierRecovery.class",
@@ -129,6 +139,7 @@
     "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class"
   ],
   "requiredClientClasses": [
+    "orsc/CurrentBaseSkillContract.class",
     "orsc/VerifierLifetime.class",
     "orsc/CurrentBaseVerifierClient.class",
     "orsc/CurrentInstalledLaunch.class",

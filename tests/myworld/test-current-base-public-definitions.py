@@ -28,6 +28,42 @@ def records(name):
 
 
 class PublicDefinitionSnapshotTest(unittest.TestCase):
+    def test_closed_public_skill_policy_and_selection(self):
+        spec = importlib.util.spec_from_file_location('public_skill_verify', ROOT / 'scripts/verify-current-base.py')
+        verify = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(verify)
+        profile = verify.validate_profile(SNAPSHOT.parent / 'profile.json')
+        binding = profile['skillPolicy']
+        raw = (ROOT / binding['sourcePath']).read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), binding['sha256'])
+        policy = json.loads(raw)
+        self.assertEqual(policy['sourceCommit'], binding['sourceCommit'])
+        self.assertEqual([row['id'] for row in policy['registry']], list(range(18)))
+        self.assertEqual([policy['registry'][i]['name'] for i in [0, 1, 2, 5, 11]],
+                         ['Attack', 'Defense', 'Strength', 'Prayer', 'Firemaking'])
+        self.assertEqual([row['meleeXpWeights'] for row in policy['combatStyles']],
+                         [[1, 1, 1, 1], [0, 0, 3, 1], [3, 0, 0, 1], [0, 3, 0, 1]])
+        vector = policy['oracleVectors']['partialDamageMeleeXp']
+        self.assertEqual(int(vector['baseCombatXp'] / vector['npcDefinitionHits'] * vector['damage']),
+                         vector['truncatedShare'])
+        self.assertEqual(vector['aggressive'], [0, 0, 27, 9])
+        with tempfile.TemporaryDirectory(prefix='public-skill-policy-') as temporary:
+            forged = Path(temporary) / 'profile.json'
+            for key, value in [('skillCount', 20), ('sourceCommit', '0' * 40), ('sha256', '0' * 64),
+                               ('serverBundlePath', 'other.json'), ('unknown', True)]:
+                altered = json.loads(json.dumps(profile))
+                altered['skillPolicy'][key] = value
+                forged.write_text(json.dumps(altered))
+                with self.assertRaisesRegex(verify.VerificationError, 'skill policy'):
+                    verify.validate_profile(forged)
+        for role in ('server', 'client'):
+            manifest = json.loads((SNAPSHOT.parent / (role + '-content.json')).read_bytes())
+            selected = next(row for row in manifest['sourceFiles'] if row['sourcePath'] == binding['sourcePath'])
+            for changed in ([], [selected, selected], [dict(selected, transform='prefix-xml')]):
+                altered = dict(manifest, sourceFiles=[row for row in manifest['sourceFiles'] if row != selected] + changed)
+                with self.assertRaisesRegex(verify.VerificationError, 'skill provenance selection'):
+                    verify.validate_public_provenance_selection(altered, role)
+
     def test_closed_profile_provenance_binding_and_forgery_refusal(self):
         spec = importlib.util.spec_from_file_location('public_policy_verify', ROOT / 'scripts/verify-current-base.py')
         verify = importlib.util.module_from_spec(spec)

@@ -2488,6 +2488,7 @@ public final class Player extends Mob {
 	}
 
 	public int getEquipmentAdjustedNormalLevel(final int skill) {
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) return getSkills().getMaxStat(skill);
 		syncHerblawSkillPotionBonuses();
 		final int potionBonus = getHerblawSkillPotionBonus(skill);
 		if (skill == Skill.MELEE.id()) {
@@ -2513,6 +2514,7 @@ public final class Player extends Mob {
 	}
 
 	public int getPersistedSkillLevel(final int skill) {
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) return getSkills().getLevel(skill);
 		syncHerblawSkillPotionBonuses();
 		final int potionBonus = getHerblawSkillPotionBonus(skill);
 		if (skill == Skill.HITS.id()) {
