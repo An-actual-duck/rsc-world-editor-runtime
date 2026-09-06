@@ -11,13 +11,14 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+import struct
 import subprocess
 import tempfile
 import time
 import unittest
 import uuid
 import zipfile
-from PIL import ImageGrab, ImageChops
+from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "output/current-platform/current-base-v1"
@@ -67,6 +68,15 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         self.code, self.state, self.working, self.side, self.descriptors = {}, {}, {}, {}, {}
         self.map = self.root / "map"
         FIXTURE.write_package(self.map)
+        # The execution-only fixture intentionally uses overlay 8 (void).
+        # A normal player rendering gate needs deliberate visible terrain.
+        terrain_path = self.map / "terrain/global/lp0/xp2-yp13.raw"
+        terrain = bytes(value for x in range(48) for y in range(48)
+            for value in (0, 48 if (x // 4 + y // 4) % 2 else 96, 0, 0, 0, 0, 0, 0, 0, 0))
+        terrain_path.write_bytes(terrain)
+        manifest = json.loads((self.map / "manifest.json").read_text())
+        manifest["terrainSectors"][0]["sha256"] = FIXTURE.sha256(terrain_path)
+        write_json(self.map / "manifest.json", manifest)
         self.port = FIXTURE.free_port()
         installation_id = str(uuid.uuid4())
         for role, jar in (("server", "core.jar"), ("client", "Open_RSC_Client.jar")):
@@ -195,8 +205,9 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
 
     def manual_login(self, server, client):
         self.assertIsNotNone(shutil.which("xdotool"), "Manual UI integration requires xdotool")
+        self.assertIsNotNone(shutil.which("xwd"), "Window-isolated frame verification requires xwd")
         def xdo(*args):
-            return subprocess.run(["xdotool", *map(str, args)], capture_output=True, text=True, check=True).stdout
+            return subprocess.run(["xdotool", *map(str, args)], capture_output=True, text=True, check=True, timeout=10).stdout
         deadline = time.monotonic() + 30
         while "Got server configs!" not in self.log(client) and time.monotonic() < deadline:
             time.sleep(0.05)
@@ -205,34 +216,73 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         windows = xdo("search", "--onlyvisible", "--pid", client.pid).split()
         self.assertEqual(1, len(windows), "Only this owned child window is admitted for test input")
         window = windows[0]
-        geometry = dict(line.split("=", 1) for line in xdo("getwindowgeometry", "--shell", window).splitlines())
-        x, y, width, height = (int(geometry[key]) for key in ("X", "Y", "WIDTH", "HEIGHT"))
-        before = ImageGrab.grab(bbox=(x, y, x + width, y + height)).convert("RGB")
-        before.save(self.root / "manual-before.png")
+        xdo("windowactivate", "--sync", window)
+        xdo("windowfocus", "--sync", window)
+        def capture():
+            # Capture only this child-owned window, never a desktop rectangle or another application.
+            raw = subprocess.run(["xwd", "-silent", "-nobdrs", "-id", window],
+                check=True, capture_output=True).stdout
+            header = struct.unpack(">25I", raw[:100])
+            self.assertEqual(32, header[11], "Expected bounded true-color fixture display")
+            offset = header[0] + header[19] * 12
+            return Image.frombytes("RGB", (header[4], header[5]), raw[offset:], "raw",
+                "BGRX" if header[7] == 0 else "XRGB", header[12])
+        before = capture()
+        width, height = before.size
         if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
             before.save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "before.png")
-        print("Manual launch geometry", geometry, str(self.root), flush=True)
-        xdo("windowfocus", window)
-        xdo("mousemove", "--window", window, width // 2 + round(100 * width / 960), height // 2 + round(123 * height / 540))
+        # Locate the blue Existing User button in this actual rendered surface;
+        # OS frame insets/scaling do not share the game's coordinate system.
+        pixels = before.load()
+        blue = [(px, py) for py in range(height // 3, height * 9 // 10)
+            for px in range(width // 2, width * 4 // 5)
+            if 40 < pixels[px, py][0] < 150 and pixels[px, py][0] <= pixels[px, py][1]
+            and pixels[px, py][2] > pixels[px, py][1] + 10]
+        self.assertGreater(len(blue), 1000, "Expected normal Existing User button")
+        click_x = sum(px for px, _ in blue) // len(blue)
+        click_y = sum(py for _, py in blue) // len(blue)
+        xdo("mousemove", "--window", window, click_x, click_y)
+        self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
         xdo("click", "1")
         time.sleep(0.3)
-        xdo("type", "--window", window, "--delay", "70", "launchtest")
-        xdo("key", "--window", window, "Return")
-        ImageGrab.grab(bbox=(x, y, x + width, y + height)).save(self.root / "manual-input.png")
+        self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
+        xdo("type", "--delay", "70", "launchtest")
+        xdo("key", "Return")
         if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
-            ImageGrab.grab(bbox=(x, y, x + width, y + height)).save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "input.png")
-        xdo("type", "--window", window, "--delay", "70", "launchpass")
-        xdo("key", "--window", window, "Return")
+            capture().save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "input.png")
+        self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
+        xdo("type", "--delay", "70", "launchpass")
+        xdo("key", "Return")
+        time.sleep(2)
+        if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
+            capture().save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "submitted.png")
         deadline = time.monotonic() + 25
         while "Player Loaded: launchtest" not in self.log(server) and time.monotonic() < deadline:
             time.sleep(0.1)
         self.assertTrue("Player Loaded: launchtest" in self.log(server), self.log(client)[-2500:])
         time.sleep(3)
-        after = ImageGrab.grab(bbox=(x, y, x + width, y + height)).convert("RGB")
+        # Dismiss the normal welcome modal using the real owned-window input path.
+        xdo("mousemove", "--window", window, width // 8, height // 2)
+        self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
+        xdo("click", "1")
+        time.sleep(3)
+        after = capture()
+        if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
+            after.save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "world.png")
+            (Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "client.txt").write_text(self.log(client))
+            (Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "server.txt").write_text(self.log(server))
         difference = ImageChops.difference(before, after)
-        changed = sum(pixel != (0, 0, 0) for pixel in difference.getdata())
+        changed = width * height - difference.convert("L").histogram()[0]
         self.assertGreater(changed, width * height // 4, "Manual login must render a world, not leave a login/loading window")
-        self.assertGreater(len(after.getcolors(width * height)), 100, "Actual map frame must contain rendered content")
+        terrain_pixels = sum(count for count, (red, green, blue) in after.getcolors(width * height)
+            if green > 35 and green > red and green > blue * 2)
+        self.assertGreater(terrain_pixels, width * height // 3, "Actual frame must display the invented green terrain")
+        avatar = after.crop((width // 2 - 40, height // 2 - 50, width // 2 + 40, height // 2 + 65))
+        black_pixels = sum(count for count, rgb in avatar.getcolors(80 * 115) if rgb == (0, 0, 0))
+        self.assertLess(black_pixels, 80 * 115 // 5, "Welcome modal must be dismissed before avatar verification")
+        avatar_pixels = sum(count for count, (red, green, blue) in avatar.getcolors(80 * 115)
+            if blue > 20 or red > green + 12)
+        self.assertGreater(avatar_pixels, 100, "The normally authenticated player must be visibly rasterized over the terrain")
         self.assertNotIn("CURRENT_BASE_RUNTIME_EXECUTION", self.log(client), "Normal client must not use credential evidence mode")
         self.assertFalse((self.side["client"] / "credentials.txt").exists())
 
@@ -241,6 +291,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         before = {role: tree_hash(self.code[role]) for role in ("server", "client")}
         key_hash = FIXTURE.sha256(self.side["server"] / "server.pem")
         sessions = []
+        client_uid_hash = None
         for iteration in range(2):
             server, server_ready = self.start("server")
             client, client_ready = self.start("client")
@@ -250,12 +301,33 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
                 self.assertEqual(2, duplicate.returncode)
             sessions.append((server_ready.parent.name, client_ready.parent.name))
             self.manual_login(server, client)
+            stale = json.loads(server_ready.read_text())
+            stale["action"] = "shutdown"
+            stale["nonce"] = "0" * 64
+            write_json(server_ready.parent / "shutdown.json", stale)
+            time.sleep(0.3)
+            self.assertIsNone(server.poll(), "An unbound stale shutdown request must not terminate the live server")
+            self.assert_locked("server")
+            (server_ready.parent / "shutdown.json").write_text("{malformed")
+            time.sleep(0.3)
+            self.assertIsNone(server.poll(), "Malformed shutdown bytes must not terminate the live server")
+            self.assert_locked("server")
+            (server_ready.parent / "shutdown.json").unlink()
             self.stop(client, client_ready)
             self.stop(server, server_ready)
             with sqlite3.connect(self.state["server"] / "current_base.db") as database:
                 self.assertEqual((120, 648), database.execute("SELECT x,y FROM players WHERE id=901").fetchone())
                 self.assertEqual((321,), database.execute("SELECT amount FROM itemstatuses JOIN invitems USING(itemID) WHERE playerID=901 AND catalogID=10").fetchone())
                 self.assertEqual((3,), database.execute("SELECT stage FROM quests WHERE playerID=901 AND id=1").fetchone())
+                login_date, online = database.execute("SELECT login_date,online FROM players WHERE id=901").fetchone()
+                self.assertGreater(login_date, 100, "Normal login must update durable account state")
+                self.assertEqual(0, online, "Clean shutdown must persist the offline account state")
+            uid = self.side["client"] / "uid.dat"
+            self.assertTrue(uid.is_file(), "Normal authentication must create UID only in persistent client state")
+            if client_uid_hash is None:
+                client_uid_hash = FIXTURE.sha256(uid)
+            else:
+                self.assertEqual(client_uid_hash, FIXTURE.sha256(uid), "Client UID must survive restart")
             self.assertEqual(before, {role: tree_hash(self.code[role]) for role in ("server", "client")})
             self.assertEqual(key_hash, FIXTURE.sha256(self.side["server"] / "server.pem"))
             for role in ("server", "client"):
@@ -298,6 +370,25 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         client = (ROOT / "Client_Base/src/orsc/CurrentInstalledLaunch.java").read_text().split("\n", 1)[1]
         self.assertEqual(server, client)
 
+    def test_missing_client_cache_refuses_without_working_or_neighbor_fallback(self):
+        (self.code["client"] / "Cache").rename(self.root / "saved-code-cache")
+        changed = copy.deepcopy(self.descriptors["client"])
+        changed["codeTreeSha256"] = tree_hash(self.code["client"])
+        path = self.root / "missing-cache-launch.json"
+        write_json(path, changed)
+        selected = copy.deepcopy(self.active)
+        selected["clientDescriptorSha256"] = FIXTURE.sha256(path)
+        write_json(self.anchor / "active-launch.json", selected)
+        # Nearby writable content must never become an implicit asset source.
+        (self.working["client"] / "Cache").mkdir()
+        marker = self.working["client"] / "Cache" / "invented-marker"
+        marker.write_text("do-not-use-this-fallback")
+        result = subprocess.run(self.command("client", path), cwd=self.working["client"],
+            capture_output=True, text=True, timeout=20)
+        self.assertEqual(2, result.returncode)
+        self.assertEqual([], list((self.anchor / "sessions/client").iterdir()))
+        self.assertEqual("do-not-use-this-fallback", marker.read_text())
+
     def test_active_selection_refuses_retired_descriptor_and_accepts_current(self):
         next_descriptor = copy.deepcopy(self.descriptors["server"])
         next_profile = self.root / "next-reviewed-server-profile.json"
@@ -315,6 +406,62 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         server, ready = self.start("server", next_path)
         self.assertEqual(FIXTURE.sha256(next_path), json.loads(ready.read_text())["descriptorSha256"])
         self.stop(server, ready)
+
+    def test_private_alias_oversized_key_and_external_override_refusals(self):
+        for mutation in ("oversized-public", "oversized-private", "private-key-mismatch", "credentials-symlink", "hideip-hardlink",
+                         "lock-hardlink", "renderer-property", "renderer-alias-property", "renderer-environment", "database-mode"):
+            with self.subTest(mutation=mutation):
+                role = "client" if mutation in ("credentials-symlink", "hideip-hardlink") else "server"
+                restore = []
+                command = self.command(role)
+                environment = os.environ.copy()
+                if mutation == "oversized-public":
+                    file = self.side["server"] / "client.pem"
+                    original = file.read_bytes()
+                    file.write_bytes(b"x" * 65537)
+                    restore.append(lambda: file.write_bytes(original))
+                elif mutation == "oversized-private":
+                    file = self.side["server"] / "server.pem"
+                    original = file.read_bytes()
+                    file.write_bytes(b"x" * 65537)
+                    restore.append(lambda: file.write_bytes(original))
+                elif mutation == "private-key-mismatch":
+                    file = self.side["server"] / "server.pem"
+                    original = file.read_bytes()
+                    subprocess.run(["openssl", "genpkey", "-algorithm", "RSA", "-pkeyopt", "rsa_keygen_bits:512",
+                        "-out", str(file)], check=True, capture_output=True)
+                    restore.append(lambda: file.write_bytes(original))
+                elif mutation == "credentials-symlink":
+                    outside = self.root / "invented-private-marker"
+                    outside.write_text("never-read-or-overwrite-this-fixture")
+                    alias = self.side["client"] / "credentials.txt"
+                    alias.symlink_to(outside)
+                    restore.append(alias.unlink)
+                elif mutation == "hideip-hardlink":
+                    outside = self.root / "invented-privacy-marker"
+                    outside.write_text("0")
+                    alias = self.side["client"] / "hideIp.txt"
+                    os.link(outside, alias)
+                    restore.append(alias.unlink)
+                elif mutation == "lock-hardlink":
+                    alias = self.root / "extra-role-lock"
+                    os.link(self.anchor / "server.lock", alias)
+                    restore.append(alias.unlink)
+                elif mutation == "renderer-property": command.insert(1, "-Dspoiledmilk.openglPresenter=true")
+                elif mutation == "renderer-alias-property": command.insert(1, "-Dspoiled_milk.opengl_native_ui_replace=true")
+                elif mutation == "renderer-environment": environment["SPOILED_MILK_OPENGL_PRESENTER"] = "true"
+                elif mutation == "database-mode":
+                    file = self.state["server"] / "current_base.db"
+                    file.chmod(0o644)
+                    restore.append(lambda: file.chmod(0o600))
+                try:
+                    result = subprocess.run(command, cwd=self.working[role], env=environment,
+                        capture_output=True, text=True, timeout=20)
+                    self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+                    self.assertEqual([], list((self.anchor / "sessions" / role).iterdir()))
+                    self.assertEqual([], list(self.working[role].iterdir()))
+                finally:
+                    for action in restore: action()
 
 
 if __name__ == "__main__":

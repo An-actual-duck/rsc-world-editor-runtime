@@ -67,7 +67,7 @@ public final class CurrentInstalledLaunch {
         if (!FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
             throw new IOException("Installed Current Base launch requires POSIX");
         for (String key : System.getProperties().stringPropertyNames())
-            if (key.startsWith("openrsc.") || key.startsWith("spoiledmilk.")
+            if (key.startsWith("openrsc.") || key.startsWith("spoiledmilk.") || key.startsWith("spoiled_milk.")
                 || key.equals("conf") || key.equals("log4j.configurationFile"))
                 throw new IOException("External runtime property is not admitted: " + key);
         for (String key : System.getenv().keySet())
@@ -195,6 +195,7 @@ public final class CurrentInstalledLaunch {
             }
         } else {
             keys(document.getJSONObject("configuration"));
+            directory(code.resolve("Cache"));
             if (!bound("publicKey").equals(root("sideStateRoot").resolve("client.pem")))
                 throw new IOException("Client public key must belong to its own persistent side-state");
             for (String name : Arrays.asList("clientSettings.conf", "uid.dat", "hideIp.txt", "credentials.txt")) {
@@ -236,6 +237,7 @@ public final class CurrentInstalledLaunch {
             System.setProperty("spoiledmilk.openglPrimaryWindow", "false");
             System.setProperty("spoiledmilk.directFramebuffer", "false");
             System.setProperty("spoiledmilk.skipLegacyWorldRaster", "false");
+            System.setProperty("spoiledmilk.openglWorldSpritesVisible", "false");
         }
     }
 
@@ -331,10 +333,15 @@ public final class CurrentInstalledLaunch {
     public boolean shutdownRequested() throws Exception {
         Path request = sessionDirectory.resolve("shutdown.json");
         if (!Files.exists(request, LinkOption.NOFOLLOW_LINKS)) return false;
-        JSONObject actual = object(regular(request));
         JSONObject expected = binding("shutdown");
-        if (!actual.similar(expected)) throw new IOException("Shutdown request is not bound to this live session");
-        return true;
+        try {
+            JSONObject actual = object(regular(request));
+            return actual.similar(expected);
+        } catch (IOException | RuntimeException invalidRequest) {
+            // Stale/malformed control bytes are not shutdown authority. Retain
+            // them for inspection, without terminating this live role.
+            return false;
+        }
     }
     private JSONObject binding(String action) throws Exception {
         return new JSONObject().put("schemaVersion", 1).put("manifestType", "current-base-installed-session")

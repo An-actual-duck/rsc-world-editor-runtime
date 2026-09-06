@@ -140,6 +140,13 @@ POSIX-only.
 The normal Base client selects the maintained software desktop renderer because
 this composition does not ship native LWJGL executable dependencies. Generic and
 Advanced renderer defaults are unchanged.
+Normal installed connection lookups remain descriptor-bound after server-config
+refresh; cached endpoint files cannot redirect a later manual login. Software
+presentation includes actor sprites, with OpenGL-only sprite replay disabled.
+The normal-launch integration lane requires a POSIX graphical test session,
+`xdotool`, `xwd`, and Python Pillow. It targets only its owned client window,
+enters invented fixture credentials through the login UI, and verifies visible
+terrain/player pixels plus durable state across two complete restarts.
 The complete reviewed server configuration includes `db_type: sqlite`
 and `db_name: current_base`; managed launch never reads `connections.conf` or
 `local.conf` implicitly. Immutable definitions, SQL queries/patches, plugin JARs,

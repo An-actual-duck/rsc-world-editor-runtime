@@ -443,6 +443,9 @@ public class PacketHandler {
 	}
 
 	public final Socket openSocket(int port, String host) throws IOException {
+		CurrentInstalledLaunch installed = CurrentInstalledLaunch.current();
+		if (installed != null && (!installed.host().equals(host) || installed.port() != port))
+			throw new IOException("Connection endpoint differs from installed descriptor");
 		Socket s = new Socket(InetAddress.getByName(host), port);
 		//s.setSendBufferSize(25000);
 		//s.setReceiveBufferSize(25000);

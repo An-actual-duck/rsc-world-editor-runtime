@@ -1,5 +1,7 @@
 package orsc.multiclient;
 
+import orsc.CurrentInstalledLaunch;
+
 import com.openrsc.client.model.Sprite;
 
 import java.io.BufferedReader;
@@ -143,6 +145,7 @@ public interface ClientPort {
 	}
 
 	static String loadIP() {
+		if (CurrentInstalledLaunch.current() != null) return CurrentInstalledLaunch.current().host();
 		try {
 			FileInputStream in = new FileInputStream(Config.F_CACHE_DIR + File.separator + "ip.txt");
 			InputStreamReader inputStreamReader = new InputStreamReader(in);
@@ -161,6 +164,7 @@ public interface ClientPort {
 	}
 
 	static int loadPort() {
+		if (CurrentInstalledLaunch.current() != null) return CurrentInstalledLaunch.current().port();
 		try {
 			FileInputStream in = new FileInputStream(Config.F_CACHE_DIR + File.separator + "port.txt");
 			InputStreamReader inputStreamReader = new InputStreamReader(in);
