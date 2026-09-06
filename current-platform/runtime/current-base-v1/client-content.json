@@ -10,6 +10,10 @@
     }
   ],
   "sourceFiles": [
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/provenance.json","bundlePath":"Cache/current-base-definitions/provenance/provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/gameplay-provenance.json","bundlePath":"Cache/current-base-definitions/provenance/gameplay-provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/visual-provenance.json","bundlePath":"Cache/current-base-definitions/provenance/visual-provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/effective-policy.json","bundlePath":"Cache/current-base-definitions/provenance/effective-policy.json","transform":"copy"},
     {
       "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/PrayerDef.xml",
       "bundlePath": "Cache/current-base-definitions/PrayerDef.xml",

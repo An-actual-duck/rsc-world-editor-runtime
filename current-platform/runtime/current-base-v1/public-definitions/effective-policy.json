@@ -13,6 +13,24 @@
     }
   ],
   "itemPostLoadPolicy": "preserve-stock-fields-no-owner-throwing-stackability-rewrite",
+  "customRegistryPolicy": "stock-appended-data-does-not-enable-advanced-behavior",
+  "gatheringPolicy": {
+    "tools": "carried-public-pickaxes-and-axes-with-stock-levels-and-curves",
+    "miningChance": "legacy-threshold-clamped-1-through-127-roll-1-through-128",
+    "yield": "one-resource-per-success",
+    "depletion": "public-resource-definition-and-stock-extended-rock-policy",
+    "respawn": "public-definition-seconds-times-1000"
+  },
+  "magicActionPolicy": {
+    "elementalStaffs": "twelve-stock-staves-supply-matching-runes-without-owner-percentage-effects",
+    "orbCharging": "four-matching-obelisks-consume-public-reagents-and-replace-unpowered-orb",
+    "arenaStones": "three-stock-god-capes-stage-two-to-three-no-owner-staff-path"
+  },
+  "verificationScope": "bounded-effective-definitions-assets-and-selected-actions-not-full-gameplay-parity",
+  "remainingCandidateBlockers": [
+    "public-combat-effective-stat-policy",
+    "genuine-imported-map-ladder-removal-and-client-void-boundary-proof"
+  ],
   "spellDispatch": [
     {
       "spell": "WIND_STRIKE",

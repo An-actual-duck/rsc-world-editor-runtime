@@ -190,7 +190,10 @@ def write_client_content_archive(path: Path) -> None:
             if not source.is_file() or source.is_symlink():
                 raise RuntimeError(f"unsafe Current Base client content file: {source}")
             relative = source.relative_to(source_root).as_posix()
-            records[f'{tree["bundlePath"]}/{relative}'] = source.read_bytes()
+            bundle_path = f'{tree["bundlePath"]}/{relative}'
+            if bundle_path in records:
+                raise RuntimeError("duplicate Current Base client content tree path")
+            records[bundle_path] = source.read_bytes()
     for record in manifest["sourceFiles"]:
         bundle_path = record["bundlePath"]
         if bundle_path in records:

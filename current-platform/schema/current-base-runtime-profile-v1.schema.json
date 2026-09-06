@@ -4,7 +4,7 @@
   "title": "RSC World Editor Current Base runtime profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "statePolicy", "mapPolicy", "serverContent", "stateMigration", "installedExecutionVerifier", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "definitionPolicy", "statePolicy", "mapPolicy", "serverContent", "stateMigration", "installedExecutionVerifier", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
   "properties": {
     "schemaId": {"const": "current-base-runtime-profile-v1"},
     "manifestType": {"const": "current-base-runtime-profile"},
@@ -23,6 +23,96 @@
         "contentId": {"const": "current-base-public-client-content-v1"},
         "manifestRole": {"const": "client-content-manifest"},
         "archiveRole": {"const": "client-content"}
+      }
+    },
+    "definitionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyId",
+        "sourceCommit",
+        "registryCounts",
+        "customRegistryPolicy",
+        "serverProvenanceRoot",
+        "clientProvenanceRoot",
+        "provenanceSha256"
+      ],
+      "properties": {
+        "policyId": {
+          "const": "current-base-public-effective-content-v1"
+        },
+        "sourceCommit": {
+          "const": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00"
+        },
+        "registryCounts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "items",
+            "npcs",
+            "scenery",
+            "boundaries",
+            "tiles",
+            "prayers",
+            "spells"
+          ],
+          "properties": {
+            "items": {
+              "const": 1593
+            },
+            "npcs": {
+              "const": 836
+            },
+            "scenery": {
+              "const": 1296
+            },
+            "boundaries": {
+              "const": 214
+            },
+            "tiles": {
+              "const": 25
+            },
+            "prayers": {
+              "const": 14
+            },
+            "spells": {
+              "const": 48
+            }
+          }
+        },
+        "customRegistryPolicy": {
+          "const": "stock-appended-data-not-advanced"
+        },
+        "serverProvenanceRoot": {
+          "const": "conf/server/current-base-public-provenance"
+        },
+        "clientProvenanceRoot": {
+          "const": "Cache/current-base-definitions/provenance"
+        },
+        "provenanceSha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provenance.json",
+            "gameplay-provenance.json",
+            "visual-provenance.json",
+            "effective-policy.json"
+          ],
+          "properties": {
+            "provenance.json": {
+              "const": "c5923ef6fc5b30b533a0652aa79bfca13d79c46eec95aa739e0faa15920bea0b"
+            },
+            "gameplay-provenance.json": {
+              "const": "e6a858676e05b48f202a829bafc41dcc30bf0defe7490f6646433f03365c1d51"
+            },
+            "visual-provenance.json": {
+              "const": "ab395bcfa425fe5a92d691888ea1c2b5aa65153b359f32206d876613b274ec1d"
+            },
+            "effective-policy.json": {
+              "const": "b70f38f94b8c7b3a2cdaa86428fd2f3a8c6c2438badbd884024e3819c4a3908e"
+            }
+          }
+        }
       }
     },
     "statePolicy": {

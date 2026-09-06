@@ -130,6 +130,7 @@ def validate_profile(path: Path) -> dict:
             "clientAssetSets",
             "clientContent",
             "statePolicy",
+            "definitionPolicy",
             "mapPolicy",
             "serverContent",
             "stateMigration",
@@ -159,6 +160,34 @@ def validate_profile(path: Path) -> dict:
         "archiveRole": "client-content",
     }:
         raise VerificationError("Current Base client content binding is incomplete")
+    expected_definition_policy = {
+        "policyId": "current-base-public-effective-content-v1",
+        "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+        "registryCounts": {
+            "items": 1593,
+            "npcs": 836,
+            "scenery": 1296,
+            "boundaries": 214,
+            "tiles": 25,
+            "prayers": 14,
+            "spells": 48
+        },
+        "customRegistryPolicy": "stock-appended-data-not-advanced",
+        "serverProvenanceRoot": "conf/server/current-base-public-provenance",
+        "clientProvenanceRoot": "Cache/current-base-definitions/provenance",
+        "provenanceSha256": {
+            "provenance.json": "c5923ef6fc5b30b533a0652aa79bfca13d79c46eec95aa739e0faa15920bea0b",
+            "gameplay-provenance.json": "e6a858676e05b48f202a829bafc41dcc30bf0defe7490f6646433f03365c1d51",
+            "visual-provenance.json": "ab395bcfa425fe5a92d691888ea1c2b5aa65153b359f32206d876613b274ec1d",
+            "effective-policy.json": "b70f38f94b8c7b3a2cdaa86428fd2f3a8c6c2438badbd884024e3819c4a3908e"
+        }
+    }
+    if profile["definitionPolicy"] != expected_definition_policy:
+        raise VerificationError("Current Base public definition policy differs from its reviewed contract")
+    for name, digest in expected_definition_policy["provenanceSha256"].items():
+        source = ROOT / "current-platform/runtime/current-base-v1/public-definitions" / name
+        if source.is_symlink() or not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest() != digest:
+            raise VerificationError("Current Base public provenance differs from the reviewed contract: " + name)
     if profile["statePolicy"] != {
         "contractId": "canonical-public-state-v1",
         "durableLocation": "outside-code-runtime",
@@ -276,6 +305,18 @@ def inventory_path(identity: dict, role: str, payload_root: Path) -> Path:
     return payload_root / matches[0]["sourcePath"]
 
 
+def validate_public_provenance_selection(manifest: dict, role: str) -> None:
+    policy = validate_profile(ROOT / "current-platform/runtime/current-base-v1/profile.json")["definitionPolicy"]
+    for name in policy["provenanceSha256"]:
+        expected = {
+            "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/" + name,
+            "bundlePath": policy[role + "ProvenanceRoot"] + "/" + name,
+            "transform": "copy",
+        }
+        if manifest["sourceFiles"].count(expected) != 1:
+            raise VerificationError("Current Base must package its exact public provenance: " + name)
+
+
 def validate_server_content(manifest_path: Path, archive_path: Path,
                             exclusions: dict[str, bool]) -> None:
     try:
@@ -295,6 +336,7 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
             or manifest["contentId"] != "current-base-public-content-v1"
             or manifest["variantId"] != "current-base-v1"):
         raise VerificationError("server content manifest has wrong identity")
+    validate_public_provenance_selection(manifest, "server")
     expected = {manifest["configurationEntry"], manifest["connectionsEntry"]}
     for record in manifest["sourceFiles"]:
         require_exact_keys(record, {"sourcePath", "bundlePath", "transform"},
@@ -481,6 +523,7 @@ def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
             or manifest["contentId"] != "current-base-public-client-content-v1"
             or manifest["variantId"] != "current-base-v1"):
         raise VerificationError("client content manifest has wrong identity")
+    validate_public_provenance_selection(manifest, "client")
     expected: dict[str, bytes] = {}
     folded: set[str] = set()
     def add(name: str, payload: bytes) -> None:

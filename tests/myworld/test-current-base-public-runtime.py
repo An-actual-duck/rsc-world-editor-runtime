@@ -39,9 +39,12 @@ class PublicRuntimeTest(unittest.TestCase):
                 '-Dopenrsc.currentCompositionIdentityFile=' + str(OUTPUT / 'composition-identity.json'),
                 '-cp', str(root) + os.pathsep + classpath, probe, role,
                 str(ROOT / 'current-platform/runtime/current-base-v1/public-definitions')]
+            if probe == 'PublicGenericDispatchProbe':
+                command = [arg for arg in command if not arg.startswith('-Dopenrsc.currentCompositionIdentityFile=')]
             result = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=45)
             self.assertEqual(result.returncode, 0, result.stdout[-6000:] + result.stderr[-12000:])
-            self.assertIn('PUBLIC_MAGIC_VERIFIED' if probe == 'PublicMagicProbe' else
+            self.assertIn('PUBLIC_GENERIC_CONTROL_VERIFIED' if probe == 'PublicGenericDispatchProbe' else
+                          'PUBLIC_MAGIC_VERIFIED' if probe == 'PublicMagicProbe' else
                           'PUBLIC_GATHERING_VERIFIED' if probe == 'PublicGatheringProbe'
                           else 'PUBLIC_DEFINITIONS_VERIFIED role=' + role, result.stdout)
 
@@ -56,6 +59,9 @@ class PublicRuntimeTest(unittest.TestCase):
 
     def test_actual_public_magic_and_arena_effects(self):
         self.probe('server', 'PublicMagicProbe')
+
+    def test_unselected_dispatch_remains_generic(self):
+        self.probe('server', 'PublicGenericDispatchProbe')
 
 
 if __name__ == '__main__':

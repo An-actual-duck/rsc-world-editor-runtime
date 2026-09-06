@@ -31,9 +31,16 @@ public final class PublicMagicProbe {
     server = new Server("current-base.conf"); server.getEntityHandler().load();
     player = new Player(server.getWorld(), 725L);
     player.setClientVersion(server.getConfig().CLIENT_VERSION);
+    player.setClientLimitations(com.openrsc.server.net.rsc.ClientLimitations.forVersion(player.getClientVersion()));
+    // The custom client advertises these loaded-registry bounds during login;
+    // forVersion alone only fills historical hard-coded protocol profiles.
+    player.getClientLimitations().maxItemId = 1592;
+    player.getClientLimitations().maxSkillId = 20;
+    player.setLocation(Point.location(120, 648), true);
+    player.setBank(new com.openrsc.server.model.container.Bank(player));
     server.getWorld().getPlayers().add(player);
-    player.getSkills().setLevel(Skill.MAGIC.id(), 99, false, true);
-    int[][] staves = {{101, 617, 684}, {102, 616, 683}, {197, 618, 685}, {103, 615, 682}};
+    player.getSkills().setExperienceAndLevel(Skill.MAGIC.id(), 14000000, 99, false);
+    int[][] staves = {{101, 617, 684}, {102, 616, 683}, {103, 618, 685}, {197, 615, 682}};
     // IDs are checked against loaded public names as well as actual spell results.
     int[] runes = {33, 32, 34, 31};
     Spells[] strikes = {Spells.WIND_STRIKE, Spells.WATER_STRIKE, Spells.EARTH_STRIKE, Spells.FIRE_STRIKE};

@@ -13,6 +13,10 @@
     "sceneryMaxId": 1295
   },
   "sourceFiles": [
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/provenance.json","bundlePath":"conf/server/current-base-public-provenance/provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/gameplay-provenance.json","bundlePath":"conf/server/current-base-public-provenance/gameplay-provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/visual-provenance.json","bundlePath":"conf/server/current-base-public-provenance/visual-provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/effective-policy.json","bundlePath":"conf/server/current-base-public-provenance/effective-policy.json","transform":"copy"},
     {"sourcePath": "server/alertwords.txt", "bundlePath": "alertwords.txt", "transform": "copy"},
     {"sourcePath": "server/badwords.txt", "bundlePath": "badwords.txt", "transform": "copy"},
     {"sourcePath": "server/goodwords.txt", "bundlePath": "goodwords.txt", "transform": "copy"},

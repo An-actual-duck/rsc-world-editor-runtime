@@ -135,6 +135,65 @@ public final class PublicDefinitionProbe {
       throw new AssertionError("unexpected public spell dispatch outside bounds");
   }
 
+  static List<Element> children(Element parent) {
+    List<Element> result = new ArrayList<>();
+    for (Node node = parent.getFirstChild(); node != null; node = node.getNextSibling())
+      if (node instanceof Element) result.add((Element) node);
+    return result;
+  }
+
+  static void checkExtraNode(Element node, Object actual, String label) throws Exception {
+    if (actual == null) throw new AssertionError("missing public extra " + label);
+    List<Element> kids = children(node);
+    if (actual instanceof Map) {
+      Map<?, ?> map = (Map<?, ?>) actual; Set<Object> keys = new HashSet<>();
+      for (Element entry : kids) {
+        List<Element> pair = children(entry);
+        if (!entry.getTagName().equals("entry") || pair.size() != 2) throw new AssertionError("malformed map fixture");
+        Element key = pair.get(0); Object mapKey;
+        if (key.getTagName().equals("int")) mapKey = Integer.valueOf(key.getTextContent().trim());
+        else if (key.getTagName().equals("Point")) {
+          mapKey = Class.forName("com.openrsc.server.model.Point").getMethod("location", int.class, int.class).invoke(null,
+            Integer.parseInt(key.getElementsByTagName("x").item(0).getTextContent().trim()),
+            Integer.parseInt(key.getElementsByTagName("y").item(0).getTextContent().trim()));
+        } else throw new AssertionError("unreviewed extra map key " + key.getTagName());
+        if (!keys.add(mapKey)) throw new AssertionError("duplicate public extra key");
+        checkExtraNode(pair.get(1), map.get(mapKey), label + "[" + mapKey + "]");
+      }
+      if (map.size() != keys.size()) throw new AssertionError("trailing public extra map entries " + label);
+    } else if (actual.getClass().isArray() || actual instanceof List) {
+      int size = actual instanceof List ? ((List<?>) actual).size() : Array.getLength(actual);
+      if (size != kids.size()) throw new AssertionError("public extra collection size " + label);
+      for (int i = 0; i < size; i++) checkExtraNode(kids.get(i),
+        actual instanceof List ? ((List<?>) actual).get(i) : Array.get(actual, i), label + "[" + i + "]");
+    } else if (kids.isEmpty()) {
+      String want = node.getTextContent(), got = String.valueOf(actual);
+      boolean same = actual instanceof Number
+        ? Double.compare(Double.parseDouble(want.trim()), ((Number) actual).doubleValue()) == 0 : got.equals(want);
+      if (!same) throw new AssertionError("public extra field " + label + " expected=" + want + " actual=" + got);
+      comparisons++;
+    } else for (Element child : kids) checkExtraNode(child, field(actual, child.getTagName()), label + "." + child.getTagName());
+  }
+
+  static void checkExtras() throws Exception {
+    if (client) return;
+    Map<String, String> hooks = mapping("ItemHerbSecond", "herbSeconds", "ItemDartTipDef", "dartTips",
+      "ItemGemDef", "gems", "ItemLogCutDef", "logCut", "ItemBowStringDef", "bowString", "ItemArrowHeadDef", "arrowHeads",
+      "FiremakingDef", "firemaking", "ItemAffectedTypes", "itemAffectedTypes", "ItemUnIdentHerbDef", "itemUnIdentHerb",
+      "ItemHerbDef", "itemHerb", "ItemEdibleHeals", "itemEdibleHeals", "ItemCookingDef", "itemCooking",
+      "ItemPerfectCookingDef", "itemPerfectCooking", "ItemSmeltingDef", "itemSmelting", "ItemSmithingDef", "itemSmithing",
+      "ItemCraftingDef", "itemCrafting", "ObjectMining", "objectMining", "ObjectWoodcutting", "objectWoodcutting",
+      "ObjectFishing", "objectFishing", "ObjectTelePoints", "objectTelePoints", "NpcCerters", "certers");
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    for (Map.Entry<String, String> hook : hooks.entrySet()) {
+      Element root = factory.newDocumentBuilder().parse(definitions.resolve("extras/" + hook.getKey() + ".xml").toFile()).getDocumentElement();
+      checkExtraNode(root, field(handler, hook.getValue()), hook.getKey());
+    }
+    if (!((Map<?, ?>) field(handler, "objectHarvesting")).isEmpty() || !((Map<?, ?>) field(handler, "objectRunecraft")).isEmpty())
+      throw new AssertionError("Advanced skill hooks enabled");
+  }
+
   static void checkSprites() throws Exception {
     if (!client) return;
     Class<?> surfaceClass = Class.forName("orsc.graphics.two.GraphicsController");
@@ -177,6 +236,11 @@ public final class PublicDefinitionProbe {
     }
     java.util.zip.ZipFile archive = (java.util.zip.ZipFile) field(surface, "spriteArchive");
     if (archive != null) archive.close();
+    // An authored project sprite remains the primary selection after stock load.
+    Object project = select.invoke(surface, definition("getItemDef", 1));
+    ((Map) field(surface, "projectItemSprites")).put(Integer.valueOf(0), project);
+    if (select.invoke(surface, definition("getItemDef", 0)) != project)
+      throw new AssertionError("stock visual selection overwrote authored project sprite");
     System.out.println("PUBLIC_STOCK_ITEM_PIXELS_VERIFIED selected=" + selected + " nonblank=" + nonblank);
   }
 
@@ -250,6 +314,7 @@ public final class PublicDefinitionProbe {
     checkXml("PrayerDef.xml", "getPrayerDef", mapping());
     checkXml("SpellDef.xml", "getSpellDef", mapping());
     checkDispatch();
+    checkExtras();
     checkSprites();
     if (!errors.isEmpty()) throw new AssertionError(String.join("\n", errors));
     System.out.println("PUBLIC_DEFINITIONS_VERIFIED role=" + args[0] + " comparisons=" + comparisons);
