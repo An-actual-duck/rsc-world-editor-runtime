@@ -110,13 +110,13 @@ public final class PreservationTransitionExecution {
     ladders.onObjectAction(object(5, 446, 3367, 0, 0), "climb-up", player);
     destination(223, 109, "explicit object edge surface return");
 
-    // All 20 explicit edges must resolve from signed source coordinates with their
+    // All 18 reviewed public edges must resolve from signed source coordinates with their
     // original command and decode into package-owned destinations.
     javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
     factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
     org.w3c.dom.NodeList edges = factory.newDocumentBuilder().parse(
       new java.io.File("conf/server/defs/extras/ObjectTelePoints.xml")).getElementsByTagName("entry");
-    check(edges.getLength() == 20, "exact explicit edge count");
+    check(edges.getLength() == 18, "exact reviewed public edge count");
     for (int index = 0; index < edges.getLength(); index++) {
       org.w3c.dom.Element entry = (org.w3c.dom.Element)edges.item(index);
       org.w3c.dom.Element origin = (org.w3c.dom.Element)entry.getElementsByTagName("Point").item(0);
@@ -132,6 +132,13 @@ public final class PreservationTransitionExecution {
       destination(Integer.parseInt(target.getElementsByTagName("x").item(0).getTextContent()),
         Integer.parseInt(target.getElementsByTagName("y").item(0).getTextContent()), "explicit edge " + index);
     }
+    // The owner's two added transitions must not leak into the public composition.
+    check(server.getEntityHandler().getObjectTelePoint(
+      LegacyPackedPointAdapter.fromPackedValues(499, 469), "Go down") == null,
+      "owner-only downward edge excluded from Base");
+    check(server.getEntityHandler().getObjectTelePoint(
+      LegacyPackedPointAdapter.fromPackedValues(498, 3296), "Go up") == null,
+      "owner-only upward edge excluded from Base");
     // Individual wall edge: Melzar's maze floor1, long-distance floor1 destination.
     WorldLocation wallSource = LegacyPackedPointAdapter.fromPackedValues(414, 1107);
     TelePoint wall = server.getEntityHandler().getObjectTelePoint(wallSource, "walk through");
