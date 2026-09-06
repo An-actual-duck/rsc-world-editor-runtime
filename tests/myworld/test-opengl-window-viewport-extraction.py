@@ -2,6 +2,7 @@
 """Exercise the B07 OpenGL window and viewport ownership boundaries."""
 
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -13,6 +14,8 @@ PRESENTER = ROOT / "PC_Client/src/orsc/OpenGLFramePresenter.java"
 VIEWPORT = ROOT / "PC_Client/src/orsc/OpenGLViewportPresenter.java"
 WINDOW = ROOT / "PC_Client/src/orsc/OpenGLWindowController.java"
 WINDOW_READY = ROOT / "Client_Base/src/orsc/WorldBuilderClientWindowReady.java"
+INSTALLED_LAUNCH = ROOT / "Client_Base/src/orsc/CurrentInstalledLaunch.java"
+JSON = ROOT / "server/lib/json-20190722.jar"
 SCALED_WINDOW = ROOT / "PC_Client/src/orsc/ScaledWindow.java"
 PRESENTATION_SETTINGS = ROOT / "Client_Base/src/orsc/OpenGLPresentationSettings.java"
 WINDOW_SETTINGS = ROOT / "Client_Base/src/orsc/OpenGLWindowSettings.java"
@@ -53,6 +56,11 @@ def verify_source_ownership() -> None:
         < window.index("WorldBuilderClientWindowReady.signalWindowShown();"),
         "Builder readiness must follow the native window show call",
     )
+    require(
+        window.index("gl.glfwShowWindow(window);")
+        < window.index("CurrentInstalledLaunch.signalWindowShown();"),
+        "Installed readiness must follow the native window show call",
+    )
     scaled_launch = scaled_window[
         scaled_window.index("public void launchScaledWindow()") :
         scaled_window.index("public void setGameImage(BufferedImage gameImage)")
@@ -61,6 +69,11 @@ def verify_source_ownership() -> None:
         scaled_launch.index("setVisible(true);")
         < scaled_launch.index("WorldBuilderClientWindowReady.signalWindowShown();"),
         "Builder readiness must follow the Swing window show call",
+    )
+    require(
+        scaled_launch.index("setVisible(true);")
+        < scaled_launch.index("CurrentInstalledLaunch.signalWindowShown();"),
+        "Installed readiness must follow the Swing window show call",
     )
     require("OpenGL presenter cleanup failure during" in presenter, "resource cleanup diagnostics missing")
     readiness_enabled = "Renderer3DSettings.setOpenGLPresentationAvailable(true);"
@@ -113,6 +126,8 @@ def run_java_fixture(name: str, sources: dict[str, str], project_sources: list[P
                 "8",
                 "-target",
                 "8",
+                "-cp",
+                str(JSON),
                 "-d",
                 str(temp),
                 *[str(path) for path in project_sources],
@@ -124,7 +139,7 @@ def run_java_fixture(name: str, sources: dict[str, str], project_sources: list[P
         )
         require(result.returncode == 0, f"{name} fixture compile failed:\n{result.stderr}")
         result = subprocess.run(
-            [java, "-cp", str(temp), f"orsc.{name}"],
+            [java, "-cp", os.pathsep.join((str(temp), str(JSON))), f"orsc.{name}"],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -483,7 +498,9 @@ def verify_window_behavior() -> None:
             "LwjglBindings.java": bindings,
             "WindowFixture.java": fixture,
         },
-        [WINDOW_SETTINGS, WINDOW_READY, MONITOR_MODE, WINDOW],
+        # Compile the real installed bootstrap; this generic window fixture
+        # never opens an installed context and must retain its normal behavior.
+        [WINDOW_SETTINGS, WINDOW_READY, INSTALLED_LAUNCH, MONITOR_MODE, WINDOW],
     )
     require(output == "window-ok", "window fixture did not complete")
 
