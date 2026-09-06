@@ -64,10 +64,12 @@ public final class GenuineMapClientWindowProbe {
               && tile.roofTexture==0 && tile.horizontalWall==0 && tile.verticalWall==0 && tile.diagonalWalls==0,
               "missing native cell borrowed legacy/presentation data");voidTiles++;
           } else {
-            check(tile.groundElevation==(raw.getShort()&65535) && (tile.groundTexture&255)==(raw.get()&255)
-              && (tile.groundOverlay&255)==(raw.get()&255) && (tile.roofTexture&255)==(raw.get()&255)
-              && (tile.horizontalWall&255)==(raw.get()&255) && (tile.verticalWall&255)==(raw.get()&255)
-              && tile.diagonalWalls==raw.getInt(),"CPU window changed canonical presentation/gameplay fields");presentTiles++;
+            int[] expectedValues={raw.getShort()&65535,raw.get()&255,raw.get()&255,raw.get()&255,
+              raw.get()&255,raw.get()&255,raw.getInt()};
+            int[] actualValues={tile.groundElevation,tile.groundTexture&255,tile.groundOverlay&255,tile.roofTexture&255,
+              tile.verticalWall&255,tile.horizontalWall&255,tile.diagonalWalls};
+            check(Arrays.equals(expectedValues,actualValues),"CPU fields at "+key(level,(sx+dx)*48+x,(sy+dy)*48+y)
+              +" expected="+Arrays.toString(expectedValues)+" actual="+Arrays.toString(actualValues));presentTiles++;
           }
         }
       }
@@ -77,8 +79,8 @@ public final class GenuineMapClientWindowProbe {
     System.out.println("GENUINE_CLIENT_CPU windows=352 presentTileVisits="+presentTiles+" voidTileVisits="+voidTiles+" legacyReads=0");
   }
   private static byte[] wire(com.openrsc.server.io.NativeLayeredWorldPackage source,int level,int sx,int sy) {
-    // Reuse the actual packaged server wire encoder, not raw storage bytes:
-    // storage and wire deliberately order the two wall fields differently.
+    // Reuse the actual packaged server wire encoder. Canonical storage and
+    // wire both use vertical/horizontal order; historical JAG uses the reverse.
     byte[] result=new byte[48*48*11];
     for(int cx=0;cx<2;cx++)for(int cy=0;cy<2;cy++) {
       byte[] chunk=source.findPresentationChunk(com.openrsc.server.model.world.coordinate.WorldSpaceId.GLOBAL,

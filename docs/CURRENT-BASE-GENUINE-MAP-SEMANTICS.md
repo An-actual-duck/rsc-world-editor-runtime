@@ -74,6 +74,20 @@ The existing real Player/plugin transition harness now also passes on the sealed
 352-sector package using `world-builder-installed`, instead of its separate
 1,764-sector ZIP fixture. This proves those actual transition consumers and all
 18 reviewed edge lookups/destinations, not every plugin in the game.
-Raw, original-definition, canonical-tile and derivation tampering refuse. Client
-CPU/void proof is being completed separately; normal login/rendered-frame proof
-and production promotion remain outside these headless tests.
+Raw, original-definition, canonical-tile and derivation tampering refuse.
+
+The packaged server's real presentation encoder and the packaged client's native
+chunk parser feed the actual `World.buildCpuSectionWindow` consumer for all 352
+sector-centered 3×3 windows. Every present tile retains its canonical elevation,
+texture, overlay, roof, walls and diagonal. Missing cells remain explicit void;
+the legacy landscape read counter stays zero. Snapshots are injected only to
+isolate this CPU consumer from GUI scheduling: this is not an authenticated
+packet/session, rendered mesh/frame or normal-login proof. Canonical storage and
+wire both order vertical then horizontal walls; historical JAG uses the reverse.
+
+The historical projectile comparison covers `projectileAllowed` and the default
+distance-check product. Modern `HOSTILE_PROJECTILE` distance checks consume a
+separate collision mask; their combat dispatch and positive public behavior still
+need explicit policy acceptance. A passing tile-flag comparison must not be
+reported as proof of every ranged/spell attack. Production promotion remains
+outside these headless tests.
