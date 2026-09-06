@@ -1,5 +1,6 @@
 package com.openrsc.server.model;
 
+import com.openrsc.server.CurrentCompositionIdentity;
 import com.openrsc.server.constants.HiscoreSkills;
 import com.openrsc.server.constants.Skill;
 import com.openrsc.server.content.RangersGuildPoints;
@@ -57,7 +58,9 @@ public class Skills {
 	}
 
 	private boolean isHiddenAutoMaxedSkill(int skill) {
-		return getMob() instanceof Player && skill == Skill.FIREMAKING.id();
+		CurrentCompositionIdentity composition = CurrentCompositionIdentity.current();
+		boolean publicBase = composition.isEnabled() && "current-base-v1".equals(composition.value("variantId"));
+		return !publicBase && getMob() instanceof Player && skill == Skill.FIREMAKING.id();
 	}
 
 	private int getHiddenSkillExperience(int skill) {
@@ -67,7 +70,7 @@ public class Skills {
 	}
 
 	private void applyHiddenSkillDefaults() {
-		if (getMob() instanceof Player && Skill.FIREMAKING.id() >= 0 && Skill.FIREMAKING.id() < levels.length) {
+		if (isHiddenAutoMaxedSkill(Skill.FIREMAKING.id()) && Skill.FIREMAKING.id() >= 0 && Skill.FIREMAKING.id() < levels.length) {
 			int skill = Skill.FIREMAKING.id();
 			int level = Math.min(HIDDEN_SKILL_LEVEL, getWorld().getServer().getConstants().getSkills().getSkill(skill).getMaxLevel());
 			levels[skill] = level;

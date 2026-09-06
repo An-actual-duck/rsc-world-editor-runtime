@@ -102,6 +102,7 @@ python3 ./tests/myworld/test-current-platform-composition.py
 python3 ./tests/myworld/test-current-base-candidate.py
 python3 ./tests/myworld/test-current-base-state-migration.py
 python3 ./tests/myworld/test-current-base-state-location.py
+python3 ./tests/myworld/test-current-base-skill-state.py
 python3 ./tests/myworld/test-current-base-runtime-execution.py
 python3 ./tests/myworld/test-current-base-installed-execution.py
 python3 ./tests/myworld/test-preservation-jag-decode.py
