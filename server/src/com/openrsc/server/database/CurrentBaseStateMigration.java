@@ -40,7 +40,8 @@ import java.util.regex.Pattern;
 public final class CurrentBaseStateMigration {
 	private static final String CONTRACT_TYPE = "current-base-state-migration";
 	private static final String CONTRACT_SHA256 =
-		"fed89bd2add4fdc064d37b28b9332d30de34ec6875f9ec5618844d167bd0974b";
+		"13ac0ef772a7eab9e39e1ca5e2c1e01c86a03fc6f0ef37d968d84d36ed19d5a5";
+	private static final String CURRENT_COPY = "current-base-byte-copy-v1";
 	private static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 	private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
 	private static final long MAXIMUM_SQLITE_SOURCE_BYTES = 4294967296L;
@@ -121,6 +122,8 @@ public final class CurrentBaseStateMigration {
 				"jdbc:sqlite:" + source.toUri().toASCIIString() + "?mode=ro")) {
 				sourceSchema = sqliteSchema(sourceDb);
 				sourceRow = contract.matchSource("sqlite", sourceSchema.fingerprint);
+				boolean currentCopy = CURRENT_COPY.equals(sourceRow.transformationId);
+				if (currentCopy) validateCurrentSqlite(sourceDb, contract, sourceSchema.fingerprint);
 				sourceState = stateHash(sourceDb, sourceSchema, null);
 				Files.createFile(stage);
 				stageOwned = true;
@@ -130,18 +133,26 @@ public final class CurrentBaseStateMigration {
 					"jdbc:sqlite:" + stage.toUri().toASCIIString() + "?mode=rw")) {
 					staged.setAutoCommit(false);
 					try {
-						applyTransform(staged, "sqlite", sourceRow.transformationId);
+						if (!currentCopy) applyTransform(staged, "sqlite", sourceRow.transformationId);
 						projected = stateHash(staged, sourceSchema, null);
 						if (!sourceState.equals(projected)) throw new SQLException(
 							"staged SQLite database did not preserve source durable rows");
-						writeRuntimePatchLedger(staged, "sqlite");
-						writeLedger(staged, contract, sourceRow, sourceSchema.fingerprint, sourceState);
+						if (currentCopy) {
+							if (!sourceSchema.fingerprint.equals(sqliteSchema(staged).fingerprint))
+								throw new SQLException("current SQLite copied schema changed");
+							validateCurrentSqlite(staged, contract, sourceSchema.fingerprint);
+						} else {
+							writeRuntimePatchLedger(staged, "sqlite");
+							writeLedger(staged, contract, sourceRow, sourceSchema.fingerprint, sourceState);
+						}
 						staged.commit();
 					} catch (Exception failure) {
 						staged.rollback();
 						throw failure;
 					}
 				}
+				if (currentCopy && !sourceBytes.equals(sha256(stage))) throw new IOException(
+					"current SQLite successor must preserve every source byte");
 			}
 			requireNoSqliteSidecars(source);
 			writeEvidence(evidence, contract, sourceRow, sourceSchema.fingerprint,
@@ -150,6 +161,54 @@ public final class CurrentBaseStateMigration {
 			if (stageOwned) try { Files.deleteIfExists(stage); } catch (IOException ignored) { }
 			throw failure;
 		}
+	}
+
+	private static void validateCurrentSqlite(Connection connection, Contract contract,
+		String schema) throws Exception {
+		try (Statement statement = connection.createStatement();
+			ResultSet result = statement.executeQuery("PRAGMA quick_check")) {
+			if (!result.next() || !"ok".equals(result.getString(1)) || result.next())
+				throw new SQLException("current SQLite integrity check failed");
+		}
+		JSONArray sources = contract.document.getJSONArray("supportedSources");
+		JSONArray currentSchemas = sources.getJSONObject(4).getJSONArray("sourceSchemaFingerprints");
+		int lineage = -1;
+		for (int index = 0; index < currentSchemas.length(); index++)
+			if (schema.equals(currentSchemas.getString(index))) lineage = index;
+		if (lineage < 0) throw new SQLException("unsupported current SQLite lineage");
+		JSONObject origin = sources.getJSONObject(lineage);
+		try (Statement statement = connection.createStatement(); ResultSet result =
+			statement.executeQuery("SELECT * FROM current_base_migrations")) {
+			if (!result.next()
+				|| !origin.getString("migrationRowId").equals(result.getString("migration_row_id"))
+				|| !origin.getString("sourceSchemaFingerprint").equals(result.getString("source_schema_sha256"))
+				|| !HASH.matcher(result.getString("source_state_sha256")).matches())
+				throw new SQLException("current SQLite migration marker is missing or inconsistent");
+			String hash = result.getString("contract_sha256");
+			if (!CONTRACT_SHA256.equals(hash)
+				&& !"fed89bd2add4fdc064d37b28b9332d30de34ec6875f9ec5618844d167bd0974b".equals(hash))
+				throw new SQLException("current SQLite migration contract marker is unreviewed");
+			Instant.parse(result.getString("completed_at"));
+			if (result.next()) throw new SQLException("current SQLite migration marker has extra rows");
+		}
+		Map<String, Integer> patches = new LinkedHashMap<String, Integer>();
+		try (Statement statement = connection.createStatement(); ResultSet result =
+			statement.executeQuery("SELECT patch_name,run_date FROM db_patches")) {
+			while (result.next()) {
+				java.time.LocalDate.parse(result.getString("run_date"));
+				String name = result.getString("patch_name");
+				patches.put(name, patches.containsKey(name) ? patches.get(name) + 1 : 1);
+			}
+		}
+		Map<String, Integer> expectedPatches = new LinkedHashMap<String, Integer>();
+		// The initialized public schema has no unique patch-name key; the
+		// existing producer retains its two old rows and inserts its four rows.
+		expectedPatches.put("2021_05_11_add_db_patches.sql", lineage == 2 ? 2 : 1);
+		expectedPatches.put("2023_02_01_former_names.sql", lineage == 2 ? 2 : 1);
+		expectedPatches.put("2026_05_14_add_summoning_skill.sql", 1);
+		expectedPatches.put("2026_08_03_add_blessing_skill.sql", 1);
+		if (!patches.equals(expectedPatches))
+			throw new SQLException("current SQLite patch history is incomplete or unreviewed");
 	}
 
 	private static void migrateMaria(Contract contract, MariaTarget target,
@@ -663,7 +722,7 @@ public final class CurrentBaseStateMigration {
 			}
 			JSONArray rows = value.getJSONArray("supportedSources");
 			JSONArray rowIds = value.getJSONArray("migrationRows");
-			if (rows.length() != 4 || rowIds.length() != 4) throw new IOException(
+			if (rows.length() != 5 || rowIds.length() != 5) throw new IOException(
 				"migration source matrix is incomplete");
 			Set<String> expectedRows = new LinkedHashSet<String>();
 			for (int index = 0; index < rowIds.length(); index++)
@@ -671,7 +730,11 @@ public final class CurrentBaseStateMigration {
 			Set<String> actualRows = new LinkedHashSet<String>();
 			for (int index = 0; index < rows.length(); index++) {
 				JSONObject row = rows.getJSONObject(index);
-				requireKeys(row, ENGINE_KEYS, "source row");
+				Set<String> keys = new LinkedHashSet<String>(ENGINE_KEYS);
+				if ("current-base-sqlite-to-current-base-v1".equals(row.getString("migrationRowId"))) {
+					keys.remove("sourceSchemaFingerprint"); keys.add("sourceSchemaFingerprints");
+				}
+				requireKeys(row, keys, "source row");
 				actualRows.add(row.getString("migrationRowId"));
 			}
 			if (!expectedRows.equals(actualRows)) throw new IOException(
@@ -702,9 +765,14 @@ public final class CurrentBaseStateMigration {
 			JSONArray rows = document.getJSONArray("supportedSources");
 			for (int index = 0; index < rows.length(); index++) {
 				JSONObject row = rows.getJSONObject(index);
-				String expected = row.getString("sourceSchemaFingerprint");
-				if (engine.equals(row.getString("engine")) && HASH.matcher(expected).matches()
-					&& expected.equals(actual)) return new SourceRow(row);
+				JSONArray fingerprints = row.has("sourceSchemaFingerprints")
+					? row.getJSONArray("sourceSchemaFingerprints")
+					: new JSONArray().put(row.getString("sourceSchemaFingerprint"));
+				for (int fingerprint = 0; fingerprint < fingerprints.length(); fingerprint++) {
+					String expected = fingerprints.getString(fingerprint);
+					if (engine.equals(row.getString("engine")) && HASH.matcher(expected).matches()
+						&& expected.equals(actual)) return new SourceRow(row);
+				}
 			}
 			throw new IOException(
 				"unsupported or customized " + engine + " source schema: " + actual);

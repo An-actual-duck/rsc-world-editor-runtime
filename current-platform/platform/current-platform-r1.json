@@ -46,7 +46,7 @@
     {
       "schemaId": "current-base-runtime-profile-v1",
       "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
-      "sha256": "8d9e4e0a23c4513ebc1197518aee2dc3ca4244d3e575af23d800aafa5f0cd63b"
+      "sha256": "021d2fa0fb04e4a2ef76adecd194bf80ebcf6f5812b8d9551d668aaac090aa82"
     },
     {
       "schemaId": "current-base-server-content-v1",
@@ -56,7 +56,7 @@
     {
       "schemaId": "current-base-state-migration-v1",
       "relativePath": "schema/current-base-state-migration-v1.schema.json",
-      "sha256": "8ada5187334449a5f1e791c8b7d5d87ee2668d25f474e2f80c9005ee7b989e6b"
+      "sha256": "726f2b9b880d56df5f7301de0993402717a992e03b269a2dcb761f2f8f8f0a2d"
     },
     {
       "schemaId": "current-bundle-spec-v1",

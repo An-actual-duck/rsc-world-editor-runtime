@@ -5,7 +5,8 @@
     "preservation-retro-sqlite-to-current-base-v1",
     "preservation-core-sqlite-to-current-base-v1",
     "preservation-initialized-sqlite-to-current-base-v1",
-    "preservation-retro-mariadb-to-current-base-v1"
+    "preservation-retro-mariadb-to-current-base-v1",
+    "current-base-sqlite-to-current-base-v1"
   ],
   "targetStateContractId": "canonical-public-state-v1",
   "supportedSources": [
@@ -60,6 +61,23 @@
       "rollback": "drop-unpromoted-stage",
       "credentialPolicy": "environment-name-reference-only",
       "transformationId": "retro-split-skills-to-current-v1"
+    },
+    {
+      "migrationRowId": "current-base-sqlite-to-current-base-v1",
+      "engine": "sqlite",
+      "sourceSchemaId": "canonical-public-state-sqlite-v1",
+      "sourceSchemaFingerprints": [
+        "355fa60476c8ed2acee13e895f7ed39dc877df82a267af7e3434552d1fb6934b",
+        "4f17364a3d9428efaeb3a349da96b02e75a0cfec41844756d7fd4396ee9e80d7",
+        "0a132ad29a0632715296b78e249ef5f51b5cc89bb157ad26bc2bd9d035918cb3"
+      ],
+      "sourceSchemaFingerprintAlgorithm": "sha256-sqlite-table-ddl-xinfo-foreign-key-and-index-v2",
+      "verificationRuntime": "bundled-sqlite-jdbc",
+      "stageMode": "new-database-file",
+      "sourceMutation": "forbidden-read-only",
+      "rollback": "delete-unpromoted-stage",
+      "credentialPolicy": "none",
+      "transformationId": "current-base-byte-copy-v1"
     }
   ],
   "transformations": {
