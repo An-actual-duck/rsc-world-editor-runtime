@@ -76,10 +76,33 @@ public final class RegionCollisionMutationExecutorFixture {
     private static final WorldBounds BOUNDS = WorldBounds.of(1008, 4032);
 
     public static void main(String[] args) throws Exception {
+        publicBasePolicyExcludesOnlyTheOwnerTreeAllowance();
         appliesExactMultiRegionRoundTrip();
         sameFootprintMutationsExcludeEachOther();
         underflowAndUnavailableTilesRefuseWithoutPartialMutation();
         reversedBoundaryCoverageRefusesBeforeMutation();
+    }
+
+    private static void publicBasePolicyExcludesOnlyTheOwnerTreeAllowance() {
+        for (String tree : new String[] {"tree", "Oak Tree", "treestump"}) {
+            check(Definition.scenery(1, 2, 2, tree, ALLOWLIST).isProjectileClipAllowed(),
+                "unchanged non-Base tree allowance");
+            check(!Definition.publicBaseScenery(1, 2, 2, tree, ALLOWLIST).isProjectileClipAllowed(),
+                "Base must not inherit unconditional all-tree allowance");
+        }
+        check(!Definition.publicBaseScenery(1, 1, 1, "tree", ALLOWLIST).isProjectileClipAllowed(),
+            "historical exact-tree exception remains blocked even at 1x1");
+        check(Definition.publicBaseScenery(1, 1, 1, "Oak Tree", ALLOWLIST).isProjectileClipAllowed(),
+            "historical 1x1 rule is not a blanket named-tree ban");
+        check(Definition.publicBaseScenery(1, 2, 2, "treestump", new String[] {"treestump"})
+                .isProjectileClipAllowed(), "historical allowlisted tree name stays allowed");
+        for (String name : new String[] {"gate", "chair", "chest", "rock", "wall"}) {
+            for (int size : new int[] {1, 2}) {
+                check(Definition.scenery(1, size, size, name, ALLOWLIST).isProjectileClipAllowed()
+                    == Definition.publicBaseScenery(1, size, size, name, ALLOWLIST).isProjectileClipAllowed(),
+                    "non-tree classifier remains identical");
+            }
+        }
     }
 
     private static void appliesExactMultiRegionRoundTrip() {

@@ -1,6 +1,7 @@
 package com.openrsc.server.model.world;
 
 import com.openrsc.server.Server;
+import com.openrsc.server.CurrentCompositionIdentity;
 import com.openrsc.server.ServerConfiguration;
 import com.openrsc.server.avatargenerator.AvatarGenerator;
 import com.openrsc.server.constants.Constants;
@@ -718,7 +719,16 @@ public final class World implements SimpleSubscriber<FishingTrawler>, Runnable {
 		Definition definition = null;
 		if (object.getID() != 1147 || operation != Operation.REGISTER) {
 			if (object.isScenery()) {
-				definition = Definition.scenery(
+				CurrentCompositionIdentity composition = CurrentCompositionIdentity.current();
+				definition = composition.isEnabled()
+					&& "current-base-v1".equals(composition.value("variantId"))
+					? Definition.publicBaseScenery(
+						object.getGameObjectDef().getType(),
+						object.getGameObjectDef().getWidth(),
+						object.getGameObjectDef().getHeight(),
+						object.getGameObjectDef().getName(),
+						Constants.objectsProjectileClipAllowed)
+					: Definition.scenery(
 					object.getGameObjectDef().getType(),
 					object.getGameObjectDef().getWidth(),
 					object.getGameObjectDef().getHeight(),

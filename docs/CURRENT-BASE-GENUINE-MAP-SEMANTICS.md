@@ -1,4 +1,4 @@
-# Genuine Preservation map semantic acceptance (in progress)
+# Genuine Preservation map semantic acceptance
 
 This runtime test umbrella consumes an explicitly supplied, sealed Editor map
 derivation. It does not grant production promotion or provide a target descriptor.
@@ -56,19 +56,26 @@ and `Constants.java` SHA-256
 `f3b04a325a9b518ca7827c27976cf29094c1ba2dbd60af88e376f820132befe5` at c0102.
 It composes effective historical scenery/boundaries, their footprints, rotations,
 reciprocal bits and projectile-clip rules without invoking the native planner.
-Movement matches on all 811,008 populated tiles, but **7,376 projectile flags
-differ**. The current classifier's unconditional `name.contains("tree")` branch
-explains every discrepancy: adding that branch only to a separate diagnostic
-oracle leaves zero residual differences. It is not substituted for the original
-oracle; the semantic test remains failing pending a reviewed Base-only correction.
-No runtime behavior change accompanies this checkpoint.
+The initial comparison found matching movement on all 811,008 populated tiles
+but **7,376 differing projectile flags**. The inherited classifier's unconditional
+`name.contains("tree")` branch explained every discrepancy: adding that branch
+only to a separate diagnostic oracle left zero residual differences.
+
+Current Base now selects the historical classifier at the World collision-footprint
+adapter only when the initialized, artifact-bound composition identifies
+`current-base-v1`. Unbound and non-Base runtimes retain the existing tree allowance.
+The Base rule removes only that unconditional allowance: historical 1×1 behavior
+and explicit allowlisted names remain intact. The original independent oracle is
+unchanged, and all 811,008 composed movement/projectile comparisons now match.
+Hostile-projectile dispatch and its separate collision policy are unchanged.
 
 Actual ladder199 removal and reconstructed native-identity re-registration restore
 the original collision state exactly. Correct overlay0 exposes traversal0 after
 removal; the separately copied wrong-overlay8 control retains traversal64 despite
 its dynamic scenery count reaching zero. Direct re-registration of an already
-removed instance is correctly refused. Both cases retain the outstanding tree
-projectile refusal; a diagnostic sub-result is not an overall test pass.
+removed instance is correctly refused. The positive and wrong-overlay cases must
+also pass the complete independent composed collision/projectile comparison;
+a diagnostic sub-result is not an overall test pass.
 
 The existing real Player/plugin transition harness now also passes on the sealed
 352-sector package using `world-builder-installed`, instead of its separate
@@ -91,3 +98,10 @@ separate collision mask; their combat dispatch and positive public behavior stil
 need explicit policy acceptance. A passing tile-flag comparison must not be
 reported as proof of every ranged/spell attack. Production promotion remains
 outside these headless tests.
+
+Focused acceptance after the Base-only correction: the existing genuine module
+passes all five tests with the sealed external probe (88.777 seconds, no skips).
+The collision-planner/control module passes four tests, including historical
+Base versus unchanged non-Base tree, 1×1 and allowlist cases. Existing owner tree
+and hostile-projectile policy/path controls pass. No GUI or full-suite result is
+claimed by this worker handoff.

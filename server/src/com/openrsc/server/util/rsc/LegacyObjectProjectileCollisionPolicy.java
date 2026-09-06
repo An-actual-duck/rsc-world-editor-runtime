@@ -18,6 +18,20 @@ public final class LegacyObjectProjectileCollisionPolicy {
 		if (lowercaseName.contains("tree")) {
 			return true;
 		}
+		return allowsPublicBaseSceneryProjectileClip(
+			checkedName, width, height, checkedAllowedNames);
+	}
+
+	/** Public c0102 behavior, without the later owner-only all-tree allowance. */
+	public static boolean allowsPublicBaseSceneryProjectileClip(
+		final String name,
+		final int width,
+		final int height,
+		final String[] allowedNames) {
+		String checkedName = Objects.requireNonNull(name, "name");
+		String[] checkedAllowedNames = Objects.requireNonNull(
+			allowedNames, "allowedNames");
+		String lowercaseName = checkedName.toLowerCase();
 		for (String allowedName : checkedAllowedNames) {
 			String checkedAllowedName = Objects.requireNonNull(
 				allowedName, "allowedNames entry");
