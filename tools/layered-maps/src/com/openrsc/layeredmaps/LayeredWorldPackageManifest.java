@@ -376,6 +376,15 @@ public final class LayeredWorldPackageManifest {
 				placements.getScenery().size(),
 				placements.getBoundaries().size()));
 		}
+		boolean blockedVoid = false;
+		boolean terrainCovered = false;
+		for (PlacementSet set : result) {
+			if (LayeredEntityPlacements.ENCODING_V5.equals(set.getEncoding())) blockedVoid = true;
+			else terrainCovered = true;
+		}
+		if (blockedVoid && terrainCovered) {
+			throw new PreflightException("A v5 package must use v5 for every placement set.");
+		}
 		return result;
 	}
 

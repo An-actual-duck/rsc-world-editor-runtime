@@ -406,6 +406,15 @@ public final class NativeLayeredWorldPackage {
 			validatePlacementTerrainCoverage(set, terrainSectors);
 			result.put(id, set);
 		}
+		boolean blockedVoid = false;
+		boolean terrainCovered = false;
+		for (NativeLayeredPlacementSet set : result.values()) {
+			if (set.allowsBlockedVoidNpcRoaming()) blockedVoid = true;
+			else terrainCovered = true;
+		}
+		if (blockedVoid && terrainCovered) {
+			throw new IOException("A v5 package must use v5 for every placement set");
+		}
 		return result;
 	}
 

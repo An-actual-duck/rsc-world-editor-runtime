@@ -1348,6 +1348,7 @@ class LayeredNativePackageFoundationTest(unittest.TestCase):
                 "layered-world-placements-v2",
                 "layered-world-placements-v3",
                 "layered-world-placements-v4",
+                "layered-world-placements-v5",
             },
             set(
             package_schema["properties"]["placementSets"]["items"][

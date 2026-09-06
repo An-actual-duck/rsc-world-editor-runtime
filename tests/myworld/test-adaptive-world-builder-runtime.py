@@ -1517,6 +1517,15 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             self.assertEqual(0, accepted.returncode, accepted.stderr)
             self.assertIn(fields["packageId"], accepted.stdout)
 
+            for encoding, supported in (("layered-world-placements-v4", True),
+                                        ("layered-world-placements-v5", True),
+                                        ("layered-world-placements-v6", False)):
+                negotiated = dict(fields, placementEncoding=encoding)
+                binding.write_text("adaptive-world-builder-session-v1\n" + "".join(
+                    f"{name}={negotiated[name]}\n" for name in sorted(negotiated)), encoding="ascii")
+                result = self.run_client_binding(binding, definitions, assets, negotiated)
+                self.assertEqual(supported, result.returncode == 0, result.stderr)
+
             for key, value in (
                 ("loader", "legacy-packed-loader-v1"),
                 ("authoring", "legacy-packed-authoring-v1"),

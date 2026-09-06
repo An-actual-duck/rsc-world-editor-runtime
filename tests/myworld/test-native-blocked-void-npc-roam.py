@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
 
 ROOT = Path(__file__).resolve().parents[2]
 CORE = ROOT / "server/core.jar"
@@ -124,6 +126,29 @@ class BlockedVoidRoamTest(unittest.TestCase):
                                "BlockedVoidRoamHarness", mode, str(root), *map(str, extra)],
                               capture_output=True, text=True, timeout=30)
 
+    def test_schema_v5_is_closed_and_old_schema_fails_closed(self):
+        schema_root = ROOT / "tools/layered-maps/schema"
+        schemas = [json.loads((schema_root / name).read_text()) for name in (
+            "layered-world-placements-v4.schema.json", "layered-world-placements-v5.schema.json")]
+        registry = Registry().with_resources((value["$id"], Resource.from_contents(value)) for value in schemas)
+        validator = Draft202012Validator(schemas[1], registry=registry)
+        with tempfile.TemporaryDirectory(prefix="blocked-void-schema-") as temporary:
+            payload = package(Path(temporary) / "package")
+            validator.validate(payload)
+            self.assertTrue(list(Draft202012Validator(schemas[0]).iter_errors(payload)))
+            for policy in (None, "terrain-covered", "unknown"):
+                changed = copy.deepcopy(payload)
+                if policy is None:
+                    changed.pop("npcRoamCoverage")
+                else:
+                    changed["npcRoamCoverage"] = policy
+                self.assertTrue(list(validator.iter_errors(changed)))
+            manifest = json.loads((Path(temporary) / "package/manifest.json").read_text())
+            manifest_validator = Draft202012Validator(json.loads((schema_root / "layered-world-package-v1.schema.json").read_text()))
+            manifest_validator.validate(manifest)
+            manifest["placementSets"].append(dict(manifest["placementSets"][0], encoding="layered-world-placements-v4"))
+            self.assertTrue(list(manifest_validator.iter_errors(manifest)))
+
     def test_v5_accepts_exact_bounds_and_both_older_versions_refuse_void(self):
         with tempfile.TemporaryDirectory(prefix="blocked-void-input-") as temporary:
             for version in (3, 4, 5):
@@ -178,6 +203,30 @@ class BlockedVoidRoamTest(unittest.TestCase):
                 payload = json.loads((root / declaration["path"]).read_text())
                 self.assertEqual("blocked-void", payload["npcRoamCoverage"])
                 self.assertEqual(original["npcs"], payload["npcs"])
+
+    def test_mixed_v5_and_older_payloads_are_rejected_even_when_empty(self):
+        with tempfile.TemporaryDirectory(prefix="blocked-void-mixed-") as temporary:
+            for empty in (False, True):
+                root = Path(temporary) / str(empty)
+                payload = package(root)
+                if empty:
+                    payload["npcs"] = []
+                    update(root, payload)
+                older = copy.deepcopy(payload)
+                older.update(schemaVersion=4, encoding="layered-world-placements-v4")
+                older.pop("npcRoamCoverage")
+                older["npcs"] = []
+                manifest = json.loads((root / "manifest.json").read_text())
+                manifest["placementSets"].append({
+                    "id": "old-empty", "worldSpace": "global", "level": 0,
+                    "encoding": older["encoding"], "path": "older.json",
+                    "sha256": write_json(root / "older.json", older),
+                })
+                write_json(root / "manifest.json", manifest)
+                for reader in ("tools", "native"):
+                    result = self.run_harness(reader, root)
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertIn("v5 for every placement set", result.stderr)
 
 
 if __name__ == "__main__":

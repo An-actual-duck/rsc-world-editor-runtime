@@ -34,7 +34,7 @@ public class TileValue {
 		tile.initializeTerrainCollision();
 		tile.addTerrainCollision(CollisionFlag.FULL_BLOCK);
 		tile.setTerrainBlocked(true);
-		tile.setTerrainOverlayProjectileBlocked(true);
+		// The legacy projectileAllowed product must remain false for void.
 		return tile;
 	}
 
