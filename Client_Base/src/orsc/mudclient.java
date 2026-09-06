@@ -6360,7 +6360,8 @@ public final class mudclient implements Runnable {
 				this.getSurface().drawLineHoriz(sx, 20 + sy + row * 20, width, 0);
 			}
 
-				String[] focusLabels = hitsXpFocusMenu ? getHitsXpFocusLabels() : getGatheringFocusLabels();
+				String[] focusLabels = CurrentBaseSkillContract.selected() ? CurrentBaseSkillContract.styleLabels()
+					: hitsXpFocusMenu ? getHitsXpFocusLabels() : getGatheringFocusLabels();
 				this.getSurface().drawColoredStringCentered(width / 2 + sx, focusLabels[0], 0xFFFFFF, 0, 3, 16 + sy);
 				this.getSurface().drawColoredStringCentered(width / 2 + sx, focusLabels[1], 0, 0, 3, sy + 36);
 				this.getSurface().drawColoredStringCentered(width / 2 + sx, focusLabels[2], 0, 0, 3, 56 + sy);
@@ -11927,7 +11928,7 @@ public final class mudclient implements Runnable {
 					this.drawDialogOptionsMenu(-312);
 				}
 
-				if (shouldDrawHitsXpFocusMenu() || shouldDrawGatheringFocusMenu()) {
+				if (shouldDrawPublicCombatStyleMenu() || shouldDrawHitsXpFocusMenu() || shouldDrawGatheringFocusMenu()) {
 					this.drawDialogCombatStyle();
 				}
 
@@ -26762,7 +26763,14 @@ public final class mudclient implements Runnable {
 		}
 	}
 
+	private boolean shouldDrawPublicCombatStyleMenu() {
+		return CurrentBaseSkillContract.selected() && C_FIGHT_MENU != 0
+			&& (C_FIGHT_MENU == 2 || (localPlayer != null && localPlayer.direction != null
+				&& localPlayer.direction.isCombat()));
+	}
+
 	private boolean shouldDrawGatheringFocusMenu() {
+		if (CurrentBaseSkillContract.selected()) return false;
 		if (C_GATHERING_FOCUS_MENU == 0) {
 			return false;
 		}
@@ -26788,6 +26796,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private boolean shouldDrawHitsXpFocusMenu() {
+		if (CurrentBaseSkillContract.selected()) return false;
 		if (C_HITS_XP_FOCUS_MENU == 0) {
 			return false;
 		}
@@ -29024,6 +29033,11 @@ public final class mudclient implements Runnable {
 	}
 
 		private void loadSkills() {
+			if (CurrentBaseSkillContract.selected()) {
+				for (String name : CurrentBaseSkillContract.names())
+					addSkill(name, "Woodcutting".equals(name) ? "Woodcut" : name);
+				return;
+			}
 			addSkill("Melee");
 			addSkill("Defense");
 			addSkill("Strength");
@@ -29069,7 +29083,7 @@ public final class mudclient implements Runnable {
 			}
 			displayedSkills[outputIndex++] = skillIndex;
 		}
-		sortDisplayedSkillsByName(displayedSkills);
+		if (!CurrentBaseSkillContract.selected()) sortDisplayedSkillsByName(displayedSkills);
 		return displayedSkills;
 	}
 
@@ -29095,6 +29109,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private boolean isSkillHiddenFromStatsMenu(int skillIndex) {
+		if (CurrentBaseSkillContract.selected()) return false;
 		return skillIndex == 1 || skillIndex == 2 || skillIndex == 9 || skillIndex == 11;
 	}
 
@@ -29265,7 +29280,7 @@ public final class mudclient implements Runnable {
 	}
 
 	public void setFightModeSelectorToggle(int i) {
-		C_FIGHT_MENU = 1;
+		C_FIGHT_MENU = CurrentBaseSkillContract.selected() && i >= 0 && i <= 2 ? i : 1;
 	}
 
 	public void setGatheringFocusMenuToggle(int i) {

@@ -1060,6 +1060,9 @@ public final class Player extends Mob {
 	}
 
 	public int combatStyleToIndex() {
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) {
+			return com.openrsc.server.CurrentBaseSkillContract.styleSkill(getCombatStyle());
+		}
 		if (getCombatStyle() == Skills.AGGRESSIVE_MODE
 			|| getCombatStyle() == Skills.ACCURATE_MODE
 			|| getCombatStyle() == Skills.DEFENSIVE_MODE) {
@@ -1069,6 +1072,7 @@ public final class Player extends Mob {
 	}
 
 	private int remapLegacyMeleeRequirementSkill(int skillIndex) {
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) return skillIndex;
 		if (skillIndex == Skill.ATTACK.id() || skillIndex == Skill.DEFENSE.id() || skillIndex == Skill.STRENGTH.id()) {
 			return Skill.MELEE.id();
 		}
@@ -1174,12 +1178,12 @@ public final class Player extends Mob {
 						(itemLower.endsWith("spear") && !getWorld().getServer().getConfig().STRICT_PSPEAR_CHECK))
 			);
 			if (itemLower.endsWith("spear")) {
-				optionalLevel = Optional.of(requiredLevel);
+				optionalLevel = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() && requiredLevel > 10 ? requiredLevel + 5 : requiredLevel);
 				optionalSkillIndex = Optional.of(Skill.MELEE.id());
 			}
 			if (itemLower.endsWith("throwing knife")) {
-				optionalLevel = Optional.of(requiredLevel);
-				optionalSkillIndex = Optional.of(Skill.RANGED.id());
+				optionalLevel = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() && requiredLevel > 10 ? requiredLevel + 5 : requiredLevel);
+				optionalSkillIndex = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() ? Skill.ATTACK.id() : Skill.RANGED.id());
 			}
 			//staff of iban (usable)
 			if (item.getCatalogId() == ItemId.STAFF_OF_IBAN.id()) {
@@ -1191,11 +1195,11 @@ public final class Player extends Mob {
 				optionalLevel = Optional.of(requiredLevel);
 				optionalSkillIndex = Optional.of(Skill.MELEE.id());
 			}
-			if (isBlessedStaff(item.getCatalogId())) {
+			if (!com.openrsc.server.CurrentBaseSkillContract.selected() && isBlessedStaff(item.getCatalogId())) {
 				optionalLevel = Optional.of(requiredLevel);
 				optionalSkillIndex = Optional.of(Skill.MAGIC.id());
 			}
-			if (isGodStaff(item.getCatalogId())) {
+			if (!com.openrsc.server.CurrentBaseSkillContract.selected() && isGodStaff(item.getCatalogId())) {
 				optionalLevel = Optional.of(requiredLevel);
 				optionalSkillIndex = Optional.of(Skill.PRAYER.id());
 			}
@@ -1275,12 +1279,12 @@ public final class Player extends Mob {
 							(itemLower.endsWith("spear") && !getWorld().getServer().getConfig().STRICT_PSPEAR_CHECK))
 				);
 				if (itemLower.endsWith("spear")) {
-					optionalLevel = Optional.of(requiredLevel);
+					optionalLevel = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() && requiredLevel > 10 ? requiredLevel + 5 : requiredLevel);
 					optionalSkillIndex = Optional.of(Skill.MELEE.id());
 				}
 				if (itemLower.endsWith("throwing knife")) {
-					optionalLevel = Optional.of(requiredLevel);
-					optionalSkillIndex = Optional.of(Skill.RANGED.id());
+					optionalLevel = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() && requiredLevel > 10 ? requiredLevel + 5 : requiredLevel);
+					optionalSkillIndex = Optional.of(com.openrsc.server.CurrentBaseSkillContract.selected() ? Skill.ATTACK.id() : Skill.RANGED.id());
 				}
 				//staff of iban (usable)
 				if (item.getCatalogId() == ItemId.STAFF_OF_IBAN.id()) {
@@ -3098,7 +3102,7 @@ public final class Player extends Mob {
 		}
 
 		int skillXP = origSkillXP;
-		if (!fromQuest) {
+		if (!fromQuest && !com.openrsc.server.CurrentBaseSkillContract.selected()) {
 			final double jewelryBonus = getCarriedItems().getEquipment().getMindJewelryXpBonus(skill)
 				+ getCarriedItems().getEquipment().getBodyJewelryXpBonus(skill);
 			if (jewelryBonus > 0.0D) {

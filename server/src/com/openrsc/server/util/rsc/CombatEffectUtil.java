@@ -12,6 +12,7 @@ public final class CombatEffectUtil {
 	}
 
 	public static int remapLegacyPlayerMeleeStat(Mob mob, int skillId) {
+		if (com.openrsc.server.CurrentBaseSkillContract.selected()) return skillId;
 		if (mob != null && mob.isPlayer() && isLegacyMeleeStat(skillId)) {
 			return Skill.MELEE.id();
 		}

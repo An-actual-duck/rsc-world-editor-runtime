@@ -96,6 +96,9 @@ public class Skill {
 		// rest of the combat system migrates to the Melee naming model.
 		if (mapSkills.containsKey(Skills.MELEE)) {
 			nameMap.put(Skills.ATTACK, new Skill(Skills.ATTACK, mapSkills.get(Skills.MELEE)));
+		} else if (com.openrsc.server.CurrentBaseSkillContract.selected() && mapSkills.containsKey(Skills.ATTACK)) {
+			// Compatibility name for shared consumers, not a collapse of Defense or Strength.
+			nameMap.put(Skills.MELEE, new Skill(Skills.MELEE, mapSkills.get(Skills.ATTACK)));
 		}
 		if (mapSkills.containsKey("MAGECRAFT")) {
 			nameMap.put(Skills.RUNECRAFT, new Skill(Skills.RUNECRAFT, mapSkills.get("MAGECRAFT")));

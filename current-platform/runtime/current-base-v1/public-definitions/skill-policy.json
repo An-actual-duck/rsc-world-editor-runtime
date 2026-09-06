@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "current-base-public-skill-policy",
+  "contractId": "current-base-public-skills-v1",
+  "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+  "sourceFiles": [
+    {
+      "path": "server/src/com/openrsc/server/constants/Skills.java",
+      "sha256": "7e54280d6553ba9ad1cd8fc9ebd0d0c39cd02aa6f0477306db599d3b3e5466f7"
+    },
+    {
+      "path": "server/src/com/openrsc/server/model/entity/player/Player.java",
+      "sha256": "e945a467eae4f6ecd7d951fd6792ab92a7c7faeb64507eefd94abc6e83ce77d8"
+    },
+    {
+      "path": "server/src/com/openrsc/server/model/entity/npc/Npc.java",
+      "sha256": "8686a6ffcb343a86234013786ad61e6d5df27794bcb4b12d52bfcd5a18fbc25d"
+    },
+    {
+      "path": "server/src/com/openrsc/server/model/container/Equipment.java",
+      "sha256": "0a8e8ad42eb40590d2345cb66fd4e8dde568baf7864b8fc179e86313ad778d52"
+    },
+    {
+      "path": "server/src/com/openrsc/server/event/rsc/impl/combat/CombatEvent.java",
+      "sha256": "4fe76e1e135232b1b3feedbe47f29f71610a13103593a5559fba56a03d3940dc"
+    },
+    {
+      "path": "server/src/com/openrsc/server/net/rsc/handlers/SpellHandler.java",
+      "sha256": "145b0725033f4bed5ca4b40a1c115e454d99ee1428fb8ceeb0bf2c2960e21fde"
+    },
+    {
+      "path": "Client_Base/src/orsc/mudclient.java",
+      "sha256": "bddd7630f4988b4402f88b0552ffbc3ea2a9db7496145bf90de50df5a46093ca"
+    }
+  ],
+  "selection": "enabled-current-base-v1-only",
+  "registry": [
+    {
+      "id": 0,
+      "name": "Attack",
+      "shortName": "Attack",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 1,
+      "name": "Defense",
+      "shortName": "Defense",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 2,
+      "name": "Strength",
+      "shortName": "Strength",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 3,
+      "name": "Hits",
+      "shortName": "Hits",
+      "minLevel": 10,
+      "maxLevel": 99
+    },
+    {
+      "id": 4,
+      "name": "Ranged",
+      "shortName": "Ranged",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 5,
+      "name": "Prayer",
+      "shortName": "Prayer",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 6,
+      "name": "Magic",
+      "shortName": "Magic",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 7,
+      "name": "Cooking",
+      "shortName": "Cooking",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 8,
+      "name": "Woodcutting",
+      "shortName": "Woodcut",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 9,
+      "name": "Fletching",
+      "shortName": "Fletching",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 10,
+      "name": "Fishing",
+      "shortName": "Fishing",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 11,
+      "name": "Firemaking",
+      "shortName": "Firemaking",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 12,
+      "name": "Crafting",
+      "shortName": "Crafting",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 13,
+      "name": "Smithing",
+      "shortName": "Smithing",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 14,
+      "name": "Mining",
+      "shortName": "Mining",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 15,
+      "name": "Herblaw",
+      "shortName": "Herblaw",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 16,
+      "name": "Agility",
+      "shortName": "Agility",
+      "minLevel": 1,
+      "maxLevel": 99
+    },
+    {
+      "id": 17,
+      "name": "Thieving",
+      "shortName": "Thieving",
+      "minLevel": 1,
+      "maxLevel": 99
+    }
+  ],
+  "numericStatePolicy": "independent-experience-current-and-max-values-no-collapse-no-implicit-migration",
+  "sharedMeleeAlias": "alias-to-Attack0-only-never-Defense1-or-Strength2",
+  "combatStyles": [
+    {
+      "id": 0,
+      "name": "Controlled",
+      "selectedSkillId": -1,
+      "meleeXpWeights": [
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Aggressive",
+      "selectedSkillId": 2,
+      "meleeXpWeights": [
+        0,
+        0,
+        3,
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Accurate",
+      "selectedSkillId": 0,
+      "meleeXpWeights": [
+        3,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Defensive",
+      "selectedSkillId": 1,
+      "meleeXpWeights": [
+        0,
+        3,
+        0,
+        1
+      ]
+    }
+  ],
+  "meleeXp": "truncate(baseCombatXp/npcDefinitionHits*damage)-then-multiply-style-weights",
+  "rangedXp": "truncate(baseCombatXp*4/npcDefinitionHits*damage)-minus-configured-per-hit-credit-all-remainder-to-Ranged",
+  "magicXp": "successful-cast-SpellDef-exp-no-NPC-death-XP",
+  "experienceModifiers": "retain-supported-public-server-rate-configuration-no-owner-group-hits-focus-jewelry-potion-prayer-skilling-multipliers",
+  "requirementPolicy": "public-definition-skill-and-level-no-armor-exemption-secondary-Attack-for-spear-knife-Iban-battlestaff",
+  "secondarySpearKnifeLevel": "primary-level-up-to10-otherwise-primary-plus5",
+  "presentation": "all18-in-numeric-order-classic-style-packet29-values0-through3-no-owner-XP-focus-controls",
+  "oracleVectors": {
+    "baseCombatXp": 23,
+    "fullDamageMeleeXp": [
+      [
+        23,
+        23,
+        23,
+        23
+      ],
+      [
+        0,
+        0,
+        69,
+        23
+      ],
+      [
+        69,
+        0,
+        0,
+        23
+      ],
+      [
+        0,
+        69,
+        0,
+        23
+      ]
+    ],
+    "fullDamageRangedXpWithoutPerHit": 92,
+    "magicKillXp": 0,
+    "windStrikeSuccessfulCastXp": 88,
+    "defenseShield": {
+      "itemId": 130,
+      "attack": 1,
+      "defense": 20,
+      "eligible": true
+    },
+    "defenseShieldRefusal": {
+      "itemId": 130,
+      "attack": 99,
+      "defense": 19,
+      "eligible": false
+    }
+  },
+  "excludedClaims": [
+    "combat-damage-balance",
+    "devotion",
+    "ring-procs",
+    "economy",
+    "hiscores",
+    "full-map-semantic-acceptance"
+  ]
+}

@@ -19,6 +19,11 @@ import com.openrsc.server.database.struct.PlayerExperience;
 import com.openrsc.server.database.struct.PlayerSkills;
 import com.openrsc.server.model.Skills;
 import com.openrsc.server.model.entity.player.Player;
+import com.openrsc.server.model.entity.npc.Npc;
+import com.openrsc.server.model.container.Item;
+import com.openrsc.server.util.rsc.CombatEffectUtil;
+import java.lang.reflect.*;
+import java.util.*;
 
 public final class PublicSkillStateProbe {
   static void check(boolean condition, String label) {
@@ -62,6 +67,52 @@ public final class PublicSkillStateProbe {
     int rawTotal = 0;
     for (int i = 0; i < skills.getLevels().length; i++) rawTotal += skills.getMaxStat(i);
     check(skills.getTotalLevel() == rawTotal - (base ? 0 : 99), "raw total policy");
+    check(server.getConstants().getSkills().getSkillsCount() == (base ? 18 : 20), "registry end bound");
+    check(server.getConstants().getSkills().getSkillName(0).equals(base ? "Attack" : "Melee"), "numeric0 identity");
+    check(server.getConstants().getSkills().getSkillDisplayName(5).equals(base ? "Prayer" : "Worship"), "prayer presentation");
+    for (int style = 0; style < 4; style++) {
+      player.setCombatStyle(style);
+      check(player.combatStyleToIndex() == (base ? new int[]{-1,2,0,1}[style] : style == 0 ? -1 : 0), "style numeric identity");
+    }
+    for (int id = 0; id < 3; id++) check(CombatEffectUtil.remapLegacyPlayerMeleeStat(player, id) == (base ? id : 0), "buff identity");
+    check(Arrays.equals(CombatEffectUtil.remapLegacyPlayerMeleeStats(player, 0,1,2), base ? new int[]{0,1,2} : new int[]{0}), "independent buff set");
+    if (base) {
+      server.getEntityHandler().load();
+      player.setClientVersion(server.getConfig().CLIENT_VERSION);
+      player.setClientLimitations(com.openrsc.server.net.rsc.ClientLimitations.forVersion(player.getClientVersion()));
+      player.getClientLimitations().maxSkillId = 17;
+      player.getClientLimitations().maxItemId = 1592;
+      player.setLocation(com.openrsc.server.model.Point.location(120,648),true);
+      for (int id = 0; id < 18; id++) skills.setExperienceAndLevel(id, 14000000,99,false);
+      skills.setExperienceAndLevel(1, 14000000,19,false);
+      check(!player.getCarriedItems().getEquipment().ableToEquip(new Item(130)), "Mithril shield must require Defense20 despite Attack99");
+      skills.setExperienceAndLevel(1,14000000,20,false);
+      skills.setExperienceAndLevel(0,14000000,1,false);
+      check(player.getCarriedItems().getEquipment().ableToEquip(new Item(130)), "Mithril shield eligible with Defense20 and Attack1");
+      skills.setExperienceAndLevel(4,14000000,15,false);
+      skills.setExperienceAndLevel(0,14000000,19,false);
+      check(!player.getCarriedItems().getEquipment().ableToEquip(new Item(1090)), "Mithril spear secondary Attack20");
+      skills.setExperienceAndLevel(0,14000000,20,false);
+      check(player.getCarriedItems().getEquipment().ableToEquip(new Item(1090)), "Mithril spear dual skills satisfied");
+      for (int id = 0; id < 18; id++) skills.setExperienceAndLevel(id,14000000,99,false);
+      Npc npc = new Npc(server.getWorld(),3,120,648);
+      Method melee = Npc.class.getDeclaredMethod("awardMeleeDamageShareXp",Player.class,int.class,int.class); melee.setAccessible(true);
+      Method range = Npc.class.getDeclaredMethod("awardRangedDamageShareXp",Player.class,int.class,int.class); range.setAccessible(true);
+      Method magic = Npc.class.getDeclaredMethod("awardMagicDamageShareXp",Player.class,int.class,int.class); magic.setAccessible(true);
+      int[][] weights = {{1,1,1,1},{0,0,3,1},{3,0,0,1},{0,3,0,1}};
+      for (int style = 0; style < 4; style++) for (int focus = 0; focus < 4; focus++) {
+        player.setCombatStyle(style); player.setHitsXpFocus(focus);
+        int[] before = skills.getExperiences().clone();
+        melee.invoke(npc,player,npc.getDef().hits,23);
+        for (int id = 0; id < 18; id++) check(skills.getExperience(id)-before[id] == (id < 4 ? weights[style][id]*23 : 0), "actual melee XP style/focus/id="+style+"/"+focus+"/"+id);
+      }
+      int[] before = skills.getExperiences().clone();
+      range.invoke(npc,player,npc.getDef().hits,23);
+      int rangedExpected = 92-(server.getConfig().RANGED_GIVES_XP_HIT ? 16*npc.getDef().hits/3 : 0);
+      for (int id=0; id<18;id++) check(skills.getExperience(id)-before[id] == (id==4 ? Math.max(0,rangedExpected) : 0), "actual ranged remainder identity");
+      before=skills.getExperiences().clone(); magic.invoke(npc,player,npc.getDef().hits,23);
+      check(Arrays.equals(before,skills.getExperiences()),"magic death must not double award cast XP");
+    }
     System.out.println("SKILL_STATE_VERIFIED " + (base ? "base" : "unselected-control"));
   }
 }
@@ -71,6 +122,8 @@ public final class PublicSkillStateProbe {
 class PublicSkillStateTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if os.environ.get('CURRENT_BASE_PUBLIC_USE_EXISTING') == '1':
+            return
         build = subprocess.run(["python3", "scripts/build-current-base.py", "--test-allow-dirty"],
                                cwd=ROOT, capture_output=True, text=True, timeout=240)
         if build.returncode:
