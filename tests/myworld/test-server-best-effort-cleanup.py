@@ -11,8 +11,10 @@ import textwrap
 
 ROOT = Path(__file__).resolve().parents[2]
 LOADER = ROOT / "server/src/com/openrsc/server/plugins/io/PluginJarLoader.java"
+INSTALLED_LAUNCH = ROOT / "server/src/com/openrsc/server/CurrentInstalledLaunch.java"
 LOG4J_API = ROOT / "server/lib/log4j-api-2.17.0.jar"
 LOG4J_CORE = ROOT / "server/lib/log4j-core-2.17.0.jar"
+JSON = ROOT / "server/lib/json-20190722.jar"
 
 
 def fail(message: str) -> None:
@@ -42,7 +44,9 @@ def main() -> None:
     javac = shutil.which("javac")
     java = shutil.which("java")
     require(javac is not None and java is not None, "Java compiler/runtime are required")
-    classpath = os.pathsep.join((str(LOG4J_API), str(LOG4J_CORE)))
+    # Compile the real bootstrap dependency; no installed context is activated
+    # by this generic cleanup fixture, and no game/server classes are needed.
+    classpath = os.pathsep.join((str(LOG4J_API), str(LOG4J_CORE), str(JSON)))
     harness = textwrap.dedent(
         """
         package com.openrsc.server.plugins.io;
@@ -111,6 +115,7 @@ def main() -> None:
                 "-d",
                 str(temp),
                 str(LOADER),
+                str(INSTALLED_LAUNCH),
                 str(harness_path),
             ],
             cwd=ROOT,
