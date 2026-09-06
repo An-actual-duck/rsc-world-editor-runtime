@@ -18,6 +18,14 @@ public final class PublicModelsProbe {
     Field field = instance.getClass().getDeclaredField(name); field.setAccessible(true); return field.get(instance);
   }
   static int count(Object model, String name) throws Exception { return ((Number) field(model, name)).intValue(); }
+  static void registerModels() {
+    // Same final step performed by EntityHandler.load after applying an authored definition bundle.
+    for (int id = 0; id < EntityHandler.objectCount(); id++)
+      EntityHandler.getObjectDef(id).modelID = EntityHandler.storeModel(EntityHandler.getObjectDef(id).getObjectModel());
+  }
+  static void set(Object instance, String name, Object value) throws Exception {
+    Field f = instance.getClass().getDeclaredField(name); f.setAccessible(true); f.set(instance, value);
+  }
   static String sha(byte[] bytes) throws Exception {
     StringBuilder out = new StringBuilder();
     for (byte value : MessageDigest.getInstance("SHA-256").digest(bytes)) out.append(String.format("%02x", value & 255));
@@ -74,19 +82,39 @@ public final class PublicModelsProbe {
     Path override = Paths.get("authored-scenery.xml");
     TransformerFactory.newInstance().newTransformer().transform(new DOMSource(document), new StreamResult(override.toFile()));
     Method project = EntityHandler.class.getDeclaredMethod("loadProjectScenery", Path.class); project.setAccessible(true);
-    project.invoke(null, override); load.invoke(instance);
+    project.invoke(null, override); registerModels(); load.invoke(instance);
     if (!EntityHandler.getObjectDef(211).getObjectModel().equals("tree2")
         || count(loaded[EntityHandler.getObjectDef(211).modelID], "vertHead") < 1) throw new AssertionError("authored model did not win");
     Element unknown = (Element) authored.cloneNode(true);
     unknown.getElementsByTagName("objectModel").item(0).setTextContent("unreviewed_missing_public_model");
     document.getDocumentElement().appendChild(unknown);
     TransformerFactory.newInstance().newTransformer().transform(new DOMSource(document), new StreamResult(override.toFile()));
-    project.invoke(null, override);
+    project.invoke(null, override); registerModels();
     try { load.invoke(instance); throw new AssertionError("unknown authored model accepted"); }
     catch (InvocationTargetException expected) {
       if (!(expected.getCause() instanceof IllegalStateException)
           || !expected.getCause().getMessage().contains("missing model unreviewed_missing_public_model")) throw expected;
     }
-    System.out.println("PUBLIC_MODELS_VERIFIED resolved=1295 explicitEmpty=1 actualStartup=true authoredOverride=true missingRefused=true");
+    // Exercise production archive routing with an injected, already-validated bundle seam.
+    // Bundle validation itself is covered separately; this probe checks Base never overrides its selected asset.
+    Path original = Paths.get(args[1]).getParent().getParent().getParent().getParent().resolve("Client_Base/Cache/video/models.orsc");
+    Class<?> bundleClass = Class.forName("orsc.ProjectContentBundle");
+    Constructor<?> bundleConstructor = bundleClass.getDeclaredConstructors()[0]; bundleConstructor.setAccessible(true);
+    Object bundle = bundleConstructor.newInstance(Paths.get("."), null,
+      Collections.singletonMap("asset.model", original), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), 1, "");
+    Object unsafe = singleton.get(null);
+    Class<?> sessionClass = Class.forName("orsc.AdaptiveWorldBuilderClientSession");
+    Object session = unsafeClass.getMethod("allocateInstance", Class.class).invoke(unsafe, sessionClass);
+    set(session, "contentBundle", bundle);
+    Class<?> profileClass = Class.forName("orsc.WorldBuilderClientProfile");
+    Object profile = unsafeClass.getMethod("allocateInstance", Class.class).invoke(unsafe, profileClass);
+    set(profile, "enabled", true); set(profile, "adaptive", true); set(profile, "adaptiveSession", session);
+    Field current = profileClass.getDeclaredField("current"); current.setAccessible(true); current.set(null, profile);
+    byte[] authoredBytes = (byte[]) client.getMethod("unpackData", String.class, String.class, int.class)
+      .invoke(instance, "video/models.orsc", "test authored archive", 60);
+    byte[] originalPacked = Files.readAllBytes(original);
+    if (!Arrays.equals(authoredBytes, Arrays.copyOfRange(originalPacked, 6, originalPacked.length)))
+      throw new AssertionError("Base archive overrode authored project selection");
+    System.out.println("PUBLIC_MODELS_VERIFIED resolved=1295 explicitEmpty=1 actualStartup=true authoredOverride=true missingRefused=true authoredArchive=true");
   }
 }
