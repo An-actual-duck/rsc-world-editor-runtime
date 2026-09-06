@@ -11,6 +11,8 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import base64
+import binascii
 from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
@@ -314,6 +316,14 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
                for fragment in manifest["forbiddenPathFragments"]):
             raise VerificationError(f"Advanced-only server content path is present: {name}")
     with zipfile.ZipFile(archive_path) as archive:
+        for record in manifest["sourceFiles"]:
+            if record["transform"] != "copy":
+                raise VerificationError("public Base content must not filter stock definition IDs")
+            source = ROOT / record["sourcePath"]
+            if not source.is_file() or source.is_symlink():
+                raise VerificationError("server content source is missing or unsafe")
+            if archive.read(record["bundlePath"]) != source.read_bytes():
+                raise VerificationError("server content payload differs from selected source: " + record["bundlePath"])
         for name, payload in generated.items():
             if archive.read(name) != payload:
                 raise VerificationError(f"generated server content differs: {name}")
@@ -471,29 +481,52 @@ def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
             or manifest["contentId"] != "current-base-public-client-content-v1"
             or manifest["variantId"] != "current-base-v1"):
         raise VerificationError("client content manifest has wrong identity")
-    expected: set[str] = set()
+    expected: dict[str, bytes] = {}
+    folded: set[str] = set()
+    def add(name: str, payload: bytes) -> None:
+        if (name.startswith("/") or "\\" in name or ".." in Path(name).parts
+                or name.casefold() in folded):
+            raise VerificationError("unsafe or duplicate client content output path")
+        folded.add(name.casefold())
+        expected[name] = payload
     for tree in manifest["sourceTrees"]:
         require_exact_keys(tree, {"sourcePath", "bundlePath"},
                            "client content source tree")
         source_root = ROOT / tree["sourcePath"]
+        if not source_root.is_dir() or source_root.is_symlink():
+            raise VerificationError("client content source tree is missing or unsafe")
         for source in source_root.rglob("*"):
-            if source.is_file() and not source.is_symlink():
-                expected.add(
-                    tree["bundlePath"] + "/" + source.relative_to(source_root).as_posix()
-                )
+            if source.is_symlink() or not (source.is_file() or source.is_dir()):
+                raise VerificationError("unsafe client content source tree entry")
+            if source.is_file():
+                add(tree["bundlePath"] + "/" + source.relative_to(source_root).as_posix(),
+                    source.read_bytes())
     for record in manifest["sourceFiles"]:
         require_exact_keys(record, {"sourcePath", "bundlePath", "transform"},
                            "client content source file")
         if record["transform"] not in ("copy", "base64"):
             raise VerificationError("unsupported client content transform")
-        expected.add(record["bundlePath"])
+        source = ROOT / record["sourcePath"]
+        if not source.is_file() or source.is_symlink():
+            raise VerificationError("client content source file is missing or unsafe")
+        payload = source.read_bytes()
+        if record["transform"] == "base64":
+            try:
+                payload = base64.b64decode(b"".join(payload.split()), validate=True)
+            except binascii.Error as error:
+                raise VerificationError("invalid Base client asset base64") from error
+        add(record["bundlePath"], payload)
     names = archive_names(archive_path)
-    if names != expected:
+    if names != set(expected):
         raise VerificationError("client content archive differs from its closed inventory")
     for name in names:
         if any(fragment.casefold() in name.casefold()
                for fragment in manifest["forbiddenPathFragments"]):
             raise VerificationError(f"Advanced-only client content is present: {name}")
+    with zipfile.ZipFile(archive_path) as archive:
+        for name, payload in expected.items():
+            if archive.read(name) != payload:
+                raise VerificationError(f"client content payload differs from selected source: {name}")
 
 
 def verify(identity_path: Path, payload_root: Path) -> dict:

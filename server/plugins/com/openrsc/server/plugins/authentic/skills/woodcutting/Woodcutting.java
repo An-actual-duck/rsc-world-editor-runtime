@@ -62,6 +62,9 @@ public class Woodcutting implements OpLocTrigger, UseLocTrigger {
 	}
 
 	public static int getAxe(Player player) {
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled()) {
+			return com.openrsc.server.CurrentBasePublicContent.selectWoodcuttingAxe(player);
+		}
 		int lvl = player.getSkills().getLevel(Skill.WOODCUTTING.id());
 		for (int i = 0; i < Formulae.woodcuttingAxeIDs.length; i++) {
 			if (player.getCarriedItems().getEquipment().hasCatalogID(Formulae.woodcuttingAxeIDs[i])
@@ -196,8 +199,12 @@ public class Woodcutting implements OpLocTrigger, UseLocTrigger {
 		// New trees update; map32 introduced new trees & made woodcut xp no longer be scaled
 		boolean isOldWoodcut = (player.getConfig().SCALED_WOODCUT_XP || player.getConfig().BASED_MAP_DATA < 32) && def.getLogId() == ItemId.LOGS.id();
 		GameObject obj = player.getViewArea().getGameObject(object.getID(), object.getX(), object.getY());
-		if (!player.getConfig().SHARED_GATHERING_RESOURCES || obj != null) {
-			int quantity = Formulae.calcGatheringYield(def.getReqLevel(), player.getSkills().getLevel(Skill.WOODCUTTING.id()), getAxeTier(axeId));
+		boolean publicBase = com.openrsc.server.CurrentBasePublicContent.isEnabled();
+		boolean successful = !publicBase || (isOldWoodcut
+			? Formulae.chopLogs(player.getSkills().getLevel(Skill.WOODCUTTING.id()))
+			: getLog(def, player.getSkills().getLevel(Skill.WOODCUTTING.id()), axeId));
+		if (successful && (!player.getConfig().SHARED_GATHERING_RESOURCES || obj != null)) {
+			int quantity = publicBase ? 1 : Formulae.calcGatheringYield(def.getReqLevel(), player.getSkills().getLevel(Skill.WOODCUTTING.id()), getAxeTier(axeId));
 			boolean rareRewardAwarded = player.getConfig().WANT_MYWORLD && maybeAwardMyWorldWoodcuttingSeed(player, object, getAxeTier(axeId));
 			if (isOldWoodcut) {
 				player.incExp(Skill.WOODCUTTING.id(), getExpRetro(player.getSkills().getMaxStat(Skill.WOODCUTTING.id()), 25) * quantity, true);
@@ -206,8 +213,8 @@ public class Woodcutting implements OpLocTrigger, UseLocTrigger {
 			}
 
 			if (!rareRewardAwarded) {
-				int rewardQuantity = quantity + addGatheringAmuletBonusLogs(player, def.getLogId(), quantity);
-				int bankedQuantity = player.getCarriedItems().getEquipment().bankSkillingDropWithLawRing(new Item(def.getLogId(), rewardQuantity));
+				int rewardQuantity = publicBase ? quantity : quantity + addGatheringAmuletBonusLogs(player, def.getLogId(), quantity);
+				int bankedQuantity = publicBase ? 0 : player.getCarriedItems().getEquipment().bankSkillingDropWithLawRing(new Item(def.getLogId(), rewardQuantity));
 				int remainingQuantity = rewardQuantity - bankedQuantity;
 				int storedQuantity = Math.min(remainingQuantity, player.getCarriedItems().getInventory().getFreeSlots());
 				if (storedQuantity > 0) {
@@ -232,7 +239,9 @@ public class Woodcutting implements OpLocTrigger, UseLocTrigger {
 		}
 
 		int stumpId = getTreeStumpId(object, def);
-		if (obj != null && obj.getID() == object.getID() && def.getRespawnTime() > 0) {
+		if (obj != null && obj.getID() == object.getID() && def.getRespawnTime() > 0
+			&& (!publicBase || (successful && DataConversions.random(1, 100) <= def.getFell()
+				&& !woodcuttingSkillcape(player)))) {
 			if (stumpId < 0) {
 				player.getWorld().unregisterGameObject(object);
 			} else {
@@ -259,6 +268,8 @@ public class Woodcutting implements OpLocTrigger, UseLocTrigger {
 	}
 
 	private int resourceRespawnMillis(int respawnSeconds) {
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled())
+			return Math.max(1, Math.multiplyExact(respawnSeconds, 1000));
 		return Math.max(1, (respawnSeconds * 1000) / 4);
 	}
 
@@ -313,6 +324,8 @@ public class Woodcutting implements OpLocTrigger, UseLocTrigger {
 	}
 
 	private int getTreeStumpId(GameObject object, ObjectWoodcuttingDef def) {
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled())
+			return def.getLogId() == ItemId.LOGS.id() || def.getLogId() == ItemId.MAGIC_LOGS.id() ? 4 : 314;
 		if (def.getLogId() == ItemId.PALM_LOGS.id()) {
 			return -1;
 		}

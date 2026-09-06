@@ -9802,6 +9802,9 @@ public class EntityHandler {
 			npcs.clear();
 			appendProjectNpcs(firstArray(json(root.resolve("NpcDefs.json"))));
 			appendProjectNpcs(firstArray(json(root.resolve("NpcDefsCustom.json"))));
+			// Historical server customNpcConditions always supplies these commands.
+			npcs.get(375).updateCommand1("pickpocket");
+			npcs.get(376).updateCommand1("pickpocket");
 			JSONObject visuals = json(root.resolve("item-visuals.json"));
 			if (visuals.getInt("schemaVersion") != 1
 				|| !"current-base-public-item-visuals".equals(visuals.getString("manifestType"))) {

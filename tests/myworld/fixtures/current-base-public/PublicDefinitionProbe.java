@@ -13,6 +13,7 @@ public final class PublicDefinitionProbe {
   static Object handler;
   static Class<?> handlerClass;
   static Path definitions;
+  static Object server;
 
   static Object field(Object object, String name) throws Exception {
     for (Class<?> type = object.getClass(); type != null; type = type.getSuperclass()) {
@@ -98,10 +99,37 @@ public final class PublicDefinitionProbe {
       for (Object raw : rows(name)) {
         JSONObject row = (JSONObject) raw;
         if (row.getInt("id") != count) throw new AssertionError("non-contiguous NPC ID");
+        // Reviewed historical customNpcConditions, independent of optional flags.
+        if (count == 375 || count == 376) row.put("command", "pickpocket");
         compare(definition("getNpcDef", count), row, "npc" + count, names, omitted); count++;
       }
     }
     if (count != 836) throw new AssertionError("incomplete NPCs");
+    int actualCount = client ? ((Number) handlerClass.getMethod("npcCount").invoke(null)).intValue()
+      : ((List<?>) field(handler, "npcs")).size();
+    if (actualCount != count) throw new AssertionError("trailing/missing NPCs");
+  }
+
+  static void checkDispatch() throws Exception {
+    if (client) return;
+    Class<?> constants = Class.forName("com.openrsc.server.constants.Constants");
+    Class<?> spells = Class.forName("com.openrsc.server.constants.Spells");
+    Map<?, ?> actual = (Map<?, ?>) constants.getMethod("currentSpellMap").invoke(null);
+    JSONObject policy = new JSONObject(new String(Files.readAllBytes(definitions.resolve("effective-policy.json")), "UTF-8"));
+    JSONArray dispatch = policy.getJSONArray("spellDispatch");
+    if (actual.size() != dispatch.length() || dispatch.length() != 48) throw new AssertionError("public spell dispatch size");
+    for (Object raw : dispatch) {
+      JSONObject row = (JSONObject) raw; int id = row.getInt("id");
+      Object selected = constants.getMethod("spellToEnum", int.class).invoke(null, id);
+      if (!row.getString("spell").equals(String.valueOf(selected)) || !Integer.valueOf(id).equals(actual.get(selected)))
+        throw new AssertionError("public spell dispatch changed at " + id);
+      if (handlerClass.getMethod("getSpellDef", spells).invoke(handler, selected) != definition("getSpellDef", id))
+        throw new AssertionError("reverse spell dispatch changed at " + id);
+      comparisons += 3;
+    }
+    if (constants.getMethod("spellToEnum", int.class).invoke(null, -1) != null
+        || constants.getMethod("spellToEnum", int.class).invoke(null, 48) != null)
+      throw new AssertionError("unexpected public spell dispatch outside bounds");
   }
 
   static void checkXml(String file, String method, Map<String, String> names) throws Exception {
@@ -117,13 +145,37 @@ public final class PublicDefinitionProbe {
       for (int j = 0; j < children.getLength(); j++) {
         if (children.item(j) instanceof Element) {
           Element child = (Element) children.item(j);
-          if (!"requiredRunes".equals(child.getTagName())) fields.put(child.getTagName(), child.getTextContent().trim());
+          if (!"requiredRunes".equals(child.getTagName())) {
+            String value = child.getTextContent();
+            String key = child.getTagName();
+            if (!Arrays.asList("name", "description", "command1", "command2", "objectModel").contains(key)) value = value.trim();
+            fields.put(key, value);
+          }
         }
       }
       compare(definition(method, id), fields, file + id, names,
         client && file.equals("SpellDef.xml") ? skip("members", "evil", "exp") : skip());
+      if (file.equals("SpellDef.xml")) {
+        Map<Integer, Integer> expectedRunes = new HashMap<>();
+        NodeList entries = row.getElementsByTagName("entry");
+        for (int j = 0; j < entries.getLength(); j++) {
+          NodeList pair = ((Element) entries.item(j)).getElementsByTagName("int");
+          if (pair.getLength() != 2 || expectedRunes.put(Integer.parseInt(pair.item(0).getTextContent().trim()),
+              Integer.parseInt(pair.item(1).getTextContent().trim())) != null) throw new AssertionError("duplicate/invalid expected rune map");
+        }
+        if (!expectedRunes.equals(field(definition(method, id), "requiredRunes")))
+          throw new AssertionError("spell rune ID/count mismatch " + id);
+        comparisons += expectedRunes.size();
+      }
       id++;
     }
+    String[] files = {"GameObjectDef.xml", "DoorDef.xml", "TileDef.xml", "PrayerDef.xml", "SpellDef.xml"};
+    String[] countMethods = {"objectCount", "doorCount", "tileCount", "prayerCount", "spellCount"};
+    String[] fields = {"gameObjects", "doors", "tiles", "prayers", "spells"};
+    int index = Arrays.asList(files).indexOf(file);
+    int actualCount = client ? ((Number) handlerClass.getMethod(countMethods[index]).invoke(null)).intValue()
+      : Array.getLength(field(handler, fields[index]));
+    if (id != actualCount) throw new AssertionError("unexpected trailing/missing " + file + " definitions");
   }
 
   public static void main(String[] args) throws Exception {
@@ -139,7 +191,7 @@ public final class PublicDefinitionProbe {
       handlerClass.getMethod("load", boolean.class).invoke(null, true);
     } else {
       Class.forName("com.openrsc.server.CurrentCompositionIdentity").getMethod("initializeFromSystemProperties").invoke(null);
-      Object server = Class.forName("com.openrsc.server.Server").getConstructor(String.class).newInstance("current-base.conf");
+      server = Class.forName("com.openrsc.server.Server").getConstructor(String.class).newInstance("current-base.conf");
       handler = server.getClass().getMethod("getEntityHandler").invoke(server);
       handlerClass = handler.getClass(); handlerClass.getMethod("load").invoke(handler);
     }
@@ -149,6 +201,7 @@ public final class PublicDefinitionProbe {
     checkXml("TileDef.xml", "getTileDef", client ? mapping("unknown", "tileValue") : mapping());
     checkXml("PrayerDef.xml", "getPrayerDef", mapping());
     checkXml("SpellDef.xml", "getSpellDef", mapping());
+    checkDispatch();
     if (!errors.isEmpty()) throw new AssertionError(String.join("\n", errors));
     System.out.println("PUBLIC_DEFINITIONS_VERIFIED role=" + args[0] + " comparisons=" + comparisons);
     System.exit(0);

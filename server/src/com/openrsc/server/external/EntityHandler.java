@@ -1121,6 +1121,9 @@ public final class EntityHandler {
 			items.get(ItemId.DRAGONSTONE_RING.id()).setRequiredSkillIndex(0);
 		}
 
+		// Public stock keeps its historical stackability/noteability. The owner's
+		// throwing-equipment convenience rewrite is not a public definition rule.
+		if (!com.openrsc.server.CurrentBasePublicContent.isEnabled()) {
 		for (Integer itemId : RangeUtils.THROWING_DARTS) {
 			// Current Base deliberately carries only the conservative public item
 			// prefix.  Shared convenience lists also contain Advanced item IDs, so
@@ -1135,6 +1138,7 @@ public final class EntityHandler {
 				items.get(itemId).setStackable(true);
 				items.get(itemId).setNoteable(false);
 			}
+		}
 		}
 
 		// This enables overrides for existing authentic items so replacement custom equipment animations may be used instead
@@ -1693,7 +1697,7 @@ public final class EntityHandler {
 	 * @return
 	 */
 	public SpellDef getSpellDef(Spells spellEnum) {
-		Integer spellId = Constants.spellMap.get(spellEnum);
+		Integer spellId = Constants.currentSpellMap().get(spellEnum);
 		if (spellId != null) {
 			SpellDef spell = getSpellDef(spellId);
 			if (spell != null) {

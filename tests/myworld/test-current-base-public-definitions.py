@@ -9,6 +9,8 @@ import io
 import json
 from pathlib import Path
 import unittest
+import tempfile
+import zipfile
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,6 +28,45 @@ def records(name):
 
 
 class PublicDefinitionSnapshotTest(unittest.TestCase):
+    def test_client_content_payload_tampering_and_duplicate_paths_refused(self):
+        def module(name, filename):
+            spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts' / filename)
+            result = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(result)
+            return result
+        build = module('public_content_build', 'build-current-base.py')
+        verify = module('public_content_verify', 'verify-current-base.py')
+        manifest_path = SNAPSHOT.parent / 'client-content.json'
+        with tempfile.TemporaryDirectory(prefix='public-content-payload-') as tmp:
+            root = Path(tmp)
+            archive = root / 'client.zip'
+            build.write_client_content_archive(archive)
+            verify.validate_client_content(manifest_path, archive)
+            with zipfile.ZipFile(archive) as source:
+                payloads = {name: source.read(name) for name in source.namelist()}
+            audio = next(name for name in payloads if name.startswith('Cache/audio/'))
+            for name in ['Cache/video/CurrentBase_Public_Sprites.osar',
+                         'Cache/current-base-definitions/ItemDefs.json', audio]:
+                changed = root / 'changed.zip'
+                with zipfile.ZipFile(changed, 'w', compression=zipfile.ZIP_DEFLATED) as output:
+                    for path, payload in payloads.items():
+                        output.writestr(path, payload + b'X' if path == name else payload)
+                with self.assertRaisesRegex(verify.VerificationError, 'payload differs'):
+                    verify.validate_client_content(manifest_path, changed)
+            manifest = json.loads(manifest_path.read_bytes())
+            manifest['sourceFiles'].append(dict(manifest['sourceFiles'][0]))
+            forged = root / 'manifest.json'
+            forged.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(verify.VerificationError, 'duplicate'):
+                verify.validate_client_content(forged, archive)
+            manifest['sourceFiles'].pop()
+            invalid = root / 'invalid.base64'
+            invalid.write_bytes(b'not%%%base64')
+            next(row for row in manifest['sourceFiles'] if row['transform'] == 'base64')['sourcePath'] = str(invalid)
+            forged.write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(verify.VerificationError, 'invalid.*base64'):
+                verify.validate_client_content(forged, archive)
+
     def test_public_gameplay_hook_provenance_and_no_cap_filtering(self):
         document = json.loads((SNAPSHOT / 'gameplay-provenance.json').read_bytes())
         self.assertEqual(document['sourceCommit'], 'c0102e60774ab9c9076aabae49f6f97fb6fc4b00')

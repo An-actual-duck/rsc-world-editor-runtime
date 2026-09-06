@@ -279,7 +279,7 @@ public final class Constants {
 	}};
 
 	public static Spells spellToEnum(int id) {
-		Iterator<Map.Entry<Spells, Integer>> itr = spellMap.entrySet().iterator();
+		Iterator<Map.Entry<Spells, Integer>> itr = currentSpellMap().entrySet().iterator();
 
 		boolean found = false;
 		Spells spell = null;
@@ -293,5 +293,10 @@ public final class Constants {
 		}
 
 		return spell;
+	}
+
+	public static Map<Spells, Integer> currentSpellMap() {
+		return com.openrsc.server.CurrentBasePublicContent.isEnabled()
+			? com.openrsc.server.CurrentBasePublicContent.spellMap() : spellMap;
 	}
 }
