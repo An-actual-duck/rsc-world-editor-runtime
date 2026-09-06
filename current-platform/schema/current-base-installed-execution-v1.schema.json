@@ -4,72 +4,296 @@
   "title": "Current Base installed execution verifier contract",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "verifierId", "invocation", "executionPolicy", "isolationPolicy", "supervisionPolicy", "requiredObservations", "evidenceContract", "exitSemantics"],
+  "required": [
+    "schemaId",
+    "manifestType",
+    "verifierId",
+    "invocation",
+    "executionPolicy",
+    "isolationPolicy",
+    "supervisionPolicy",
+    "requiredObservations",
+    "evidenceContract",
+    "exitSemantics",
+    "recoveryPolicy"
+  ],
   "properties": {
-    "schemaId": {"const": "current-base-installed-execution-v1"},
-    "manifestType": {"const": "current-base-installed-execution-verifier"},
-    "verifierId": {"const": "current-base-installed-execution-v1"},
+    "schemaId": {
+      "const": "current-base-installed-execution-v1"
+    },
+    "manifestType": {
+      "const": "current-base-installed-execution-verifier"
+    },
+    "verifierId": {
+      "const": "current-base-installed-execution-v1"
+    },
     "invocation": {
-      "type": "object", "additionalProperties": false,
-      "required": ["toolArtifactRole", "mainClass", "arguments"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "toolArtifactRole",
+        "mainClass",
+        "arguments"
+      ],
       "properties": {
-        "toolArtifactRole": {"const": "server-runtime"},
-        "mainClass": {"const": "com.openrsc.server.database.CurrentBaseInstalledExecutionVerifier"},
-        "arguments": {"type": "array", "minItems": 14, "maxItems": 14, "prefixItems": [
-          {"const": "--contract"}, {"const": "--composition-identity"}, {"const": "--runtime-profile"},
-          {"const": "--installed-server-root"}, {"const": "--installed-client-root"}, {"const": "--server-config"},
-          {"const": "--server-profile"}, {"const": "--client-profile"}, {"const": "--map-package"},
-          {"const": "--state-db"}, {"const": "--workspace"}, {"const": "--server-port"},
-          {"const": "--websocket-port"}, {"const": "--evidence"}
-        ], "items": false}
+        "toolArtifactRole": {
+          "const": "server-runtime"
+        },
+        "mainClass": {
+          "const": "com.openrsc.server.database.CurrentBaseInstalledExecutionVerifier"
+        },
+        "arguments": {
+          "const": [
+            "--contract",
+            "--composition-identity",
+            "--runtime-profile",
+            "--installed-server-root",
+            "--installed-client-root",
+            "--server-config",
+            "--server-profile",
+            "--client-profile",
+            "--map-package",
+            "--state-db",
+            "--workspace",
+            "--server-port",
+            "--websocket-port",
+            "--evidence",
+            "--supervision",
+            "--supervision-sha256"
+          ]
+        }
       }
     },
     "executionPolicy": {
-      "type": "object", "additionalProperties": false,
-      "required": ["engine", "endpoint", "launchCount", "serverReadyTimeoutSeconds", "clientEvidenceTimeoutSeconds", "shutdownTimeoutSeconds", "maximumLogBytesPerProcess", "maximumMapManifestBytes", "maximumSourceFilesPerRoot", "maximumSourceBytesPerRoot", "graphicalClientPrerequisite", "mapSpawnSelection"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine",
+        "endpoint",
+        "launchCount",
+        "serverReadyTimeoutSeconds",
+        "clientEvidenceTimeoutSeconds",
+        "shutdownTimeoutSeconds",
+        "maximumLogBytesPerProcess",
+        "maximumMapManifestBytes",
+        "maximumSourceFilesPerRoot",
+        "maximumSourceBytesPerRoot",
+        "graphicalClientPrerequisite",
+        "mapSpawnSelection"
+      ],
       "properties": {
-        "engine": {"const": "sqlite"}, "endpoint": {"const": "127.0.0.1"}, "launchCount": {"const": 2},
-        "serverReadyTimeoutSeconds": {"const": 60}, "clientEvidenceTimeoutSeconds": {"const": 90},
-        "shutdownTimeoutSeconds": {"const": 20}, "maximumLogBytesPerProcess": {"const": 1048576},
-        "maximumMapManifestBytes": {"const": 16777216},
-        "maximumSourceFilesPerRoot": {"const": 20000}, "maximumSourceBytesPerRoot": {"const": 1073741824},
-        "graphicalClientPrerequisite": {"const": "java-awt-non-headless"},
-        "mapSpawnSelection": {"const": "global-level-zero-sector-center-coverage-only"}
+        "engine": {
+          "const": "sqlite"
+        },
+        "endpoint": {
+          "const": "127.0.0.1"
+        },
+        "launchCount": {
+          "const": 2
+        },
+        "serverReadyTimeoutSeconds": {
+          "const": 60
+        },
+        "clientEvidenceTimeoutSeconds": {
+          "const": 90
+        },
+        "shutdownTimeoutSeconds": {
+          "const": 20
+        },
+        "maximumLogBytesPerProcess": {
+          "const": 1048576
+        },
+        "maximumMapManifestBytes": {
+          "const": 16777216
+        },
+        "maximumSourceFilesPerRoot": {
+          "const": 20000
+        },
+        "maximumSourceBytesPerRoot": {
+          "const": 1073741824
+        },
+        "graphicalClientPrerequisite": {
+          "const": "java-awt-non-headless"
+        },
+        "mapSpawnSelection": {
+          "const": "global-level-zero-sector-center-coverage-only"
+        }
       }
     },
     "isolationPolicy": {
-      "type": "object", "additionalProperties": false,
-      "required": ["workspace", "sourceMutation", "runtimeRoots", "state", "map", "account", "credential", "workspacePermissions", "network", "processes"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace",
+        "sourceMutation",
+        "runtimeRoots",
+        "state",
+        "map",
+        "account",
+        "credential",
+        "workspacePermissions",
+        "network",
+        "processes"
+      ],
       "properties": {
-        "workspace": {"const": "new-provider-owned-disposable-directory"},
-        "sourceMutation": {"const": "forbidden-hash-before-and-after"},
-        "runtimeRoots": {"const": "copied-under-workspace"}, "state": {"const": "copied-sqlite-database-outside-runtime-roots"},
-        "map": {"const": "copied-package-outside-runtime-roots"},
-        "account": {"const": "generated-disposable-account-only"},
-        "credential": {"const": "generated-inside-workspace-delete-always"},
-        "workspacePermissions": {"const": "owner-only-0700-and-state-0600"},
-        "network": {"const": "literal-ipv4-loopback-only"}, "processes": {"const": "bounded-and-terminated-always"}
+        "workspace": {
+          "const": "new-provider-owned-disposable-directory"
+        },
+        "sourceMutation": {
+          "const": "forbidden-hash-before-and-after"
+        },
+        "runtimeRoots": {
+          "const": "copied-under-workspace"
+        },
+        "state": {
+          "const": "copied-sqlite-database-outside-runtime-roots"
+        },
+        "map": {
+          "const": "copied-package-outside-runtime-roots"
+        },
+        "account": {
+          "const": "generated-disposable-account-only"
+        },
+        "credential": {
+          "const": "generated-inside-workspace-delete-only-with-sealed-ownership"
+        },
+        "workspacePermissions": {
+          "const": "owner-only-0700-and-state-0600"
+        },
+        "network": {
+          "const": "literal-ipv4-loopback-only"
+        },
+        "processes": {
+          "const": "bounded-owned-handles-with-lease-proven-recovery"
+        }
       }
     },
     "supervisionPolicy": {
-      "type": "object", "additionalProperties": false,
-      "required": ["stdin", "cancellation", "cleanup", "cancellationExitCode", "forcedTerminationWaitSeconds", "logDrainWaitSeconds", "maximumCancellationSeconds", "hardKill"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stdin",
+        "cancellation",
+        "cleanup",
+        "cancellationExitCode",
+        "forcedTerminationWaitSeconds",
+        "logDrainWaitSeconds",
+        "maximumCancellationSeconds",
+        "hardKill"
+      ],
       "properties": {
-        "stdin": {"const": "parent-held-open-pipe-until-verifier-exit"},
-        "cancellation": {"const": "stdin-eof-or-unexpected-data-before-success-publication"},
-        "cleanup": {"const": "terminate-owned-server-client-processes-and-delete-credential"},
-        "cancellationExitCode": {"const": 2},
-        "forcedTerminationWaitSeconds": {"const": 10},
-        "logDrainWaitSeconds": {"const": 5},
-        "maximumCancellationSeconds": {"const": 90},
-        "hardKill": {"const": "unsupported-requires-disposable-workspace-recovery"}
+        "stdin": {
+          "const": "parent-held-open-pipe-until-verifier-exit"
+        },
+        "cancellation": {
+          "const": "stdin-eof-or-unexpected-data-before-success-publication"
+        },
+        "cleanup": {
+          "const": "terminate-only-owned-child-handles-then-all-leases-revoke-and-delete-owned-credential"
+        },
+        "cancellationExitCode": {
+          "const": 2
+        },
+        "forcedTerminationWaitSeconds": {
+          "const": 10
+        },
+        "logDrainWaitSeconds": {
+          "const": 5
+        },
+        "maximumCancellationSeconds": {
+          "const": 90
+        },
+        "hardKill": {
+          "const": "recover-with-prebound-leases-and-permanent-delayed-start-revocation"
+        }
       }
     },
-    "requiredObservations": {"type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": {"enum": ["six-field-composition-handshake", "successful-normal-login", "canonical-installed-map", "representative-disposable-state", "normal-logout", "second-launch-restart-persistence", "advanced-configuration-excluded"]}},
-    "evidenceContract": {"type": "object", "additionalProperties": false, "required": ["schemaId", "outputPolicy", "credentialDisclosure", "sourcePathDisclosure"], "properties": {
-      "schemaId": {"const": "current-base-installed-execution-evidence-v1"}, "outputPolicy": {"const": "create-new-regular-file"},
-      "credentialDisclosure": {"const": "forbidden"}, "sourcePathDisclosure": {"const": "forbidden"}
-    }},
-    "exitSemantics": {"type": "object", "additionalProperties": false, "required": ["verified", "refused"], "properties": {"verified": {"const": 0}, "refused": {"const": 2}}}
+    "requiredObservations": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "six-field-composition-handshake",
+          "successful-normal-login",
+          "canonical-installed-map",
+          "representative-disposable-state",
+          "normal-logout",
+          "second-launch-restart-persistence",
+          "advanced-configuration-excluded"
+        ]
+      }
+    },
+    "evidenceContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaId",
+        "outputPolicy",
+        "credentialDisclosure",
+        "sourcePathDisclosure"
+      ],
+      "properties": {
+        "schemaId": {
+          "const": "current-base-installed-execution-evidence-v1"
+        },
+        "outputPolicy": {
+          "const": "create-new-regular-file"
+        },
+        "credentialDisclosure": {
+          "const": "forbidden"
+        },
+        "sourcePathDisclosure": {
+          "const": "forbidden"
+        }
+      }
+    },
+    "exitSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verified",
+        "refused"
+      ],
+      "properties": {
+        "verified": {
+          "const": 0
+        },
+        "refused": {
+          "const": 2
+        }
+      }
+    },
+    "recoveryPolicy": {
+      "const": {
+        "mainClass": "com.openrsc.server.database.CurrentBaseVerifierRecovery",
+        "arguments": [
+          "--contract",
+          "--supervision",
+          "--supervision-sha256",
+          "--evidence"
+        ],
+        "authoritySchema": "current-base-installed-execution-evidence-v1#/$defs/supervisionAuthority",
+        "evidenceSchema": "current-base-installed-execution-evidence-v1#/$defs/recoveryEvidence",
+        "platform": "posix",
+        "anchorPolicy": "caller-preexisting-0600-zero-byte-singly-linked-dev-ino-bound-supervisor-server-client-intent",
+        "leaseOrder": [
+          "supervisor",
+          "server",
+          "client"
+        ],
+        "leaseLifetime": "actual-jvm-exit-including-hooks",
+        "intentPolicy": "prebound-inode-runtime-once-written-body-bound-to-authority-invocation-and-credential",
+        "childPolicy": "role-lease-then-exact-authority-and-intent-sha256-before-game-initialization",
+        "revocationPolicy": "all-leases-then-create-new-fsynced-permanent-revocation-refuse-any-entry-before-effects",
+        "credentialPolicy": "delete-only-exact-sealed-private-inode-size-and-sha256-or-already-absent",
+        "durabilityPolicy": "force-file-bodies-and-parent-directory-entries",
+        "invocationHash": "sorted-original-option-name-nul-exact-argument-value-nul-excluding-supervision-options",
+        "busyExitCode": 3,
+        "refusedExitCode": 2,
+        "closedExitCode": 0
+      }
+    }
   }
 }

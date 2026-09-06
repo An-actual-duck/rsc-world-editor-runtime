@@ -90,9 +90,13 @@
     "startTimeoutSeconds": 120,
     "clientRenderer": "software-desktop-window-v1",
     "activeSelection": "installationRoot/active-launch.json",
-    "selectionPolicy": "closed-private-current-role-descriptor-sha256-rechecked-after-lease-before-game-init"
+    "selectionPolicy": "closed-private-current-role-descriptor-sha256-rechecked-after-lease-before-game-init",
+    "pendingCutover": "installationRoot/pending-cutover.json-any-entry-refuses-after-lease-before-effects"
   },
   "requiredRuntimeClasses": [
+    "com/openrsc/server/VerifierLifetime.class",
+    "com/openrsc/server/CurrentBaseVerifierServer.class",
+    "com/openrsc/server/database/CurrentBaseVerifierRecovery.class",
     "com/openrsc/server/CurrentInstalledLaunch.class",
     "com/openrsc/server/CurrentBaseInstalledServer.class",
     "com/openrsc/server/database/impl/sqlite/CurrentBaseStateLocation.class",
@@ -102,6 +106,8 @@
     "com/openrsc/server/io/WorldBuilderInstalledServerProfile.class"
   ],
   "requiredClientClasses": [
+    "orsc/VerifierLifetime.class",
+    "orsc/CurrentBaseVerifierClient.class",
     "orsc/CurrentInstalledLaunch.class",
     "orsc/CurrentBaseInstalledClient.class",
     "orsc/CurrentBaseExecutionProfile.class",

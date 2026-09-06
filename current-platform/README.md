@@ -241,6 +241,10 @@ aliased or mismatched selections refuse; an old descriptor cannot restart
 retired code/map against current player state. Editor changes this pointer
 transactionally while holding both role leases and retains exact rollback
 evidence. The descriptor does not hash this pointer, avoiding a hash cycle.
+Any entry at `installationRoot/pending-cutover.json`, including a directory or
+dangling symlink, refuses both roles after lease acquisition and before state,
+session or game effects. The Editor owns creation, durable completion/rollback,
+and removal of this guard; the runtime neither parses nor repairs it.
 
 The same descriptor is restartable. After validation and lease acquisition,
 the role generates a fresh 256-bit nonce, creates `sessionRoot/<nonce>` privately,
@@ -257,3 +261,71 @@ recovery evidence, not proof of a completed save.
 This runtime API is separate from the disposable installed-execution verifier.
 It does not enable Editor activation, implement an Editor ledger/map transaction,
 or by itself establish candidate acceptance.
+
+### Interrupted disposable-verifier recovery
+
+The installed-execution verifier additionally requires `--supervision` pointing
+to a caller-prepared `controlRoot/authority.json` and `--supervision-sha256`
+containing its journaled byte hash. The closed authority schema is embedded in
+`current-base-installed-execution-evidence-v1.schema.json#/$defs/supervisionAuthority`.
+It binds the invocation UUID, composition and verifier-contract hashes, absolute
+workspace/control paths, ten named input paths, and device/inode identities of
+four pre-existing, singly linked, empty mode-0600 files: `supervisor.lock`,
+`server.lock`, `client.lock`, and `intent.json`. The control directory is private
+0700, disjoint from workspace and inputs, and must remain at its original path.
+The caller durably creates these files and journals the authority hash before
+starting the verifier. This live authority is not a portable historical report.
+
+`invocationSha256` is SHA-256 over the original fourteen option names, without
+their `--` prefix, in sorted order: UTF-8 name, NUL, exact argument value, NUL.
+The two supervision options are excluded to avoid a hash cycle. Input paths are
+canonical absolute paths, bounded to 4096 characters. Authority, intent and
+revocation documents are bounded to 64 KiB; all objects have exact closed fields.
+
+The actual supervisor JVM takes its prebound lock before workspace effects.
+The provider writes the prebound intent inode once, retaining its inode and
+forcing its body and directory. The body contains a runtime-generated 256-bit
+nonce plus exact private credential path, inode, size and SHA-256 ownership.
+Actual child JVMs enter `CurrentBaseVerifierServer` / `orsc.CurrentBaseVerifierClient`
+with exactly `--supervision`, `--supervision-sha256`, and `--intent-sha256`.
+They acquire their role lease, validate both exact hashes and invocation binding,
+and reject any `revocation.json` entry before game classes initialize. Leases
+are retained through actual JVM exit, including shutdown hooks. Each child also
+watches its own parent pipe; orphaned children request their own process exit.
+
+Recovery uses the provider artifact, never an arbitrary target executable:
+
+```text
+java -cp <provider-core.jar> com.openrsc.server.database.CurrentBaseVerifierRecovery
+  --contract <reviewed-verifier-contract>
+  --supervision <absolute-authority.json> --supervision-sha256 <journaled-hash>
+  --evidence <new-disjoint-output>
+```
+
+The command acquires supervisor, server, then client leases. It validates their
+original inodes, validates the intent body against authority/invocation and
+credential ownership, then durably creates an immutable `revocation.json`.
+Recovery does not claim the intent body was externally hash-pinned: its inode
+was pinned before launch; its full body is checked against the bound authority.
+Every delayed parent or child rechecks revocation under its respective lease,
+so a process created before the supervisor died cannot start gameplay later.
+An empty prebound intent can be revoked only under all three leases. A partial,
+inconsistent or replaced intent is retained and refused, never repaired.
+
+Only an absent credential or the exact sealed, canonical, singly linked 0600
+credential can be cleaned. A foreign/replaced/partial credential is retained.
+File bodies and parent directory entries are forced for creation/deletion and
+evidence publication. Recovery never removes the workspace or authority/anchors.
+It creates a new disjoint private report using the embedded `recoveryEvidence`
+schema: exit 0 means permanent closure and credential cleanup; 3 means busy;
+2 means unsafe/refused. Existing valid revocation and absent credentials are
+idempotently recoverable into a fresh report. The Editor must await the owned
+recovery command's successful exit and validate that report before any separate
+journal-owned workspace cleanup. Neither free ports nor PID disappearance nor
+unbound free locks prove cleanup authority.
+
+Normal successful verifier evidence contains its closed supervision binding.
+Cancellation retains the existing 20-second owned-child shutdown, 10-second
+forced-termination and 5-second log-drain bounds. Forced termination applies
+only to disposable child handles created by this verifier; it is never used on
+PID-discovered processes and never substitutes for lease/revocation proof.
