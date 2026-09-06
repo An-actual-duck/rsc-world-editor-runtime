@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import unittest
+import uuid
 import zipfile
 
 import jsonschema
@@ -57,6 +58,7 @@ def option(command: list[str], name: str, value: Path | str) -> list[str]:
 
 
 def run_supervised(command: list[str], timeout: int = 240) -> subprocess.CompletedProcess:
+    command = with_supervision(command)
     # communicate() would close stdin before waiting and therefore cancel the verifier.
     with tempfile.TemporaryFile(mode="w+") as stdout, tempfile.TemporaryFile(mode="w+") as stderr:
         process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.PIPE,
@@ -70,6 +72,49 @@ def run_supervised(command: list[str], timeout: int = 240) -> subprocess.Complet
         stderr.seek(0)
         return subprocess.CompletedProcess(command, process.returncode,
                                            stdout.read(), stderr.read())
+
+
+def with_supervision(command: list[str]) -> list[str]:
+    """Caller prepares and journals authority before the provider JVM can start."""
+    command = list(command)
+    for key in ("--supervision", "--supervision-sha256"):
+        if key in command:
+            offset = command.index(key)
+            del command[offset:offset + 2]
+    first = command.index("--contract")
+    options = {command[i][2:]: command[i + 1] for i in range(first, len(command), 2)}
+    workspace = Path(options["workspace"])
+    control = Path(options["evidence"]).parent / (workspace.name + ".supervision")
+    control.mkdir(mode=0o700)
+    identities = {}
+    for role in ("supervisor", "server", "client", "intent"):
+        path = control / ("intent.json" if role == "intent" else role + ".lock")
+        path.touch(mode=0o600)
+        stat = path.stat()
+        identities[role] = {"device": str(stat.st_dev), "inode": str(stat.st_ino)}
+    digest = hashlib.sha256()
+    for name, value in sorted(options.items()):
+        digest.update(name.encode() + b"\0" + value.encode() + b"\0")
+    inputs = ("client-profile", "composition-identity", "contract", "installed-client-root",
+              "installed-server-root", "map-package", "runtime-profile", "server-config", "server-profile", "state-db")
+    authority = control / "authority.json"
+    authority.write_bytes(canonical_json({"schemaVersion": 1,
+        "manifestType": "current-base-verifier-supervision", "invocationId": str(uuid.uuid4()),
+        "controlRoot": str(control), "workspace": str(workspace),
+        "invocationSha256": digest.hexdigest(), "compositionIdentitySha256": sha256(Path(options["composition-identity"])),
+        "verifierContractSha256": sha256(Path(options["contract"])),
+        "inputPaths": {name: options[name] for name in inputs}, "files": identities}))
+    authority.chmod(0o600)
+    return command + ["--supervision", str(authority), "--supervision-sha256", sha256(authority)]
+
+
+def recover(command: list[str], evidence: Path) -> subprocess.CompletedProcess:
+    core = command[command.index("-cp") + 1]
+    return subprocess.run(["java", "-cp", core, "com.openrsc.server.database.CurrentBaseVerifierRecovery",
+        "--contract", command[command.index("--contract") + 1],
+        "--supervision", command[command.index("--supervision") + 1],
+        "--supervision-sha256", command[command.index("--supervision-sha256") + 1],
+        "--evidence", str(evidence)], capture_output=True, text=True, timeout=20)
 
 
 def process_running(pid: int) -> bool:
@@ -260,6 +305,9 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
             self.assertFalse((workspace / "execution/server/inc/sqlite/current_base.db").exists())
             self.assertNotIn("existing", evidence_path.read_text(encoding="utf-8"))
             self.assertFalse((workspace / "execution/credential.json").exists())
+            recovered = recover(verified.args, root / "successful-recovery.json")
+            self.assertEqual(0, recovered.returncode, recovered.stdout + recovered.stderr)
+            self.assertEqual(0, recover(verified.args, root / "successful-recovery-again.json").returncode)
             with sqlite3.connect(workspace / "state/current_base.db") as db:
                 self.assertEqual((913, "existing"), db.execute(
                     "SELECT id,username FROM players WHERE id=913").fetchone())
@@ -269,7 +317,8 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
             self.assertEqual(before, after)
 
             for mode, child_count in (("eof", 1), ("data", 2), ("term", 2),
-                                      ("parent-loss", 1), ("parent-loss", 2)):
+                                      ("parent-loss", 1), ("parent-loss", 2),
+                                      ("verifier-hard-kill", 1), ("verifier-hard-kill", 2)):
                 with self.subTest(supervision=mode, active_children=child_count):
                     self.assert_supervised_cancellation(
                         command, root, mode, child_count)
@@ -282,8 +331,8 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
             closed_workspace = root / "closed-pipe-workspace"
             closed_evidence = root / "closed-pipe-evidence.json"
             closed = subprocess.run(
-                option(option(command, "--workspace", closed_workspace),
-                       "--evidence", closed_evidence),
+                with_supervision(option(option(command, "--workspace", closed_workspace),
+                       "--evidence", closed_evidence)),
                 cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True, text=True,
                 timeout=90,
             )
@@ -315,7 +364,7 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
                 timeout=30,
             )
             self.assertEqual(2, refused.returncode)
-            self.assertIn("disjoint from every supplied input", refused.stderr)
+            self.assertIn("Symlink path component refused", refused.stderr)
             self.assertFalse(aliased_workspace.exists())
             self.assertFalse(aliased_evidence.exists())
 
@@ -343,6 +392,7 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
         selected = option(option(command, "--workspace", workspace), "--evidence", evidence)
         selected = option(option(selected, "--server-port", str(free_port())),
                           "--websocket-port", str(free_port()))
+        selected = with_supervision(selected)
         with tempfile.TemporaryFile(mode="w+") as output:
             if mode == "parent-loss":
                 # Only this parent owns the write end. Its hard exit must produce EOF in
@@ -378,6 +428,8 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
                     process.wait(timeout=10)
                 elif mode == "term":
                     process.terminate()
+                elif mode == "verifier-hard-kill":
+                    process.kill()  # Own disposable verifier; children must close themselves on pipe loss.
                 elif mode == "data":
                     process.stdin.write("unexpected\n")
                     process.stdin.flush()
@@ -388,13 +440,17 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
                 if mode != "parent-loss":
                     process.wait(timeout=5)
                     self.assertNotEqual(0, process.returncode)
-                    if mode != "term":
+                    if mode not in ("term", "verifier-hard-kill"):
                         self.assertEqual(2, process.returncode)
-                self.assertTrue(all(not process_running(pid) for pid in observed_children))
+                await_condition(lambda: all(not process_running(pid) for pid in observed_children),
+                    30, "orphan child JVM exit after actual supervisor hard kill")
+                recovered = recover(selected, root / f"cancel-{mode}-{child_count}-recovery.json")
+                self.assertEqual(0, recovered.returncode, recovered.stdout + recovered.stderr)
                 self.assertFalse((workspace / "execution/credential.json").exists())
                 self.assertFalse(evidence.exists())
-                self.assertTrue((workspace / "logs/server-1.log").is_file())
-                if child_count == 2:
+                if mode != "verifier-hard-kill":
+                    self.assertTrue((workspace / "logs/server-1.log").is_file())
+                if child_count == 2 and mode != "verifier-hard-kill":
                     self.assertTrue((workspace / "logs/client-1.log").is_file())
                 for log in (workspace / "logs").glob("*.log"):
                     self.assertLessEqual(log.stat().st_size, 1048576)

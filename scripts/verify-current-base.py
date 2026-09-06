@@ -403,7 +403,7 @@ def validate_installed_verifier(path: Path, profile: dict) -> None:
         verifier,
         {"schemaId", "manifestType", "verifierId", "invocation",
          "executionPolicy", "isolationPolicy", "supervisionPolicy", "requiredObservations",
-         "evidenceContract", "exitSemantics"},
+         "evidenceContract", "exitSemantics", "recoveryPolicy"},
         "installed verifier contract",
     )
     binding = profile["installedExecutionVerifier"]

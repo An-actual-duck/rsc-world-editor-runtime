@@ -392,6 +392,27 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         client = (ROOT / "Client_Base/src/orsc/CurrentInstalledLaunch.java").read_text().split("\n", 1)[1]
         self.assertEqual(server, client)
 
+    def test_pending_cutover_refuses_both_roles_without_writable_effects(self):
+        guard = self.anchor / "pending-cutover.json"
+        before = {role: tree_hash(self.state[role]) for role in ("server", "client")}
+        for kind in ("malformed-file", "directory", "dangling-symlink"):
+            if kind == "malformed-file": guard.write_text("incomplete cutover")
+            elif kind == "directory": guard.mkdir()
+            else: guard.symlink_to(self.root / "missing-cutover-record")
+            for role in ("server", "client"):
+                result = subprocess.run(self.command(role), cwd=self.working[role], capture_output=True,
+                    text=True, timeout=20)
+                self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+                self.assertEqual([], list(self.working[role].iterdir()))
+                self.assertEqual([], list((self.anchor / "sessions" / role).iterdir()))
+                self.assertEqual(before[role], tree_hash(self.state[role]))
+            if kind == "directory": guard.rmdir()
+            else: guard.unlink()  # This test fixture is the owning installation manager.
+        server, server_ready = self.start("server")
+        client, client_ready = self.start("client")
+        self.stop(client, client_ready)
+        self.stop(server, server_ready)
+
     def test_anchor_and_immutable_document_mutable_root_overlap_refusals(self):
         for key in ("compositionIdentity", "runtimeProfile", "installedMapProfile", "configuration"):
             for mutable in ("workingRoot", "stateRoot", "sideStateRoot", "installationRoot"):

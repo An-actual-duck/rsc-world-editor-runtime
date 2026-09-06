@@ -1,6 +1,7 @@
 package com.openrsc.server.database;
 
 import com.openrsc.server.io.AdaptiveWorldBuilderPackageGuard;
+import com.openrsc.server.VerifierLifetime;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -47,7 +48,7 @@ import java.util.regex.Pattern;
  */
 public final class CurrentBaseInstalledExecutionVerifier {
 	private static final String CONTRACT_SHA256 =
-		"b13aaa9f247dbcfd8c5cb55ea2535f07f76400ae9d12d1cf654197be1b3afe55";
+		"227abec8c5180b80a504591083c2d4d000152d2047dba5fa27202cdce56659da";
 	private static final int MAX_LOG_BYTES = 1048576;
 	private static final int MAX_MAP_MANIFEST_BYTES = 16777216;
 	private static final int MAX_SOURCE_FILES = 20000;
@@ -55,7 +56,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 	private static final Set<String> OPTIONS = set("contract", "composition-identity",
 		"runtime-profile", "installed-server-root", "installed-client-root",
 		"server-config", "server-profile", "client-profile", "map-package", "state-db",
-		"workspace", "server-port", "websocket-port", "evidence");
+		"workspace", "server-port", "websocket-port", "evidence", "supervision", "supervision-sha256");
 	private static final List<String> IDENTITY_FIELDS = Arrays.asList(
 		"platformReleaseId", "platformManifestHash", "variantId", "variantManifestHash",
 		"moduleSetHash", "bundleInventoryHash");
@@ -71,14 +72,16 @@ public final class CurrentBaseInstalledExecutionVerifier {
 	public static void main(String[] arguments) {
 		Map<String,String> parsed = null;
 		Supervision supervision = new Supervision();
-		supervision.start();
 		try {
 			Map<String,String> options = options(arguments); parsed = options;
 			if (!options.keySet().equals(OPTIONS)) throw new IOException(
 				"arguments differ from the closed installed-execution invocation");
 			Contract contract = Contract.load(regular(options, "contract"));
+			supervision.lifetime = VerifierLifetime.supervisor(options);
+			supervision.start();
 			Verification verification = new Verification(options, contract, supervision);
 			JSONObject evidence = verification.execute();
+			evidence.put("supervision", supervision.lifetime.finish());
 			Path output = newOutput(options, "evidence");
 			supervision.publish(output, evidence);
 			System.out.println("Current Base installed execution verified");
@@ -91,11 +94,13 @@ public final class CurrentBaseInstalledExecutionVerifier {
 		}
 	}
 
+	static void validateRecoveryContract(Path path) throws Exception { Contract.load(path); }
+
 	/** The parent's pipe is a capability, not a supplied PID or a guessed process group. */
 	private static final class Supervision {
 		private final List<BoundedProcess> children = new ArrayList<BoundedProcess>();
 		private boolean cancelled, published;
-		private Path credential;
+		private VerifierLifetime lifetime;
 
 		private void start() {
 			Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
@@ -118,6 +123,9 @@ public final class CurrentBaseInstalledExecutionVerifier {
 		}
 		private synchronized void requireActive() throws IOException {
 			if (cancelled) throw new IOException("installed execution was cancelled");
+			try { lifetime.requireOpen(); } catch (Exception failure) {
+				throw new IOException("installed execution lifetime was revoked", failure);
+			}
 		}
 		private synchronized BoundedProcess startChild(List<String> command, Path root,
 			Path log) throws IOException {
@@ -126,30 +134,21 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			children.add(child); return child;
 		}
 		private synchronized void writeCredential(Path path, byte[] bytes) throws Exception {
-			requireActive(); credential = path;
-			Files.createDirectories(path.getParent());
-			try {
-				Set<PosixFilePermission> mode = PosixFilePermissions.fromString("rw-------");
-				Files.createFile(path, PosixFilePermissions.asFileAttribute(mode));
-			} catch (UnsupportedOperationException unsupported) { Files.createFile(path); }
-			Files.write(path, bytes, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+			requireActive(); lifetime.credential(bytes);
 		}
 		private void cleanup() {
 			List<BoundedProcess> active;
-			Path secret;
-			synchronized (this) { active = new ArrayList<BoundedProcess>(children); secret = credential; }
+			synchronized (this) { active = new ArrayList<BoundedProcess>(children); }
 			// Close each client before its server, including cancellation during login.
 			Collections.reverse(active);
 			for (BoundedProcess child : active) child.closeQuietly();
-			if (secret != null) try { Files.deleteIfExists(secret); } catch (IOException failure) {
-				System.err.println("Disposable credential cleanup failed; workspace recovery required");
+			if (lifetime != null) try { lifetime.finish(); } catch (Exception failure) {
+				System.err.println("Disposable lifetime cleanup incomplete; workspace recovery required");
 			}
 		}
 		private synchronized void publish(Path output, JSONObject evidence) throws Exception {
-			requireActive();
-			Files.createDirectories(output.getParent());
-			Files.write(output, (evidence.toString(2) + "\n").getBytes(StandardCharsets.UTF_8),
-				StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+			if (cancelled) throw new IOException("installed execution was cancelled");
+			lifetime.publish(output, evidence);
 			published = true;
 		}
 	}
@@ -258,9 +257,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 					runCycle(run, identityCopy, serverPort, websocketPort);
 			} finally {
 				supervision.cleanup();
-				if (credential != null) Files.deleteIfExists(credential);
 			}
-			supervision.requireActive();
+			if (supervision.cancelled) throw new IOException("installed execution was cancelled");
 			verifyPersistentState();
 			if (!workingMapBefore.equals(treeHash(workingMap))) throw new IOException(
 				"external installed map changed during runtime execution");
@@ -286,19 +284,20 @@ public final class CurrentBaseInstalledExecutionVerifier {
 			int websocketPort) throws Exception {
 			BoundedProcess server = null, client = null;
 			try {
-				List<String> serverCommand = Arrays.asList(javaCommand(), "-Xms128m", "-Xmx768m",
+				List<String> serverCommand = new ArrayList<>(Arrays.asList(javaCommand(), "-Xms128m", "-Xmx768m",
 					"-Dopenrsc.worldBuilderInstalledMapRoot=" + workingMap,
 					"-Dopenrsc.currentBaseStateRoot=" + workingState.getParent(),
 					"-Dopenrsc.currentCompositionIdentityFile=" + identityPath,
 					"-Dopenrsc.worldBuilderInstalledServerProfile="
 						+ serverRoot.resolve("world-builder-configs/installed-server.json"),
 					"-cp", "core.jar" + java.io.File.pathSeparator + "plugins.jar",
-					"com.openrsc.server.Server", "current-base.conf");
+					"com.openrsc.server.CurrentBaseVerifierServer"));
+				serverCommand.addAll(supervision.lifetime.childArguments());
 				server = supervision.startChild(serverCommand, serverRoot,
 					workspace.resolve("logs/server-" + run + ".log"));
 				server.awaitText("Game world is now online on", 60, "server startup");
 
-				List<String> clientCommand = Arrays.asList(javaCommand(), "-Xms256m", "-Xmx1024m",
+				List<String> clientCommand = new ArrayList<>(Arrays.asList(javaCommand(), "-Xms256m", "-Xmx1024m",
 					"-Dopenrsc.worldBuilderInstalledMapRoot=" + workingMap,
 					"-Dopenrsc.currentCompositionIdentityFile=" + identityPath,
 					"-Dopenrsc.worldBuilderInstalledClientProfile="
@@ -307,7 +306,8 @@ public final class CurrentBaseInstalledExecutionVerifier {
 					"-Dopenrsc.currentBaseHost=127.0.0.1",
 					"-Dopenrsc.currentBasePort=" + serverPort,
 					"-Dopenrsc.currentBaseCredentialFile=" + credential,
-					"-Dsun.java2d.opengl=false", "-jar", "Open_RSC_Client.jar");
+					"-Dsun.java2d.opengl=false", "-cp", "Open_RSC_Client.jar", "orsc.CurrentBaseVerifierClient"));
+				clientCommand.addAll(supervision.lifetime.childArguments());
 				client = supervision.startChild(clientCommand, clientRoot,
 					workspace.resolve("logs/client-" + run + ".log"));
 				String marker = client.awaitText("CURRENT_BASE_RUNTIME_EXECUTION", 90,
@@ -516,7 +516,7 @@ public final class CurrentBaseInstalledExecutionVerifier {
 				new String(bytes, StandardCharsets.UTF_8));
 			requireKeys(value, set("schemaId", "manifestType", "verifierId", "invocation",
 				"executionPolicy", "isolationPolicy", "requiredObservations", "evidenceContract",
-				"exitSemantics", "supervisionPolicy"), "verifier contract");
+				"exitSemantics", "supervisionPolicy", "recoveryPolicy"), "verifier contract");
 			if (!"current-base-installed-execution-v1".equals(value.getString("schemaId"))
 				|| !"current-base-installed-execution-verifier".equals(value.getString("manifestType"))
 				|| !"current-base-installed-execution-v1".equals(value.getString("verifierId")))

@@ -118,6 +118,7 @@ public final class CurrentInstalledLaunch {
         try {
             if (!lockKey.equals(Files.readAttributes(regular(lock), java.nio.file.attribute.BasicFileAttributes.class,
                 LinkOption.NOFOLLOW_LINKS).fileKey())) throw new IOException("Role lease inode changed during acquisition");
+            requireNoPendingCutover(installation);
             CurrentInstalledLaunch launch = new CurrentInstalledLaunch(value, descriptor, role, channel, lease);
             launch.validate(anchor);
             byte[] random = new byte[32]; new SecureRandom().nextBytes(random);
@@ -250,6 +251,7 @@ public final class CurrentInstalledLaunch {
 
     public static CurrentInstalledLaunch current() { return current; }
     private void validateSelection() throws Exception {
+        requireNoPendingCutover(root("installationRoot"));
         Path pointer = regular(root("installationRoot").resolve("active-launch.json"));
         if (!Files.getPosixFilePermissions(pointer).equals(PosixFilePermissions.fromString("rw-------")))
             throw new IOException("Active selection must have mode 0600");
@@ -262,6 +264,10 @@ public final class CurrentInstalledLaunch {
             || !descriptorHash.equals(sha256(descriptor)))
             throw new IOException("Launch descriptor is not the active installed role selection");
         hash(active, "serverDescriptorSha256"); hash(active, "clientDescriptorSha256");
+    }
+    private static void requireNoPendingCutover(Path installation) throws IOException {
+        if (Files.exists(installation.resolve("pending-cutover.json"), LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("Installation has an unresolved pending cutover");
     }
     private void validateConfiguration(JSONObject profile) throws Exception {
         Map<String, String> values = new HashMap<String, String>();

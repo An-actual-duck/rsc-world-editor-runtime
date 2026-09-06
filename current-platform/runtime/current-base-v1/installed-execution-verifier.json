@@ -19,7 +19,9 @@
       "--workspace",
       "--server-port",
       "--websocket-port",
-      "--evidence"
+      "--evidence",
+      "--supervision",
+      "--supervision-sha256"
     ]
   },
   "executionPolicy": {
@@ -43,20 +45,20 @@
     "state": "copied-sqlite-database-outside-runtime-roots",
     "map": "copied-package-outside-runtime-roots",
     "account": "generated-disposable-account-only",
-    "credential": "generated-inside-workspace-delete-always",
+    "credential": "generated-inside-workspace-delete-only-with-sealed-ownership",
     "workspacePermissions": "owner-only-0700-and-state-0600",
     "network": "literal-ipv4-loopback-only",
-    "processes": "bounded-and-terminated-always"
+    "processes": "bounded-owned-handles-with-lease-proven-recovery"
   },
   "supervisionPolicy": {
     "stdin": "parent-held-open-pipe-until-verifier-exit",
     "cancellation": "stdin-eof-or-unexpected-data-before-success-publication",
-    "cleanup": "terminate-owned-server-client-processes-and-delete-credential",
+    "cleanup": "terminate-only-owned-child-handles-then-all-leases-revoke-and-delete-owned-credential",
     "cancellationExitCode": 2,
     "forcedTerminationWaitSeconds": 10,
     "logDrainWaitSeconds": 5,
     "maximumCancellationSeconds": 90,
-    "hardKill": "unsupported-requires-disposable-workspace-recovery"
+    "hardKill": "recover-with-prebound-leases-and-permanent-delayed-start-revocation"
   },
   "requiredObservations": [
     "six-field-composition-handshake",
@@ -76,5 +78,33 @@
   "exitSemantics": {
     "verified": 0,
     "refused": 2
+  },
+  "recoveryPolicy": {
+    "mainClass": "com.openrsc.server.database.CurrentBaseVerifierRecovery",
+    "arguments": [
+      "--contract",
+      "--supervision",
+      "--supervision-sha256",
+      "--evidence"
+    ],
+    "authoritySchema": "current-base-installed-execution-evidence-v1#/$defs/supervisionAuthority",
+    "evidenceSchema": "current-base-installed-execution-evidence-v1#/$defs/recoveryEvidence",
+    "platform": "posix",
+    "anchorPolicy": "caller-preexisting-0600-zero-byte-singly-linked-dev-ino-bound-supervisor-server-client-intent",
+    "leaseOrder": [
+      "supervisor",
+      "server",
+      "client"
+    ],
+    "leaseLifetime": "actual-jvm-exit-including-hooks",
+    "intentPolicy": "prebound-inode-runtime-once-written-body-bound-to-authority-invocation-and-credential",
+    "childPolicy": "role-lease-then-exact-authority-and-intent-sha256-before-game-initialization",
+    "revocationPolicy": "all-leases-then-create-new-fsynced-permanent-revocation-refuse-any-entry-before-effects",
+    "credentialPolicy": "delete-only-exact-sealed-private-inode-size-and-sha256-or-already-absent",
+    "durabilityPolicy": "force-file-bodies-and-parent-directory-entries",
+    "invocationHash": "sorted-original-option-name-nul-exact-argument-value-nul-excluding-supervision-options",
+    "busyExitCode": 3,
+    "refusedExitCode": 2,
+    "closedExitCode": 0
   }
 }
