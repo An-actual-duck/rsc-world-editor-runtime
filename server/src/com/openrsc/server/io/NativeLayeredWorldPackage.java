@@ -55,6 +55,9 @@ public final class NativeLayeredWorldPackage {
 		"layered-world-placements-v3";
 	public static final String WORLD_PLACEMENT_ENCODING_V4 =
 		"layered-world-placements-v4";
+	public static final String WORLD_PLACEMENT_ENCODING_V5 =
+		"layered-world-placements-v5";
+	public static final int MAX_BLOCKED_VOID_NPC_ROAM_SPAN = 128;
 	public static final String ENTITY_PLACEMENT_ENCODING =
 		WORLD_PLACEMENT_ENCODING_V4;
 	public static final String RUNTIME_PROJECTION_ID =
@@ -374,7 +377,8 @@ public final class NativeLayeredWorldPackage {
 			if (!ENTITY_PLACEMENT_ENCODING_V1.equals(encoding)
 				&& !WORLD_PLACEMENT_ENCODING_V2.equals(encoding)
 				&& !WORLD_PLACEMENT_ENCODING_V3.equals(encoding)
-				&& !WORLD_PLACEMENT_ENCODING_V4.equals(encoding)) {
+				&& !WORLD_PLACEMENT_ENCODING_V4.equals(encoding)
+				&& !WORLD_PLACEMENT_ENCODING_V5.equals(encoding)) {
 				throw new IOException(
 					"Placement payload encoding is unsupported by this loader: "
 						+ encoding);
@@ -401,6 +405,15 @@ public final class NativeLayeredWorldPackage {
 				placementIds);
 			validatePlacementTerrainCoverage(set, terrainSectors);
 			result.put(id, set);
+		}
+		boolean blockedVoid = false;
+		boolean terrainCovered = false;
+		for (NativeLayeredPlacementSet set : result.values()) {
+			if (set.allowsBlockedVoidNpcRoaming()) blockedVoid = true;
+			else terrainCovered = true;
+		}
+		if (blockedVoid && terrainCovered) {
+			throw new IOException("A v5 package must use v5 for every placement set");
 		}
 		return result;
 	}
@@ -429,7 +442,9 @@ public final class NativeLayeredWorldPackage {
 		boolean version4 =
 			schemaVersion == 4
 				&& WORLD_PLACEMENT_ENCODING_V4.equals(payloadEncoding);
-		if (!version1 && !version2 && !version3 && !version4) {
+		boolean version5 = schemaVersion == 5
+			&& WORLD_PLACEMENT_ENCODING_V5.equals(payloadEncoding);
+		if (!version1 && !version2 && !version3 && !version4 && !version5) {
 			throw new IOException(
 				"Placement schemaVersion/encoding pair is unsupported");
 		}
@@ -448,6 +463,11 @@ public final class NativeLayeredWorldPackage {
 				"level",
 				"npcs",
 				"groundItems");
+		} else if (version5) {
+			exactKeys(document, "world placement set", "schemaVersion", "encoding",
+				"npcRoamCoverage", "worldSpace", "level", "npcs", "groundItems",
+				"scenery", "boundaries");
+			requireString(document, "npcRoamCoverage", "blocked-void");
 		} else {
 			exactKeys(
 				document,
@@ -472,7 +492,7 @@ public final class NativeLayeredWorldPackage {
 		int placementCount = Math.addExact(
 			Math.addExact(npcValues.length(), itemValues.length()),
 			Math.addExact(sceneryValues.length(), boundaryValues.length()));
-		if ((!version3 && !version4 && placementCount < 1)
+		if ((!version3 && !version4 && !version5 && placementCount < 1)
 			|| npcValues.length() > MAX_PLACEMENTS_PER_SET
 			|| itemValues.length() > MAX_PLACEMENTS_PER_SET
 			|| sceneryValues.length() > MAX_PLACEMENTS_PER_SET
@@ -480,14 +500,14 @@ public final class NativeLayeredWorldPackage {
 			|| placementCount > MAX_PLACEMENTS_PER_SET) {
 			throw new IOException(
 				"World placement set count must be "
-					+ (version3 || version4 ? "0.." : "1..")
+					+ (version3 || version4 || version5 ? "0.." : "1..")
 					+ MAX_PLACEMENTS_PER_SET);
 		}
 		java.util.List<NativeLayeredNpcPlacement> npcs =
 			new java.util.ArrayList<NativeLayeredNpcPlacement>();
 		for (int index = 0; index < npcValues.length(); index++) {
 			JSONObject value = object(npcValues, index, "npcs");
-			if (version4) {
+			if (version4 || version5) {
 				exactKeys(
 					value,
 					"npcs[" + index + "]",
@@ -521,7 +541,7 @@ public final class NativeLayeredWorldPackage {
 				"npcs[" + index + "].start",
 				worldSpace,
 				level);
-			if (version3 || version4) {
+			if (version3 || version4 || version5) {
 				JSONObject bounds = object(value, "roamBounds");
 				exactKeys(
 					bounds,
@@ -542,6 +562,7 @@ public final class NativeLayeredWorldPackage {
 					start,
 					minimum,
 					maximum,
+					version5 ? MAX_BLOCKED_VOID_NPC_ROAM_SPAN : MAX_NPC_ROAM_SPAN,
 					"npcs[" + index + "].roamBounds");
 				npcs.add(new NativeLayeredNpcPlacement(
 					placementId,
@@ -551,7 +572,7 @@ public final class NativeLayeredWorldPackage {
 					minimum.getCoordinate().getY(),
 					maximum.getCoordinate().getX(),
 					maximum.getCoordinate().getY(),
-					version4
+					version4 || version5
 						? rangedInt(value, "respawnSeconds", -1, 86400)
 						: -1));
 			} else {
@@ -725,6 +746,7 @@ public final class NativeLayeredWorldPackage {
 		WorldLocation start,
 		WorldLocation minimum,
 		WorldLocation maximum,
+		int maximumSpan,
 		String label) throws IOException {
 		WorldCoordinate startCoordinate = start.getCoordinate();
 		WorldCoordinate minimumCoordinate = minimum.getCoordinate();
@@ -742,12 +764,12 @@ public final class NativeLayeredWorldPackage {
 				label + " must contain the NPC start position");
 		}
 		if ((long) maximumCoordinate.getX() - minimumCoordinate.getX()
-				> MAX_NPC_ROAM_SPAN
+				> maximumSpan
 			|| (long) maximumCoordinate.getY() - minimumCoordinate.getY()
-				> MAX_NPC_ROAM_SPAN) {
+				> maximumSpan) {
 			throw new IOException(
 				label + " width and height must not exceed "
-					+ MAX_NPC_ROAM_SPAN + " tiles");
+					+ maximumSpan + " tiles");
 		}
 	}
 
@@ -766,9 +788,10 @@ public final class NativeLayeredWorldPackage {
 		Map<WorldMapSectorId, NativeLayeredTerrainSector> terrainSectors)
 		throws IOException {
 		for (NativeLayeredNpcPlacement npc : set.getNpcs()) {
-			requireNpcRoamTerrain(
-				npc,
-				terrainSectors);
+			requirePlacementTerrain(npc.getStart(), npc.getPlacementId(), terrainSectors);
+			if (!set.allowsBlockedVoidNpcRoaming()) {
+				requireNpcRoamTerrain(npc, terrainSectors);
+			}
 		}
 		for (NativeLayeredGroundItemPlacement item : set.getGroundItems()) {
 			requirePlacementTerrain(
@@ -1117,6 +1140,15 @@ public final class NativeLayeredWorldPackage {
 
 	public Map<String, NativeLayeredPlacementSet> getPlacementSets() {
 		return placementSets;
+	}
+
+	/** A package-wide capability: mixed encodings cannot opt a level into void roaming. */
+	public boolean allowsBlockedVoidNpcRoaming() {
+		if (placementSets.isEmpty()) return false;
+		for (NativeLayeredPlacementSet set : placementSets.values()) {
+			if (!set.allowsBlockedVoidNpcRoaming()) return false;
+		}
+		return true;
 	}
 
 	/** Immutable package-declared world-space identities and kinds. */

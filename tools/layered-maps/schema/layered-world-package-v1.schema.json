@@ -16,6 +16,15 @@
     "terrainSectors",
     "placementSets"
   ],
+  "allOf": [{
+    "if": {"properties": {"placementSets": {"contains": {
+      "required": ["encoding"],
+      "properties": {"encoding": {"const": "layered-world-placements-v5"}}
+    }}}},
+    "then": {"properties": {"placementSets": {"items": {
+      "properties": {"encoding": {"const": "layered-world-placements-v5"}}
+    }}}}
+  }],
   "properties": {
     "schemaVersion": {"const": 1},
     "packageType": {"const": "layered-world"},
@@ -161,7 +170,8 @@
               "layered-entity-placements-v1",
               "layered-world-placements-v2",
               "layered-world-placements-v3",
-              "layered-world-placements-v4"
+              "layered-world-placements-v4",
+              "layered-world-placements-v5"
             ]
           },
           "path": {"type": "string", "minLength": 1},

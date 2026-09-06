@@ -818,7 +818,7 @@ public abstract class Mob extends Entity {
 			if (getWorld().getRegionManager().hasNativeLayeredTerrain(owner)
 				&& !getWorld().getRegionManager()
 					.hasNativeLayeredTerrain(candidate)) {
-				return null;
+				return TileValue.blockedVoid();
 			}
 			return getWorld().getTile(candidate);
 		}

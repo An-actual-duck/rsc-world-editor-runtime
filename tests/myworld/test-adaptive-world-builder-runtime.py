@@ -1517,6 +1517,15 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             self.assertEqual(0, accepted.returncode, accepted.stderr)
             self.assertIn(fields["packageId"], accepted.stdout)
 
+            for encoding, supported in (("layered-world-placements-v4", True),
+                                        ("layered-world-placements-v5", True),
+                                        ("layered-world-placements-v6", False)):
+                negotiated = dict(fields, placementEncoding=encoding)
+                binding.write_text("adaptive-world-builder-session-v1\n" + "".join(
+                    f"{name}={negotiated[name]}\n" for name in sorted(negotiated)), encoding="ascii")
+                result = self.run_client_binding(binding, definitions, assets, negotiated)
+                self.assertEqual(supported, result.returncode == 0, result.stderr)
+
             for key, value in (
                 ("loader", "legacy-packed-loader-v1"),
                 ("authoring", "legacy-packed-authoring-v1"),
@@ -1740,7 +1749,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertEqual("rsc-world-editor-runtime-adaptive-builder-server-v5", evidence["buildId"])
         self.assertEqual("generic-signed-layered-loader-v7-blocking-base-color", evidence["loaderId"])
         self.assertEqual("world-builder-native-layered-protocol-v2-u16-elevation", evidence["protocolId"])
-        self.assertEqual([1, 2, 3, 4], evidence["encodingVersions"])
+        self.assertEqual([1, 2, 3, 4, 5], evidence["encodingVersions"])
         self.assertEqual(
             ["boundary", "ground-item", "npc", "scenery"],
             evidence["authoring"]["placementFamilies"],
@@ -1827,7 +1836,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "world-builder-installed-server-profile-v1",
             installed["serverBootstrapId"],
         )
-        self.assertEqual([1, 2, 3, 4], installed["encodingVersions"])
+        self.assertEqual([1, 2, 3, 4, 5], installed["encodingVersions"])
         self.assertEqual(
             "server/world-builder-configs/installed-server.json",
             installed["activation"]["serverProfile"]["targetRelativePath"],

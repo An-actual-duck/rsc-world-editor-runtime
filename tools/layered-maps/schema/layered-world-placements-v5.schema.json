@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rsc-remastered.invalid/schema/layered-world-placements-v5.schema.json",
+  "title": "Native Layered World Placements v5: bounded blocked-void NPC roaming",
+  "description": "NPC anchors require present terrain. Same-level roam bounds must contain the anchor and span at most 128 tiles on each axis. Missing sectors remain fully blocked, never allocated by this capability. Other placement semantics are identical to v4.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "encoding", "npcRoamCoverage", "worldSpace", "level", "npcs", "groundItems", "scenery", "boundaries"],
+  "properties": {
+    "schemaVersion": {"const": 5},
+    "encoding": {"const": "layered-world-placements-v5"},
+    "npcRoamCoverage": {"const": "blocked-void"},
+    "worldSpace": {"$ref": "layered-world-placements-v4.schema.json#/properties/worldSpace"},
+    "level": {"$ref": "layered-world-placements-v4.schema.json#/properties/level"},
+    "npcs": {"$ref": "layered-world-placements-v4.schema.json#/properties/npcs"},
+    "groundItems": {"$ref": "layered-world-placements-v4.schema.json#/properties/groundItems"},
+    "scenery": {"$ref": "layered-world-placements-v4.schema.json#/properties/scenery"},
+    "boundaries": {"$ref": "layered-world-placements-v4.schema.json#/properties/boundaries"}
+  }
+}

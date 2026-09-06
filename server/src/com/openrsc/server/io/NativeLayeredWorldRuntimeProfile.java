@@ -194,6 +194,8 @@ public enum NativeLayeredWorldRuntimeProfile {
 				|| (!NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V3.equals(
 					sourceEncoding)
 					&& !NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4.equals(
+						sourceEncoding)
+					&& !NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V5.equals(
 						sourceEncoding))
 				|| (placementEncoding != null
 					&& !placementEncoding.equals(sourceEncoding))

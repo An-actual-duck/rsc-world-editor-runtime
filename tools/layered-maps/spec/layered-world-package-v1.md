@@ -129,6 +129,20 @@ exact roaming rectangle and the other placement families retain their v3
 shape. Version 3 remains readable and is interpreted as definition-default
 respawn for every NPC.
 
+`layered-world-placements-v5` retains v4 placement records and requires the
+closed payload field `npcRoamCoverage: "blocked-void"`. NPC starts still require
+allocated terrain. Their same-level bounds must contain the start, remain
+ordered, and span at most 128 tiles on each axis, but may intersect unallocated
+sectors. Those sectors remain FULL_BLOCK for traversal and path planning; this
+capability never allocates terrain or enables legacy archive fallback. Other
+placements retain their existing coverage rules. Older v3/v4 payloads continue
+to require complete roaming-rectangle terrain coverage and reject this field.
+Current profiles require a consistent placement encoding across all levels.
+Any package containing v5 must use v5 for every set, including empty sets.
+Native session snapshots, saves, and composition evidence preserve v5; ordinary
+new/default packages still use v4. Readers without v5 support must reject its
+encoding before activation.
+
 The first private runtime registers these entities during world population.
 The developer entry command only changes the Player's location and verifies
 that package population already happened; it does not construct native

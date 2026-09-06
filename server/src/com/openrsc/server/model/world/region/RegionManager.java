@@ -4144,6 +4144,10 @@ public class RegionManager {
 		if (hasNativeLayeredTerrain(location)) {
 			return nativeLayeredTile(location);
 		}
+		if (nativeLayeredWorldPackageCatalog != null
+			&& nativeLayeredWorldRuntimeProfile.skipsLegacyTerrainArchive()) {
+			return TileValue.blockedVoid();
+		}
 		if (LayeredCompatibilityPointAdapter.isSyntheticDeepLevel(location)) {
 			LayeredCompatibilityPointAdapter.toCompatibilityPoint(
 				location,

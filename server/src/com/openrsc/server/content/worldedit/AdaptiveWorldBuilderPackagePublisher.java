@@ -494,6 +494,7 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 	}
 
 	public static final class Draft {
+		private final String placementEncoding;
 		private final String packageId;
 		private final String packageVersion;
 		private final int presentationChunkSize;
@@ -511,6 +512,22 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 			List<Sector> sectors, List<Boundary> boundaries,
 			List<Scenery> scenery, List<Npc> npcs,
 			List<GroundItem> groundItems) {
+			this(packageId, packageVersion, presentationChunkSize, worldSpaces,
+				levels, sectors, boundaries, scenery, npcs, groundItems,
+				NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4);
+		}
+
+		public Draft(
+			String packageId, String packageVersion, int presentationChunkSize,
+			Map<String, String> worldSpaces, List<Level> levels,
+			List<Sector> sectors, List<Boundary> boundaries,
+			List<Scenery> scenery, List<Npc> npcs,
+			List<GroundItem> groundItems, String placementEncoding) {
+			if (!NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4.equals(placementEncoding)
+				&& !NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V5.equals(placementEncoding)) {
+				throw new IllegalArgumentException("Unsupported adaptive save placement encoding");
+			}
+			this.placementEncoding = placementEncoding;
 			if (worldSpaces == null || worldSpaces.size() != 1
 				|| levels == null || levels.isEmpty()
 				|| levels.size()
@@ -597,8 +614,10 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 
 		private byte[] placement(PlacementGroup group) {
 			StringBuilder value = new StringBuilder();
-			value.append("{\"schemaVersion\":4,\"encoding\":");
-			json(value, NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4);
+			boolean blockedVoid = NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V5.equals(placementEncoding);
+			value.append("{\"schemaVersion\":").append(blockedVoid ? 5 : 4).append(",\"encoding\":");
+			json(value, placementEncoding);
+			if (blockedVoid) value.append(",\"npcRoamCoverage\":\"blocked-void\"");
 			value.append(",\"worldSpace\":"); json(value, group.key.worldSpace);
 			value.append(",\"level\":").append(group.key.level);
 			value.append(",\"npcs\":[");
@@ -695,7 +714,8 @@ public final class AdaptiveWorldBuilderPackagePublisher {
 				value.append("{\"id\":"); json(value, level.placementSetId);
 				value.append(",\"worldSpace\":"); json(value, level.worldSpace);
 				value.append(",\"level\":").append(level.level)
-					.append(",\"encoding\":\"layered-world-placements-v4\",\"path\":");
+					.append(",\"encoding\":");
+				json(value, placementEncoding); value.append(",\"path\":");
 				json(value, file.path); value.append(",\"sha256\":");
 				json(value, file.sha256); value.append('}');
 			}

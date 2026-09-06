@@ -288,7 +288,9 @@ public final class LayeredWorldPackageManifest {
 			String encoding = matchedString(value, "encoding", ID);
 			if (!LayeredEntityPlacements.ENCODING_V1.equals(encoding)
 				&& !LayeredEntityPlacements.ENCODING_V2.equals(encoding)
-				&& !LayeredEntityPlacements.ENCODING_V3.equals(encoding)) {
+				&& !LayeredEntityPlacements.ENCODING_V3.equals(encoding)
+				&& !LayeredEntityPlacements.ENCODING_V4.equals(encoding)
+				&& !LayeredEntityPlacements.ENCODING_V5.equals(encoding)) {
 				throw new PreflightException(
 					"Placement payload encoding is unsupported by this loader: "
 						+ encoding + ".");
@@ -322,10 +324,11 @@ public final class LayeredWorldPackageManifest {
 				: placements.getNpcs()) {
 				requireUniquePlacementId(
 					npc.getPlacementId(), placementIds);
-				requireNpcRoamTerrain(
-					levelKey,
-					npc,
-					terrainIdentities);
+				requirePlacementTerrain(levelKey, npc.getX(), npc.getY(),
+					npc.getPlacementId(), terrainIdentities);
+				if (!LayeredEntityPlacements.ENCODING_V5.equals(encoding)) {
+					requireNpcRoamTerrain(levelKey, npc, terrainIdentities);
+				}
 			}
 			for (LayeredEntityPlacements.GroundItemPlacement item
 				: placements.getGroundItems()) {
@@ -372,6 +375,15 @@ public final class LayeredWorldPackageManifest {
 				placements.getGroundItems().size(),
 				placements.getScenery().size(),
 				placements.getBoundaries().size()));
+		}
+		boolean blockedVoid = false;
+		boolean terrainCovered = false;
+		for (PlacementSet set : result) {
+			if (LayeredEntityPlacements.ENCODING_V5.equals(set.getEncoding())) blockedVoid = true;
+			else terrainCovered = true;
+		}
+		if (blockedVoid && terrainCovered) {
+			throw new PreflightException("A v5 package must use v5 for every placement set.");
 		}
 		return result;
 	}
