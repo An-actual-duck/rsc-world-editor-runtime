@@ -45,6 +45,8 @@ public final class AdaptiveWorldBuilderClientSession {
 	public static final String COORDINATE_MODEL = "signed-layered-v1";
 	public static final String PLACEMENT_ENCODING =
 		"layered-world-placements-v4";
+	public static final String BLOCKED_VOID_PLACEMENT_ENCODING =
+		"layered-world-placements-v5";
 	public static final String LEGACY_PLACEMENT_ENCODING =
 		"layered-world-placements-v3";
 	public static final String PROFILE_ID = "adaptive-world-builder";
@@ -356,6 +358,7 @@ public final class AdaptiveWorldBuilderClientSession {
 		expect(fields, "packageSchema", PACKAGE_SCHEMA_ID);
 		String placementEncoding = fields.get("placementEncoding");
 		if (!PLACEMENT_ENCODING.equals(placementEncoding)
+			&& !BLOCKED_VOID_PLACEMENT_ENCODING.equals(placementEncoding)
 			&& !LEGACY_PLACEMENT_ENCODING.equals(placementEncoding)) {
 			throw new IllegalArgumentException(
 				"placementEncoding is unsupported");

@@ -1740,7 +1740,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
         self.assertEqual("rsc-world-editor-runtime-adaptive-builder-server-v5", evidence["buildId"])
         self.assertEqual("generic-signed-layered-loader-v7-blocking-base-color", evidence["loaderId"])
         self.assertEqual("world-builder-native-layered-protocol-v2-u16-elevation", evidence["protocolId"])
-        self.assertEqual([1, 2, 3, 4], evidence["encodingVersions"])
+        self.assertEqual([1, 2, 3, 4, 5], evidence["encodingVersions"])
         self.assertEqual(
             ["boundary", "ground-item", "npc", "scenery"],
             evidence["authoring"]["placementFamilies"],
@@ -1827,7 +1827,7 @@ class AdaptiveWorldBuilderRuntimeTest(unittest.TestCase):
             "world-builder-installed-server-profile-v1",
             installed["serverBootstrapId"],
         )
-        self.assertEqual([1, 2, 3, 4], installed["encodingVersions"])
+        self.assertEqual([1, 2, 3, 4, 5], installed["encodingVersions"])
         self.assertEqual(
             "server/world-builder-configs/installed-server.json",
             installed["activation"]["serverProfile"]["targetRelativePath"],

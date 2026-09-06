@@ -75,13 +75,14 @@ class HostRuntimeCapabilityTest(unittest.TestCase):
 
     def test_every_package_encoding_has_concrete_artifact_probes(self):
         matrix = self.capability["packageEncodingCapabilities"]
-        self.assertEqual([1, 2, 3, 4], [item["encodingVersion"] for item in matrix])
+        self.assertEqual([1, 2, 3, 4, 5], [item["encodingVersion"] for item in matrix])
         self.assertEqual(
             {
                 1: "native-layered-terrain-wire-v1",
                 2: "native-layered-terrain-wire-v2-u16",
                 3: "layered-placement-runtime-v3",
                 4: "layered-placement-runtime-v4",
+                5: "layered-placement-runtime-v5",
             },
             {item["encodingVersion"]: item["capabilityId"] for item in matrix},
         )

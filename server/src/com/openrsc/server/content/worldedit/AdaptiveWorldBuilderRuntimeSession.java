@@ -209,6 +209,9 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 		writer.write(",\"worldSpace\":"); json(writer, set.getWorldSpace().getValue());
 		writer.write(",\"level\":"); writer.write(Integer.toString(set.getLevel()));
 		writer.write(",\"encoding\":"); json(writer, set.getSourceEncoding());
+		if (set.allowsBlockedVoidNpcRoaming()) {
+			writer.write(",\"npcRoamCoverage\":\"blocked-void\"");
+		}
 		writer.write(",\"sourcePath\":"); json(writer, set.getSourcePath());
 		writer.write(",\"sourceSha256\":"); json(writer, set.getSourceSha256());
 		writer.write(",\"boundaries\":[");
@@ -254,7 +257,7 @@ public final class AdaptiveWorldBuilderRuntimeSession {
 			coordinate(writer, value.getMaxX(), value.getMaxY());
 			writer.write('}');
 			if (NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4.equals(
-				set.getSourceEncoding())) {
+				set.getSourceEncoding()) || set.allowsBlockedVoidNpcRoaming()) {
 				writer.write(",\"respawnSeconds\":");
 				writer.write(Integer.toString(value.getRespawnSeconds()));
 			}

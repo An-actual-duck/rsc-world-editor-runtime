@@ -28,6 +28,16 @@ public class TileValue {
 	public TileValue() {
 	}
 
+	/** An unallocated native cell is collision, not walkable terrain or a null hole. */
+	public static TileValue blockedVoid() {
+		TileValue tile = new TileValue();
+		tile.initializeTerrainCollision();
+		tile.addTerrainCollision(CollisionFlag.FULL_BLOCK);
+		tile.setTerrainBlocked(true);
+		tile.setTerrainOverlayProjectileBlocked(true);
+		return tile;
+	}
+
 	TileValue(
 		final byte traversalMask,
 		final short diagWallVal,

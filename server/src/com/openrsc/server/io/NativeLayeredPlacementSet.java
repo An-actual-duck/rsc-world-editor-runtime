@@ -64,6 +64,11 @@ public final class NativeLayeredPlacementSet {
 		return sourceEncoding;
 	}
 
+	/** Available only after the v5 payload's closed policy has been validated. */
+	public boolean allowsBlockedVoidNpcRoaming() {
+		return NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V5.equals(sourceEncoding);
+	}
+
 	public String getSourcePath() {
 		return sourcePath;
 	}

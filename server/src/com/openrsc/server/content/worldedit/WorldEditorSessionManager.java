@@ -1739,7 +1739,9 @@ public final class WorldEditorSessionManager {
 				scenery.values()),
 			new ArrayList<AdaptiveWorldBuilderPackagePublisher.Npc>(npcs.values()),
 			new ArrayList<AdaptiveWorldBuilderPackagePublisher.GroundItem>(
-				groundItems.values()));
+				groundItems.values()), owner.allowsBlockedVoidNpcRoaming()
+				? NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V5
+				: NativeLayeredWorldPackage.WORLD_PLACEMENT_ENCODING_V4);
 	}
 
 	private Map<WorldMapSectorId,List<Map.Entry<NativeTileKey,NativeLayeredTerrainTile>>>
@@ -2319,6 +2321,19 @@ public final class WorldEditorSessionManager {
 	private void requireNativeNpcTerrainCoverage(
 		Player player,WorldLocation start,int minX,int minY,int maxX,int maxY){
 		NativeLayeredWorldPackage owner=nativeOwner(player,start);
+		if(!findNativeTerrainSector(owner,WorldMapSectorId.from(start)).isPresent()){
+			throw new IllegalArgumentException("NPC start must remain on allocated package terrain.");
+		}
+		if(owner.allowsBlockedVoidNpcRoaming()){
+			if(minX>maxX || minY>maxY || start.getCoordinate().getX()<minX
+				|| start.getCoordinate().getX()>maxX || start.getCoordinate().getY()<minY
+				|| start.getCoordinate().getY()>maxY
+				|| (long)maxX-minX>NativeLayeredWorldPackage.MAX_BLOCKED_VOID_NPC_ROAM_SPAN
+				|| (long)maxY-minY>NativeLayeredWorldPackage.MAX_BLOCKED_VOID_NPC_ROAM_SPAN){
+				throw new IllegalArgumentException("Blocked-void NPC bounds must contain the start and span at most 128 tiles.");
+			}
+			return;
+		}
 		int level=start.getCoordinate().getLevel();
 		for(int sectorX=Math.floorDiv(minX,NativeLayeredTerrainSector.SIZE);
 			sectorX<=Math.floorDiv(maxX,NativeLayeredTerrainSector.SIZE);sectorX++){

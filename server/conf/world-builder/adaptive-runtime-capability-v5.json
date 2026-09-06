@@ -49,7 +49,7 @@
     "creatorCodeExecuted": false,
     "materialFreeFallback": true
   },
-  "encodingVersions": [1, 2, 3, 4],
+  "encodingVersions": [1, 2, 3, 4, 5],
   "authoring": {
     "editExistingLevels": true,
     "createLevels": true,

@@ -17,6 +17,8 @@ public final class LayeredEntityPlacements {
 	public static final String ENCODING_V2 = "layered-world-placements-v2";
 	public static final String ENCODING_V3 = "layered-world-placements-v3";
 	public static final String ENCODING_V4 = "layered-world-placements-v4";
+	public static final String ENCODING_V5 = "layered-world-placements-v5";
+	public static final int MAX_BLOCKED_VOID_NPC_ROAM_SPAN = 128;
 	public static final String ENCODING = ENCODING_V4;
 	private static final int MAX_PLACEMENTS = 65536;
 	private static final int MAX_NPC_ROAM_RADIUS = 64;
@@ -67,7 +69,9 @@ public final class LayeredEntityPlacements {
 			schemaVersion == 3 && ENCODING_V3.equals(encoding);
 		boolean version4 =
 			schemaVersion == 4 && ENCODING_V4.equals(encoding);
-		if (!version1 && !version2 && !version3 && !version4) {
+		boolean version5 =
+			schemaVersion == 5 && ENCODING_V5.equals(encoding);
+		if (!version1 && !version2 && !version3 && !version4 && !version5) {
 			throw new PreflightException(
 				"Placement schemaVersion/encoding pair is unsupported.");
 		}
@@ -81,6 +85,13 @@ public final class LayeredEntityPlacements {
 				"level",
 				"npcs",
 				"groundItems");
+		} else if (version5) {
+			exactKeys(document, "world placement set", "schemaVersion", "encoding",
+				"npcRoamCoverage", "worldSpace", "level", "npcs", "groundItems",
+				"scenery", "boundaries");
+			if (!"blocked-void".equals(string(document, "npcRoamCoverage"))) {
+				throw new PreflightException("Unsupported NPC roam coverage policy.");
+			}
 		} else {
 			exactKeys(
 				document,
@@ -105,7 +116,7 @@ public final class LayeredEntityPlacements {
 		int placementCount = Math.addExact(
 			Math.addExact(npcValues.size(), itemValues.size()),
 			Math.addExact(sceneryValues.size(), boundaryValues.size()));
-		if ((!version3 && !version4 && placementCount < 1)
+		if ((!version3 && !version4 && !version5 && placementCount < 1)
 			|| npcValues.size() > MAX_PLACEMENTS
 			|| itemValues.size() > MAX_PLACEMENTS
 			|| sceneryValues.size() > MAX_PLACEMENTS
@@ -113,7 +124,7 @@ public final class LayeredEntityPlacements {
 			|| placementCount > MAX_PLACEMENTS) {
 			throw new PreflightException(
 				"World placement set count must be "
-					+ (version3 || version4 ? "0.." : "1..") + MAX_PLACEMENTS + ".");
+					+ (version3 || version4 || version5 ? "0.." : "1..") + MAX_PLACEMENTS + ".");
 		}
 
 		Set<String> placementIds = new HashSet<String>();
@@ -121,7 +132,7 @@ public final class LayeredEntityPlacements {
 		for (int index = 0; index < npcValues.size(); index++) {
 			Map<String, Object> value =
 				object(npcValues.get(index), "npcs[" + index + "]");
-			if (version4) {
+			if (version4 || version5) {
 				exactKeys(
 					value,
 					"npcs[" + index + "]",
@@ -152,7 +163,7 @@ public final class LayeredEntityPlacements {
 			Position start = position(
 				object(value.get("start"), "npcs[" + index + "].start"),
 				"npcs[" + index + "].start");
-			if (version3 || version4) {
+			if (version3 || version4 || version5) {
 				Map<String, Object> bounds = object(
 					value.get("roamBounds"),
 					"npcs[" + index + "].roamBounds");
@@ -175,6 +186,7 @@ public final class LayeredEntityPlacements {
 					start,
 					minimum,
 					maximum,
+					version5 ? MAX_BLOCKED_VOID_NPC_ROAM_SPAN : MAX_NPC_ROAM_SPAN,
 					"npcs[" + index + "].roamBounds");
 				npcs.add(new NpcPlacement(
 					placementId,
@@ -186,7 +198,7 @@ public final class LayeredEntityPlacements {
 					maximum.x,
 					maximum.y,
 					-1,
-					version4
+					version4 || version5
 						? integerRange(value, "respawnSeconds", -1,
 							MAX_RESPAWN_SECONDS)
 						: -1));
@@ -361,6 +373,7 @@ public final class LayeredEntityPlacements {
 		Position start,
 		Position minimum,
 		Position maximum,
+		int maximumSpan,
 		String label) throws PreflightException {
 		if (minimum.x > maximum.x || minimum.y > maximum.y) {
 			throw new PreflightException(
@@ -371,11 +384,11 @@ public final class LayeredEntityPlacements {
 			throw new PreflightException(
 				label + " must contain the NPC start position.");
 		}
-		if ((long) maximum.x - minimum.x > MAX_NPC_ROAM_SPAN
-			|| (long) maximum.y - minimum.y > MAX_NPC_ROAM_SPAN) {
+		if ((long) maximum.x - minimum.x > maximumSpan
+			|| (long) maximum.y - minimum.y > maximumSpan) {
 			throw new PreflightException(
 				label + " width and height must not exceed "
-					+ MAX_NPC_ROAM_SPAN + " tiles.");
+					+ maximumSpan + " tiles.");
 		}
 	}
 
