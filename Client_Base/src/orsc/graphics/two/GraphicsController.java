@@ -4478,10 +4478,16 @@ public class GraphicsController {
 	public boolean fillSpriteTree() {
 		ProjectContentBundle content =
 			WorldBuilderClientProfile.current().contentBundle();
+		boolean publicBase = orsc.CurrentCompositionIdentity.current().isEnabled()
+			&& "current-base-v1".equals(orsc.CurrentCompositionIdentity.current().value("variantId"));
 		File workspaceFile = content.isPresent()
 			? content.path("asset.sprite.custom").toFile()
-			: new File(Config.F_CACHE_DIR, "video" + File.separator + "Custom_Sprites.osar");
+			: new File(Config.F_CACHE_DIR, "video" + File.separator
+				+ (publicBase ? "CurrentBase_Public_Sprites.osar" : "Custom_Sprites.osar"));
 		if (!workspaceFile.exists())
+			if (publicBase && !content.isPresent())
+				throw new IllegalStateException("Current Base requires its bound stock public sprites");
+			else
 			return false;
 
 		Unpacker unpacker = new Unpacker();

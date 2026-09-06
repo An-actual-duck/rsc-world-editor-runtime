@@ -10,11 +10,91 @@
     }
   ],
   "sourceFiles": [
-    {"sourcePath": "Client_Base/Cache/config.txt", "bundlePath": "Cache/config.txt"},
-    {"sourcePath": "Client_Base/Cache/video/Authentic_Sprites.orsc", "bundlePath": "Cache/video/Authentic_Sprites.orsc"},
-    {"sourcePath": "Client_Base/Cache/video/library.orsc", "bundlePath": "Cache/video/library.orsc"},
-    {"sourcePath": "Client_Base/Cache/video/models.orsc", "bundlePath": "Cache/video/models.orsc"},
-    {"sourcePath": "Client_Base/Cache/video/spritepacks/Menus.osar", "bundlePath": "Cache/video/spritepacks/Menus.osar"}
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/scenery-visuals.json","bundlePath":"Cache/current-base-definitions/scenery-visuals.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/provenance.json","bundlePath":"Cache/current-base-definitions/provenance/provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/gameplay-provenance.json","bundlePath":"Cache/current-base-definitions/provenance/gameplay-provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/visual-provenance.json","bundlePath":"Cache/current-base-definitions/provenance/visual-provenance.json","transform":"copy"},
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/effective-policy.json","bundlePath":"Cache/current-base-definitions/provenance/effective-policy.json","transform":"copy"},
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/PrayerDef.xml",
+      "bundlePath": "Cache/current-base-definitions/PrayerDef.xml",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/SpellDef.xml",
+      "bundlePath": "Cache/current-base-definitions/SpellDef.xml",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "Client_Base/Cache/config.txt",
+      "bundlePath": "Cache/config.txt",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "Client_Base/Cache/video/Authentic_Sprites.orsc",
+      "bundlePath": "Cache/video/Authentic_Sprites.orsc",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "Client_Base/Cache/video/library.orsc",
+      "bundlePath": "Cache/video/library.orsc",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "Client_Base/Cache/video/models.orsc",
+      "bundlePath": "Cache/video/models.orsc",
+      "transform": "public-models-empty-211-v1"
+    },
+    {
+      "sourcePath": "Client_Base/Cache/video/spritepacks/Menus.osar",
+      "bundlePath": "Cache/video/spritepacks/Menus.osar",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/DoorDef.xml",
+      "bundlePath": "Cache/current-base-definitions/DoorDef.xml",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/GameObjectDef.xml",
+      "bundlePath": "Cache/current-base-definitions/GameObjectDef.xml",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/TileDef.xml",
+      "bundlePath": "Cache/current-base-definitions/TileDef.xml",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/ItemDefs.json",
+      "bundlePath": "Cache/current-base-definitions/ItemDefs.json",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/ItemDefsCustom.json",
+      "bundlePath": "Cache/current-base-definitions/ItemDefsCustom.json",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/NpcDefs.json",
+      "bundlePath": "Cache/current-base-definitions/NpcDefs.json",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/NpcDefsCustom.json",
+      "bundlePath": "Cache/current-base-definitions/NpcDefsCustom.json",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/item-visuals.json",
+      "bundlePath": "Cache/current-base-definitions/item-visuals.json",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/stock-sprites.osar.base64",
+      "bundlePath": "Cache/video/CurrentBase_Public_Sprites.osar",
+      "transform": "base64"
+    }
   ],
   "forbiddenPathFragments": [
     "Authentic_Landscape.orsc",

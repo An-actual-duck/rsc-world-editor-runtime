@@ -388,7 +388,7 @@ public final class CurrentBaseMapHarness {
             )
         self.assertEqual(["true", "world-builder-installed"], executed.stdout.splitlines())
 
-    def test_provider_server_content_loads_vanilla_definition_prefixes(self) -> None:
+    def test_provider_server_content_loads_complete_public_definitions(self) -> None:
         core = self.output / "server/core.jar"
         plugins = self.output / "server/plugins.jar"
         content = self.output / "server/content.zip"
@@ -410,15 +410,23 @@ public final class CurrentBaseContentHarness {
       || config.WANT_MYWORLD || config.WANT_NEW_RARE_DROP_TABLES
       || config.WANT_RUNECRAFT;
     if (advanced) throw new AssertionError("Advanced configuration became active");
-    if (server.getEntityHandler().getItemDef(1289) == null
-        || server.getEntityHandler().getItemDef(1290) != null
-        || server.getEntityHandler().getNpcDef(793) == null
-        || server.getEntityHandler().getNpcDef(794) != null
+    if (server.getEntityHandler().getItemDef(1592) == null
+        || server.getEntityHandler().getItemDef(1593) != null
+        || server.getEntityHandler().getNpcDef(835) == null
+        || server.getEntityHandler().getNpcDef(836) != null
         || server.getEntityHandler().getDoorDef(213) == null
         || server.getEntityHandler().getDoorDef(214) != null
-        || server.getEntityHandler().getGameObjectDef(1189) == null
-        || server.getEntityHandler().getGameObjectDef(1190) != null) {
-      throw new AssertionError("definition catalogs exceed vanilla prefixes");
+        || server.getEntityHandler().getGameObjectDef(1295) == null
+        || server.getEntityHandler().getGameObjectDef(1296) != null) {
+      throw new AssertionError("definition catalogs differ from complete public registries");
+    }
+    if (!"Staff of Air".equals(server.getEntityHandler().getItemDef(101).getName())
+        || !"Unpowered orb".equals(server.getEntityHandler().getItemDef(611).getName())
+        || !"Boomstick".equals(server.getEntityHandler().getItemDef(1592).getName())
+        || server.getEntityHandler().getGameObjectDef(2).getWidth() != 2
+        || server.getEntityHandler().getGameObjectDef(2).getHeight() != 2
+        || server.getEntityHandler().getGameObjectDef(21).getType() != 0) {
+      throw new AssertionError("public gameplay definitions were replaced by owner values");
     }
     System.out.println("current-base-content-loaded");
     System.exit(0);

@@ -62,6 +62,9 @@ public final class Mining implements OpLocTrigger, UseLocTrigger {
 
 	public static int getAxe(Player player) {
 		int lvl = player.getSkills().getLevel(Skill.MINING.id());
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled()) {
+			return com.openrsc.server.CurrentBasePublicContent.selectPickaxe(player, lvl);
+		}
 		for (int i = 0; i < Formulae.miningAxeIDs.length; i++) {
 			if (player.getCarriedItems().getEquipment().hasCatalogID(Formulae.miningAxeIDs[i])
 				&& lvl >= Formulae.miningAxeLvls[i]) {
@@ -72,6 +75,8 @@ public final class Mining implements OpLocTrigger, UseLocTrigger {
 	}
 
 	public static int getPickaxeRequiredLevel(int axeId) {
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled())
+			return com.openrsc.server.CurrentBasePublicContent.pickaxeRequiredLevel(axeId);
 		switch (ItemId.getById(axeId)) {
 			case RUNE_PICKAXE:
 				return 70;
@@ -98,6 +103,8 @@ public final class Mining implements OpLocTrigger, UseLocTrigger {
 	}
 
 	public static int getPickaxeRepeat(int axeId) {
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled())
+			return com.openrsc.server.CurrentBasePublicContent.pickaxeRepeat(axeId);
 		switch (ItemId.getById(axeId)) {
 			case COPPER_PICKAXE:
 				return 2;
@@ -356,14 +363,15 @@ public final class Mining implements OpLocTrigger, UseLocTrigger {
 				return;
 			}
 		}
-		if (mineLvl >= def.getReqLevel()) {
+		boolean publicBase = com.openrsc.server.CurrentBasePublicContent.isEnabled();
+		if (mineLvl >= def.getReqLevel() && (!publicBase || getOre(def, mineLvl, axeId))) {
 			GameObject obj = player.getViewArea().getGameObject(rock.getID(), rock.getX(), rock.getY());
 			if (!player.getConfig().SHARED_GATHERING_RESOURCES || obj != null) {
 				// Successful mining attempt
 				// It is authentic to allow multiple players to get the rock if they have already started mining it.
 				// In retro mechanic, if other player had depleted it you would not get it
 				// In both cases if there is no ore in the rock, there will be no retry
-				int quantity = Formulae.calcGatheringYield(def.getReqLevel(), mineLvl, getPickaxeTier(axeId));
+				int quantity = publicBase ? 1 : Formulae.calcGatheringYield(def.getReqLevel(), mineLvl, getPickaxeTier(axeId));
 
 				if (SkillCapes.shouldActivate(player, ItemId.MINING_CAPE)) {
 					thinkbubble(new Item(ItemId.MINING_CAPE.id(), 1));
@@ -372,8 +380,8 @@ public final class Mining implements OpLocTrigger, UseLocTrigger {
 				if (maybeAwardMyWorldMiningGeode(player, rock, def.getReqLevel())) {
 					player.incExp(Skill.MINING.id(), def.getExp() * quantity, true);
 				} else {
-					int rewardQuantity = quantity + addGatheringAmuletBonusOre(player, ore.getCatalogId(), quantity);
-					int bankedQuantity = player.getCarriedItems().getEquipment().bankSkillingDropWithLawRing(new Item(ore.getCatalogId(), rewardQuantity));
+					int rewardQuantity = publicBase ? quantity : quantity + addGatheringAmuletBonusOre(player, ore.getCatalogId(), quantity);
+					int bankedQuantity = publicBase ? 0 : player.getCarriedItems().getEquipment().bankSkillingDropWithLawRing(new Item(ore.getCatalogId(), rewardQuantity));
 					int remainingQuantity = rewardQuantity - bankedQuantity;
 					int storedQuantity = Math.min(remainingQuantity, player.getCarriedItems().getInventory().getFreeSlots());
 					int successfulQuantity = bankedQuantity + storedQuantity;
@@ -400,10 +408,12 @@ public final class Mining implements OpLocTrigger, UseLocTrigger {
 			if (rock.getID() == 496 && player.getCache().hasKey("tutorial") && player.getCache().getInt("tutorial") == 51) {
 				player.getCache().set("tutorial", 52);
 			}
-			if (def.getRespawnTime() > 0) {
-				changeloc(rock, resourceRespawnMillis(def.getRespawnTime()), SceneryId.ROCK_GENERIC.id());
+			if (!publicBase || !config().MINING_ROCKS_EXTENDED || DataConversions.random(1, 100) <= def.getDepletion()) {
+				if (def.getRespawnTime() > 0) {
+					changeloc(rock, resourceRespawnMillis(def.getRespawnTime()), SceneryId.ROCK_GENERIC.id());
+				}
+				return;
 			}
-			return;
 		} else {
 			if (rock.getID() == 496) {
 				player.playerServerMessage(MessageType.QUEST, "You fail to make any real impact on the rock");
@@ -486,6 +496,8 @@ public final class Mining implements OpLocTrigger, UseLocTrigger {
 	}
 
 	private int resourceRespawnMillis(int respawnSeconds) {
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled())
+			return Math.max(1, Math.multiplyExact(respawnSeconds, 1000));
 		return Math.max(1, (respawnSeconds * 1000) / 2);
 	}
 
@@ -620,6 +632,8 @@ public final class Mining implements OpLocTrigger, UseLocTrigger {
 		if (!config().BATCH_PROGRESSION) {
 			return 0;
 		}
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled())
+			return com.openrsc.server.CurrentBasePublicContent.pickaxeBonus(axeId);
 		switch (ItemId.getById(axeId)) {
 			case BRONZE_PICKAXE:
 				return 2;

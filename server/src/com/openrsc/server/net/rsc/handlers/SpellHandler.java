@@ -1,5 +1,6 @@
 package com.openrsc.server.net.rsc.handlers;
 
+import com.openrsc.server.CurrentBasePublicContent;
 import com.openrsc.server.constants.Constants;
 import com.openrsc.server.constants.IronmanMode;
 import com.openrsc.server.constants.ItemId;
@@ -159,6 +160,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 		Item equippedStaff = getEquippedStaff(player);
 
 		for (Entry<Integer, Integer> e : spell.getRunesRequired()) {
+			if (publicStaffSuppliesRune(equippedStaff, e.getKey())) continue;
 			int availableRunes = player.getCarriedItems().getInventory().countId(e.getKey());
 			if (availableRunes < e.getValue()) {
 				player.setSuspiciousPlayer(true, "player not all reagents for spell");
@@ -214,7 +216,9 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 	}
 
 	public static boolean hasRequiredRunesForAutoCast(Player player, SpellDef spell) {
+		Item equippedStaff = getEquippedStaff(player);
 		for (Entry<Integer, Integer> e : spell.getRunesRequired()) {
+			if (publicStaffSuppliesRune(equippedStaff, e.getKey())) continue;
 			if (player.getCarriedItems().getInventory().countId(e.getKey()) < e.getValue()) {
 				return false;
 			}
@@ -257,7 +261,14 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 		handleMobCast(player, affectedMob, spellEnum, spell.getSpellType());
 	}
 
+	private static boolean publicStaffSuppliesRune(final Item staff, final int runeId) {
+		return CurrentBasePublicContent.isEnabled() && staff != null
+			&& CurrentBasePublicContent.staffSuppliesRune(staff.getCatalogId(), runeId);
+	}
+
 	private static double getRuneNegationChance(final Player player, final Item equippedStaff, final int runeId) {
+		// Public Base has no owner robe/staff percentage-preservation enchantments.
+		if (CurrentBasePublicContent.isEnabled()) return 0.0D;
 		double preservationChance = 0.0D;
 		preservationChance += player.getCarriedItems().getEquipment().getWoolRobeRunePreservationChance(runeId);
 		if (equippedStaff != null) {
@@ -2429,6 +2440,32 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 	}
 
 	private void handleChargeOrb(Player player, GameObject gameObject, Spells spellEnum, SpellDef spell) {
+		if (CurrentBasePublicContent.isEnabled()) {
+			int objectId;
+			int orbId;
+			switch (spellEnum) {
+				case CHARGE_AIR_ORB: objectId = 303; orbId = ItemId.AIR_ORB.id(); break;
+				case CHARGE_WATER_ORB: objectId = 300; orbId = ItemId.WATER_ORB.id(); break;
+				case CHARGE_EARTH_ORB: objectId = 304; orbId = ItemId.EARTH_ORB.id(); break;
+				case CHARGE_FIRE_ORB: objectId = 301; orbId = ItemId.FIRE_ORB.id(); break;
+				default: return;
+			}
+			if (gameObject.getID() != objectId) {
+				player.message("This spell can only be used on its matching elemental obelisk");
+				return;
+			}
+			// The public spell definition includes one unpowered orb (611); consuming
+			// it frees the inventory slot for its charged replacement.
+			if (!checkAndRemoveRunes(player, spell)) return;
+			if (!player.getCarriedItems().getInventory().add(new Item(orbId)))
+				throw new IllegalStateException("Charged orb could not replace its consumed public input");
+			player.lastCast = System.currentTimeMillis();
+			player.playSound("spellok");
+			player.playerServerMessage(MessageType.QUEST, "You successfully charge the orb");
+			player.incExp(getMagicId(player, spell), spell.getExp(), true);
+			player.setCastTimer();
+			return;
+		}
 		player.playerServerMessage(MessageType.QUEST,
 			"Orb charging has been retired. Use a staff on the matching altar through Enchanting instead.");
 	}

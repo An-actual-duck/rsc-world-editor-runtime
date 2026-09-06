@@ -15,6 +15,28 @@
     "manifestRole": "client-content-manifest",
     "archiveRole": "client-content"
   },
+  "definitionPolicy": {
+    "policyId": "current-base-public-effective-content-v1",
+    "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+    "registryCounts": {
+      "items": 1593,
+      "npcs": 836,
+      "scenery": 1296,
+      "boundaries": 214,
+      "tiles": 25,
+      "prayers": 14,
+      "spells": 48
+    },
+    "customRegistryPolicy": "stock-appended-data-not-advanced",
+    "serverProvenanceRoot": "conf/server/current-base-public-provenance",
+    "clientProvenanceRoot": "Cache/current-base-definitions/provenance",
+    "provenanceSha256": {
+      "provenance.json": "c5923ef6fc5b30b533a0652aa79bfca13d79c46eec95aa739e0faa15920bea0b",
+      "gameplay-provenance.json": "e6a858676e05b48f202a829bafc41dcc30bf0defe7490f6646433f03365c1d51",
+      "visual-provenance.json": "4eef5878ae3b1ab4e13f6d1cb2f583da2bde076ed8dd1de60f8d5c94656a0ce1",
+      "effective-policy.json": "b70f38f94b8c7b3a2cdaa86428fd2f3a8c6c2438badbd884024e3819c4a3908e"
+    }
+  },
   "statePolicy": {
     "contractId": "canonical-public-state-v1",
     "durableLocation": "outside-code-runtime",
@@ -99,6 +121,7 @@
     "com/openrsc/server/database/CurrentBaseVerifierRecovery.class",
     "com/openrsc/server/CurrentInstalledLaunch.class",
     "com/openrsc/server/CurrentBaseInstalledServer.class",
+    "com/openrsc/server/CurrentBasePublicContent.class",
     "com/openrsc/server/database/impl/sqlite/CurrentBaseStateLocation.class",
     "com/openrsc/server/database/CurrentBaseInstalledExecutionVerifier.class",
     "com/openrsc/server/database/CurrentBaseStateMigration.class",

@@ -275,8 +275,12 @@ def require_woodcutting_uses_guaranteed_yield() -> None:
     for snippet in snippets:
         if snippet not in text:
             fail(f"Woodcutting guaranteed-yield conversion missing expected snippet: {snippet}")
-    if "getLog(def, player.getSkills().getLevel(Skill.WOODCUTTING.id()), axeId))" in text:
-        fail("Woodcutting still gates log rewards behind the old failure roll")
+    # Public Base deliberately retains its stock chance curve. The inherited
+    # MyWorld/generic branch must still bypass that chance and use its yield ladder.
+    if "boolean successful = !publicBase || (isOldWoodcut" not in text:
+        fail("MyWorld woodcutting no longer bypasses the public-only failure roll")
+    if "int quantity = publicBase ? 1 : Formulae.calcGatheringYield(" not in text:
+        fail("Public and MyWorld woodcutting yield policies are not separated")
 
 
 def require_harvesting_uses_guaranteed_yield() -> None:

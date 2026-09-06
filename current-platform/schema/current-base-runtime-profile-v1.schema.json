@@ -4,7 +4,7 @@
   "title": "RSC World Editor Current Base runtime profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "statePolicy", "mapPolicy", "serverContent", "stateMigration", "installedExecutionVerifier", "installedLaunch", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
+  "required": ["schemaId", "manifestType", "variantId", "installabilityBlockers", "pluginSourceSets", "clientAssetSets", "clientContent", "definitionPolicy", "statePolicy", "mapPolicy", "serverContent", "stateMigration", "installedExecutionVerifier", "installedLaunch", "requiredRuntimeClasses", "requiredClientClasses", "requiredPluginClasses", "advancedExclusions"],
   "properties": {
     "installedLaunch": {"const": {"contractId":"current-base-installed-launch-v1","descriptorSchema":"#/$defs/installedLaunchDescriptor","serverMainClass":"com.openrsc.server.CurrentBaseInstalledServer","clientMainClass":"orsc.CurrentBaseInstalledClient","arguments":["--launch","<absolute-descriptor>"],"serverClasspath":"<codeRoot>/core.jar:<codeRoot>/plugins.jar","clientClasspath":"<codeRoot>/Open_RSC_Client.jar","workingDirectory":"descriptor-workingRoot","platform":"posix","leasePolicy":"pre-existing-regular-role-lock-held-by-role-jvm-until-process-exit","leasePaths":["server.lock","client.lock"],"sessionPolicy":"runtime-random-256-bit-nonce-subdirectory-under-role-session-parent-retain-history","sessionAnnouncement":"INSTALLED_SESSION <nonce>","readyPolicy":"server-world-and-network-or-client-visible-window","shutdownPolicy":"exact-session-bound-shutdown-json-clean-save-before-process-exit","codeTreeHash":"sorted-utf8-relative-path-nul-sha256-nul","codeTreeModes":"regular-singly-linked-files-no-symlinks-or-special-entries","mapFingerprint":"sorted-utf8-relative-path-nul-decimal-size-nul-sha256-newline","rootPolicy":"canonical-absolute-code-working-map-state-installation-disjoint-side-state-may-nest-within-state","sideStatePolicy":"server-keypair-word-filters-ip-bans-client-settings-uid-privacy-preferences-and-user-remembered-credentials-persistent","configurationPolicy":"exact-reviewed-complete-server-config-no-connections-or-local-override","clientAuthentication":"normal-manual-login-no-credential-file","publicKeyPolicy":"exact-pem-sha256-server-pair-match-and-client-handshake-pin","startTimeoutSeconds":120,"clientRenderer":"software-desktop-window-v1","activeSelection":"installationRoot/active-launch.json","selectionPolicy":"closed-private-current-role-descriptor-sha256-rechecked-after-lease-before-game-init","pendingCutover":"installationRoot/pending-cutover.json-any-entry-refuses-after-lease-before-effects"}},
     "schemaId": {"const": "current-base-runtime-profile-v1"},
@@ -24,6 +24,96 @@
         "contentId": {"const": "current-base-public-client-content-v1"},
         "manifestRole": {"const": "client-content-manifest"},
         "archiveRole": {"const": "client-content"}
+      }
+    },
+    "definitionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyId",
+        "sourceCommit",
+        "registryCounts",
+        "customRegistryPolicy",
+        "serverProvenanceRoot",
+        "clientProvenanceRoot",
+        "provenanceSha256"
+      ],
+      "properties": {
+        "policyId": {
+          "const": "current-base-public-effective-content-v1"
+        },
+        "sourceCommit": {
+          "const": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00"
+        },
+        "registryCounts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "items",
+            "npcs",
+            "scenery",
+            "boundaries",
+            "tiles",
+            "prayers",
+            "spells"
+          ],
+          "properties": {
+            "items": {
+              "const": 1593
+            },
+            "npcs": {
+              "const": 836
+            },
+            "scenery": {
+              "const": 1296
+            },
+            "boundaries": {
+              "const": 214
+            },
+            "tiles": {
+              "const": 25
+            },
+            "prayers": {
+              "const": 14
+            },
+            "spells": {
+              "const": 48
+            }
+          }
+        },
+        "customRegistryPolicy": {
+          "const": "stock-appended-data-not-advanced"
+        },
+        "serverProvenanceRoot": {
+          "const": "conf/server/current-base-public-provenance"
+        },
+        "clientProvenanceRoot": {
+          "const": "Cache/current-base-definitions/provenance"
+        },
+        "provenanceSha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provenance.json",
+            "gameplay-provenance.json",
+            "visual-provenance.json",
+            "effective-policy.json"
+          ],
+          "properties": {
+            "provenance.json": {
+              "const": "c5923ef6fc5b30b533a0652aa79bfca13d79c46eec95aa739e0faa15920bea0b"
+            },
+            "gameplay-provenance.json": {
+              "const": "e6a858676e05b48f202a829bafc41dcc30bf0defe7490f6646433f03365c1d51"
+            },
+            "visual-provenance.json": {
+              "const": "4eef5878ae3b1ab4e13f6d1cb2f583da2bde076ed8dd1de60f8d5c94656a0ce1"
+            },
+            "effective-policy.json": {
+              "const": "b70f38f94b8c7b3a2cdaa86428fd2f3a8c6c2438badbd884024e3819c4a3908e"
+            }
+          }
+        }
       }
     },
     "statePolicy": {

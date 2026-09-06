@@ -79,6 +79,18 @@ public final class ObjectWoodcuttingDef {
 	}
 
 	public double getRate(int level, int axe) {
+		if (com.openrsc.server.CurrentBasePublicContent.isEnabled()) {
+			switch (axe) {
+				case 12: return rateIron[level];
+				case 88: return rateSteel[level];
+				case 428: return rateBlack[level];
+				case 203: return rateMithril[level];
+				case 204: return rateAdamantite[level];
+				case 405: return rateRune[level];
+				case 1480: return rateDragon[level];
+				default: return rateBronze[level];
+			}
+		}
 		switch (axe) {
 			default:
 			case 2047:

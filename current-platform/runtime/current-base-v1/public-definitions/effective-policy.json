@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "current-base-public-effective-definition-policy",
+  "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+  "npcCommandOverrides": [
+    {
+      "id": 375,
+      "command": "pickpocket"
+    },
+    {
+      "id": 376,
+      "command": "pickpocket"
+    }
+  ],
+  "itemPostLoadPolicy": "preserve-stock-fields-no-owner-throwing-stackability-rewrite",
+  "customRegistryPolicy": "stock-appended-data-does-not-enable-advanced-behavior",
+  "gatheringPolicy": {
+    "tools": "carried-public-pickaxes-and-axes-with-stock-levels-and-curves",
+    "miningChance": "legacy-threshold-clamped-1-through-127-roll-1-through-128",
+    "yield": "one-resource-per-success",
+    "depletion": "public-resource-definition-and-stock-extended-rock-policy",
+    "respawn": "public-definition-seconds-times-1000"
+  },
+  "magicActionPolicy": {
+    "elementalStaffs": "twelve-stock-staves-supply-matching-runes-without-owner-percentage-effects",
+    "orbCharging": "four-matching-obelisks-consume-public-reagents-and-replace-unpowered-orb",
+    "arenaStones": "three-stock-god-capes-stage-two-to-three-no-owner-staff-path"
+  },
+  "verificationScope": "bounded-effective-definitions-assets-and-selected-actions-not-full-gameplay-parity",
+  "remainingCandidateBlockers": [
+    "public-combat-effective-stat-policy",
+    "genuine-imported-map-ladder-removal-and-client-void-boundary-proof"
+  ],
+  "spellDispatch": [
+    {
+      "spell": "WIND_STRIKE",
+      "id": 0
+    },
+    {
+      "spell": "CONFUSE",
+      "id": 1
+    },
+    {
+      "spell": "WATER_STRIKE",
+      "id": 2
+    },
+    {
+      "spell": "ENCHANT_LVL1_AMULET",
+      "id": 3
+    },
+    {
+      "spell": "EARTH_STRIKE",
+      "id": 4
+    },
+    {
+      "spell": "WEAKEN",
+      "id": 5
+    },
+    {
+      "spell": "FIRE_STRIKE",
+      "id": 6
+    },
+    {
+      "spell": "BONES_TO_BANANAS",
+      "id": 7
+    },
+    {
+      "spell": "WIND_BOLT",
+      "id": 8
+    },
+    {
+      "spell": "CURSE",
+      "id": 9
+    },
+    {
+      "spell": "LOW_LEVEL_ALCHEMY",
+      "id": 10
+    },
+    {
+      "spell": "WATER_BOLT",
+      "id": 11
+    },
+    {
+      "spell": "VARROCK_TELEPORT",
+      "id": 12
+    },
+    {
+      "spell": "ENCHANT_LVL2_AMULET",
+      "id": 13
+    },
+    {
+      "spell": "EARTH_BOLT",
+      "id": 14
+    },
+    {
+      "spell": "LUMBRIDGE_TELEPORT",
+      "id": 15
+    },
+    {
+      "spell": "TELEKINETIC_GRAB",
+      "id": 16
+    },
+    {
+      "spell": "FIRE_BOLT",
+      "id": 17
+    },
+    {
+      "spell": "FALADOR_TELEPORT",
+      "id": 18
+    },
+    {
+      "spell": "CRUMBLE_UNDEAD",
+      "id": 19
+    },
+    {
+      "spell": "WIND_BLAST",
+      "id": 20
+    },
+    {
+      "spell": "SUPERHEAT_ITEM",
+      "id": 21
+    },
+    {
+      "spell": "CAMELOT_TELEPORT",
+      "id": 22
+    },
+    {
+      "spell": "WATER_BLAST",
+      "id": 23
+    },
+    {
+      "spell": "ENCHANT_LVL3_AMULET",
+      "id": 24
+    },
+    {
+      "spell": "IBAN_BLAST",
+      "id": 25
+    },
+    {
+      "spell": "ARDOUGNE_TELEPORT",
+      "id": 26
+    },
+    {
+      "spell": "EARTH_BLAST",
+      "id": 27
+    },
+    {
+      "spell": "HIGH_LEVEL_ALCHEMY",
+      "id": 28
+    },
+    {
+      "spell": "CHARGE_WATER_ORB",
+      "id": 29
+    },
+    {
+      "spell": "ENCHANT_LVL4_AMULET",
+      "id": 30
+    },
+    {
+      "spell": "WATCHTOWER_TELEPORT",
+      "id": 31
+    },
+    {
+      "spell": "FIRE_BLAST",
+      "id": 32
+    },
+    {
+      "spell": "CLAWS_OF_GUTHIX",
+      "id": 33
+    },
+    {
+      "spell": "SARADOMIN_STRIKE",
+      "id": 34
+    },
+    {
+      "spell": "FLAMES_OF_ZAMORAK",
+      "id": 35
+    },
+    {
+      "spell": "CHARGE_EARTH_ORB",
+      "id": 36
+    },
+    {
+      "spell": "WIND_WAVE",
+      "id": 37
+    },
+    {
+      "spell": "CHARGE_FIRE_ORB",
+      "id": 38
+    },
+    {
+      "spell": "WATER_WAVE",
+      "id": 39
+    },
+    {
+      "spell": "CHARGE_AIR_ORB",
+      "id": 40
+    },
+    {
+      "spell": "VULNERABILITY",
+      "id": 41
+    },
+    {
+      "spell": "ENCHANT_LVL5_AMULET",
+      "id": 42
+    },
+    {
+      "spell": "EARTH_WAVE",
+      "id": 43
+    },
+    {
+      "spell": "ENFEEBLE",
+      "id": 44
+    },
+    {
+      "spell": "FIRE_WAVE",
+      "id": 45
+    },
+    {
+      "spell": "STUN",
+      "id": 46
+    },
+    {
+      "spell": "CHARGE",
+      "id": 47
+    }
+  ]
+}

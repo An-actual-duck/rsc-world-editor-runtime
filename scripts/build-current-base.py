@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -189,12 +190,27 @@ def write_client_content_archive(path: Path) -> None:
             if not source.is_file() or source.is_symlink():
                 raise RuntimeError(f"unsafe Current Base client content file: {source}")
             relative = source.relative_to(source_root).as_posix()
-            records[f'{tree["bundlePath"]}/{relative}'] = source.read_bytes()
+            bundle_path = f'{tree["bundlePath"]}/{relative}'
+            if bundle_path in records:
+                raise RuntimeError("duplicate Current Base client content tree path")
+            records[bundle_path] = source.read_bytes()
     for record in manifest["sourceFiles"]:
         bundle_path = record["bundlePath"]
         if bundle_path in records:
             raise RuntimeError("duplicate Current Base client content path")
-        records[bundle_path] = (ROOT / record["sourcePath"]).read_bytes()
+        payload = (ROOT / record["sourcePath"]).read_bytes()
+        if record["transform"] == "base64":
+            payload = base64.b64decode(b"".join(payload.split()), validate=True)
+        elif record["transform"] == "public-models-empty-211-v1":
+            if record["sourcePath"] != "Client_Base/Cache/video/models.orsc" or bundle_path != "Cache/video/models.orsc":
+                raise RuntimeError("public model transform is bound to the Base model archive")
+            spec = importlib.util.spec_from_file_location("base_public_models", ROOT / "scripts/current-base-public-models.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            payload = module.transform(payload)
+        elif record["transform"] != "copy":
+            raise RuntimeError("unknown Current Base client content transform")
+        records[bundle_path] = payload
     folded: set[str] = set()
     for name in records:
         if name.startswith("/") or "\\" in name or ".." in Path(name).parts:

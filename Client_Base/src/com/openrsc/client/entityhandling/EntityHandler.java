@@ -9741,6 +9741,9 @@ public class EntityHandler {
 	public static void load(boolean loadMembers) {
 		// Each function should contain only 250 definitions,
 		// otherwise they get too big to compile.
+		boolean publicBase = orsc.CurrentCompositionIdentity.current().isEnabled()
+			&& "current-base-v1".equals(orsc.CurrentCompositionIdentity.current().value("variantId"));
+		if (!publicBase) {
 		loadNpcDefinitions1();
 		loadNpcDefinitions2();
 			loadNPCDefinitions3();
@@ -9749,15 +9752,20 @@ public class EntityHandler {
 			loadItemDefinitions();
 			MyWorldItemOverrides.apply(items);
 			applyBangleVisuals();
+		}
 		loadTextureDefinitions();
 		loadAnimationDefinitions();
-		loadSpellDefinitions();
-		loadPrayerDefinitions();
-		loadTileDefinitions();
-		loadDoorDefinitions();
+		if (!publicBase) {
+			loadSpellDefinitions();
+			loadPrayerDefinitions();
+			loadTileDefinitions();
+			loadDoorDefinitions();
+			loadGameObjectDefinitionsA();
+			loadGameObjectDefinitionsB();
+		} else {
+			loadCurrentBasePublicDefinitions();
+		}
 		loadElevationDefinitions();
-		loadGameObjectDefinitionsA();
-		loadGameObjectDefinitionsB();
 		loadProjectiles();
 		loadGUIParts();
 		loadCrowns();
@@ -9785,6 +9793,79 @@ public class EntityHandler {
 				.getObjectModel());
 		}
 
+	}
+
+	/** Packaged public Base data; project-authored definitions are applied afterwards. */
+	private static void loadCurrentBasePublicDefinitions() {
+		try {
+			Path root = java.nio.file.Paths.get(Config.F_CACHE_DIR, "current-base-definitions");
+			npcs.clear();
+			appendProjectNpcs(firstArray(json(root.resolve("NpcDefs.json"))));
+			appendProjectNpcs(firstArray(json(root.resolve("NpcDefsCustom.json"))));
+			// Historical server customNpcConditions always supplies these commands.
+			npcs.get(375).updateCommand1("pickpocket");
+			npcs.get(376).updateCommand1("pickpocket");
+			JSONObject visuals = json(root.resolve("item-visuals.json"));
+			if (visuals.getInt("schemaVersion") != 1
+				|| !"current-base-public-item-visuals".equals(visuals.getString("manifestType"))) {
+				throw new IllegalArgumentException("invalid public Base item visual identity");
+			}
+			JSONArray rows = visuals.getJSONArray("items");
+			if (rows.length() != 1593 || npcs.size() != 836) {
+				throw new IllegalArgumentException("incomplete public Base registry");
+			}
+			ItemDef[] visualDefinitions = new ItemDef[rows.length()];
+			for (int id = 0; id < rows.length(); id++) {
+				JSONObject row = rows.getJSONObject(id);
+				if (row.getInt("id") != id) throw new IllegalArgumentException("non-contiguous public Base visual IDs");
+				visualDefinitions[id] = new ItemDef("", "", "", 0,
+					row.getInt("authenticSpriteId"), row.getString("spriteLocation"),
+					false, false, 0, row.getInt("pictureMask"), row.getInt("blueMask"),
+					false, false, false, id);
+			}
+			items.clear();
+			applyProjectItems(firstArray(json(root.resolve("ItemDefs.json"))), visualDefinitions, false);
+			applyProjectItems(firstArray(json(root.resolve("ItemDefsCustom.json"))), visualDefinitions, false);
+			noteDef = new ItemDef("", "", "", 0, 438, "items:438", true, false, 0, 0, false, false, false, 0);
+			certificateDef = new ItemDef("", "", "", 0, 180, "items:180", true, false, 0, 0, false, false, false, 0);
+			loadProjectTiles(root.resolve("TileDef.xml"));
+			loadProjectDoors(root.resolve("DoorDef.xml"));
+			JSONObject sceneryVisuals = json(root.resolve("scenery-visuals.json"));
+			if (sceneryVisuals.getInt("schemaVersion") != 1
+				|| !"current-base-public-scenery-visuals".equals(sceneryVisuals.getString("manifestType")))
+				throw new IllegalArgumentException("invalid public Base scenery visual identity");
+			loadProjectScenery(root.resolve("GameObjectDef.xml"), sceneryVisuals.getJSONArray("scenery"));
+			NodeList spellRows = projectXml(root.resolve("SpellDef.xml"), "SpellDef-array")
+				.getElementsByTagName("SpellDef");
+			spells.clear();
+			for (int id = 0; id < spellRows.getLength(); id++) {
+				Element row = (Element) spellRows.item(id);
+				java.util.HashMap<Integer, Integer> runes = new java.util.HashMap<>();
+				NodeList entries = row.getElementsByTagName("entry");
+				for (int j = 0; j < entries.getLength(); j++) {
+					NodeList pair = ((Element) entries.item(j)).getElementsByTagName("int");
+					if (pair.getLength() != 2 || runes.put(Integer.parseInt(pair.item(0).getTextContent().trim()),
+						Integer.parseInt(pair.item(1).getTextContent().trim())) != null) {
+						throw new IllegalArgumentException("invalid public Base spell rune table");
+					}
+				}
+				spells.add(new SpellDef(xmlText(row, "name", ""), xmlText(row, "description", ""),
+					xmlInt(row, "reqLevel", 0), xmlInt(row, "type", 0), xmlInt(row, "runeCount", 0), runes));
+			}
+			NodeList prayerRows = projectXml(root.resolve("PrayerDef.xml"), "PrayerDef-array")
+				.getElementsByTagName("PrayerDef");
+			prayers.clear();
+			for (int id = 0; id < prayerRows.getLength(); id++) {
+				Element row = (Element) prayerRows.item(id);
+				prayers.add(new PrayerDef(xmlInt(row, "reqLevel", 0), xmlInt(row, "drainRate", 0),
+					xmlText(row, "name", ""), xmlText(row, "description", "")));
+			}
+			if (items.size() != 1593 || objects.size() != 1296 || doors.size() != 214 || tiles.size() != 25) {
+				throw new IllegalArgumentException("incomplete public Base definitions");
+			}
+		} catch (Exception failure) {
+			throw new IllegalStateException("Unable to load packaged public Base definitions", failure);
+		}
 	}
 
 	private static void applyProjectContentBundle(ProjectContentBundle bundle) {
@@ -9982,7 +10063,13 @@ public class EntityHandler {
 	}
 
 	private static void loadProjectScenery(Path path) throws Exception {
+		loadProjectScenery(path, null);
+	}
+
+	private static void loadProjectScenery(Path path, JSONArray publicVisuals) throws Exception {
 		NodeList rows = projectXml(path, "GameObjectDef-array").getElementsByTagName("GameObjectDef");
+		if (publicVisuals != null && (publicVisuals.length() != 1296 || rows.getLength() != 1296))
+			throw new IllegalArgumentException("incomplete public Base scenery visuals");
 		int packagedCount = objects.size();
 		LinkedHashMap<Integer, String> packagedModels = new LinkedHashMap<>();
 		for (int id = 0; id < packagedCount; id++) {
@@ -9994,10 +10081,16 @@ public class EntityHandler {
 		objects.clear();
 		for (int id = 0; id < rows.getLength(); id++) {
 			Element row = (Element) rows.item(id);
+			String model = xmlText(row, "objectModel", "");
+			if (publicVisuals != null) {
+				JSONObject visual = publicVisuals.getJSONObject(id);
+				if (visual.getInt("id") != id) throw new IllegalArgumentException("non-contiguous public scenery visual ID");
+				model = visual.getString("objectModel");
+			}
 			GameObjectDef value = new GameObjectDef(xmlText(row, "name", ""), xmlText(row, "description", ""),
 				xmlText(row, "command1", ""), xmlText(row, "command2", ""),
 				xmlInt(row, "type", 0), xmlInt(row, "width", 1), xmlInt(row, "height", 1),
-				xmlInt(row, "groundItemVar", 0), xmlText(row, "objectModel", ""), id);
+				xmlInt(row, "groundItemVar", 0), model, id);
 			objects.add(value);
 			if (id >= packagedCount) {
 				PROJECT_REQUIRED_MODELS.add(value.getObjectModel());

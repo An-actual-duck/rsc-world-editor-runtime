@@ -1,5 +1,6 @@
 package com.openrsc.server.plugins.authentic.minigames.mage_arena;
 
+import com.openrsc.server.CurrentBasePublicContent;
 import com.openrsc.server.constants.*;
 import com.openrsc.server.content.EnchantingItemEffects;
 import com.openrsc.server.event.DelayedEvent;
@@ -572,7 +573,33 @@ public class MageArena implements MiniGameInterface, TalkNpcTrigger, KillNpcTrig
 				}
 			}
 		} else if (isMageArenaStaffStone(obj.getID())) {
-			claimMageArenaStoneStaff(player, obj.getID());
+			if (CurrentBasePublicContent.isEnabled()) claimPublicArenaCape(player, obj.getID());
+			else claimMageArenaStoneStaff(player, obj.getID());
+		}
+	}
+
+	private void claimPublicArenaCape(final Player player, final int objectId) {
+		if (!player.getCache().hasKey("mage_arena") || player.getCache().getInt("mage_arena") < 2) {
+			player.message("The stone is silent");
+			return;
+		}
+		for (ItemId cape : new ItemId[]{ItemId.SARADOMIN_CAPE, ItemId.GUTHIX_CAPE, ItemId.ZAMORAK_CAPE}) {
+			if (player.getCarriedItems().hasCatalogID(cape.id(), Optional.empty()) || player.getBank().hasItemId(cape.id())) {
+				player.message("You chant, but there is no response");
+				return;
+			}
+		}
+		if (player.getCarriedItems().getInventory().getFreeSlots() < 1) {
+			player.message("Make room in your inventory for the cape");
+			return;
+		}
+		int cape = objectId == ELEMENTAL_STONE ? ItemId.SARADOMIN_CAPE.id()
+			: objectId == POWER_STONE ? ItemId.GUTHIX_CAPE.id() : ItemId.ZAMORAK_CAPE.id();
+		if (!player.getCarriedItems().getInventory().add(new Item(cape))) return;
+		player.message("You kneel and chant, and a cape appears before you");
+		if (player.getCache().getInt("mage_arena") == 2) {
+			player.getCache().set("mage_arena", 3);
+			player.sendMiniGameComplete(this.getMiniGameId(), Optional.empty());
 		}
 	}
 

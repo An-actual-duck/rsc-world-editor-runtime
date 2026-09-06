@@ -293,7 +293,11 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
                 "--websocket-port", str(free_port()), "--evidence", str(evidence_path),
             ]
             verified = run_supervised(command)
-            self.assertEqual(0, verified.returncode, verified.stdout + verified.stderr)
+            failure_logs = ""
+            if verified.returncode:
+                for log in sorted(workspace.glob("logs/client-*.log")):
+                    failure_logs += "\n" + log.name + "\n" + log.read_text(encoding="utf-8", errors="replace")[-12000:]
+            self.assertEqual(0, verified.returncode, verified.stdout + verified.stderr + failure_logs)
             evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
             jsonschema.Draft202012Validator(
                 json.loads(EVIDENCE_SCHEMA.read_text())

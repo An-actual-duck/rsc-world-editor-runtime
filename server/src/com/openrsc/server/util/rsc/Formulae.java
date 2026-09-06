@@ -364,7 +364,12 @@ public final class Formulae {
 	}
 
 	public static boolean calcGatheringSuccessfulLegacy(int levelReq, int skillLevel, int equipmentBonus) {
-		int roll = DataConversions.random(1, 128);
+		return calcGatheringSuccessfulLegacy(levelReq, skillLevel, equipmentBonus, DataConversions.random(1, 128));
+	}
+
+	/** Deterministic form of the public success rule, also used by executable contract probes. */
+	public static boolean calcGatheringSuccessfulLegacy(int levelReq, int skillLevel, int equipmentBonus, int roll) {
+		if (roll < 1 || roll > 128) throw new IllegalArgumentException("gathering roll outside 1..128");
 
 		if (skillLevel < levelReq)
 			return false;

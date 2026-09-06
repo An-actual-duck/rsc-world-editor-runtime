@@ -1,1 +1,5 @@
 .githooks/* text eol=lf
+# Reviewed public data retains original trailing whitespace for reversible provenance.
+current-platform/runtime/current-base-v1/public-definitions/extras/ItemCraftingDef.xml whitespace=-blank-at-eol
+current-platform/runtime/current-base-v1/public-definitions/extras/ObjectFishing.xml whitespace=-blank-at-eol
+current-platform/runtime/current-base-v1/public-definitions/extras/ObjectWoodcutting.xml whitespace=-blank-at-eol

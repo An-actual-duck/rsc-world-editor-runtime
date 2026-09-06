@@ -17,8 +17,8 @@
       "type": "object", "additionalProperties": false,
       "required": ["boundaryMaxId", "itemMaxId", "npcMaxId", "sceneryMaxId"],
       "properties": {
-        "boundaryMaxId": {"const": 213}, "itemMaxId": {"const": 1289},
-        "npcMaxId": {"const": 793}, "sceneryMaxId": {"const": 1189}
+        "boundaryMaxId": {"const": 213}, "itemMaxId": {"const": 1592},
+        "npcMaxId": {"const": 835}, "sceneryMaxId": {"const": 1295}
       }
     },
     "sourceFiles": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/source"}},
@@ -32,7 +32,7 @@
       "required": ["sourcePath", "bundlePath", "transform"],
       "properties": {
         "sourcePath": {"$ref": "#/$defs/path"}, "bundlePath": {"$ref": "#/$defs/path"},
-        "transform": {"enum": ["copy", "vanilla-item-array-v1", "vanilla-item-map-v1", "vanilla-npc-map-v1", "vanilla-scenery-map-v1", "vanilla-scenery-prefix-v1"]}
+        "transform": {"const": "copy"}
       }
     },
     "generated": {

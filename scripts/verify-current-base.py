@@ -11,6 +11,8 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import base64
+import binascii
 from pathlib import Path
 import sys
 import xml.etree.ElementTree as ET
@@ -128,6 +130,7 @@ def validate_profile(path: Path) -> dict:
             "clientAssetSets",
             "clientContent",
             "statePolicy",
+            "definitionPolicy",
             "mapPolicy",
             "serverContent",
             "stateMigration",
@@ -158,6 +161,34 @@ def validate_profile(path: Path) -> dict:
         "archiveRole": "client-content",
     }:
         raise VerificationError("Current Base client content binding is incomplete")
+    expected_definition_policy = {
+        "policyId": "current-base-public-effective-content-v1",
+        "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+        "registryCounts": {
+            "items": 1593,
+            "npcs": 836,
+            "scenery": 1296,
+            "boundaries": 214,
+            "tiles": 25,
+            "prayers": 14,
+            "spells": 48
+        },
+        "customRegistryPolicy": "stock-appended-data-not-advanced",
+        "serverProvenanceRoot": "conf/server/current-base-public-provenance",
+        "clientProvenanceRoot": "Cache/current-base-definitions/provenance",
+        "provenanceSha256": {
+            "provenance.json": "c5923ef6fc5b30b533a0652aa79bfca13d79c46eec95aa739e0faa15920bea0b",
+            "gameplay-provenance.json": "e6a858676e05b48f202a829bafc41dcc30bf0defe7490f6646433f03365c1d51",
+            "visual-provenance.json": "4eef5878ae3b1ab4e13f6d1cb2f583da2bde076ed8dd1de60f8d5c94656a0ce1",
+            "effective-policy.json": "b70f38f94b8c7b3a2cdaa86428fd2f3a8c6c2438badbd884024e3819c4a3908e"
+        }
+    }
+    if profile["definitionPolicy"] != expected_definition_policy:
+        raise VerificationError("Current Base public definition policy differs from its reviewed contract")
+    for name, digest in expected_definition_policy["provenanceSha256"].items():
+        source = ROOT / "current-platform/runtime/current-base-v1/public-definitions" / name
+        if source.is_symlink() or not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest() != digest:
+            raise VerificationError("Current Base public provenance differs from the reviewed contract: " + name)
     if profile["statePolicy"] != {
         "contractId": "canonical-public-state-v1",
         "durableLocation": "outside-code-runtime",
@@ -275,6 +306,18 @@ def inventory_path(identity: dict, role: str, payload_root: Path) -> Path:
     return payload_root / matches[0]["sourcePath"]
 
 
+def validate_public_provenance_selection(manifest: dict, role: str) -> None:
+    policy = validate_profile(ROOT / "current-platform/runtime/current-base-v1/profile.json")["definitionPolicy"]
+    for name in policy["provenanceSha256"]:
+        expected = {
+            "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/" + name,
+            "bundlePath": policy[role + "ProvenanceRoot"] + "/" + name,
+            "transform": "copy",
+        }
+        if manifest["sourceFiles"].count(expected) != 1:
+            raise VerificationError("missing or duplicate Current Base public provenance selection: " + name)
+
+
 def validate_server_content(manifest_path: Path, archive_path: Path,
                             exclusions: dict[str, bool]) -> None:
     try:
@@ -294,6 +337,7 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
             or manifest["contentId"] != "current-base-public-content-v1"
             or manifest["variantId"] != "current-base-v1"):
         raise VerificationError("server content manifest has wrong identity")
+    validate_public_provenance_selection(manifest, "server")
     expected = {manifest["configurationEntry"], manifest["connectionsEntry"]}
     for record in manifest["sourceFiles"]:
         require_exact_keys(record, {"sourcePath", "bundlePath", "transform"},
@@ -315,16 +359,26 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
                for fragment in manifest["forbiddenPathFragments"]):
             raise VerificationError(f"Advanced-only server content path is present: {name}")
     with zipfile.ZipFile(archive_path) as archive:
+        for record in manifest["sourceFiles"]:
+            if record["transform"] != "copy":
+                raise VerificationError("public Base content must not filter stock definition IDs")
+            source = ROOT / record["sourcePath"]
+            if not source.is_file() or source.is_symlink():
+                raise VerificationError("server content source is missing or unsafe")
+            if archive.read(record["bundlePath"]) != source.read_bytes():
+                raise VerificationError("server content payload differs from selected source: " + record["bundlePath"])
         for name, payload in generated.items():
             if archive.read(name) != payload:
                 raise VerificationError(f"generated server content differs: {name}")
-        items = json.loads(archive.read("conf/server/defs/ItemDefs.json"))["item"]
-        npcs = json.loads(archive.read("conf/server/defs/NpcDefs.json"))["npcs"]
+        items = (json.loads(archive.read("conf/server/defs/ItemDefs.json"))["item"]
+                 + json.loads(archive.read("conf/server/defs/ItemDefsCustom.json"))["items"])
+        npcs = (json.loads(archive.read("conf/server/defs/NpcDefs.json"))["npcs"]
+                + json.loads(archive.read("conf/server/defs/NpcDefsCustom.json"))["npcs"])
         limits = manifest["definitionLimits"]
         if [row["id"] for row in items] != list(range(limits["itemMaxId"] + 1)):
-            raise VerificationError("Base item definitions are not the vanilla ID prefix")
+            raise VerificationError("Base items do not preserve the complete public registry")
         if [row["id"] for row in npcs] != list(range(limits["npcMaxId"] + 1)):
-            raise VerificationError("Base NPC definitions are not the vanilla ID prefix")
+            raise VerificationError("Base NPCs do not preserve the complete public registry")
         doors = ET.fromstring(archive.read("conf/server/defs/DoorDef.xml"))
         scenery = ET.fromstring(archive.read("conf/server/defs/GameObjectDef.xml"))
         if len(list(doors)) != limits["boundaryMaxId"] + 1:
@@ -470,27 +524,72 @@ def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
             or manifest["contentId"] != "current-base-public-client-content-v1"
             or manifest["variantId"] != "current-base-v1"):
         raise VerificationError("client content manifest has wrong identity")
-    expected: set[str] = set()
+    validate_public_provenance_selection(manifest, "client")
+    selections = manifest["sourceFiles"]
+    for required in (
+        {"sourcePath": "Client_Base/Cache/video/models.orsc", "bundlePath": "Cache/video/models.orsc", "transform": "public-models-empty-211-v1"},
+        {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/scenery-visuals.json", "bundlePath": "Cache/current-base-definitions/scenery-visuals.json", "transform": "copy"},
+    ):
+        if required not in selections:
+            raise VerificationError("public scenery/model selection differs from reviewed Base policy")
+    expected: dict[str, bytes] = {}
+    folded: set[str] = set()
+    def add(name: str, payload: bytes) -> None:
+        if (name.startswith("/") or "\\" in name or ".." in Path(name).parts
+                or name.casefold() in folded):
+            raise VerificationError("unsafe or duplicate client content output path")
+        folded.add(name.casefold())
+        expected[name] = payload
     for tree in manifest["sourceTrees"]:
         require_exact_keys(tree, {"sourcePath", "bundlePath"},
                            "client content source tree")
         source_root = ROOT / tree["sourcePath"]
+        if not source_root.is_dir() or source_root.is_symlink():
+            raise VerificationError("client content source tree is missing or unsafe")
         for source in source_root.rglob("*"):
-            if source.is_file() and not source.is_symlink():
-                expected.add(
-                    tree["bundlePath"] + "/" + source.relative_to(source_root).as_posix()
-                )
+            if source.is_symlink() or not (source.is_file() or source.is_dir()):
+                raise VerificationError("unsafe client content source tree entry")
+            if source.is_file():
+                add(tree["bundlePath"] + "/" + source.relative_to(source_root).as_posix(),
+                    source.read_bytes())
     for record in manifest["sourceFiles"]:
-        require_exact_keys(record, {"sourcePath", "bundlePath"},
+        require_exact_keys(record, {"sourcePath", "bundlePath", "transform"},
                            "client content source file")
-        expected.add(record["bundlePath"])
+        if record["transform"] not in ("copy", "base64", "public-models-empty-211-v1"):
+            raise VerificationError("unsupported client content transform")
+        source = ROOT / record["sourcePath"]
+        if not source.is_file() or source.is_symlink():
+            raise VerificationError("client content source file is missing or unsafe")
+        payload = source.read_bytes()
+        if record["transform"] == "base64":
+            try:
+                payload = base64.b64decode(b"".join(payload.split()), validate=True)
+            except binascii.Error as error:
+                raise VerificationError("invalid Base client asset base64") from error
+        elif record["transform"] == "public-models-empty-211-v1":
+            if record["sourcePath"] != "Client_Base/Cache/video/models.orsc" or record["bundlePath"] != "Cache/video/models.orsc":
+                raise VerificationError("public model transform is bound to the Base model archive")
+            spec = importlib.util.spec_from_file_location("base_public_models_verify", ROOT / "scripts/current-base-public-models.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            try:
+                payload = module.transform(payload)
+            except ValueError as error:
+                raise VerificationError("public model source or augmentation differs") from error
+            if hashlib.sha256(payload).hexdigest() != "fcde7214b1730d50d840767a9af0448d683b544ef94fa011380e358c3680d23f":
+                raise VerificationError("public model augmentation differs from reviewed bytes")
+        add(record["bundlePath"], payload)
     names = archive_names(archive_path)
-    if names != expected:
+    if names != set(expected):
         raise VerificationError("client content archive differs from its closed inventory")
     for name in names:
         if any(fragment.casefold() in name.casefold()
                for fragment in manifest["forbiddenPathFragments"]):
             raise VerificationError(f"Advanced-only client content is present: {name}")
+    with zipfile.ZipFile(archive_path) as archive:
+        for name, payload in expected.items():
+            if archive.read(name) != payload:
+                raise VerificationError(f"client content payload differs from selected source: {name}")
 
 
 def verify(identity_path: Path, payload_root: Path) -> dict:

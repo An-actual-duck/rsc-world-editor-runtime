@@ -31,7 +31,7 @@
     {
       "schemaId": "current-base-client-content-v1",
       "relativePath": "schema/current-base-client-content-v1.schema.json",
-      "sha256": "88622ebc7430c22d8f598463cadaa4f4825857991de28a67009f3d34d5321362"
+      "sha256": "6a83dc40499125ab697642ea53eadc2aac82ae4de28c33768053f62711fb78ad"
     },
     {
       "schemaId": "current-base-installed-execution-evidence-v1",
@@ -46,12 +46,12 @@
     {
       "schemaId": "current-base-runtime-profile-v1",
       "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
-      "sha256": "bb66ce428d87470b557f5e4c0f5689befa9735a2cecb4262ea8d77e2eb0f3ca5"
+      "sha256": "67f615c2ad804923e03953d51b19b930b58af9fc03ecf8acec25aef8b0d1cf63"
     },
     {
       "schemaId": "current-base-server-content-v1",
       "relativePath": "schema/current-base-server-content-v1.schema.json",
-      "sha256": "9d4cd12c00a740b710430a3a88b1a27438805de29e28cbd6d7135b61aba510b8"
+      "sha256": "4a247ae4094a22ee0a42621c15e90dfd4c10d47ea4ed154e1476464504731c94"
     },
     {
       "schemaId": "current-base-state-migration-v1",
