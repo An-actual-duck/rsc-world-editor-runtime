@@ -80,6 +80,9 @@ public final class PublicDefinitionProbe {
       }
     }
     if (count != 1593) throw new AssertionError("incomplete items");
+    int actualCount = client ? ((Number) handlerClass.getMethod("itemCount").invoke(null)).intValue()
+      : ((List<?>) field(handler, "items")).size();
+    if (actualCount != count) throw new AssertionError("trailing/missing items");
     if (client) {
       JSONObject visuals = new JSONObject(new String(Files.readAllBytes(definitions.resolve("item-visuals.json")), "UTF-8"));
       for (Object raw : visuals.getJSONArray("items")) {
@@ -130,6 +133,51 @@ public final class PublicDefinitionProbe {
     if (constants.getMethod("spellToEnum", int.class).invoke(null, -1) != null
         || constants.getMethod("spellToEnum", int.class).invoke(null, 48) != null)
       throw new AssertionError("unexpected public spell dispatch outside bounds");
+  }
+
+  static void checkSprites() throws Exception {
+    if (!client) return;
+    Class<?> surfaceClass = Class.forName("orsc.graphics.two.GraphicsController");
+    Constructor<?> constructor = surfaceClass.getDeclaredConstructor(int.class, int.class, int.class);
+    constructor.setAccessible(true); Object surface = constructor.newInstance(256, 256, 6000);
+    if (!Boolean.TRUE.equals(surfaceClass.getMethod("fillSpriteTree").invoke(surface))) throw new AssertionError("stock sprite archive not loaded");
+    Map<?, ?> tree = (Map<?, ?>) field(surface, "spriteTree");
+    if (!new TreeSet<Object>(tree.keySet()).equals(new TreeSet<String>(Arrays.asList(
+        "GUI", "GUIutil", "clipping", "crowns", "equipment", "items", "npc", "player", "projectiles", "skill_icons", "textures"))))
+      throw new AssertionError("unexpected public stock sprite namespace");
+    Method select = surfaceClass.getMethod("spriteSelect", Class.forName("com.openrsc.client.entityhandling.defs.ItemDef"));
+    Method load = surfaceClass.getMethod("loadSprite", int.class, String.class);
+    int selected = 0, nonblank = 0;
+    for (int id = 0; id < 1593; id++) {
+      Object item = definition("getItemDef", id);
+      String[] location = String.valueOf(field(item, "spriteLocation")).split(":", -1);
+      Map<?, ?> namespace = (Map<?, ?>) tree.get(location[0]);
+      Object entry = namespace == null ? null : namespace.get(location[1]);
+      Object expected;
+      if (entry != null) {
+        Object frames = entry.getClass().getMethod("getFrames").invoke(entry);
+        if (Array.getLength(frames) < 1) throw new AssertionError("empty stock item frames " + id);
+        Object frame = Array.get(frames, 0);
+        expected = frame.getClass().getMethod("getSprite").invoke(frame);
+      } else {
+        int sprite = ((Number) field(item, "spriteID")).intValue();
+        if (sprite < 0) throw new AssertionError("stock item has no authoritative sprite " + id + " " + Arrays.toString(location));
+        java.util.zip.ZipFile archive = (java.util.zip.ZipFile) field(surface, "spriteArchive");
+        if (archive.getEntry(String.valueOf(2150 + sprite)) == null) throw new AssertionError("stock sprite fallback absent " + id);
+        load.invoke(surface, 2150 + sprite, "public-stock");
+        expected = Array.get(field(surface, "sprites"), 2150 + sprite);
+      }
+      Object actual = select.invoke(surface, item);
+      int[] expectedPixels = (int[]) expected.getClass().getMethod("getPixels").invoke(expected);
+      int[] actualPixels = (int[]) actual.getClass().getMethod("getPixels").invoke(actual);
+      if (!Arrays.equals(expectedPixels, actualPixels)) throw new AssertionError("wrong selected stock sprite pixels " + id);
+      if (expectedPixels.length < 1) throw new AssertionError("zero size stock sprite " + id);
+      for (int pixel : expectedPixels) if (pixel != 0) { nonblank++; break; }
+      selected++;
+    }
+    java.util.zip.ZipFile archive = (java.util.zip.ZipFile) field(surface, "spriteArchive");
+    if (archive != null) archive.close();
+    System.out.println("PUBLIC_STOCK_ITEM_PIXELS_VERIFIED selected=" + selected + " nonblank=" + nonblank);
   }
 
   static void checkXml(String file, String method, Map<String, String> names) throws Exception {
@@ -202,6 +250,7 @@ public final class PublicDefinitionProbe {
     checkXml("PrayerDef.xml", "getPrayerDef", mapping());
     checkXml("SpellDef.xml", "getSpellDef", mapping());
     checkDispatch();
+    checkSprites();
     if (!errors.isEmpty()) throw new AssertionError(String.join("\n", errors));
     System.out.println("PUBLIC_DEFINITIONS_VERIFIED role=" + args[0] + " comparisons=" + comparisons);
     System.exit(0);
