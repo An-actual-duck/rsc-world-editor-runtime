@@ -64,3 +64,12 @@ installation cutover, backups, rollback and recovery. This CLI does not prove
 installation authority merely from a database marker, and does not acquire live
 server leases or activate its output. Non-SQLite successor migrations and new
 state-schema transformations are outside this bounded row.
+
+## Focused verification
+
+The state-location module passes 7 tests (24.379 seconds), existing skill-state
+regressions pass 3 (22.168 seconds), composition/schema checks pass 14
+(0.194 seconds), and the SQLite migration class passes 11 (13.801 seconds).
+All 35 pass without skips using temporary invented state. The unchanged MariaDB
+row, full runtime suite, real-window authoring/login and Editor managed cutover
+are not claimed by this headless handoff; the product manager owns integration.

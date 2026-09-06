@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 public final class CurrentBaseStateMigration {
 	private static final String CONTRACT_TYPE = "current-base-state-migration";
 	private static final String CONTRACT_SHA256 =
-		"13ac0ef772a7eab9e39e1ca5e2c1e01c86a03fc6f0ef37d968d84d36ed19d5a5";
+		"f1a055b77fc54aa4157414991972be83a43a5c48da0518da5ac6c91101b5e94a";
 	private static final String CURRENT_COPY = "current-base-byte-copy-v1";
 	private static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 	private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");

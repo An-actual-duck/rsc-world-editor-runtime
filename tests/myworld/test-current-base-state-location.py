@@ -181,6 +181,12 @@ public class StateLocationProbe {
             self.assertNotEqual(0, result.returncode, result.stdout)
         config.write_text(text)
         self.refuse(None, "requires validated adaptive", authoring=authoring)
+        result = self.probe(name="authoring", authoring=authoring, bound=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("requires an initialized Current Base composition", result.stdout + result.stderr)
+        config.write_text(text + "world_builder_content_bundle: unreviewed-overlay.json\n")
+        result = self.probe(name="authoring", authoring=authoring)
+        self.assertNotEqual(0, result.returncode)
 
     def test_current_base_never_falls_back_or_creates_missing_state(self):
         fallback = self.runtime / "inc/sqlite/current_base.db"

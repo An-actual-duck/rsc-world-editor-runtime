@@ -81,7 +81,7 @@
     }
   ],
   "transformations": {
-    "profiles": ["retro-split-skills-to-current-v1", "core-skills-to-current-v1", "preservation-2023-skills-to-current-v1"],
+    "profiles": ["retro-split-skills-to-current-v1", "core-skills-to-current-v1", "preservation-2023-skills-to-current-v1", "current-base-byte-copy-v1"],
     "tables": ["curstats", "maxstats", "experience", "capped_experience"],
     "legacyColumnsRetained": true,
     "columnMappings": {

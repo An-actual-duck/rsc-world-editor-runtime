@@ -38,7 +38,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["profiles", "tables", "legacyColumnsRetained", "columnMappings", "newColumnDefaults", "runtimePatchState"],
       "properties": {
-        "profiles": {"type": "array", "minItems": 3, "maxItems": 3, "prefixItems": [{"const": "retro-split-skills-to-current-v1"}, {"const": "core-skills-to-current-v1"}, {"const": "preservation-2023-skills-to-current-v1"}], "items": false},
+        "profiles": {"type": "array", "minItems": 4, "maxItems": 4, "prefixItems": [{"const": "retro-split-skills-to-current-v1"}, {"const": "core-skills-to-current-v1"}, {"const": "preservation-2023-skills-to-current-v1"}, {"const": "current-base-byte-copy-v1"}], "items": false},
         "tables": {"type": "array", "minItems": 4, "maxItems": 4, "prefixItems": [{"const": "curstats"}, {"const": "maxstats"}, {"const": "experience"}, {"const": "capped_experience"}], "items": false},
         "legacyColumnsRetained": {"const": true},
         "columnMappings": {
