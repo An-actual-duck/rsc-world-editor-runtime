@@ -208,15 +208,23 @@ def ensure_spear_runtime_uses_item_requirement() -> None:
     player = PLAYER_PATH.read_text(encoding="utf-8")
     legacy_adjustment = "requiredLevel <= 10 ? requiredLevel : requiredLevel + 5"
     if legacy_adjustment in equipment or legacy_adjustment in player:
-        fail("Spear equip validation still applies the hidden +5 level adjustment")
+        fail("Spear equip validation applies an unconditional +5 level adjustment")
+    # Current Base retains the public secondary Attack requirement. The false
+    # branch must still use the item definition directly for the owner runtime.
+    # Executable Base requirement boundaries are covered by skill-state tests.
+    composition_requirement = re.escape(
+        "com.openrsc.server.CurrentBaseSkillContract.selected() && "
+        "requiredLevel > 10 ? requiredLevel + 5 : requiredLevel"
+    )
     spear_requirement_block = re.compile(
-        r'if \(itemLower\.endsWith\("spear"\)\) \{\s+optionalLevel = Optional\.of\(requiredLevel\);',
+        r'if \(itemLower\.endsWith\("spear"\)\) \{\s+optionalLevel = Optional\.of\('
+        + composition_requirement + r'\);',
         re.MULTILINE,
     )
     if len(spear_requirement_block.findall(equipment)) != 1:
-        fail("Equipment.java must validate spear equip level directly from the item definition")
+        fail("Equipment.java must isolate the Base spear adjustment and retain the owner item requirement")
     if len(spear_requirement_block.findall(player)) != 2:
-        fail("Player.java must validate spear equip level directly from the item definition in both equipment checks")
+        fail("Player.java must isolate the Base spear adjustment in both equipment checks")
 
 
 def ensure_myworld_item_requirements_are_data_owned() -> None:
