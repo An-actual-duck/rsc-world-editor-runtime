@@ -37,6 +37,15 @@ def binding(path):
     return {"path": str(path), "sha256": FIXTURE.sha256(path)}
 
 
+def launch_environment():
+    # The full suite supplies legacy-map variables to other fixtures. These
+    # installed roles admit only their descriptor; production rejection stays
+    # intact, and dedicated negative cases add their own hostile overrides.
+    return {key: value for key, value in os.environ.items()
+            if not key.startswith(("OPENRSC_", "SPOILED_MILK_"))
+            and key not in ("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS", "CLASSPATH")}
+
+
 def tree_hash(path, package=False):
     digest = hashlib.sha256()
     for entry in sorted(value for value in path.rglob("*") if value.is_file()):
@@ -173,7 +182,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         before = set((self.anchor / "sessions" / role).iterdir())
         output = tempfile.TemporaryFile(mode="w+")
         process = subprocess.Popen(self.command(role, descriptor), cwd=self.working[role],
-            stdout=output, stderr=subprocess.STDOUT, text=True)
+            stdout=output, stderr=subprocess.STDOUT, text=True, env=launch_environment())
         self.processes.append((process, output))
         deadline = time.monotonic() + 120
         while time.monotonic() < deadline:
@@ -299,7 +308,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
             client, client_ready = self.start("client")
             for role in ("server", "client"):
                 self.assert_locked(role)
-                duplicate = subprocess.run(self.command(role), cwd=self.working[role], capture_output=True, text=True, timeout=20)
+                duplicate = subprocess.run(self.command(role), cwd=self.working[role], capture_output=True, text=True, timeout=20, env=launch_environment())
                 self.assertEqual(2, duplicate.returncode)
             sessions.append((server_ready.parent.name, client_ready.parent.name))
             self.manual_login(server, client)
@@ -360,7 +369,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
                 if mutation == "missing-lock": lock.rename(self.anchor / "saved-server.lock")
                 try:
                     result = subprocess.run(command, cwd=self.root if mutation == "wrong-cwd" else self.working["server"],
-                        capture_output=True, text=True, timeout=20)
+                        capture_output=True, text=True, timeout=20, env=launch_environment())
                     self.assertEqual(2, result.returncode, result.stdout + result.stderr)
                     self.assertEqual([], list((self.anchor / "sessions/server").iterdir()))
                     self.assertEqual([], list(self.working["server"].iterdir()))
@@ -406,7 +415,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
                     selected["serverDescriptorSha256"] = FIXTURE.sha256(path)
                     write_json(self.anchor / "active-launch.json", selected)
                     result = subprocess.run(self.command("server", path), cwd=self.working["server"],
-                        capture_output=True, text=True, timeout=20)
+                        capture_output=True, text=True, timeout=20, env=launch_environment())
                     self.assertEqual(2, result.returncode)
                     self.assertEqual(changed[key]["sha256"], FIXTURE.sha256(copied))
                     self.assertEqual([], list((self.anchor / "sessions/server").iterdir()))
@@ -424,7 +433,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         selected["serverDescriptorSha256"] = FIXTURE.sha256(path)
         write_json(self.root / "active-launch.json", selected)
         result = subprocess.run(self.command("server", path), cwd=self.working["server"],
-            capture_output=True, text=True, timeout=20)
+            capture_output=True, text=True, timeout=20, env=launch_environment())
         self.assertEqual(2, result.returncode)
         self.assertEqual([], list((self.root / "sessions/server").iterdir()))
         self.assertEqual([], list(self.working["server"].iterdir()))
@@ -443,7 +452,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         marker = self.working["client"] / "Cache" / "invented-marker"
         marker.write_text("do-not-use-this-fallback")
         result = subprocess.run(self.command("client", path), cwd=self.working["client"],
-            capture_output=True, text=True, timeout=20)
+            capture_output=True, text=True, timeout=20, env=launch_environment())
         self.assertEqual(2, result.returncode)
         self.assertEqual([], list((self.anchor / "sessions/client").iterdir()))
         self.assertEqual("do-not-use-this-fallback", marker.read_text())
@@ -459,7 +468,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         next_selection["serverDescriptorSha256"] = FIXTURE.sha256(next_path)
         write_json(self.anchor / "active-launch.json", next_selection)
         refused = subprocess.run(self.command("server"), cwd=self.working["server"],
-            capture_output=True, text=True, timeout=20)
+            capture_output=True, text=True, timeout=20, env=launch_environment())
         self.assertEqual(2, refused.returncode)
         self.assertEqual([], list((self.anchor / "sessions/server").iterdir()))
         server, ready = self.start("server", next_path)
@@ -468,12 +477,12 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
 
     def test_private_alias_oversized_key_and_external_override_refusals(self):
         for mutation in ("oversized-public", "oversized-private", "private-key-mismatch", "credentials-symlink", "hideip-hardlink",
-                         "lock-hardlink", "renderer-property", "renderer-alias-property", "renderer-environment", "database-mode"):
+                         "lock-hardlink", "renderer-property", "renderer-alias-property", "renderer-environment", "legacy-map-environment", "database-mode"):
             with self.subTest(mutation=mutation):
                 role = "client" if mutation in ("credentials-symlink", "hideip-hardlink") else "server"
                 restore = []
                 command = self.command(role)
-                environment = os.environ.copy()
+                environment = launch_environment()
                 if mutation == "oversized-public":
                     file = self.side["server"] / "client.pem"
                     original = file.read_bytes()
@@ -509,6 +518,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
                 elif mutation == "renderer-property": command.insert(1, "-Dspoiledmilk.openglPresenter=true")
                 elif mutation == "renderer-alias-property": command.insert(1, "-Dspoiled_milk.opengl_native_ui_replace=true")
                 elif mutation == "renderer-environment": environment["SPOILED_MILK_OPENGL_PRESENTER"] = "true"
+                elif mutation == "legacy-map-environment": environment["SPOILED_MILK_LAYERED_PACKAGE"] = str(self.map)
                 elif mutation == "database-mode":
                     file = self.state["server"] / "current_base.db"
                     file.chmod(0o644)
