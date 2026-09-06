@@ -16,8 +16,10 @@ class PublicRuntimeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if os.environ.get('CURRENT_BASE_PUBLIC_USE_EXISTING') != '1':
-            subprocess.run(['python3', str(ROOT / 'scripts/build-current-base.py')],
-                           cwd=ROOT, check=True, capture_output=True, text=True, timeout=240)
+            result = subprocess.run(['python3', str(ROOT / 'scripts/build-current-base.py')],
+                                    cwd=ROOT, capture_output=True, text=True, timeout=240)
+            if result.returncode:
+                raise AssertionError('Base build failed:\n' + result.stdout[-12000:] + result.stderr[-12000:])
 
     def probe(self, role, probe='PublicDefinitionProbe'):
         with tempfile.TemporaryDirectory(prefix='current-base-public-runtime-') as tmp:

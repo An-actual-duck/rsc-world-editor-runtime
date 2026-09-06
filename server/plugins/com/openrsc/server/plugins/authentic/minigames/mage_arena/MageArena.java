@@ -588,6 +588,7 @@ public class MageArena implements MiniGameInterface, TalkNpcTrigger, KillNpcTrig
 				player.message("You chant, but there is no response");
 				return;
 			}
+		}
 		if (player.getCarriedItems().getInventory().getFreeSlots() < 1) {
 			player.message("Make room in your inventory for the cape");
 			return;
