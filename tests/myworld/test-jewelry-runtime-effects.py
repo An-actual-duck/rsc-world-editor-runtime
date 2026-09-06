@@ -680,14 +680,14 @@ def ensure_runtime_paths_are_wired() -> None:
         require(snippet in effects, f"Gathering amulet shared carryover missing: {snippet}")
     for text, snippets, label in (
         (woodcutting, (
-            "int rewardQuantity = quantity + addGatheringAmuletBonusLogs(player, def.getLogId(), quantity);",
+            "int rewardQuantity = publicBase ? quantity : quantity + addGatheringAmuletBonusLogs(player, def.getLogId(), quantity);",
             "Skill.WOODCUTTING.id(), logId, logCount",
-            "bankSkillingDropWithLawRing(new Item(def.getLogId(), rewardQuantity))",
+            "int bankedQuantity = publicBase ? 0 : player.getCarriedItems().getEquipment().bankSkillingDropWithLawRing(new Item(def.getLogId(), rewardQuantity));",
         ), "woodcutting"),
         (mining, (
-            "int rewardQuantity = quantity + addGatheringAmuletBonusOre(player, ore.getCatalogId(), quantity);",
+            "int rewardQuantity = publicBase ? quantity : quantity + addGatheringAmuletBonusOre(player, ore.getCatalogId(), quantity);",
             "Skill.MINING.id(), oreId, oreCount",
-            "bankSkillingDropWithLawRing(new Item(ore.getCatalogId(), rewardQuantity))",
+            "int bankedQuantity = publicBase ? 0 : player.getCarriedItems().getEquipment().bankSkillingDropWithLawRing(new Item(ore.getCatalogId(), rewardQuantity));",
         ), "mining"),
         (fishing, (
             "final int rewardQuantity = 1 + addGatheringAmuletBonusFish(player, fish.getCatalogId(), 1);",
