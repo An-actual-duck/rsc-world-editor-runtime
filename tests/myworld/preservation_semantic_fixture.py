@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 import stat
 import struct
 import xml.etree.ElementTree as ET
+from collections import Counter
 
 HISTORICAL_COMMIT = "c0102e60774ab9c9076aabae49f6f97fb6fc4b00"
 HISTORICAL_TREE = "6db5536d795abf34f303bb03b20c43b8cfb9e3fe"
@@ -153,3 +154,96 @@ def terrain_oracle(root, decoded, destination):
                 output.write(struct.pack(">11i", sx * 48 + index // 48, sy * 48 + index % 48,
                     (0, 1, 2, -1)[plane], tile[2], tile[4], tile[5], (tile[6] + 32768) % 65536 - 32768,
                     masks[key][index], projectiles[key][index], counts[key][index], int(tile[2] in (2, 11))))
+    return masks, projectiles
+
+
+def placement_oracle(root, terrain, destination, diagnostic_tree_branch=False):
+    """c0102 World.registerGameObject geometry and projectile booleans, independently.
+
+    Original World.java SHA540bf30ae801822c93fd54a936f3e34633494473e99e3dd5e0977167a960539c.
+    Original Constants.java SHAf3b04a325a9b518ca7827c27976cf29094c1ba2dbd60af88e376f820132befe5.
+    Effective source composition is last scenery at position / boundary at direction.
+    """
+    masks, projectiles = ({key: bytearray(value) for key,value in part.items()} for part in terrain)
+    definitions = root / "source/original/server/conf/server/defs"
+    scenery = list(ET.fromstring((definitions / "GameObjectDef.xml").read_bytes()))
+    boundaries = list(ET.fromstring((definitions / "DoorDef.xml").read_bytes()))
+    names = {"gravestone", "sign", "broken pillar", "bone", "animalskull", "skull", "egg", "eggs",
+             "ladder", "torch", "rock", "treestump", "railing", "railings", "gate", "fence", "table",
+             "smashed chair", "smashed table", "longtable", "wooden gate", "metal gate", "chair"}
+
+    def write(plane,x,y,mask=0,shot=False):
+        key,index=(plane,x//48,y//48),(x%48)*48+y%48
+        if key in masks:
+            masks[key][index] |= mask
+            if shot: projectiles[key][index]=1
+
+    for kind, files, container in ((0,("SceneryLocs.json","SceneryLocsDiscontinued.json"),"sceneries"),
+                                   (1,("BoundaryLocs.json",),"boundaries")):
+        effective = {}
+        for name in files:
+            for row in json.loads((root / "source/migration/input/placements" / name).read_text())[container]:
+                key=(row["pos"]["X"],row["pos"]["Y"],row["direction"] if kind else 0)
+                effective[key]=row
+        if len(effective) != (26815 if kind == 0 else 967):
+            raise ValueError("historical effective object composition differs")
+        for row in effective.values():
+            object_id,direction=row["id"],row["direction"]
+            if object_id == 1147: continue
+            definition=(scenery if kind == 0 else boundaries)[object_id]
+            object_type=int(definition.findtext("type" if kind == 0 else "doorType"))
+            if kind == 0 and object_type not in (1,2) or kind == 1 and object_type != 1: continue
+            name=definition.findtext("name").lower()
+            width=int(definition.findtext("width")) if kind == 0 else 1
+            height=int(definition.findtext("height")) if kind == 0 else 1
+            shot=name in names or kind == 0 and name not in ("tree","chest") and width == height == 1
+            # Diagnostic counterfactual only: never substitutes for the historical oracle.
+            if diagnostic_tree_branch and kind == 0 and "tree" in name:
+                shot=True
+            if kind == 0 and direction not in (0,4): width,height=height,width
+            plane=row["pos"]["Y"]//944
+            for x in range(row["pos"]["X"],row["pos"]["X"]+width):
+                for y in range(row["pos"]["Y"]%944,row["pos"]["Y"]%944+height):
+                    if shot:
+                        write(plane,x,y,shot=True)
+                        if not (kind == 0 and object_type == 1):
+                            dx,dy={0:(-1,0),2:(0,1),4:(1,0),6:(0,-1)}.get(direction,(0,0))
+                            write(plane,x+dx,y+dy,shot=True)
+                    if kind == 0 and object_type == 1:
+                        write(plane,x,y,64)
+                    else:
+                        shape=({0:(2,8,-1,0),2:(4,1,0,1),4:(8,2,1,0),6:(1,4,0,-1)} if kind == 0
+                               else {0:(1,4,0,-1),1:(2,8,-1,0),2:(16,0,0,0),3:(32,0,0,0)}).get(direction)
+                        if shape:
+                            own,neighbor,dx,dy=shape
+                            write(plane,x,y,own)
+                            write(plane,x+dx,y+dy,neighbor)
+    with destination.open("wb") as output:
+        output.write(struct.pack(">i",811008))
+        for key in sorted(masks):
+            plane,sx,sy=key
+            for index in range(2304):
+                output.write(struct.pack(">5i",sx*48+index//48,sy*48+index%48,(0,1,2,-1)[plane],
+                                         masks[key][index],projectiles[key][index]))
+
+
+def npc_expectations(root, manifest, destination):
+    original = Counter()
+    for name in ("NpcLocs.json", "NpcLocsDiscontinued.json"):
+        source = json.loads((root / "source/migration/input/placements" / name).read_text())
+        for row in source["npclocs"]:
+            start, low, high = row["start"], row["min"], row["max"]
+            original[(row["id"], (0,1,2,-1)[start["Y"] // 944], start["X"], start["Y"] % 944,
+                      low["X"], low["Y"] % 944, high["X"], high["Y"] % 944, -1)] += 1
+    canonical, lines = Counter(), []
+    for declaration in manifest["placementSets"]:
+        body = json.loads((root / "conversion/package" / declaration["path"]).read_text())
+        for row in body["npcs"]:
+            start, low, high = row["start"], row["roamBounds"]["minimum"], row["roamBounds"]["maximum"]
+            key = (row["npcId"], body["level"], start["x"], start["y"],
+                   low["x"], low["y"], high["x"], high["y"], row["respawnSeconds"])
+            canonical[key] += 1
+            lines.append(row["placementId"] + "\t" + "\t".join(map(str,key)))
+    if original != canonical or sum(original.values()) != 3609:
+        raise ValueError("canonical NPC multiset differs from sealed historical derivation")
+    destination.write_text("\n".join(sorted(lines)) + "\n")

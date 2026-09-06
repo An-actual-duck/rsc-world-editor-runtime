@@ -45,9 +45,35 @@ current blocked void rather than falsely claiming a raw-sector equality result.
 
 Initial focused execution passes all 811,008 present-tile comparisons with zero
 differences. Real Current Base population loads 3,609 NPCs, 1,019 ground items,
-26,815 scenery and 967 boundaries; 146 instantiated NPC bounds cross absent
-sectors without activating them. Raw, original-definition, canonical-tile and
-derivation tampering refuse. This is an in-progress checkpoint, not full semantic
-acceptance: exact NPC multiset/movement, composed placement collision, ladder199
-removal/restoration and wrong-overlay control, real transition and client CPU/void
-proofs still need completion. No runtime behavior change accompanies this test.
+26,815 scenery and 967 boundaries. Exact NPC identities, starts, bounds, respawn
+and multiplicity match the sealed historical derivation. All 146 crossing bounds
+retain blocked void, with actual adjacency, A* and forced WalkingQueue refusal
+at a present/absent edge of every rectangle. No absent terrain is activated.
+
+The independent populated-world oracle additionally follows the exact historical
+`World.java` SHA-256 `540bf30ae801822c93fd54a936f3e34633494473e99e3dd5e0977167a960539c`
+and `Constants.java` SHA-256
+`f3b04a325a9b518ca7827c27976cf29094c1ba2dbd60af88e376f820132befe5` at c0102.
+It composes effective historical scenery/boundaries, their footprints, rotations,
+reciprocal bits and projectile-clip rules without invoking the native planner.
+Movement matches on all 811,008 populated tiles, but **7,376 projectile flags
+differ**. The current classifier's unconditional `name.contains("tree")` branch
+explains every discrepancy: adding that branch only to a separate diagnostic
+oracle leaves zero residual differences. It is not substituted for the original
+oracle; the semantic test remains failing pending a reviewed Base-only correction.
+No runtime behavior change accompanies this checkpoint.
+
+Actual ladder199 removal and reconstructed native-identity re-registration restore
+the original collision state exactly. Correct overlay0 exposes traversal0 after
+removal; the separately copied wrong-overlay8 control retains traversal64 despite
+its dynamic scenery count reaching zero. Direct re-registration of an already
+removed instance is correctly refused. Both cases retain the outstanding tree
+projectile refusal; a diagnostic sub-result is not an overall test pass.
+
+The existing real Player/plugin transition harness now also passes on the sealed
+352-sector package using `world-builder-installed`, instead of its separate
+1,764-sector ZIP fixture. This proves those actual transition consumers and all
+18 reviewed edge lookups/destinations, not every plugin in the game.
+Raw, original-definition, canonical-tile and derivation tampering refuse. Client
+CPU/void proof is being completed separately; normal login/rendered-frame proof
+and production promotion remain outside these headless tests.
