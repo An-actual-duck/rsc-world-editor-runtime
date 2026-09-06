@@ -95,6 +95,7 @@ public final class CurrentInstalledLaunch {
             roots.add(path);
         }
         Path installation = directory(Paths.get(value.getString("installationRoot")));
+        for (Path root : roots) disjoint(installation, root);
         Path working = roots.get(1);
         if (!working.equals(Paths.get("").toRealPath())) throw new IOException("Process cwd differs from reviewed working root");
         for (String key : Arrays.asList("stateRoot", "sideStateRoot", "workingRoot", "installationRoot"))
@@ -146,6 +147,12 @@ public final class CurrentInstalledLaunch {
 
     private void validate(Class<?> anchor) throws Exception {
         validateSelection();
+        for (String key : Arrays.asList("compositionIdentity", "runtimeProfile", "installedMapProfile", "configuration")) {
+            if (key.equals("configuration") && role.equals("client")) continue;
+            Path input = bound(key);
+            for (String mutable : Arrays.asList("workingRoot", "stateRoot", "sideStateRoot", "installationRoot"))
+                disjoint(input, root(mutable));
+        }
         if (!sha256(descriptor).equals(descriptorHash)) throw new IOException("Launch descriptor changed during validation");
         Path code = root("codeRoot");
         if (!treeHash(code).equals(hash(document, "codeTreeSha256"))

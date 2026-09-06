@@ -46,7 +46,7 @@
     {
       "schemaId": "current-base-runtime-profile-v1",
       "relativePath": "schema/current-base-runtime-profile-v1.schema.json",
-      "sha256": "047b877648a637c1dcef01335427f981a4d3a3d7ab5c418d6448a8814b5b58ff"
+      "sha256": "7535b2e2e68ff8f13d51578cf3389b65c303e8e796e974296fb2a681d8e32508"
     },
     {
       "schemaId": "current-base-server-content-v1",

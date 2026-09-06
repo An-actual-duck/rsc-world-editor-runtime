@@ -29,6 +29,7 @@ public final class MySqlGameLogger extends GameLogger {
 	private final Server server;
 	private ScheduledExecutorService scheduledExecutor;
 	private final MySqlGameDatabase database;
+	private volatile Throwable installedWriteFailure;
 
 	public MySqlGameLogger(final Server server, final MySqlGameDatabase database) {
 		this.server = server;
@@ -61,6 +62,23 @@ public final class MySqlGameLogger extends GameLogger {
 	}
 
 	public void stop() {
+		if (com.openrsc.server.CurrentInstalledLaunch.current() != null) {
+			// Do not hold running while waiting for a task that needs that monitor.
+			com.openrsc.server.InstalledShutdownDrain.finish(scheduledExecutor, () -> {
+				synchronized (running) {
+					if (installedWriteFailure != null)
+						throw new IllegalStateException("An installed database write previously failed", installedWriteFailure);
+					while (!queries.isEmpty()) {
+						if (!getDatabase().getConnection().isConnected())
+							throw new IllegalStateException("Installed database disconnected before final drain");
+						pollNextQuery();
+					}
+					running.set(false);
+				}
+			});
+			scheduledExecutor = null;
+			return;
+		}
 		synchronized (running) {
 			scheduledExecutor.shutdown();
 			try {
@@ -95,6 +113,12 @@ public final class MySqlGameLogger extends GameLogger {
 	}
 
 	protected void pollNextQuery() {
+		if (com.openrsc.server.CurrentInstalledLaunch.current() != null) {
+			Query query = queries.peek();
+			runQuery(query);
+			if (query != null) queries.remove(query);
+			return;
+		}
 		runQuery(queries.poll());
 	}
 
@@ -116,6 +140,10 @@ public final class MySqlGameLogger extends GameLogger {
 		/*} catch (final GameDatabaseException ex) {
 			LOGGER.catching(ex);
 		*/} catch (final Exception ex) {
+			if (com.openrsc.server.CurrentInstalledLaunch.current() != null) {
+				installedWriteFailure = ex;
+				throw new IllegalStateException("Installed database write failed", ex);
+			}
 			LOGGER.error("Error executing runQuery", ex);
 			if (server.getDiscordService() != null && server.getConfig().WANT_DISCORD_GENERAL_LOGGING) {
 				server.getDiscordService().errorLogStackTrace(ex);
@@ -125,6 +153,13 @@ public final class MySqlGameLogger extends GameLogger {
 
 	// Runs a query on the database thread. This is mostly useful for non-critical data like game logs that we don't make further calculations on.
 	public void addQuery(final Query query) {
+		if (com.openrsc.server.CurrentInstalledLaunch.current() != null) {
+			synchronized (running) {
+				if (!running.get()) throw new IllegalStateException("Installed database writer is stopped");
+				queries.add(query);
+			}
+			return;
+		}
 		if (!running.get()) {
 			return;
 		}

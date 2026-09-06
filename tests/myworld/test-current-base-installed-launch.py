@@ -248,10 +248,12 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
         xdo("type", "--delay", "70", "launchtest")
         xdo("key", "Return")
+        time.sleep(0.3)  # Allow the normal game tick to move focus to password.
         if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
             capture().save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "input.png")
         self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
         xdo("type", "--delay", "70", "launchpass")
+        time.sleep(0.3)
         xdo("key", "Return")
         time.sleep(2)
         if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
@@ -324,6 +326,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
                 self.assertEqual(0, online, "Clean shutdown must persist the offline account state")
             uid = self.side["client"] / "uid.dat"
             self.assertTrue(uid.is_file(), "Normal authentication must create UID only in persistent client state")
+            self.assertEqual(0o600, uid.stat().st_mode & 0o777)
             if client_uid_hash is None:
                 client_uid_hash = FIXTURE.sha256(uid)
             else:
@@ -365,10 +368,65 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
                     if mutation == "missing-lock": (self.anchor / "saved-server.lock").rename(lock)
                     if mutation == "missing-selection": (self.anchor / "saved-selection.json").rename(self.anchor / "active-launch.json")
 
+    def test_actual_sql_logout_write_failure_cannot_report_clean_shutdown(self):
+        with sqlite3.connect(self.state["server"] / "current_base.db") as database:
+            database.execute("CREATE TRIGGER invented_logout_failure BEFORE UPDATE OF online ON players "
+                "WHEN OLD.online=1 AND NEW.online=0 BEGIN SELECT RAISE(ABORT,'invented logout write failure'); END")
+        server, server_ready = self.start("server")
+        client, client_ready = self.start("client")
+        self.manual_login(server, client)
+        self.stop(client, client_ready)
+        request = json.loads(server_ready.read_text())
+        request["action"] = "shutdown"
+        write_json(server_ready.parent / "shutdown.json", request)
+        self.assertEqual(2, server.wait(timeout=90), "Actual SQL failure must propagate to normal launcher failure")
+        self.assertIn("Installed database write failed", self.log(server))
+        self.assertNotIn("Server unloaded", self.log(server))
+        self.assertTrue(server_ready.is_file(), "Uncertain session evidence must remain intact")
+        with sqlite3.connect(self.state["server"] / "current_base.db") as database:
+            self.assertEqual((1,), database.execute("SELECT online FROM players WHERE id=901").fetchone())
+
     def test_bootstrap_implementations_are_identical(self):
         server = (ROOT / "server/src/com/openrsc/server/CurrentInstalledLaunch.java").read_text().split("\n", 1)[1]
         client = (ROOT / "Client_Base/src/orsc/CurrentInstalledLaunch.java").read_text().split("\n", 1)[1]
         self.assertEqual(server, client)
+
+    def test_anchor_and_immutable_document_mutable_root_overlap_refusals(self):
+        for key in ("compositionIdentity", "runtimeProfile", "installedMapProfile", "configuration"):
+            for mutable in ("workingRoot", "stateRoot", "sideStateRoot", "installationRoot"):
+                with self.subTest(key=key, mutable=mutable):
+                    changed = copy.deepcopy(self.descriptors["server"])
+                    copied = Path(changed[mutable]) / "mutable-reviewed-input.json"
+                    shutil.copy2(Path(changed[key]["path"]), copied)
+                    changed[key] = binding(copied)
+                    path = self.root / "mutable-input-launch.json"
+                    write_json(path, changed)
+                    selected = copy.deepcopy(self.active)
+                    selected["serverDescriptorSha256"] = FIXTURE.sha256(path)
+                    write_json(self.anchor / "active-launch.json", selected)
+                    result = subprocess.run(self.command("server", path), cwd=self.working["server"],
+                        capture_output=True, text=True, timeout=20)
+                    self.assertEqual(2, result.returncode)
+                    self.assertEqual(changed[key]["sha256"], FIXTURE.sha256(copied))
+                    self.assertEqual([], list((self.anchor / "sessions/server").iterdir()))
+                    copied.unlink()
+        # Valid role layout nested under an anchor that improperly contains all roots.
+        (self.root / "sessions").mkdir(mode=0o700)
+        (self.root / "sessions/server").mkdir(mode=0o700)
+        (self.root / "server.lock").touch(mode=0o600)
+        changed = copy.deepcopy(self.descriptors["server"])
+        changed["installationRoot"] = str(self.root)
+        changed["sessionRoot"] = str(self.root / "sessions/server")
+        path = self.root / "overlapping-anchor-launch.json"
+        write_json(path, changed)
+        selected = copy.deepcopy(self.active)
+        selected["serverDescriptorSha256"] = FIXTURE.sha256(path)
+        write_json(self.root / "active-launch.json", selected)
+        result = subprocess.run(self.command("server", path), cwd=self.working["server"],
+            capture_output=True, text=True, timeout=20)
+        self.assertEqual(2, result.returncode)
+        self.assertEqual([], list((self.root / "sessions/server").iterdir()))
+        self.assertEqual([], list(self.working["server"].iterdir()))
 
     def test_missing_client_cache_refuses_without_working_or_neighbor_fallback(self):
         (self.code["client"] / "Cache").rename(self.root / "saved-code-cache")

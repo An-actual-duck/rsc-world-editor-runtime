@@ -1424,7 +1424,8 @@ public final class mudclient implements Runnable {
 	}
 
 	private static void saveClientSettings(Properties props) {
-		try (FileOutputStream out = new FileOutputStream(CurrentInstalledLaunch.sideState("clientSettings.conf").toFile())) {
+		try (java.io.OutputStream out = CurrentInstalledLaunch.current() == null
+			? new FileOutputStream("clientSettings.conf") : CurrentInstalledLaunch.openSideStateOutput("clientSettings.conf")) {
 			props.store(out, "Client settings");
 		} catch (IOException e) {
 			System.out.println("Something went wrong saving client settings");
@@ -20707,13 +20708,14 @@ public final class mudclient implements Runnable {
 				generatedUID = new SecureRandom().nextLong();
 			} while (generatedUID == 0L);
 
-			if (uID.exists() && !uID.canWrite()) {
+			if (CurrentInstalledLaunch.current() == null && uID.exists() && !uID.canWrite()) {
 				uID.setWritable(true);
 			}
-			try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(uID), true)) {
+			try (PrintWriter printWriter = new PrintWriter(CurrentInstalledLaunch.current() == null
+				? new FileOutputStream(uID) : CurrentInstalledLaunch.openSideStateOutput("uid.dat"), true)) {
 				printWriter.println(generatedUID);
 			}
-			uID.setReadOnly();
+			if (CurrentInstalledLaunch.current() == null) uID.setReadOnly();
 			return generatedUID;
 		} catch (Exception e) {
 			//e.printStackTrace(); // Localhost often causes an error to be printed, not important to see

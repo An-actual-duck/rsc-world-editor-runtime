@@ -147,6 +147,10 @@ The normal-launch integration lane requires a POSIX graphical test session,
 `xdotool`, `xwd`, and Python Pillow. It targets only its owned client window,
 enters invented fixture credentials through the login UI, and verifies visible
 terrain/player pixels plus durable state across two complete restarts.
+Managed shutdown drains queued database writes within the existing writer
+deadline. A failed SQL write or unresolved drain produces a failed process exit,
+not clean-stop success; session/log evidence and the role lease remain until
+the actual JVM exits. Generic logger shutdown behavior is unchanged.
 The complete reviewed server configuration includes `db_type: sqlite`
 and `db_name: current_base`; managed launch never reads `connections.conf` or
 `local.conf` implicitly. Immutable definitions, SQL queries/patches, plugin JARs,
@@ -156,8 +160,12 @@ Code-tree SHA-256 uses sorted UTF-8 portable relative paths, NUL, file SHA-256,
 NUL. Map package fingerprints use the existing distinct path, NUL, decimal size,
 NUL, SHA-256, newline recipe. Both reject links, hard-link aliases and special
 entries, with bounded entry counts and total size. Code, working, map and durable
-state roots are canonical and disjoint; `sideStateRoot` may be beneath its role's
-durable state root. Runtime mutable roots have mode `0700`. Server side-state
+state roots are canonical and disjoint, including from the stable installation
+anchor; `sideStateRoot` may be beneath its role's durable state root. Bound immutable
+composition/profile/map-profile/configuration documents must also stay outside
+all mutable working/state/side-state/installation roots. The public key remains
+an explicit persistent side-state binding.
+Runtime mutable roots have mode `0700`. Server side-state
 contains an existing matching `server.pem` (mode `0600`), `client.pem`, and
 `badwords.txt`, `goodwords.txt`, `alertwords.txt`; the installer explicitly preserves
 or initializes these. The server never silently regenerates installed keys.

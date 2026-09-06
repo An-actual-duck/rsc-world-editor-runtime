@@ -1041,6 +1041,8 @@ public class Server implements Runnable {
 				LOGGER.info("Server unloaded");
 			} catch (final Throwable t) {
 				LOGGER.error("Exception during Server stop()", t);
+				if (CurrentInstalledLaunch.current() != null)
+					throw new IllegalStateException("Installed server did not stop cleanly", t);
 				SystemUtil.exit(1);
 			}
 		}

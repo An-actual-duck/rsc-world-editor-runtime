@@ -10,12 +10,14 @@ public final class CurrentBaseInstalledServer {
             CurrentCompositionIdentity.initializeFromSystemProperties();
             Server server = Server.startServer(launch.bound("configuration").toString());
             if (!server.isRunning()) throw new IllegalStateException("Installed server did not become ready");
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                if (server.isRunning()) server.stop();
-            }, "installed-server-save-on-exit"));
+            java.util.concurrent.atomic.AtomicBoolean stopStarted = new java.util.concurrent.atomic.AtomicBoolean();
+            Runnable stopOnce = () -> {
+                if (stopStarted.compareAndSet(false, true) && server.isRunning()) server.stop();
+            };
+            Runtime.getRuntime().addShutdownHook(new Thread(stopOnce, "installed-server-save-on-exit"));
             launch.ready();
             while (server.isRunning()) {
-                if (launch.shutdownRequested()) { server.stop(); break; }
+                if (launch.shutdownRequested()) { stopOnce.run(); break; }
                 server.checkShutdown();
                 Thread.sleep(100);
             }
