@@ -11,6 +11,16 @@
   ],
   "sourceFiles": [
     {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/PrayerDef.xml",
+      "bundlePath": "Cache/current-base-definitions/PrayerDef.xml",
+      "transform": "copy"
+    },
+    {
+      "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/SpellDef.xml",
+      "bundlePath": "Cache/current-base-definitions/SpellDef.xml",
+      "transform": "copy"
+    },
+    {
       "sourcePath": "Client_Base/Cache/config.txt",
       "bundlePath": "Cache/config.txt",
       "transform": "copy"

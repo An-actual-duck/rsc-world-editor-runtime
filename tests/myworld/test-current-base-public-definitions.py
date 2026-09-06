@@ -26,6 +26,29 @@ def records(name):
 
 
 class PublicDefinitionSnapshotTest(unittest.TestCase):
+    def test_public_gameplay_hook_provenance_and_no_cap_filtering(self):
+        document = json.loads((SNAPSHOT / 'gameplay-provenance.json').read_bytes())
+        self.assertEqual(document['sourceCommit'], 'c0102e60774ab9c9076aabae49f6f97fb6fc4b00')
+        self.assertEqual(len(document['files']), 23)
+        manifest = json.loads((SNAPSHOT.parent / 'server-content.json').read_bytes())
+        sources = {row['bundlePath']: row for row in manifest['sourceFiles']}
+        for row in document['files']:
+            payload = (SNAPSHOT / row['path']).read_bytes()
+            self.assertEqual(hashlib.sha256(payload).hexdigest(), row['sha256'])
+            self.assertEqual(len(payload), row['size'])
+            original = payload if row['sourceFinalNewline'] else payload[:-1]
+            if row['sourceLineEndings'] == 'crlf':
+                original = original.replace(b'\n', b'\r\n')
+            self.assertEqual(hashlib.sha256(original).hexdigest(), row['sourceSha256'])
+            self.assertEqual(len(original), row['sourceSize'])
+            self.assertEqual(len(ET.fromstring(payload)), row['recordCount'])
+            selected = sources['conf/server/defs/' + row['path']]
+            self.assertEqual(selected['transform'], 'copy')
+            self.assertEqual(selected['sourcePath'], 'current-platform/runtime/current-base-v1/public-definitions/' + row['path'])
+        generated = {row['bundlePath']: row['content'] for row in manifest['generatedFiles']}
+        for filename in document['disabledHookMaps']:
+            self.assertEqual(generated['conf/server/defs/extras/' + filename], '<map/>')
+
     def test_closed_visual_derivation_literals_reject_code(self):
         spec = importlib.util.spec_from_file_location('public_visuals',
             ROOT / 'scripts/derive-current-base-public-item-visuals.py')

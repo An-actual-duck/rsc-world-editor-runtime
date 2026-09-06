@@ -9755,9 +9755,9 @@ public class EntityHandler {
 		}
 		loadTextureDefinitions();
 		loadAnimationDefinitions();
-		loadSpellDefinitions();
-		loadPrayerDefinitions();
 		if (!publicBase) {
+			loadSpellDefinitions();
+			loadPrayerDefinitions();
 			loadTileDefinitions();
 			loadDoorDefinitions();
 			loadGameObjectDefinitionsA();
@@ -9828,6 +9828,31 @@ public class EntityHandler {
 			loadProjectTiles(root.resolve("TileDef.xml"));
 			loadProjectDoors(root.resolve("DoorDef.xml"));
 			loadProjectScenery(root.resolve("GameObjectDef.xml"));
+			NodeList spellRows = projectXml(root.resolve("SpellDef.xml"), "SpellDef-array")
+				.getElementsByTagName("SpellDef");
+			spells.clear();
+			for (int id = 0; id < spellRows.getLength(); id++) {
+				Element row = (Element) spellRows.item(id);
+				java.util.HashMap<Integer, Integer> runes = new java.util.HashMap<>();
+				NodeList entries = row.getElementsByTagName("entry");
+				for (int j = 0; j < entries.getLength(); j++) {
+					NodeList pair = ((Element) entries.item(j)).getElementsByTagName("int");
+					if (pair.getLength() != 2 || runes.put(Integer.parseInt(pair.item(0).getTextContent().trim()),
+						Integer.parseInt(pair.item(1).getTextContent().trim())) != null) {
+						throw new IllegalArgumentException("invalid public Base spell rune table");
+					}
+				}
+				spells.add(new SpellDef(xmlText(row, "name", ""), xmlText(row, "description", ""),
+					xmlInt(row, "reqLevel", 0), xmlInt(row, "type", 0), xmlInt(row, "runeCount", 0), runes));
+			}
+			NodeList prayerRows = projectXml(root.resolve("PrayerDef.xml"), "PrayerDef-array")
+				.getElementsByTagName("PrayerDef");
+			prayers.clear();
+			for (int id = 0; id < prayerRows.getLength(); id++) {
+				Element row = (Element) prayerRows.item(id);
+				prayers.add(new PrayerDef(xmlInt(row, "reqLevel", 0), xmlInt(row, "drainRate", 0),
+					xmlText(row, "name", ""), xmlText(row, "description", "")));
+			}
 			if (items.size() != 1593 || objects.size() != 1296 || doors.size() != 214 || tiles.size() != 25) {
 				throw new IllegalArgumentException("incomplete public Base definitions");
 			}

@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "current-base-public-gameplay-definition-snapshot",
+  "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+  "normalization": "xml-lf-with-final-newline",
+  "disabledHookMaps": [
+    "ObjectHarvesting.xml",
+    "ObjectRunecraft.xml"
+  ],
+  "files": [
+    {
+      "path": "PrayerDef.xml",
+      "sourcePath": "server/conf/server/defs/PrayerDef.xml",
+      "sourceSha256": "2af99d6cc5c57a74758a4392293c32ad68594bff5bff9fb1ad8132d708a785a7",
+      "sourceSize": 2755,
+      "sourceLineEndings": "lf",
+      "sourceFinalNewline": false,
+      "sha256": "e50cb39381368af2c065e476a20d338810528981766245bb0a77b712771ba76d",
+      "size": 2756,
+      "recordCount": 14
+    },
+    {
+      "path": "SpellDef.xml",
+      "sourcePath": "server/conf/server/defs/SpellDef.xml",
+      "sourceSha256": "49d6a5af948690849bf35b66cb854f92c2d04e5c347027399068544a2d9d160c",
+      "sourceSize": 25903,
+      "sourceLineEndings": "lf",
+      "sourceFinalNewline": false,
+      "sha256": "1b0202f99c9cd2e71699ec0e41fb9e397f2b846d7e359014db8e32755099bf57",
+      "size": 25904,
+      "recordCount": 48
+    },
+    {
+      "path": "extras/FiremakingDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/FiremakingDef.xml",
+      "sourceSha256": "2ecd63c56021d025fe063923eb66260a51631bf6146bb0ea088ade26f157af1a",
+      "sourceSize": 875,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": false,
+      "sha256": "8acd43d3833956b3e54b7a4e7181cc97f4a781a8a41065a13b2a3c02d052830b",
+      "size": 827,
+      "recordCount": 6
+    },
+    {
+      "path": "extras/ItemAffectedTypes.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemAffectedTypes.xml",
+      "sourceSha256": "5af9581cbe663ddca50fd24d052d0140564f4ea51ca3f870409512a1f0d11ca9",
+      "sourceSize": 2414,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": false,
+      "sha256": "3cb8ba360093632d8a27c2ffe442abb3a294e369c8f59551922ba080377154a3",
+      "size": 2261,
+      "recordCount": 20
+    },
+    {
+      "path": "extras/ItemArrowHeadDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemArrowHeadDef.xml",
+      "sourceSha256": "48faa22e60fa5abb6c507fbcf9512019edb012c3acab6d5623b56fec688b4603",
+      "sourceSize": 990,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "2b21724586788f424f1a2e0dd306c7b761e864216c7349fa0cc20a7ae74e9566",
+      "size": 940,
+      "recordCount": 6
+    },
+    {
+      "path": "extras/ItemBowStringDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemBowStringDef.xml",
+      "sourceSha256": "41cd5a660c00ae8f6912c00a380a5a6a93e942b4d55aa176ee5eef42d2fc6d75",
+      "sourceSize": 1931,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "151e41b807677c609630d50679bc45c7d46051db6e9b1f56e4a8d15103f7cc42",
+      "size": 1833,
+      "recordCount": 12
+    },
+    {
+      "path": "extras/ItemCookingDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemCookingDef.xml",
+      "sourceSha256": "8d07ce7d8b12b8cd98b3ec2a4e00961f4127d43d6fa220d7bb3e650915584d04",
+      "sourceSize": 8744,
+      "sourceLineEndings": "lf",
+      "sourceFinalNewline": true,
+      "sha256": "8d07ce7d8b12b8cd98b3ec2a4e00961f4127d43d6fa220d7bb3e650915584d04",
+      "size": 8744,
+      "recordCount": 46
+    },
+    {
+      "path": "extras/ItemCraftingDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemCraftingDef.xml",
+      "sourceSha256": "a12fbd41d7db35a2cac2a80c35de7f334b94a4701aad055fdce3963fbb70d0fe",
+      "sourceSize": 5750,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "246c946fcae0d65c754185c4def6653d4b0974ce2f6663d51b3f98dce2d9e16a",
+      "size": 5485,
+      "recordCount": 25
+    },
+    {
+      "path": "extras/ItemDartTipDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemDartTipDef.xml",
+      "sourceSha256": "09a5585dea53121ac6748118e458caf29133b78820699a42da604d25ac1d8ed9",
+      "sourceSize": 962,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "e4cf69716b9de0d6a9cff53fd0cdbceb2a26ed7b9cbcf17dbdd22fec8369be9e",
+      "size": 912,
+      "recordCount": 6
+    },
+    {
+      "path": "extras/ItemEdibleHeals.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemEdibleHeals.xml",
+      "sourceSha256": "9b01623bf74300528a6cd61387171dbc61eee0da78196541df0a73c08dd076c4",
+      "sourceSize": 6624,
+      "sourceLineEndings": "lf",
+      "sourceFinalNewline": true,
+      "sha256": "9b01623bf74300528a6cd61387171dbc61eee0da78196541df0a73c08dd076c4",
+      "size": 6624,
+      "recordCount": 126
+    },
+    {
+      "path": "extras/ItemGemDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemGemDef.xml",
+      "sourceSha256": "826946ccd304a90cae1ce4396e4a48d11ed0ffa06f65a55ce2089003dc67ec5f",
+      "sourceSize": 1262,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "05a0cebb861f7b7cc678b4226f3ccab5e1932c1d920c6018040624288a400793",
+      "size": 1196,
+      "recordCount": 8
+    },
+    {
+      "path": "extras/ItemHerbDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemHerbDef.xml",
+      "sourceSha256": "3ddb22c7a37c0f2d304b81735a97860f1d498b86add4a61aaf5977ec7a3ce25e",
+      "sourceSize": 1520,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "9f1f9b96b6e686dca0581d557bae9fe2c4e7285a3fc085a81d404056c74627b5",
+      "size": 1441,
+      "recordCount": 11
+    },
+    {
+      "path": "extras/ItemHerbSecond.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemHerbSecond.xml",
+      "sourceSha256": "3edffb4c7ba7d507e7b6b0ff617c8adb48c13315528b3067004474f5a987cb25",
+      "sourceSize": 2778,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "9940117d962bc6b73dbb1eec322514afca91a41945d7ac45dc3f652b9de0112e",
+      "size": 2671,
+      "recordCount": 15
+    },
+    {
+      "path": "extras/ItemLogCutDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemLogCutDef.xml",
+      "sourceSha256": "a2c9ce4e50f0f1f1435c067ae794df89b4fdb549447d04409d156bcbe10f8ce7",
+      "sourceSize": 2037,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "3042f4ef8fb193cc59f7c009270d0147e9387c0019a4fd6fad164d2e5ce1b4a8",
+      "size": 1957,
+      "recordCount": 6
+    },
+    {
+      "path": "extras/ItemPerfectCookingDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemPerfectCookingDef.xml",
+      "sourceSha256": "e2b097a60825d2b994dc5af8c71f98839cc89ea3b4b9bb8787648334a258b421",
+      "sourceSize": 2744,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "a3d0108f5a9b9818a35f2dd82f281223a16b0d06f033da7bb5f4b65c541ce03e",
+      "size": 2616,
+      "recordCount": 21
+    },
+    {
+      "path": "extras/ItemSmeltingDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemSmeltingDef.xml",
+      "sourceSha256": "00f954c05c67801df8669a46c14c36eb9b685ff661222e98d3bb6bd447fc5ec6",
+      "sourceSize": 2606,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "01d2e949fb717d60192af8fa698c806e4f56253622d2d717bc121e66d8e649a9",
+      "size": 2470,
+      "recordCount": 11
+    },
+    {
+      "path": "extras/ItemSmithingDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemSmithingDef.xml",
+      "sourceSha256": "1f30726f58e2e779acd245dbfa1fb023d26e9b674f5e4359f05fb0dc9c7293e4",
+      "sourceSize": 20373,
+      "sourceLineEndings": "lf",
+      "sourceFinalNewline": true,
+      "sha256": "1f30726f58e2e779acd245dbfa1fb023d26e9b674f5e4359f05fb0dc9c7293e4",
+      "size": 20373,
+      "recordCount": 144
+    },
+    {
+      "path": "extras/ItemUnIdentHerbDef.xml",
+      "sourcePath": "server/conf/server/defs/extras/ItemUnIdentHerbDef.xml",
+      "sourceSha256": "8b925e676ac3e154bd9637244ab75a968f4a89256e76e8a8d00d7a250b2e5881",
+      "sourceSize": 2611,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "ec20725f3dc87f8f862eceb04bd717cb3fe3d0fab3e87ca4a3f5a41e84de1ef2",
+      "size": 2481,
+      "recordCount": 16
+    },
+    {
+      "path": "extras/NpcCerters.xml",
+      "sourcePath": "server/conf/server/defs/extras/NpcCerters.xml",
+      "sourceSha256": "2e9116426c25153310f2db1d341f323e137cf43e201e245073a66f2b35cc1390",
+      "sourceSize": 13069,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": false,
+      "sha256": "ff645b00ec26596e924052f31c90f6f1502c012da4d6564e6d35eaee278e89d8",
+      "size": 12542,
+      "recordCount": 16
+    },
+    {
+      "path": "extras/ObjectFishing.xml",
+      "sourcePath": "server/conf/server/defs/extras/ObjectFishing.xml",
+      "sourceSha256": "3d4311008506e328fc16a961065ef8678440699517929834b19e5e896157c9ef",
+      "sourceSize": 12927,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "84f381624d6744d8e5932c26ea088ba8ec6c441d7db5febe29ba32f9a74d8f65",
+      "size": 12564,
+      "recordCount": 8
+    },
+    {
+      "path": "extras/ObjectMining.xml",
+      "sourcePath": "server/conf/server/defs/extras/ObjectMining.xml",
+      "sourceSha256": "bd87694344a2f492d696a36bd3209ab360205c8f7845ba1a90bb398ca2c3ad33",
+      "sourceSize": 5432,
+      "sourceLineEndings": "lf",
+      "sourceFinalNewline": true,
+      "sha256": "bd87694344a2f492d696a36bd3209ab360205c8f7845ba1a90bb398ca2c3ad33",
+      "size": 5432,
+      "recordCount": 24
+    },
+    {
+      "path": "extras/ObjectTelePoints.xml",
+      "sourcePath": "server/conf/server/defs/extras/ObjectTelePoints.xml",
+      "sourceSha256": "8d41847521d4226e492d00f963ed50a4d9052e9a154b1b82b1ace93e5c11893f",
+      "sourceSize": 2904,
+      "sourceLineEndings": "lf",
+      "sourceFinalNewline": false,
+      "sha256": "d22608c5adfd6bd72893e11f9d05d778b6ed83689344089730a89e8c825c1fbf",
+      "size": 2905,
+      "recordCount": 18
+    },
+    {
+      "path": "extras/ObjectWoodcutting.xml",
+      "sourcePath": "server/conf/server/defs/extras/ObjectWoodcutting.xml",
+      "sourceSha256": "87dbc925404822318ec36b7b03dd28a1c6ebf934a9662f93c46a745ecbbcd6a3",
+      "sourceSize": 6011,
+      "sourceLineEndings": "crlf",
+      "sourceFinalNewline": true,
+      "sha256": "f87a9e99547542c56d08621fa23bb76d02bfc49aac34391cc5e727b8c9fc7a4c",
+      "size": 5800,
+      "recordCount": 8
+    }
+  ]
+}
