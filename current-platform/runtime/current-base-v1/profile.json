@@ -46,6 +46,13 @@
     "serverBundlePath": "conf/server/current-base-public-provenance/skill-policy.json",
     "clientBundlePath": "Cache/current-base-definitions/provenance/skill-policy.json"
   },
+  "authoringPolicy": {
+    "policyId": "current-base-isolated-authoring-v1",
+    "stateRootProperty": "openrsc.currentBaseAuthoringStateRoot",
+    "sqliteFile": "world_builder.db",
+    "runtimeProfile": "adaptive-world-builder",
+    "contentPolicy": "native-public-no-overlay"
+  },
   "statePolicy": {
     "contractId": "canonical-public-state-v1",
     "durableLocation": "outside-code-runtime",
@@ -74,7 +81,8 @@
       "preservation-retro-sqlite-to-current-base-v1",
       "preservation-core-sqlite-to-current-base-v1",
       "preservation-initialized-sqlite-to-current-base-v1",
-      "preservation-retro-mariadb-to-current-base-v1"
+      "preservation-retro-mariadb-to-current-base-v1",
+      "current-base-sqlite-to-current-base-v1"
     ],
     "manifestRole": "state-migration-manifest",
     "toolArtifactRole": "server-runtime",

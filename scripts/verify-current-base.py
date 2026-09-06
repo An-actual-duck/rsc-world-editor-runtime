@@ -129,7 +129,7 @@ def validate_profile(path: Path) -> dict:
             "pluginSourceSets",
             "clientAssetSets",
             "clientContent",
-            "statePolicy",
+            "statePolicy", "authoringPolicy",
             "definitionPolicy",
             "skillPolicy",
             "mapPolicy",
@@ -208,6 +208,14 @@ def validate_profile(path: Path) -> dict:
     if ("com/openrsc/server/CurrentBaseSkillContract.class" not in profile["requiredRuntimeClasses"]
             or "orsc/CurrentBaseSkillContract.class" not in profile["requiredClientClasses"]):
         raise VerificationError("Current Base skill policy implementation classes are required")
+    if profile["authoringPolicy"] != {
+        "policyId": "current-base-isolated-authoring-v1",
+        "stateRootProperty": "openrsc.currentBaseAuthoringStateRoot",
+        "sqliteFile": "world_builder.db",
+        "runtimeProfile": "adaptive-world-builder",
+        "contentPolicy": "native-public-no-overlay",
+    }:
+        raise VerificationError("Current Base isolated authoring policy is incomplete")
     if profile["statePolicy"] != {
         "contractId": "canonical-public-state-v1",
         "durableLocation": "outside-code-runtime",
@@ -240,6 +248,7 @@ def validate_profile(path: Path) -> dict:
             "preservation-core-sqlite-to-current-base-v1",
             "preservation-initialized-sqlite-to-current-base-v1",
             "preservation-retro-mariadb-to-current-base-v1",
+            "current-base-sqlite-to-current-base-v1",
         ],
         "manifestRole": "state-migration-manifest",
         "toolArtifactRole": "server-runtime",
@@ -451,17 +460,21 @@ def validate_state_migration(path: Path, profile: dict) -> dict:
     if [row.get("migrationRowId") for row in sources] != binding["migrationRowIds"]:
         raise VerificationError("state migration source rows differ from profile")
     for row in sources:
+        current_copy = row.get("migrationRowId") == "current-base-sqlite-to-current-base-v1"
+        fingerprint_key = "sourceSchemaFingerprints" if current_copy else "sourceSchemaFingerprint"
         require_exact_keys(
             row,
-            {"migrationRowId", "engine", "sourceSchemaId", "sourceSchemaFingerprint",
+            {"migrationRowId", "engine", "sourceSchemaId", fingerprint_key,
              "sourceSchemaFingerprintAlgorithm", "verificationRuntime",
              "stageMode", "sourceMutation",
              "rollback", "credentialPolicy", "transformationId"},
             "state migration engine",
         )
-        fingerprint = row["sourceSchemaFingerprint"]
-        if (not isinstance(fingerprint, str) or len(fingerprint) != 64
-                or any(character not in "0123456789abcdef" for character in fingerprint)):
+        fingerprints = row[fingerprint_key] if current_copy else [row[fingerprint_key]]
+        if (not isinstance(fingerprints, list) or len(fingerprints) != (3 if current_copy else 1)
+                or any(not isinstance(fingerprint, str) or len(fingerprint) != 64
+                    or any(character not in "0123456789abcdef" for character in fingerprint)
+                    for fingerprint in fingerprints)):
             raise VerificationError("state migration schema fingerprint is malformed")
     invocation = migration["invocation"]
     require_exact_keys(invocation, {"toolArtifactRole", "mainClass", "arguments"},

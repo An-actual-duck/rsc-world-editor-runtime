@@ -129,6 +129,87 @@ class CurrentBaseStateMigrationTest(unittest.TestCase):
         mutated["supportedSources"][0]["unexpected"] = True
         self.assertFalse(jsonschema.Draft202012Validator(schema).is_valid(mutated))
 
+    def current_source(self, lineage):
+        historical = self.root / (lineage + "-historical.db")
+        current = self.root / (lineage + "-current.db")
+        if lineage == "initialized":
+            shutil.copy2(INITIALIZED_SQLITE, historical)
+        else:
+            create_sqlite(historical, (SQLITE_SCHEMA if lineage == "retro" else CORE_SQLITE_SCHEMA).read_text())
+        if lineage == "retro":
+            seed_sqlite(historical)
+        first = self.run_sqlite(historical, current, self.root / (lineage + "-initial.json"))
+        self.assertEqual(0, first.returncode, first.stdout + first.stderr)
+        # Simulate normal gameplay after installation. Current values must not
+        # be recalculated from retained historical split-skill columns.
+        with sqlite3.connect(current) as database:
+            if lineage != "retro":
+                for table in ("curstats", "maxstats", "experience", "capped_experience"):
+                    database.execute(f"INSERT INTO {table}(playerID) VALUES(41)")
+            for table in ("curstats", "maxstats", "experience", "capped_experience"):
+                database.execute(f"UPDATE {table} SET attack=23, strength=31, defense=47, prayer=59, magic=61, woodcut=67 WHERE playerID=41")
+            database.execute("INSERT INTO equipped(playerID,itemID) VALUES(41,314)")
+            database.execute("INSERT INTO player_cache(playerID,type,key,value) VALUES(41,0,'successor','invented-current-state')")
+        return current
+
+    def test_current_base_successor_preserves_exact_bytes_all_three_supported_schemas(self):
+        for lineage in ("retro", "core", "initialized"):
+            with self.subTest(lineage=lineage):
+                source = self.current_source(lineage)
+                original = source.read_bytes()
+                stage = self.root / (lineage + "-successor.db")
+                evidence = self.root / (lineage + "-successor.json")
+                result = self.run_sqlite(source, stage, evidence)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                self.assertEqual(original, source.read_bytes())
+                self.assertEqual(original, stage.read_bytes())
+                proof = json.loads(evidence.read_text())
+                self.assertEqual(EVIDENCE_KEYS, set(proof))
+                self.assertEqual("current-base-sqlite-to-current-base-v1", proof["migrationRowId"])
+                self.assertEqual(proof["sourceStateSha256"], proof["stagedSourceProjectionSha256"])
+                again = self.run_sqlite(stage, self.root / (lineage + "-third.db"), self.root / (lineage + "-third.json"))
+                self.assertEqual(0, again.returncode, again.stderr)
+                self.assertEqual(original, (self.root / (lineage + "-third.db")).read_bytes())
+
+    def test_current_base_successor_refuses_marker_patch_schema_sidecar_and_output_drift(self):
+        baseline = self.current_source("retro")
+        mutations = {
+            "marker": "DELETE FROM current_base_migrations",
+            "contract": "UPDATE current_base_migrations SET contract_sha256='" + "0" * 64 + "'",
+            "lineage": "UPDATE current_base_migrations SET migration_row_id='preservation-core-sqlite-to-current-base-v1'",
+            "patch": "DELETE FROM db_patches WHERE patch_name='2026_08_03_add_blessing_skill.sql'",
+            "new-patch": "INSERT INTO db_patches(patch_name,run_date) VALUES('unknown.sql','2026-09-06')",
+            "schema": "ALTER TABLE players ADD COLUMN unreviewed INTEGER",
+        }
+        for name, sql in mutations.items():
+            with self.subTest(mutation=name):
+                source = self.root / (name + ".db")
+                shutil.copyfile(baseline, source)
+                with sqlite3.connect(source) as database:
+                    database.execute(sql)
+                before = source.read_bytes()
+                stage, evidence = self.root / (name + "-stage.db"), self.root / (name + ".json")
+                result = self.run_sqlite(source, stage, evidence)
+                self.assertEqual(2, result.returncode, result.stdout)
+                self.assertEqual(before, source.read_bytes())
+                self.assertFalse(stage.exists())
+                self.assertFalse(evidence.exists())
+        for suffix in ("-wal", "-shm", "-journal"):
+            sidecar = Path(str(baseline) + suffix)
+            sidecar.write_bytes(b"unclosed-state")
+            result = self.run_sqlite(baseline, self.root / "sidecar-stage.db", self.root / "sidecar.json")
+            self.assertEqual(2, result.returncode)
+            sidecar.unlink()
+        stage = self.root / "owned-stage.db"
+        evidence = self.root / "owned-evidence.json"
+        failed = self.run_sqlite(baseline, stage, evidence, "--fail-after-copy", "true", inject=True)
+        self.assertEqual(2, failed.returncode)
+        self.assertFalse(stage.exists())
+        stage.write_bytes(b"pre-existing")
+        refused = self.run_sqlite(baseline, stage, evidence)
+        self.assertEqual(2, refused.returncode)
+        self.assertEqual(b"pre-existing", stage.read_bytes())
+
     def test_sqlite_paths_are_literal_even_with_uri_metacharacters(self) -> None:
         source = self.root / "source #?mode=rw&é.db"
         stage = self.root / "stage #?mode=ro&é.db"

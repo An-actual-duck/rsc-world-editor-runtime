@@ -1,6 +1,9 @@
 package com.openrsc.server.database.impl.sqlite;
 
 import com.openrsc.server.CurrentCompositionIdentity;
+import com.openrsc.server.ServerConfiguration;
+import com.openrsc.server.content.worldedit.WorldBuilderMode;
+import com.openrsc.server.content.worldedit.WorldEditStorageContext;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,24 +15,54 @@ import java.nio.file.Paths;
 public final class CurrentBaseStateLocation {
     public static final String PROPERTY = "openrsc.currentBaseStateRoot";
     public static final String DATABASE = "current_base.db";
+    public static final String AUTHORING_PROPERTY = "openrsc.currentBaseAuthoringStateRoot";
 
     private CurrentBaseStateLocation() { }
 
     /** Null selects the unchanged historical layout only for an unconfigured non-Base runtime. */
     public static Path resolve(String databaseName) throws IOException {
+        if (System.getProperty(AUTHORING_PROPERTY) != null) throw new IOException(
+            "Base authoring state requires validated adaptive World Builder configuration");
+        return resolveSelected(databaseName, false);
+    }
+
+    public static Path resolve(ServerConfiguration configuration) throws IOException {
+        boolean authoring = System.getProperty(AUTHORING_PROPERTY) != null;
+        if (authoring) {
+            if (System.getProperty(PROPERTY) != null) throw new IOException(
+                "installed and authoring Base state roots are mutually exclusive");
+            if (!configuration.WORLD_BUILDER_MODE || !configuration.WORLD_BUILDER_ADAPTIVE_MODE)
+                throw new IOException("Base authoring state requires explicit adaptive World Builder mode");
+            if (configuration.WORLD_BUILDER_CONTENT_BUNDLE_PATH != null
+                && !configuration.WORLD_BUILDER_CONTENT_BUNDLE_PATH.trim().isEmpty())
+                throw new IOException("Base authoring state requires native public content without a custom overlay");
+            WorldBuilderMode.validate(configuration);
+            String workspace = System.getProperty(WorldEditStorageContext.WORKSPACE_PROPERTY, "");
+            Path expected = Paths.get(workspace).resolve("working/authoring-state");
+            if (workspace.isEmpty() || !expected.isAbsolute()
+                || !expected.equals(expected.normalize()) || !expected.equals(expected.toRealPath())
+                || !expected.toString().equals(System.getProperty(AUTHORING_PROPERTY)))
+                throw new IOException("Base authoring state must be the canonical workspace working/authoring-state directory");
+        }
+        return resolveSelected(configuration.DB_NAME, authoring);
+    }
+
+    private static Path resolveSelected(String databaseName, boolean authoring) throws IOException {
         CurrentCompositionIdentity identity = CurrentCompositionIdentity.current();
         boolean currentBase = identity.isEnabled()
             && "current-base-v1".equals(identity.value("variantId"));
-        String configured = System.getProperty(PROPERTY);
+        String property = authoring ? AUTHORING_PROPERTY : PROPERTY;
+        String configured = System.getProperty(property);
         if (!currentBase) {
             if (configured != null) throw new IOException(
                 "managed state root requires an initialized Current Base composition");
             return null;
         }
         if (configured == null || configured.isEmpty()) throw new IOException(
-            PROPERTY + " is required by Current Base; no in-runtime database fallback is allowed");
-        if (!"current_base".equals(databaseName)) throw new IOException(
-            "Current Base requires the canonical current_base database name");
+            property + " is required by Current Base; no in-runtime database fallback is allowed");
+        String expectedName = authoring ? WorldBuilderMode.DATABASE_NAME : "current_base";
+        if (!expectedName.equals(databaseName)) throw new IOException(
+            "Current Base requires the canonical " + expectedName + " database name");
         Path root = Paths.get(configured);
         if (!root.isAbsolute() || !root.equals(root.normalize())
             || !root.equals(root.toRealPath())) throw new IOException(
@@ -46,11 +79,14 @@ public final class CurrentBaseStateLocation {
         if (Files.isRegularFile(artifact, LinkOption.NOFOLLOW_LINKS)) artifact = artifact.getParent();
         requireDisjoint(root, working);
         requireDisjoint(root, artifact);
-        Path database = root.resolve(DATABASE);
+        if (authoring && Files.exists(root.resolve(DATABASE), LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("Base authoring state must not share an installed database directory");
+        String filename = authoring ? WorldBuilderMode.DATABASE_NAME + ".db" : DATABASE;
+        Path database = root.resolve(filename);
         requirePrivate(database, false);
         // Recovery journals are legitimate live state, but never aliases to another file.
         for (String suffix : new String[] {"-journal", "-wal", "-shm"}) {
-            Path sidecar = root.resolve(DATABASE + suffix);
+            Path sidecar = root.resolve(filename + suffix);
             if (Files.exists(sidecar, LinkOption.NOFOLLOW_LINKS)) requirePrivate(sidecar, false);
         }
         return database;

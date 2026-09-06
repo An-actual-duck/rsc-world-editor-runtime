@@ -41,7 +41,7 @@ public class SqliteGameDatabaseConnection extends JDBCDatabaseConnection {
         final Path managed;
         final String databaseUrl;
         try {
-            managed = CurrentBaseStateLocation.resolve(dbName);
+            managed = CurrentBaseStateLocation.resolve(server.getConfig());
             databaseUrl = managed == null ? "jdbc:sqlite:" + getDBPath(dbName)
                 : "jdbc:sqlite:" + managed.toUri().toASCIIString() + "?mode=rw";
             if (selectedDatabaseUrl != null && !selectedDatabaseUrl.equals(databaseUrl)) {
