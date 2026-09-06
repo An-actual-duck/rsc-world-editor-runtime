@@ -39,6 +39,47 @@ public final class PublicCombatProbe {
       for(Item added:player.getCarriedItems().getInventory().getItems())if(added.getCatalogId()==id)added.getItemStatus().setWielded(true);
     }
   }
+  static final class DeathOrderPlayer extends Player {
+    int deaths;
+    DeathOrderPlayer() { super(server.getWorld(),726L); }
+    @Override public void killedBy(Mob killer) {
+      deaths++;
+      check(getCache().getInt("ringofrecoil")==2,"lethal melee consumes recoil before death cleanup");
+      check(killer.getLevel(3)==97,"lethal melee delivers recoil before death cleanup");
+      getCarriedItems().getInventory().getItems().clear();
+    }
+  }
+  static void meleeRecoilDelivery(Npc npc)throws Exception {
+    clear();wear(1314);player.getCache().remove("ringofrecoil");
+    player.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);
+    npc.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);
+    player.getPrayers().setPrayer(Prayers.PARALYZE_MONSTER,true,false);
+    com.openrsc.server.event.rsc.impl.combat.CombatEvent event=new com.openrsc.server.event.rsc.impl.combat.CombatEvent(server.getWorld(),npc,player);
+    invoke(event.getClass(),event,"inflictDamage",new Class<?>[]{Mob.class,Mob.class,int.class},npc,player,17);
+    check(player.getLevel(3)==99&&npc.getLevel(3)==99,"blocked melee cannot damage either participant");
+    check(!player.getCache().hasKey("ringofrecoil")&&player.getCarriedItems().getEquipment().hasEquipped(1314),"blocked melee preserves recoil budget and ring");
+    // Also exercise the real run caller: it must not reflect the rejected raw roll.
+    npc.setLocation(player.getLocation(),true);field(Player.class,"loggedIn").setBoolean(player,true);
+    npc.getSkills().setTemporaryLevelAndMaxStat(0,90,90,false);npc.getSkills().setTemporaryLevelAndMaxStat(2,90,90,false);
+    npc.startCombat(player);event=npc.getCombatEvent();
+    for(int seed=0;seed<20;seed++) { DataConversions.getRandom().setSeed(seed);field(event.getClass(),"roundNumber").setInt(event,0);event.run(); }
+    check(player.getLevel(3)==99&&npc.getLevel(3)==99,"actual immune reciprocal combat has no damage or reflected roll");
+    check(!player.getCache().hasKey("ringofrecoil"),"actual immune combat spends no ring budget");
+    npc.resetCombatEvent();player.resetCombatEvent();server.getGameEventHandler().remove(event);
+    field(Player.class,"loggedIn").setBoolean(player,false);player.getPrayers().resetPrayers();
+    Player saved=player;
+    try {
+      DeathOrderPlayer dying=new DeathOrderPlayer();player=dying;
+      player.getSettings().setAppearance(new com.openrsc.server.model.PlayerAppearance(0,0,0,0,1,2));
+      player.setBank(new Bank(player));player.setClientVersion(server.getConfig().CLIENT_VERSION);
+      player.setClientLimitations(com.openrsc.server.net.rsc.ClientLimitations.forVersion(player.getClientVersion()));
+      player.setLocation(saved.getLocation(),true);field(Player.class,"prayers").set(player,new Prayers(player));
+      player.getSkills().setTemporaryLevelAndMaxStat(3,5,99,false);wear(1314);
+      event=new com.openrsc.server.event.rsc.impl.combat.CombatEvent(server.getWorld(),npc,player);
+      invoke(event.getClass(),event,"inflictDamage",new Class<?>[]{Mob.class,Mob.class,int.class},npc,player,17);
+      check(dying.deaths==1&&player.getLevel(3)==0,"lethal recoil path invokes death exactly once");
+    } finally { player=saved;clear();player.getCache().remove("ringofrecoil"); }
+  }
   static void prayerAndEffects(Npc npc)throws Exception {
     clear();player.getPrayers().resetPrayers();
     check(player.getPrayers().getActivePrayers().length==14,"actual public prayer packet extent");
@@ -119,6 +160,7 @@ public final class PublicCombatProbe {
       }
     }
     check(actual>0,"actual melee positive hit");field(Player.class,"loggedIn").setBoolean(player,false);
+    meleeRecoilDelivery(npc);
     clear();player.getCache().remove("ringofrecoil");
     player.applyEarthAttackSpeedDebuff(80);
     check(com.openrsc.server.event.rsc.impl.projectile.RangeUtils.getAdjustedRangeDelayTicks(player,3)==3,"public ranged no owner slow");

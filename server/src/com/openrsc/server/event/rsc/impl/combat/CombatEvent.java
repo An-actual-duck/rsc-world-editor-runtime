@@ -185,10 +185,6 @@ public class CombatEvent extends GameTickEvent {
 				applyPublicDaggerPoison(hitter, target);
 				damage = CombatFormula.doMeleeDamage(hitter, target);
 				inflictDamage(hitter, target, damage);
-				if (target.isPlayer()) {
-					int reflected = CurrentBaseCombatContract.consumeRecoil((Player) target, damage);
-					if (reflected > 0) inflictDamage(target, hitter, reflected);
-				}
 				return;
 			}
 			if (getWorld().getServer().getConfig().OSRS_COMBAT_MELEE) {
@@ -563,6 +559,10 @@ public class CombatEvent extends GameTickEvent {
 	}
 
 	private void inflictPublicDamage(final Mob hitter, final Mob target, int damage) {
+		inflictPublicDamage(hitter, target, damage, true);
+	}
+
+	private void inflictPublicDamage(final Mob hitter, final Mob target, int damage, boolean allowRecoil) {
 		hitter.incHitsMade();
 		if (target.isPlayer()) {
 			Player defender = (Player) target;
@@ -583,6 +583,12 @@ public class CombatEvent extends GameTickEvent {
 			updateParty((Player) target);
 		}
 		if (hitter.isPlayer()) { sendSound((Player) hitter, target, damage > 0); updateParty((Player) hitter); }
+		// Only an accepted hit can spend the stock ring budget. Resolve it before
+		// death/escape cleanup can remove the worn ring, and never reflect recoil.
+		if (allowRecoil && target.isPlayer()) {
+			int reflected = CurrentBaseCombatContract.consumeRecoil((Player) target, damage);
+			if (reflected > 0) inflictPublicDamage(target, hitter, reflected, false);
+		}
 		if (target.getLevel(Skill.HITS.id()) <= 0) { onDeath(target, hitter); return; }
 		boolean life = target.isPlayer() && !((Player) target).getDuel().isDuelActive() && ((Player) target).checkRingOfLife(hitter);
 		if (target.isNpc() || life) target.getWorld().getServer().getCombatScriptLoader().checkAndExecuteCombatScript(hitter, target);
