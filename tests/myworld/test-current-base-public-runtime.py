@@ -39,7 +39,8 @@ class PublicRuntimeTest(unittest.TestCase):
                 str(ROOT / 'current-platform/runtime/current-base-v1/public-definitions')]
             result = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=45)
             self.assertEqual(result.returncode, 0, result.stdout[-6000:] + result.stderr[-12000:])
-            self.assertIn('PUBLIC_GATHERING_VERIFIED' if probe == 'PublicGatheringProbe'
+            self.assertIn('PUBLIC_MAGIC_VERIFIED' if probe == 'PublicMagicProbe' else
+                          'PUBLIC_GATHERING_VERIFIED' if probe == 'PublicGatheringProbe'
                           else 'PUBLIC_DEFINITIONS_VERIFIED role=' + role, result.stdout)
 
     def test_actual_public_server_definitions(self):
@@ -50,6 +51,9 @@ class PublicRuntimeTest(unittest.TestCase):
 
     def test_actual_public_inventory_tools_curves_and_timing(self):
         self.probe('server', 'PublicGatheringProbe')
+
+    def test_actual_public_magic_and_arena_effects(self):
+        self.probe('server', 'PublicMagicProbe')
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 package com.openrsc.server;
 
 import com.openrsc.server.constants.Spells;
+import com.openrsc.server.constants.ItemId;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
@@ -75,6 +76,19 @@ public final class CurrentBasePublicContent {
     }
 
     public static Map<Spells, Integer> spellMap() { return SPELL_MAP; }
+
+    /** Stock elemental staves replace their matching rune, not a chance to save it. */
+    public static boolean staffSuppliesRune(int staffId, int runeId) {
+        if (runeId == ItemId.AIR_RUNE.id()) return staffId == ItemId.STAFF_OF_AIR.id()
+            || staffId == ItemId.BATTLESTAFF_OF_AIR.id() || staffId == ItemId.ENCHANTED_BATTLESTAFF_OF_AIR.id();
+        if (runeId == ItemId.WATER_RUNE.id()) return staffId == ItemId.STAFF_OF_WATER.id()
+            || staffId == ItemId.BATTLESTAFF_OF_WATER.id() || staffId == ItemId.ENCHANTED_BATTLESTAFF_OF_WATER.id();
+        if (runeId == ItemId.EARTH_RUNE.id()) return staffId == ItemId.STAFF_OF_EARTH.id()
+            || staffId == ItemId.BATTLESTAFF_OF_EARTH.id() || staffId == ItemId.ENCHANTED_BATTLESTAFF_OF_EARTH.id();
+        if (runeId == ItemId.FIRE_RUNE.id()) return staffId == ItemId.STAFF_OF_FIRE.id()
+            || staffId == ItemId.BATTLESTAFF_OF_FIRE.id() || staffId == ItemId.ENCHANTED_BATTLESTAFF_OF_FIRE.id();
+        return false;
+    }
 
     private static final int[] PICKAXES = {1262, 1261, 1260, 1259, 1258, 156};
     private static final int[] PICKAXE_LEVELS = {41, 31, 21, 6, 1, 1};
