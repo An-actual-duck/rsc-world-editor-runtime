@@ -46,8 +46,8 @@ def main() -> None:
     require_regex(
         r"if \(maybeAwardMyWorldMiningGeode\(player, rock, def\.getReqLevel\(\)\)\) \{.*?"
         r"player\.incExp\(Skill\.MINING\.id\(\), def\.getExp\(\) \* quantity, true\);.*?"
-        r"\} else \{.*?int rewardQuantity = quantity \+ addGatheringAmuletBonusOre\(player, ore\.getCatalogId\(\), quantity\);.*?"
-        r"bankSkillingDropWithLawRing\(new Item\(ore\.getCatalogId\(\), rewardQuantity\)\)",
+        r"\} else \{.*?int rewardQuantity = publicBase \? quantity : quantity \+ addGatheringAmuletBonusOre\(player, ore\.getCatalogId\(\), quantity\);.*?"
+        r"int bankedQuantity = publicBase \? 0 : player\.getCarriedItems\(\)\.getEquipment\(\)\.bankSkillingDropWithLawRing\(new Item\(ore\.getCatalogId\(\), rewardQuantity\)\)",
         mining,
         "Mining should award either the geode or the ore, not both",
     )
@@ -56,8 +56,8 @@ def main() -> None:
     require("boolean rareRewardAwarded = player.getConfig().WANT_MYWORLD && maybeAwardMyWorldWoodcuttingSeed(player, object, getAxeTier(axeId));", woodcutting, "Woodcutting rare replacement roll")
     require_regex(
         r"if \(!rareRewardAwarded\) \{.*?"
-        r"int rewardQuantity = quantity \+ addGatheringAmuletBonusLogs\(player, def\.getLogId\(\), quantity\);.*?"
-        r"bankSkillingDropWithLawRing\(new Item\(def\.getLogId\(\), rewardQuantity\)\)",
+        r"int rewardQuantity = publicBase \? quantity : quantity \+ addGatheringAmuletBonusLogs\(player, def\.getLogId\(\), quantity\);.*?"
+        r"int bankedQuantity = publicBase \? 0 : player\.getCarriedItems\(\)\.getEquipment\(\)\.bankSkillingDropWithLawRing\(new Item\(def\.getLogId\(\), rewardQuantity\)\)",
         woodcutting,
         "Woodcutting should only award logs and extra logs when no seed replaced them",
     )
