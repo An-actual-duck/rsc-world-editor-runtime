@@ -17,6 +17,8 @@ public final class VerifierLifetime {
         "server-profile", "state-db");
     private static final List<FileChannel> CHANNELS = new ArrayList<>();
     private static final List<FileLock> LOCKS = new ArrayList<>();
+    private static final Map<String,VerifierLifetime> PROCESS_OWNERS = new HashMap<>();
+    private final Set<String> heldRoles = new HashSet<>();
     private final JSONObject authority;
     private final Path authorityPath, control, workspace;
     private final String authorityHash;
@@ -30,9 +32,10 @@ public final class VerifierLifetime {
 
     private VerifierLifetime(Path path, String expected) throws Exception {
         authorityPath = privateFile(path);
-        authorityHash = hash(read(authorityPath));
+        byte[] authorityBytes = read(authorityPath);
+        authorityHash = hash(authorityBytes);
         require(hashValue(expected).equals(authorityHash), "Supervision authority hash differs");
-        authority = object(read(authorityPath));
+        authority = object(authorityBytes);
         keys(authority, "schemaVersion", "manifestType", "invocationId", "controlRoot", "workspace",
             "invocationSha256", "compositionIdentitySha256", "verifierContractSha256", "inputPaths", "files");
         identity(authority, "current-base-verifier-supervision");
@@ -144,7 +147,6 @@ public final class VerifierLifetime {
         require(hash(read(privateFile(authorityPath))).equals(authorityHash), "Supervision authority changed");
         JSONObject intent = intent();
         Path credential = workspace.resolve("execution/credential.json");
-        validateCredential(intent, credential);
         JSONObject revocation = record("current-base-verifier-revocation");
         revocation.put("intentSha256", intentHash);
         Path sealed = control.resolve("revocation.json");
@@ -242,15 +244,24 @@ public final class VerifierLifetime {
     }
 
     private void acquire(String role) throws Exception {
-        Path file = checkAnchor(role);
-        FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
-        FileLock lock = null;
-        try {
-            try { lock = channel.tryLock(); } catch (OverlappingFileLockException busy) { throw new Busy(); }
-            if (lock == null) throw new Busy();
-            checkAnchor(role);
-            synchronized (CHANNELS) { CHANNELS.add(channel); LOCKS.add(lock); }
-        } catch (Exception failure) { if (lock != null) lock.release(); channel.close(); throw failure; }
+        synchronized (CHANNELS) {
+            Path file = checkAnchor(role);
+            JSONObject identity = fileIdentity(file);
+            String key = identity.getString("device") + ":" + identity.getString("inode");
+            VerifierLifetime owner = PROCESS_OWNERS.get(key);
+            if (owner == this && heldRoles.contains(role)) return;
+            // POSIX may release a process's existing inode lock when ANY fd for
+            // that inode closes. Refuse another in-JVM owner BEFORE opening it.
+            if (owner != null) throw new Busy();
+            FileChannel channel = FileChannel.open(file, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+            FileLock lock = null;
+            try {
+                try { lock = channel.tryLock(); } catch (OverlappingFileLockException busy) { throw new Busy(); }
+                if (lock == null) throw new Busy();
+                checkAnchor(role);
+                CHANNELS.add(channel); LOCKS.add(lock); PROCESS_OWNERS.put(key, this); heldRoles.add(role);
+            } catch (Exception failure) { if (lock != null) lock.release(); channel.close(); throw failure; }
+        }
     }
 
     public static Map<String,String> options(String[] arguments, String... names) throws Exception {

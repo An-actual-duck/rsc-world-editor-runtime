@@ -45,6 +45,16 @@ public class Probe {
       Map<String,String> options = new TreeMap<>();
       for (String key : input.keySet()) options.put(key, input.getString(key));
       VerifierLifetime owner = VerifierLifetime.supervisor(options);
+      if (args[0].equals("retry")) {
+        try { owner.finish(); throw new AssertionError("expected external client lease"); }
+        catch (VerifierLifetime.Busy expected) { }
+        try { VerifierLifetime.supervisor(options); throw new AssertionError("overlapping owner admitted"); }
+        catch (VerifierLifetime.Busy expected) { }
+        try { owner.finish(); throw new AssertionError("expected second external client lease"); }
+        catch (VerifierLifetime.Busy expected) { }
+        System.out.println("RETRY_HELD"); System.out.flush();
+        System.in.read(); owner.finish(); return;
+      }
       if (!args[0].equals("empty")) {
         Files.createDirectories(Paths.get(options.get("workspace"), "execution/server"));
         Files.createDirectories(Paths.get(options.get("workspace"), "execution/client"));
@@ -220,7 +230,27 @@ public class OpenRSC {
         credential.write_bytes(saved.read_bytes()); credential.chmod(0o600)
         self.assertEqual(2, self.recovery().returncode)
         self.assertTrue(credential.exists())
-        self.assertFalse((self.control / "revocation.json").exists())
+        self.assertTrue((self.control / "revocation.json").is_file(),
+            "Foreign credential refuses deletion but delayed execution must already be revoked")
+
+    def test_partial_acquisition_retry_and_overlapping_owner_preserve_process_locks(self):
+        with (self.control / "client.lock").open("r+b") as client_lock:
+            fcntl.lockf(client_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            process = self.spawn(["java", "-cp", self.classpath, "Probe", "retry", str(self.options_file)])
+            self.assertTrue(select.select([process.stdout], [], [], 10)[0])
+            self.assertEqual("RETRY_HELD", process.stdout.readline().strip())
+            # These contenders are separate processes, so Java's overlapping-lock
+            # bookkeeping cannot disguise a dropped kernel lease.
+            for role in ("supervisor", "server"):
+                contender = subprocess.run(["python3", "-c",
+                    "import fcntl,sys; f=open(sys.argv[1],'r+b'); "
+                    "fcntl.lockf(f,fcntl.LOCK_EX|fcntl.LOCK_NB)", str(self.control / (role + ".lock"))],
+                    capture_output=True, timeout=10)
+                self.assertNotEqual(0, contender.returncode, role + " lease was dropped by retry/overlap")
+            fcntl.lockf(client_lock, fcntl.LOCK_UN)
+            process.stdin.write("f"); process.stdin.flush()
+            self.assertEqual(0, process.wait(timeout=10))
+        self.assertEqual(0, self.recovery().returncode)
 
     def test_evidence_overlap_and_symlink_parent_refused_without_revocation(self):
         for name in ("workspace/evidence.json", self.control.name + "/evidence.json", "contract"):

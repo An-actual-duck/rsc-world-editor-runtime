@@ -105,6 +105,12 @@ def with_supervision(command: list[str]) -> list[str]:
         "verifierContractSha256": sha256(Path(options["contract"])),
         "inputPaths": {name: options[name] for name in inputs}, "files": identities}))
     authority.chmod(0o600)
+    for path in control.iterdir():
+        with path.open("rb") as stream: os.fsync(stream.fileno())
+    for path in (control, control.parent):
+        descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+        try: os.fsync(descriptor)
+        finally: os.close(descriptor)
     return command + ["--supervision", str(authority), "--supervision-sha256", sha256(authority)]
 
 
@@ -315,6 +321,7 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
             after.update({str(server): tree_hash(server), str(client): tree_hash(client),
                           str(package): tree_hash(package)})
             self.assertEqual(before, after)
+            self.assert_owned_timeout_cleanup(core, root, classes)
 
             for mode, child_count in (("eof", 1), ("data", 2), ("term", 2),
                                       ("parent-loss", 1), ("parent-loss", 2),
@@ -382,6 +389,42 @@ class CurrentBaseInstalledExecutionTest(unittest.TestCase):
                           refused.stderr)
             self.assertFalse(mismatch_workspace.exists())
             self.assertFalse(mismatch_evidence.exists())
+
+    def assert_owned_timeout_cleanup(self, core: Path, root: Path, classes: Path) -> None:
+        source = classes / "OwnedTimeoutProbe.java"
+        source.write_text('''
+import java.lang.reflect.*;
+import java.nio.file.*;
+import java.util.*;
+public class OwnedTimeoutProbe {
+  public static void main(String[] args) throws Exception {
+    Class<?> type = Class.forName("com.openrsc.server.database.CurrentBaseInstalledExecutionVerifier$BoundedProcess");
+    Method start = type.getDeclaredMethod("start", List.class, Path.class, Path.class);
+    Method await = type.getDeclaredMethod("awaitText", String.class, int.class, String.class);
+    Method close = type.getDeclaredMethod("close");
+    Field handle = type.getDeclaredField("process");
+    start.setAccessible(true); await.setAccessible(true); close.setAccessible(true); handle.setAccessible(true);
+    Path root = Paths.get(args[0]);
+    Object child = start.invoke(null, Arrays.asList(args[1], "-c", "import time; time.sleep(60)"),
+      root, root.resolve("owned-timeout.log"));
+    Process process = (Process)handle.get(child);
+    try {
+      try { await.invoke(child, "invented-never-produced-marker", 1, "invented timeout");
+        throw new AssertionError("timeout reported success"); }
+      catch (InvocationTargetException expected) {
+        if (!(expected.getCause() instanceof java.io.IOException)
+            || !expected.getCause().getMessage().contains("timed out")) throw expected;
+      }
+    } finally { close.invoke(child); }
+    if (process.isAlive() || !Files.isRegularFile(root.resolve("owned-timeout.log")))
+      throw new AssertionError("timed-out owned child cleanup incomplete");
+  }
+}''', encoding="utf-8")
+        subprocess.run(["javac", "-source", "8", "-target", "8", "-cp", str(core), "-d", str(classes), str(source)],
+            check=True, capture_output=True)
+        result = subprocess.run(["java", "-cp", os.pathsep.join((str(core), str(classes))),
+            "OwnedTimeoutProbe", str(root), sys.executable], capture_output=True, text=True, timeout=40)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def assert_supervised_cancellation(self, command: list[str], root: Path,
                                       mode: str, child_count: int) -> None:
