@@ -380,7 +380,8 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         request["action"] = "shutdown"
         write_json(server_ready.parent / "shutdown.json", request)
         self.assertEqual(2, server.wait(timeout=90), "Actual SQL failure must propagate to normal launcher failure")
-        self.assertIn("Installed database write failed", self.log(server))
+        self.assertIn("Installed writer drain did not complete cleanly", self.log(server))
+        self.assertIn("invented logout write failure", self.log(server))
         self.assertNotIn("Server unloaded", self.log(server))
         self.assertTrue(server_ready.is_file(), "Uncertain session evidence must remain intact")
         with sqlite3.connect(self.state["server"] / "current_base.db") as database:
