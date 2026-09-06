@@ -1,0 +1,669 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "current-base-public-combat-policy",
+  "contractId": "current-base-public-combat-v1",
+  "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+  "sourceFiles": [
+    {
+      "path": "server/src/com/openrsc/server/event/rsc/impl/combat/CombatFormula.java",
+      "sha256": "e1f141611300a17e2a1eaeb491f2cc14c19fe6ee6509e9fbc3d5881303fe512e"
+    },
+    {
+      "path": "server/src/com/openrsc/server/event/rsc/impl/combat/CombatEvent.java",
+      "sha256": "4fe76e1e135232b1b3feedbe47f29f71610a13103593a5559fba56a03d3940dc"
+    },
+    {
+      "path": "server/src/com/openrsc/server/event/rsc/impl/projectile/ProjectileEvent.java",
+      "sha256": "26110d9ed0aa7d8a0b3990f8506864e382ee3b174cf99ca8602ca8db86411330"
+    },
+    {
+      "path": "server/src/com/openrsc/server/model/container/Equipment.java",
+      "sha256": "0a8e8ad42eb40590d2345cb66fd4e8dde568baf7864b8fc179e86313ad778d52"
+    },
+    {
+      "path": "server/src/com/openrsc/server/model/entity/player/Player.java",
+      "sha256": "e945a467eae4f6ecd7d951fd6792ab92a7c7faeb64507eefd94abc6e83ce77d8"
+    },
+    {
+      "path": "server/src/com/openrsc/server/constants/ItemId.java",
+      "sha256": "c21e31a142e78e6fe66a7a18cb937b734fe539c6859d41a64df1ce8313753baa"
+    },
+    {
+      "path": "server/src/com/openrsc/server/constants/SpellDamages.java",
+      "sha256": "1b0582f19c5fc6403a63e76e55534e1f5321eb22e957c59d78d2ec71a6215b1c"
+    },
+    {
+      "path": "server/src/com/openrsc/server/net/rsc/handlers/SpellHandler.java",
+      "sha256": "145b0725033f4bed5ca4b40a1c115e454d99ee1428fb8ceeb0bf2c2960e21fde"
+    },
+    {
+      "path": "server/src/com/openrsc/server/util/rsc/Formulae.java",
+      "sha256": "a5e6c5f0982541bf5dd37e63a1ad6d01a01be63ef8a9e5628691bab4c2f1213c"
+    }
+  ],
+  "selection": "enabled-current-base-v1-only",
+  "equipment": "player-max1-of-1-plus-all-worn-public-fields-NPC-equipment0-no-devotion-growth-no-owner-hand-filter",
+  "melee": "classic-accuracy-vs-defense-roll-then-nextInt(maxRoll)-plus320-div640-independent-Attack-Defense-Strength-style-prayer",
+  "ranged": "classic-bow-aim-ammunition-power-separate-no-owner-offense-mitigation-or-procs",
+  "magic": "public-modern-spell-power-floor-uniform-cast-failure-uses-level-and-equipment-godspell-charge-and-cape",
+  "rings": {
+    "recoil": {
+      "id": 1314,
+      "damage": "incoming/10+(incoming>0?1:0)",
+      "budget": 40,
+      "cacheKey": "ringofrecoil",
+      "exhaustion": "clamp-to-remaining-and-shatter-remove-cache"
+    },
+    "life": {
+      "id": 1317,
+      "condition": "living-Hits-at-most10percent-max-and-wilderness-at-most30",
+      "effect": "reset-combat-teleport-configured-respawn-always-shatter"
+    }
+  },
+  "projectileTables": {
+    "rangedAim": [
+      {
+        "id": 59,
+        "name": "PHOENIX_CROSSBOW",
+        "value": 12
+      },
+      {
+        "id": 60,
+        "name": "CROSSBOW",
+        "value": 12
+      },
+      {
+        "id": 188,
+        "name": "LONGBOW",
+        "value": 15
+      },
+      {
+        "id": 189,
+        "name": "SHORTBOW",
+        "value": 10
+      },
+      {
+        "id": 648,
+        "name": "OAK_LONGBOW",
+        "value": 20
+      },
+      {
+        "id": 649,
+        "name": "OAK_SHORTBOW",
+        "value": 15
+      },
+      {
+        "id": 650,
+        "name": "WILLOW_LONGBOW",
+        "value": 25
+      },
+      {
+        "id": 651,
+        "name": "WILLOW_SHORTBOW",
+        "value": 20
+      },
+      {
+        "id": 652,
+        "name": "MAPLE_LONGBOW",
+        "value": 30
+      },
+      {
+        "id": 653,
+        "name": "MAPLE_SHORTBOW",
+        "value": 25
+      },
+      {
+        "id": 654,
+        "name": "YEW_LONGBOW",
+        "value": 35
+      },
+      {
+        "id": 655,
+        "name": "YEW_SHORTBOW",
+        "value": 30
+      },
+      {
+        "id": 656,
+        "name": "MAGIC_LONGBOW",
+        "value": 40
+      },
+      {
+        "id": 657,
+        "name": "MAGIC_SHORTBOW",
+        "value": 35
+      },
+      {
+        "id": 827,
+        "name": "BRONZE_SPEAR",
+        "value": 25
+      },
+      {
+        "id": 1013,
+        "name": "BRONZE_THROWING_DART",
+        "value": 25
+      },
+      {
+        "id": 1015,
+        "name": "IRON_THROWING_DART",
+        "value": 30
+      },
+      {
+        "id": 1024,
+        "name": "STEEL_THROWING_DART",
+        "value": 35
+      },
+      {
+        "id": 1068,
+        "name": "MITHRIL_THROWING_DART",
+        "value": 40
+      },
+      {
+        "id": 1069,
+        "name": "ADAMANTITE_THROWING_DART",
+        "value": 45
+      },
+      {
+        "id": 1070,
+        "name": "RUNE_THROWING_DART",
+        "value": 50
+      },
+      {
+        "id": 1075,
+        "name": "IRON_THROWING_KNIFE",
+        "value": 35
+      },
+      {
+        "id": 1076,
+        "name": "BRONZE_THROWING_KNIFE",
+        "value": 30
+      },
+      {
+        "id": 1077,
+        "name": "STEEL_THROWING_KNIFE",
+        "value": 40
+      },
+      {
+        "id": 1078,
+        "name": "MITHRIL_THROWING_KNIFE",
+        "value": 45
+      },
+      {
+        "id": 1079,
+        "name": "ADAMANTITE_THROWING_KNIFE",
+        "value": 50
+      },
+      {
+        "id": 1080,
+        "name": "RUNE_THROWING_KNIFE",
+        "value": 55
+      },
+      {
+        "id": 1081,
+        "name": "BLACK_THROWING_KNIFE",
+        "value": 40
+      },
+      {
+        "id": 1088,
+        "name": "IRON_SPEAR",
+        "value": 33
+      },
+      {
+        "id": 1089,
+        "name": "STEEL_SPEAR",
+        "value": 41
+      },
+      {
+        "id": 1090,
+        "name": "MITHRIL_SPEAR",
+        "value": 49
+      },
+      {
+        "id": 1091,
+        "name": "ADAMANTITE_SPEAR",
+        "value": 57
+      },
+      {
+        "id": 1092,
+        "name": "RUNE_SPEAR",
+        "value": 65
+      },
+      {
+        "id": 1122,
+        "name": "POISONED_BRONZE_THROWING_DART",
+        "value": 25
+      },
+      {
+        "id": 1123,
+        "name": "POISONED_IRON_THROWING_DART",
+        "value": 30
+      },
+      {
+        "id": 1124,
+        "name": "POISONED_STEEL_THROWING_DART",
+        "value": 35
+      },
+      {
+        "id": 1125,
+        "name": "POISONED_MITHRIL_THROWING_DART",
+        "value": 40
+      },
+      {
+        "id": 1126,
+        "name": "POISONED_ADAMANTITE_THROWING_DART",
+        "value": 45
+      },
+      {
+        "id": 1127,
+        "name": "POISONED_RUNE_THROWING_DART",
+        "value": 50
+      },
+      {
+        "id": 1128,
+        "name": "POISONED_BRONZE_THROWING_KNIFE",
+        "value": 30
+      },
+      {
+        "id": 1129,
+        "name": "POISONED_IRON_THROWING_KNIFE",
+        "value": 35
+      },
+      {
+        "id": 1130,
+        "name": "POISONED_STEEL_THROWING_KNIFE",
+        "value": 40
+      },
+      {
+        "id": 1131,
+        "name": "POISONED_MITHRIL_THROWING_KNIFE",
+        "value": 45
+      },
+      {
+        "id": 1132,
+        "name": "POISONED_BLACK_THROWING_KNIFE",
+        "value": 40
+      },
+      {
+        "id": 1133,
+        "name": "POISONED_ADAMANTITE_THROWING_KNIFE",
+        "value": 50
+      },
+      {
+        "id": 1134,
+        "name": "POISONED_RUNE_THROWING_KNIFE",
+        "value": 55
+      },
+      {
+        "id": 1135,
+        "name": "POISONED_BRONZE_SPEAR",
+        "value": 25
+      },
+      {
+        "id": 1136,
+        "name": "POISONED_IRON_SPEAR",
+        "value": 33
+      },
+      {
+        "id": 1137,
+        "name": "POISONED_STEEL_SPEAR",
+        "value": 41
+      },
+      {
+        "id": 1138,
+        "name": "POISONED_MITHRIL_SPEAR",
+        "value": 49
+      },
+      {
+        "id": 1139,
+        "name": "POISONED_ADAMANTITE_SPEAR",
+        "value": 57
+      },
+      {
+        "id": 1140,
+        "name": "POISONED_RUNE_SPEAR",
+        "value": 65
+      },
+      {
+        "id": 1453,
+        "name": "DRAGON_CROSSBOW",
+        "value": 40
+      }
+    ],
+    "rangedPower": [
+      {
+        "id": 11,
+        "name": "BRONZE_ARROWS",
+        "value": 15
+      },
+      {
+        "id": 190,
+        "name": "CROSSBOW_BOLTS",
+        "value": 20
+      },
+      {
+        "id": 574,
+        "name": "POISON_BRONZE_ARROWS",
+        "value": 15
+      },
+      {
+        "id": 592,
+        "name": "POISON_CROSSBOW_BOLTS",
+        "value": 20
+      },
+      {
+        "id": 638,
+        "name": "IRON_ARROWS",
+        "value": 20
+      },
+      {
+        "id": 639,
+        "name": "POISON_IRON_ARROWS",
+        "value": 20
+      },
+      {
+        "id": 640,
+        "name": "STEEL_ARROWS",
+        "value": 25
+      },
+      {
+        "id": 641,
+        "name": "POISON_STEEL_ARROWS",
+        "value": 25
+      },
+      {
+        "id": 642,
+        "name": "MITHRIL_ARROWS",
+        "value": 30
+      },
+      {
+        "id": 643,
+        "name": "POISON_MITHRIL_ARROWS",
+        "value": 30
+      },
+      {
+        "id": 644,
+        "name": "ADAMANTITE_ARROWS",
+        "value": 35
+      },
+      {
+        "id": 645,
+        "name": "POISON_ADAMANTITE_ARROWS",
+        "value": 35
+      },
+      {
+        "id": 646,
+        "name": "RUNE_ARROWS",
+        "value": 40
+      },
+      {
+        "id": 647,
+        "name": "POISON_RUNE_ARROWS",
+        "value": 40
+      },
+      {
+        "id": 786,
+        "name": "OYSTER_PEARL_BOLTS",
+        "value": 30
+      },
+      {
+        "id": 827,
+        "name": "BRONZE_SPEAR",
+        "value": 29
+      },
+      {
+        "id": 1013,
+        "name": "BRONZE_THROWING_DART",
+        "value": 15
+      },
+      {
+        "id": 1015,
+        "name": "IRON_THROWING_DART",
+        "value": 17
+      },
+      {
+        "id": 1024,
+        "name": "STEEL_THROWING_DART",
+        "value": 22
+      },
+      {
+        "id": 1068,
+        "name": "MITHRIL_THROWING_DART",
+        "value": 25
+      },
+      {
+        "id": 1069,
+        "name": "ADAMANTITE_THROWING_DART",
+        "value": 27
+      },
+      {
+        "id": 1070,
+        "name": "RUNE_THROWING_DART",
+        "value": 30
+      },
+      {
+        "id": 1075,
+        "name": "IRON_THROWING_KNIFE",
+        "value": 30
+      },
+      {
+        "id": 1076,
+        "name": "BRONZE_THROWING_KNIFE",
+        "value": 25
+      },
+      {
+        "id": 1077,
+        "name": "STEEL_THROWING_KNIFE",
+        "value": 35
+      },
+      {
+        "id": 1078,
+        "name": "MITHRIL_THROWING_KNIFE",
+        "value": 40
+      },
+      {
+        "id": 1079,
+        "name": "ADAMANTITE_THROWING_KNIFE",
+        "value": 45
+      },
+      {
+        "id": 1080,
+        "name": "RUNE_THROWING_KNIFE",
+        "value": 50
+      },
+      {
+        "id": 1081,
+        "name": "BLACK_THROWING_KNIFE",
+        "value": 35
+      },
+      {
+        "id": 1088,
+        "name": "IRON_SPEAR",
+        "value": 37
+      },
+      {
+        "id": 1089,
+        "name": "STEEL_SPEAR",
+        "value": 46
+      },
+      {
+        "id": 1090,
+        "name": "MITHRIL_SPEAR",
+        "value": 53
+      },
+      {
+        "id": 1091,
+        "name": "ADAMANTITE_SPEAR",
+        "value": 61
+      },
+      {
+        "id": 1092,
+        "name": "RUNE_SPEAR",
+        "value": 69
+      },
+      {
+        "id": 1122,
+        "name": "POISONED_BRONZE_THROWING_DART",
+        "value": 15
+      },
+      {
+        "id": 1123,
+        "name": "POISONED_IRON_THROWING_DART",
+        "value": 17
+      },
+      {
+        "id": 1124,
+        "name": "POISONED_STEEL_THROWING_DART",
+        "value": 22
+      },
+      {
+        "id": 1125,
+        "name": "POISONED_MITHRIL_THROWING_DART",
+        "value": 25
+      },
+      {
+        "id": 1126,
+        "name": "POISONED_ADAMANTITE_THROWING_DART",
+        "value": 27
+      },
+      {
+        "id": 1127,
+        "name": "POISONED_RUNE_THROWING_DART",
+        "value": 30
+      },
+      {
+        "id": 1128,
+        "name": "POISONED_BRONZE_THROWING_KNIFE",
+        "value": 25
+      },
+      {
+        "id": 1129,
+        "name": "POISONED_IRON_THROWING_KNIFE",
+        "value": 30
+      },
+      {
+        "id": 1130,
+        "name": "POISONED_STEEL_THROWING_KNIFE",
+        "value": 35
+      },
+      {
+        "id": 1131,
+        "name": "POISONED_MITHRIL_THROWING_KNIFE",
+        "value": 40
+      },
+      {
+        "id": 1132,
+        "name": "POISONED_BLACK_THROWING_KNIFE",
+        "value": 35
+      },
+      {
+        "id": 1133,
+        "name": "POISONED_ADAMANTITE_THROWING_KNIFE",
+        "value": 45
+      },
+      {
+        "id": 1134,
+        "name": "POISONED_RUNE_THROWING_KNIFE",
+        "value": 50
+      },
+      {
+        "id": 1135,
+        "name": "POISONED_BRONZE_SPEAR",
+        "value": 29
+      },
+      {
+        "id": 1136,
+        "name": "POISONED_IRON_SPEAR",
+        "value": 37
+      },
+      {
+        "id": 1137,
+        "name": "POISONED_STEEL_SPEAR",
+        "value": 46
+      },
+      {
+        "id": 1138,
+        "name": "POISONED_MITHRIL_SPEAR",
+        "value": 53
+      },
+      {
+        "id": 1139,
+        "name": "POISONED_ADAMANTITE_SPEAR",
+        "value": 61
+      },
+      {
+        "id": 1140,
+        "name": "POISONED_RUNE_SPEAR",
+        "value": 69
+      },
+      {
+        "id": 1449,
+        "name": "DRAGON_ARROWS",
+        "value": 50
+      },
+      {
+        "id": 1450,
+        "name": "POISON_DRAGON_ARROWS",
+        "value": 50
+      },
+      {
+        "id": 1451,
+        "name": "DRAGON_BOLTS",
+        "value": 50
+      },
+      {
+        "id": 1452,
+        "name": "POISON_DRAGON_BOLTS",
+        "value": 50
+      }
+    ],
+    "rangedPowerRetro": [
+      {
+        "id": 59,
+        "name": "PHOENIX_CROSSBOW",
+        "value": 22
+      },
+      {
+        "id": 60,
+        "name": "CROSSBOW",
+        "value": 22
+      },
+      {
+        "id": 188,
+        "name": "LONGBOW",
+        "value": 20
+      },
+      {
+        "id": 189,
+        "name": "SHORTBOW",
+        "value": 14
+      }
+    ]
+  },
+  "spellPowers": {
+    "WIND_STRIKE": 1,
+    "WATER_STRIKE": 2,
+    "EARTH_STRIKE": 3,
+    "FIRE_STRIKE": 4,
+    "WIND_BOLT": 4.5,
+    "WATER_BOLT": 5,
+    "EARTH_BOLT": 5.5,
+    "FIRE_BOLT": 6,
+    "WIND_BLAST": 6.5,
+    "WATER_BLAST": 7,
+    "EARTH_BLAST": 7.5,
+    "FIRE_BLAST": 8,
+    "WIND_WAVE": 8.5,
+    "WATER_WAVE": 9,
+    "EARTH_WAVE": 9.5,
+    "FIRE_WAVE": 10
+  },
+  "excludedEffects": [
+    "owner-armor-triangle-flat-mitigation",
+    "owner-medium-helm-bias-chain-speed",
+    "owner-damage-procs-AoE-lifesteal",
+    "owner-devotion-growth"
+  ],
+  "limitations": [
+    "no-exhaustive-plugin-audit",
+    "no-hiscores-economy-visual-redesign"
+  ]
+}

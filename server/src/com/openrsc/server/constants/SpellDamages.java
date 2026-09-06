@@ -158,6 +158,8 @@ public class SpellDamages {
 	}};
 
 	public double getSpellDamage(Spells spell, EntityType entityType, MagicType magicType) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected() && magicType == MagicType.MODERNMAGIC)
+			return com.openrsc.server.CurrentBaseCombatContract.spellPower(spell);
 		double damage = -1.0;
 
 		switch(magicType) {

@@ -1328,6 +1328,7 @@ public class Equipment {
 	}
 
 	private boolean matchesPrayerBook(final int itemId, final PrayerCatalog.GodLine prayerBook) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return true;
 		final PrayerCatalog.GodLine requiredGodLine = getRequiredGodLine(itemId);
 		return requiredGodLine == null || requiredGodLine == prayerBook;
 	}
@@ -1679,10 +1680,12 @@ public class Equipment {
 	}
 
 	public int getUnicornHidePrayerBonus() {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 0;
 		return hasFullUnicornHideSet() ? 10 : 0;
 	}
 
 	public int getBlackUnicornHidePrayerBonus() {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 0;
 		return hasFullBlackUnicornHideSet() ? 10 : 0;
 	}
 
@@ -1690,6 +1693,7 @@ public class Equipment {
 		if (item == null || item.getDef(player.getWorld()) == null) {
 			return 0;
 		}
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return item.getDef(player.getWorld()).getPrayerBonus();
 		if (!matchesCurrentPrayerBook(item.getCatalogId())) {
 			return 0;
 		}
@@ -1733,6 +1737,7 @@ public class Equipment {
 	}
 
 	private int getDevotionScaledCombatBonus(final Item item, final int baseValue, final int targetValue) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 0;
 		if (item == null || targetValue <= baseValue || !matchesCurrentPrayerBook(item.getCatalogId())) {
 			return 0;
 		}
@@ -2033,6 +2038,7 @@ public class Equipment {
 	}
 
 	public double getDamageRollHighBiasChance() {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 0.0D;
 		double bonus = getEquippedWeaponFamilyHighRollBias();
 		if (player.getConfig().WANT_EQUIPMENT_TAB) {
 			synchronized (list) {
@@ -2055,6 +2061,7 @@ public class Equipment {
 	}
 
 	public double getArmorSpeedMultiplier() {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 1.0D;
 		double multiplier = 1.0D;
 		if (player.getConfig().WANT_EQUIPMENT_TAB) {
 			synchronized (list) {

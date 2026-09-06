@@ -419,6 +419,14 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 	}
 
 	private boolean spellSuccessCheck(Player player, SpellDef spell) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()
+			&& !Formulae.castSpell(spell, player.getSkills().getLevel(getMagicId(player, spell)), player.getMagicPoints())) {
+			player.message("The spell fails! You may try again in 20 seconds");
+			player.playSound("spellfail");
+			player.setSpellFail();
+			player.resetPath();
+			return false;
+		}
 		return true;
 	}
 

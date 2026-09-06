@@ -421,6 +421,8 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
     for key, expected_value in exclusions.items():
         if configured.get(key) != str(expected_value).lower():
             raise VerificationError(f"Base server content does not disable {key}")
+    if configured.get("restrict_item_id") != str(limits["itemMaxId"]):
+        raise VerificationError("Base server content must permit the complete public item registry")
 
 
 def validate_state_migration(path: Path, profile: dict) -> dict:

@@ -2893,6 +2893,7 @@ public final class Player extends Mob {
 	}
 
 	public int getPrayerPoints() {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return Math.max(getCarriedItems().getEquipment().getPrayer(), 1);
 		return Math.max(getCarriedItems().getEquipment().getPrayer() + Summoning.getPrayerBonus(this), 1);
 	}
 

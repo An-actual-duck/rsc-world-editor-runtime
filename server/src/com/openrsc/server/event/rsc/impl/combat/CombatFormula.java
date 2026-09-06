@@ -1,6 +1,7 @@
 package com.openrsc.server.event.rsc.impl.combat;
 
 import com.openrsc.server.constants.ItemId;
+import com.openrsc.server.CurrentBaseCombatContract;
 import com.openrsc.server.constants.NpcId;
 import com.openrsc.server.constants.Skill;
 import com.openrsc.server.constants.Skills;
@@ -45,6 +46,10 @@ public class CombatFormula {
 	 * @return The randomized value.
 	 */
 	private static int calculateMeleeDamage(final Mob source) {
+		if (CurrentBaseCombatContract.selected()) {
+			int maxRoll = getMeleeDamage(source);
+			return maxRoll <= 0 ? 0 : (DataConversions.getRandom().nextInt(maxRoll) + 320) / 640;
+		}
 		return rollDamage(source, offenseToMaxHit(source, source.getMeleeOffense()));
 	}
 
@@ -58,6 +63,10 @@ public class CombatFormula {
 	 * @return The randomized value.
 	 */
 	private static int calculateRangedDamage(final Mob source, final int bowId, final int arrowId) {
+		if (CurrentBaseCombatContract.selected()) {
+			int maxRoll = getRangedDamage(source, bowId, arrowId);
+			return maxRoll <= 0 ? 0 : (DataConversions.getRandom().nextInt(maxRoll) + 320) / 640;
+		}
 		return rollDamage(source, offenseToMaxHit(source, source.getRangedOffense()));
 	}
 
@@ -73,6 +82,7 @@ public class CombatFormula {
 	}
 
 	public static int calculateMagicDamage(final Mob source, final Mob victim, final double spellPower) {
+		if (CurrentBaseCombatContract.selected()) return calculateMagicDamage(spellPower);
 		int spellMax = Math.max(1, (int) Math.ceil(spellPower));
 		int offenseBonus = offenseBonus(source, source.getMagicOffense());
 		int defenseMax = defenseToMitigation(victim.getMagicDefense());
@@ -83,6 +93,7 @@ public class CombatFormula {
 	}
 
 	public static int calculateMagicDamage(final Mob source, final Mob victim, final double spellPower, final double maxHitPercent) {
+		if (CurrentBaseCombatContract.selected()) return calculateMagicDamage(spellPower);
 		int spellMax = Math.max(1, (int) Math.ceil(spellPower));
 		int offenseBonus = offenseBonus(source, source.getMagicOffense());
 		int attackMax = applyOutgoingMaxHitDebuff(source, spellMax + offenseBonus);
@@ -117,6 +128,7 @@ public class CombatFormula {
 				break;
 			}
 		}
+		if (CurrentBaseCombatContract.selected()) return source.isCharged() && hasCapeEquipped ? 25 : 18;
 		if (advancedSpell) {
 			return hasCapeEquipped ? 32 : 24;
 		}
@@ -204,6 +216,12 @@ public class CombatFormula {
 	 * @return The amount to hit.
 	 */
 	public static int doMeleeDamage(final Mob source, final Mob victim) {
+		if (CurrentBaseCombatContract.selected()) {
+			boolean hit = calculateMeleeAccuracy(source, victim);
+			int damage = calculateMeleeDamage(source);
+			if (hit && victim.isPlayer()) ((Player) victim).updateDamageAndBlockedDamageTracking(source, damage, 0);
+			return hit ? damage : 0;
+		}
 		final int attackMax = getDragonBreathMainAttackMax(source, offenseToMaxHit(source, source.getMeleeOffense()));
 		int damage = rollPlayerCrit(source, attackMax) ? attackMax : applyMitigationRoll(source, victim, attackMax, defenseToMitigation(victim.getMeleeDefense()));
 		damage = applyMyWorldPrayerModifiers(source, victim, damage, PrayerCatalog.CombatStyle.MELEE);
@@ -227,6 +245,9 @@ public class CombatFormula {
 	 * @return The amount to hit.
 	 */
 	public static int doRangedDamage(final Mob source, final int bowId, final int arrowId, final Mob victim, final boolean skillCape) {
+		if (CurrentBaseCombatContract.selected()) {
+			return calculateRangedAccuracy(source, bowId, victim) ? calculateRangedDamage(source, bowId, arrowId) : 0;
+		}
 		int attackMax = offenseToMaxHit(source, source.getRangedOffense());
 		if (skillCape) {
 			attackMax *= 2;
@@ -684,6 +705,7 @@ public class CombatFormula {
 	 * Uses values from the old projectile.txt file included with configXX.jag.
 	 */
 	private static int rangedPowerRetro(final int bowId) {
+		if (CurrentBaseCombatContract.selected()) return CurrentBaseCombatContract.rangedPowerRetro(bowId);
 		switch (ItemId.getById(bowId)) {
 			case SHORTBOW:
 				return 14;
@@ -701,6 +723,7 @@ public class CombatFormula {
 	 * Returns a power to associate with each arrow (post-Fletching version)
 	 */
 	private static int rangedPower(final int arrowId) {
+		if (CurrentBaseCombatContract.selected()) return CurrentBaseCombatContract.rangedPower(arrowId);
 		/**
 		 * We don't have good data for throwing knives,
 		 * so everything besides rune knives is a guess based on
@@ -799,6 +822,7 @@ public class CombatFormula {
 	 * Returns an aim to associate with each ranged item
 	 */
 	private static int rangedAim(final int bowId) {
+		if (CurrentBaseCombatContract.selected()) return CurrentBaseCombatContract.rangedAim(bowId);
 		/**
 		 * We have limited pre-Fletching "aim" information for
 		 * the shortbow, longbow, and crossbow in configXX.jag
