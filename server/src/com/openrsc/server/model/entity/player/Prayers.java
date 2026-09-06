@@ -11,7 +11,7 @@ public class Prayers {
 	private static final int SPECIAL_PRAYER_NO_CAPE_COST_NUMERATOR = 3;
 	private static final int SPECIAL_PRAYER_NO_CAPE_COST_DENOMINATOR = 2;
 
-	private final boolean[] activatedPrayers = new boolean[PrayerCatalog.PRAYERS_PER_BOOK];
+	private final boolean[] activatedPrayers = new boolean[com.openrsc.server.CurrentBaseCombatContract.selected() ? 14 : PrayerCatalog.PRAYERS_PER_BOOK];
 	private final Player player;
 
 	public Prayers(final Player player) {
@@ -19,6 +19,7 @@ public class Prayers {
 	}
 
 	public boolean isPrayerActivated(final int prayerID) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected() && (prayerID < 0 || prayerID >= 14)) return false;
 		return activatedPrayers[prayerID];
 	}
 
@@ -31,11 +32,13 @@ public class Prayers {
 	}
 
 	public void setPrayer(final int prayerID, final boolean activated, final boolean updatePlayer) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected() && (prayerID < 0 || prayerID >= 14)) return;
 		activatedPrayers[prayerID] = activated;
 		if (updatePlayer) ActionSender.sendPrayers(player, activatedPrayers);
 	}
 
 	public int getAllocatedPoints() {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 0;
 		int allocatedPoints = 0;
 		for (int i = 0; i < activatedPrayers.length; i++) {
 			if (!activatedPrayers[i]) {
@@ -50,6 +53,11 @@ public class Prayers {
 	}
 
 	public boolean canActivate(final int prayerID) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) {
+			if (prayerID < 0 || prayerID >= 14) return false;
+			com.openrsc.server.external.PrayerDef definition = player.getWorld().getServer().getEntityHandler().getPrayerDef(prayerID);
+			return definition != null && player.getSkills().getMaxStat(5) >= definition.getReqLevel() && player.getSkills().getLevel(5) > 0;
+		}
 		final PrayerCatalog.PrayerDefinition definition = PrayerCatalog.getDefinition(player.getPrayerBook(), prayerID);
 		if (definition == null) {
 			return false;
@@ -61,6 +69,9 @@ public class Prayers {
 	}
 
 	public String getActivationBlockMessage(final int prayerID) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) {
+			return player.getSkills().getLevel(5) <= 0 ? "You have run out of prayer points. Return to a church to recharge" : "Your prayer ability is not high enough to use this prayer";
+		}
 		final PrayerCatalog.PrayerDefinition definition = PrayerCatalog.getDefinition(player.getPrayerBook(), prayerID);
 		if (definition == null) {
 			return null;
@@ -77,6 +88,7 @@ public class Prayers {
 	}
 
 	public void deactivateUnavailableEquipmentPrayers() {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return;
 		boolean changed = false;
 		for (int i = 0; i < activatedPrayers.length; i++) {
 			if (!activatedPrayers[i]) {
@@ -94,6 +106,7 @@ public class Prayers {
 	}
 
 	public void deactivateOverflowingPrayers() {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return;
 		boolean changed = false;
 		for (int i = activatedPrayers.length - 1; i >= 0 && getAllocatedPoints() > player.getPrayerAllocationPoints(); i--) {
 			if (activatedPrayers[i]) {
@@ -107,14 +120,17 @@ public class Prayers {
 	}
 
 	public int getOffenseBonusPercent(final PrayerCatalog.CombatStyle combatStyle) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 0;
 		return getCombatEffectPercent(PrayerCatalog.PrayerKind.OFFENSE, combatStyle);
 	}
 
 	public int getDefenseReductionPercent(final PrayerCatalog.CombatStyle combatStyle) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 0;
 		return getCombatEffectPercent(PrayerCatalog.PrayerKind.DEFENSE, combatStyle);
 	}
 
 	public int getSkillingBonusPercent(final String skillName) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 0;
 		int totalPercent = 0;
 		for (int i = 0; i < activatedPrayers.length; i++) {
 			if (!activatedPrayers[i]) {

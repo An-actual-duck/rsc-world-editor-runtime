@@ -132,6 +132,7 @@ def validate_profile(path: Path) -> dict:
             "statePolicy",
             "definitionPolicy",
             "skillPolicy",
+            "combatPolicy",
             "mapPolicy",
             "serverContent",
             "stateMigration",
@@ -208,6 +209,22 @@ def validate_profile(path: Path) -> dict:
     if ("com/openrsc/server/CurrentBaseSkillContract.class" not in profile["requiredRuntimeClasses"]
             or "orsc/CurrentBaseSkillContract.class" not in profile["requiredClientClasses"]):
         raise VerificationError("Current Base skill policy implementation classes are required")
+    expected_combat_policy = {
+        "contractId": "current-base-public-combat-v1",
+        "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+        "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/combat-policy.json",
+        "sha256": "c2a7e61e9977dc7b04ed1587c22b351580310bb5546e0dc3e2d708afb9498e05",
+        "serverBundlePath": "conf/server/current-base-public-provenance/combat-policy.json",
+        "clientBundlePath": "Cache/current-base-definitions/provenance/combat-policy.json"
+    }
+    if profile["combatPolicy"] != expected_combat_policy:
+        raise VerificationError("Current Base public combat policy differs from its reviewed contract")
+    combat_source = ROOT / expected_combat_policy["sourcePath"]
+    if (combat_source.is_symlink() or not combat_source.is_file()
+            or hashlib.sha256(combat_source.read_bytes()).hexdigest() != expected_combat_policy["sha256"]):
+        raise VerificationError("Current Base public combat policy source differs from its reviewed contract")
+    if "com/openrsc/server/CurrentBaseCombatContract.class" not in profile["requiredRuntimeClasses"]:
+        raise VerificationError("Current Base combat policy implementation class is required")
     if profile["statePolicy"] != {
         "contractId": "canonical-public-state-v1",
         "durableLocation": "outside-code-runtime",
@@ -327,6 +344,10 @@ def inventory_path(identity: dict, role: str, payload_root: Path) -> Path:
 
 def validate_public_provenance_selection(manifest: dict, role: str) -> None:
     profile = validate_profile(ROOT / "current-platform/runtime/current-base-v1/profile.json")
+    combat = profile["combatPolicy"]
+    expected_combat = {"sourcePath": combat["sourcePath"], "bundlePath": combat[role + "BundlePath"], "transform": "copy"}
+    if manifest["sourceFiles"].count(expected_combat) != 1:
+        raise VerificationError("missing or duplicate Current Base public combat provenance selection")
     skill = profile["skillPolicy"]
     expected_skill = {"sourcePath": skill["sourcePath"], "bundlePath": skill[role + "BundlePath"], "transform": "copy"}
     if manifest["sourceFiles"].count(expected_skill) != 1:

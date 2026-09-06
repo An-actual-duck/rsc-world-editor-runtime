@@ -6317,8 +6317,12 @@ public final class Player extends Mob {
 	}
 
 	public boolean checkRingOfLife(final Mob hitter) {
-		final Item wornRing = getCarriedItems().getEquipment().getRingItem();
-		if (this.isPlayer() && wornRing != null && EnchantingItemEffects.isSoulRing(wornRing.getCatalogId())
+		final boolean publicCombat = com.openrsc.server.CurrentBaseCombatContract.selected();
+		final Item wornRing = publicCombat
+			? (getCarriedItems().getEquipment().hasEquipped(1317) ? new Item(1317) : null)
+			: getCarriedItems().getEquipment().getRingItem();
+		if (this.isPlayer() && wornRing != null
+			&& (publicCombat ? wornRing.getCatalogId() == 1317 && getSkills().getLevel(Skill.HITS.id()) > 0 : EnchantingItemEffects.isSoulRing(wornRing.getCatalogId()))
 			&& (!this.getLocation().inWilderness()
 			|| (this.getLocation().inWilderness() && this.getLocation().wildernessLevel() <= Constants.GLORY_TELEPORT_LIMIT))) {
 			if (((float) this.getSkills().getLevel(Skill.HITS.id())) / ((float) this.getSkills().getMaxStat(Skill.HITS.id())) <= 0.1f) {
@@ -6333,7 +6337,7 @@ public final class Player extends Mob {
 				this.teleportToConfiguredRespawn(false);
 				this.message("Your ring of life shines brightly");
 				final double survivalChance = EnchantingItemEffects.getSoulRingSurvivalChance(wornRing.getCatalogId());
-				if (DataConversions.getRandom().nextDouble() >= survivalChance) {
+				if (publicCombat || DataConversions.getRandom().nextDouble() >= survivalChance) {
 					getCarriedItems().shatter(new Item(wornRing.getCatalogId()));
 				}
 				return true;

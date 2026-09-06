@@ -1,6 +1,7 @@
 package com.openrsc.server.event.rsc.impl.combat;
 
 import com.openrsc.server.constants.Constants;
+import com.openrsc.server.CurrentBaseCombatContract;
 import com.openrsc.server.constants.ItemId;
 import com.openrsc.server.constants.Skill;
 import com.openrsc.server.constants.Skills;
@@ -180,6 +181,16 @@ public class CombatEvent extends GameTickEvent {
 
 			//if(hitter.isNpc() && target.isPlayer() || target.isNpc() && hitter.isPlayer()) {
 			int damage;
+			if (CurrentBaseCombatContract.selected()) {
+				applyPublicDaggerPoison(hitter, target);
+				damage = CombatFormula.doMeleeDamage(hitter, target);
+				inflictDamage(hitter, target, damage);
+				if (target.isPlayer()) {
+					int reflected = CurrentBaseCombatContract.consumeRecoil((Player) target, damage);
+					if (reflected > 0) inflictDamage(target, hitter, reflected);
+				}
+				return;
+			}
 			if (getWorld().getServer().getConfig().OSRS_COMBAT_MELEE) {
 				damage = OSRSCombatFormula.Melee.doMeleeDamage(hitter, target);
 			} else {
@@ -407,6 +418,7 @@ public class CombatEvent extends GameTickEvent {
 	}
 
 	private double getCombatSpeedMultiplier(Mob hitter) {
+		if (CurrentBaseCombatContract.selected()) return 1.0D;
 		double multiplier = 1.0D;
 		if (hitter.isPlayer()) {
 			Player player = (Player) hitter;
@@ -443,6 +455,10 @@ public class CombatEvent extends GameTickEvent {
 	}
 
 	private void inflictDamage(final Mob hitter, final Mob target, int damage) {
+		if (CurrentBaseCombatContract.selected()) {
+			inflictPublicDamage(hitter, target, damage);
+			return;
+		}
 		if (!Summoning.canSummonAttack(hitter, target)) {
 			return;
 		}
@@ -543,6 +559,41 @@ public class CombatEvent extends GameTickEvent {
 				applyDeathRobeOverkillSplash((Player) hitter, (Npc) target, rawDamage - lastHits);
 			}
 			onDeath(target, hitter);
+		}
+	}
+
+	private void inflictPublicDamage(final Mob hitter, final Mob target, int damage) {
+		hitter.incHitsMade();
+		if (target.isPlayer()) {
+			Player defender = (Player) target;
+			hitter.getWorld().getServer().getCombatScriptLoader().checkAndExecuteCombatSideEffectScript(hitter, target);
+			if (hitter.isNpc()) {
+				if (defender.getPrayers().isPrayerActivated(Prayers.PARALYZE_MONSTER)) return;
+				hitter.getWorld().getServer().getCombatScriptLoader().checkAndExecuteCombatScript(hitter, target);
+			}
+		}
+		int previousHits = target.getLevel(Skill.HITS.id());
+		target.getSkills().subtractLevel(Skill.HITS.id(), damage, false);
+		target.getUpdateFlags().setDamage(new Damage(target, damage));
+		target.getUpdateFlags().addHitSplat(new HitSplat(target, HitSplat.TYPE_STANDARD, damage));
+		if (target.isNpc() && hitter.isPlayer()) ((Npc) target).addCombatDamage((Player) hitter, Math.min(damage, previousHits));
+		if (target.isPlayer()) {
+			sendSound((Player) target, hitter, damage > 0);
+			ActionSender.sendStat((Player) target, Skill.HITS.id());
+			updateParty((Player) target);
+		}
+		if (hitter.isPlayer()) { sendSound((Player) hitter, target, damage > 0); updateParty((Player) hitter); }
+		if (target.getLevel(Skill.HITS.id()) <= 0) { onDeath(target, hitter); return; }
+		boolean life = target.isPlayer() && !((Player) target).getDuel().isDuelActive() && ((Player) target).checkRingOfLife(hitter);
+		if (target.isNpc() || life) target.getWorld().getServer().getCombatScriptLoader().checkAndExecuteCombatScript(hitter, target);
+	}
+
+	private void applyPublicDaggerPoison(final Mob hitter, final Mob target) {
+		if (!hitter.isPlayer() || !hitter.getConfig().WANT_POISON_NPCS || target.getCurrentPoisonPower() >= 10) return;
+		int[] daggers = {ItemId.POISONED_BRONZE_DAGGER.id(), ItemId.POISONED_IRON_DAGGER.id(), ItemId.POISONED_STEEL_DAGGER.id(), ItemId.POISONED_BLACK_DAGGER.id(), ItemId.POISONED_MITHRIL_DAGGER.id(), ItemId.POISONED_ADAMANTITE_DAGGER.id(), ItemId.POISONED_RUNE_DAGGER.id(), ItemId.POISONED_DRAGON_DAGGER.id()};
+		for (int id : daggers) if (((Player) hitter).getCarriedItems().getEquipment().hasEquipped(id)) {
+			if (DataConversions.random(1, 50) == 1) { target.setPoisonDamage(60); target.startPoisonEvent(); }
+			return;
 		}
 	}
 

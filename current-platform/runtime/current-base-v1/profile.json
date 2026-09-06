@@ -46,6 +46,14 @@
     "serverBundlePath": "conf/server/current-base-public-provenance/skill-policy.json",
     "clientBundlePath": "Cache/current-base-definitions/provenance/skill-policy.json"
   },
+  "combatPolicy": {
+    "contractId": "current-base-public-combat-v1",
+    "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
+    "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/combat-policy.json",
+    "sha256": "c2a7e61e9977dc7b04ed1587c22b351580310bb5546e0dc3e2d708afb9498e05",
+    "serverBundlePath": "conf/server/current-base-public-provenance/combat-policy.json",
+    "clientBundlePath": "Cache/current-base-definitions/provenance/combat-policy.json"
+  },
   "statePolicy": {
     "contractId": "canonical-public-state-v1",
     "durableLocation": "outside-code-runtime",
@@ -125,6 +133,7 @@
     "pendingCutover": "installationRoot/pending-cutover.json-any-entry-refuses-after-lease-before-effects"
   },
   "requiredRuntimeClasses": [
+    "com/openrsc/server/CurrentBaseCombatContract.class",
     "com/openrsc/server/CurrentBaseSkillContract.class",
     "com/openrsc/server/VerifierLifetime.class",
     "com/openrsc/server/CurrentBaseVerifierServer.class",

@@ -39,6 +39,53 @@ public final class PublicCombatProbe {
       for(Item added:player.getCarriedItems().getInventory().getItems())if(added.getCatalogId()==id)added.getItemStatus().setWielded(true);
     }
   }
+  static void prayerAndEffects(Npc npc)throws Exception {
+    clear();player.getPrayers().resetPrayers();
+    check(player.getPrayers().getActivePrayers().length==14,"actual public prayer packet extent");
+    com.openrsc.server.net.rsc.handlers.PrayerHandler handler=new com.openrsc.server.net.rsc.handlers.PrayerHandler();
+    com.openrsc.server.net.rsc.struct.incoming.PrayerStruct payload=new com.openrsc.server.net.rsc.struct.incoming.PrayerStruct();
+    payload.setOpcode(com.openrsc.server.net.rsc.enums.OpcodeIn.PRAYER_ACTIVATED);
+    player.getSkills().setTemporaryLevelAndMaxStat(5,1,99,false);
+    for(int id:new int[]{0,3,9,1,4,10,2,5,11,12,13}) {payload.prayerID=id;handler.process(payload,player);check(player.getPrayers().isPrayerActivated(id),"actual public prayer activation "+id);}
+    for(int id:new int[]{0,3,1,4,2,5})check(!player.getPrayers().isPrayerActivated(id),"exclusive prayer family "+id);
+    for(int id:new int[]{9,10,11,12,13})check(player.getPrayers().isPrayerActivated(id),"independent classic prayers "+id);
+    check(player.getPrayers().getAllocatedPoints()==0,"no reservation");
+    player.getPrayers().resetPrayers();player.getSkills().setTemporaryLevelAndMaxStat(5,99,1,false);
+    payload.prayerID=13;handler.process(payload,player);check(!player.getPrayers().isPrayerActivated(13),"required max not boosted current");
+    player.getSkills().setTemporaryLevelAndMaxStat(5,0,99,false);payload.prayerID=0;handler.process(payload,player);
+    check(!player.getPrayers().isPrayerActivated(0),"empty prayer refusal");
+    player.getSkills().setTemporaryLevelAndMaxStat(5,10,99,false);payload.prayerID=0;handler.process(payload,player);
+    player.setPrayerStatePoints(1200);
+    int drain=(int)Math.ceil(server.getEntityHandler().getPrayerDef(0).getDrainRate()*120/300.0);
+    new com.openrsc.server.event.rsc.impl.PrayerDrainEvent(server.getWorld(),player).run();
+    check(player.getPrayerStatePoints()==1200-drain,"actual classic prayer drain");
+    player.setPrayerStatePoints(1);new com.openrsc.server.event.rsc.impl.PrayerDrainEvent(server.getWorld(),player).run();
+    check(player.getSkills().getLevel(5)==0&&!player.getPrayers().isPrayerActivated(0),"drain exhaustion deactivates");
+    player.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);npc.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);
+    // Execute the real impact path with owner elemental proc fields deliberately populated.
+    new com.openrsc.server.event.rsc.impl.projectile.ProjectileEvent(server.getWorld(),npc,player,17,1,false,100,100,100,100).action();
+    check(player.getSkills().getLevel(3)==82,"actual projectile damage without owner mitigation");
+    check(npc.getSkills().getLevel(3)==99,"no projectile life steal");
+    com.openrsc.server.event.rsc.impl.combat.CombatEvent event=new com.openrsc.server.event.rsc.impl.combat.CombatEvent(server.getWorld(),npc,player);
+    invoke(event.getClass(),event,"inflictDamage",new Class<?>[]{Mob.class,Mob.class,int.class},npc,player,17);
+    check(player.getSkills().getLevel(3)==65,"actual melee impact no owner mitigation");
+    clear();wear(1314);player.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);
+    new com.openrsc.server.event.rsc.impl.projectile.ProjectileEvent(server.getWorld(),npc,player,17,1,false).action();
+    check(npc.getSkills().getLevel(3)==97&&player.getCache().getInt("ringofrecoil")==2,"actual projectile deterministic recoil");
+    player.getCache().set("ringofrecoil",39);
+    new com.openrsc.server.event.rsc.impl.projectile.ProjectileEvent(server.getWorld(),npc,player,17,2,false).action();
+    check(npc.getSkills().getLevel(3)==96,"recoil remaining budget clamp");
+    check(!player.getCarriedItems().getEquipment().hasEquipped(1314)&&!player.getCache().hasKey("ringofrecoil"),"actual recoil shatter and cache clear");
+    clear();wear(1314);check(CurrentBaseCombatContract.consumeRecoil(player,0)==0&&!player.getCache().hasKey("ringofrecoil"),"zero damage no recoil consumption");
+    clear();wear(1317);player.getSkills().setTemporaryLevelAndMaxStat(3,11,100,false);
+    check(!player.checkRingOfLife(npc),"life above threshold refusal");
+    player.getSkills().setTemporaryLevelAndMaxStat(3,0,100,false);check(!player.checkRingOfLife(npc),"life cannot resurrect");
+    player.getSkills().setTemporaryLevelAndMaxStat(3,10,100,false);
+    check(player.checkRingOfLife(npc),"living ten percent life trigger");
+    check(!player.getCarriedItems().getEquipment().hasEquipped(1317),"life always shatters");
+    check(player.getX()==server.getConfig().RESPAWN_LOCATION_X&&player.getY()==server.getConfig().RESPAWN_LOCATION_Y,"actual life destination");
+    clear();player.setLocation(Point.location(120,648),true);
+  }
   public static void main(String[] args) {
     try {run(args);System.exit(0);}catch(Throwable failure){failure.printStackTrace();System.exit(1);}
   }
@@ -47,6 +94,8 @@ public final class PublicCombatProbe {
     server=new Server("current-base.conf");server.getEntityHandler().load();
     check(server.getConfig().RESTRICT_ITEM_ID==1592,"public stock items remain obtainable");
     player=new Player(server.getWorld(),725L);
+    player.getSettings().setAppearance(new com.openrsc.server.model.PlayerAppearance(0,0,0,0,1,2));
+    player.setBank(new Bank(player));
     player.setClientVersion(server.getConfig().CLIENT_VERSION);
     player.setClientLimitations(com.openrsc.server.net.rsc.ClientLimitations.forVersion(player.getClientVersion()));
     player.getClientLimitations().maxSkillId=17;player.getClientLimitations().maxItemId=1592;
@@ -116,6 +165,7 @@ public final class PublicCombatProbe {
     check(!(Boolean)invoke(SpellHandler.class,new SpellHandler(),"spellSuccessCheck",new Class<?>[]{Player.class,SpellDef.class},player,spell),"actual public cast failure");
     player.getSkills().setTemporaryLevelAndMaxStat(6,99,99,false);
     check((Boolean)invoke(SpellHandler.class,new SpellHandler(),"spellSuccessCheck",new Class<?>[]{Player.class,SpellDef.class},player,spell),"actual public cast success");
+    prayerAndEffects(npc);
     // Owner selection control is an injected dispatch unit, never an Advanced launch claim.
     Constructor<CurrentCompositionIdentity> constructor=CurrentCompositionIdentity.class.getDeclaredConstructor(boolean.class,Map.class);constructor.setAccessible(true);
     Map<String,String> fields=new HashMap<>();fields.put("variantId","current-advanced-v1");

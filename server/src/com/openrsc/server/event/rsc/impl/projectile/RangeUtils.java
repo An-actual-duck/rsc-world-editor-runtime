@@ -419,6 +419,7 @@ public class RangeUtils {
     }
 
     private static double getRangeSpeedMultiplier(final Mob attacker) {
+        if (com.openrsc.server.CurrentBaseCombatContract.selected()) return 1.0D;
         double multiplier = 1.0D;
         if (attacker.isPlayer()) {
             final Player player = (Player) attacker;

@@ -1,6 +1,7 @@
 package com.openrsc.server.event.rsc.impl.projectile;
 
 import com.openrsc.server.constants.ItemId;
+import com.openrsc.server.CurrentBaseCombatContract;
 import com.openrsc.server.constants.Skill;
 import com.openrsc.server.content.CorrosiveAura;
 import com.openrsc.server.content.DivineGrace;
@@ -192,6 +193,14 @@ public class ProjectileEvent extends SingleTickEvent {
 			// cancel the damage
 			// out on death
 			projectileDamage();
+			if (CurrentBaseCombatContract.selected()) {
+				if (opponent.isPlayer()) {
+					Player target = (Player) opponent;
+					if (target.getCarriedItems().getEquipment().hasEquipped(ItemId.RING_OF_RECOIL.id())) recoilDamage(target, caster, damage);
+					else if (target.getLevel(Skill.HITS.id()) > 0) target.checkRingOfLife(caster);
+				}
+				return;
+			}
 			if (caster.getSkills().getLevel(Skill.HITS.id()) <= 0) {
 				return;
 			}
@@ -308,6 +317,18 @@ public class ProjectileEvent extends SingleTickEvent {
 	}
 
 	private void recoilDamage(Player opponent, Mob caster, int damage) {
+		if (CurrentBaseCombatContract.selected()) {
+			int reflected = CurrentBaseCombatContract.consumeRecoil(opponent, damage);
+			if (reflected <= 0) return;
+			caster.getSkills().subtractLevel(Skill.HITS.id(), reflected, false);
+			caster.getUpdateFlags().setDamage(new Damage(caster, reflected));
+			caster.getUpdateFlags().addHitSplat(new HitSplat(caster, HitSplat.TYPE_STANDARD, reflected));
+			if (caster.getLevel(Skill.HITS.id()) <= 0) {
+				if (type == 2 || type == 5) opponent.resetRange();
+				caster.killedBy(opponent);
+			} else if (caster.isPlayer()) ((Player) caster).checkRingOfLife(opponent);
+			return;
+		}
 		final double recoilChance = opponent.getCarriedItems().getEquipment().getChaosRecoilChance();
 		if (recoilChance <= 0.0D) {
 			return;
@@ -336,6 +357,7 @@ public class ProjectileEvent extends SingleTickEvent {
 	}
 
 	private void projectileDamage() {
+		if (CurrentBaseCombatContract.selected()) { publicProjectileDamage(); return; }
 		if (!Summoning.canSummonAttack(caster, opponent)) {
 			return;
 		}
@@ -947,6 +969,30 @@ public class ProjectileEvent extends SingleTickEvent {
 		}
 		if (target.getSkills().getLevel(Skill.HITS.id()) <= 0) {
 			handleDeath();
+		}
+	}
+
+	private void publicProjectileDamage() {
+		if (caster.isPlayer() && opponent.isRemoved() && type == 2) caster.resetRange();
+		int previousHits = opponent.getLevel(Skill.HITS.id());
+		opponent.getSkills().subtractLevel(Skill.HITS.id(), damage, false);
+		opponent.getUpdateFlags().setDamage(new Damage(opponent, damage));
+		opponent.getUpdateFlags().addHitSplat(new HitSplat(opponent, HitSplat.TYPE_STANDARD, damage));
+		if (caster.isPlayer() && opponent.isNpc()) {
+			Npc npc = (Npc) opponent;
+			damage = Math.min(damage, previousHits);
+			if (type == 1 || type == 4) npc.addMageDamage((Player) caster, damage);
+			else if (type == 2 || type == 5) npc.addRangeDamage((Player) caster, damage);
+		}
+		if (opponent.isPlayer()) {
+			Player defender = (Player) opponent;
+			ActionSender.sendStat(defender, Skill.HITS.id());
+			if (defender.getConfig().WANT_PARTIES && defender.getParty() != null) defender.getParty().sendParty();
+		}
+		if (opponent.getLevel(Skill.HITS.id()) <= 0) { handleDeath(); return; }
+		if (opponent.isNpc() && caster.isPlayer()) {
+			Npc npc = (Npc) opponent;
+			if (!npc.isChasing() && !npc.inCombat() && npc.getCombatState() != CombatState.RUNNING && shouldChase) npc.setChasing((Player) caster);
 		}
 	}
 

@@ -4,6 +4,11 @@
   "contractId": "current-base-public-combat-v1",
   "sourceCommit": "c0102e60774ab9c9076aabae49f6f97fb6fc4b00",
   "sourceFiles": [
+    {"path":"server/src/com/openrsc/server/net/rsc/handlers/PrayerHandler.java","sha256":"b2ebc9950bb47931249062ca302417b76e6d0a07085075148ba18209e8bf88e0"},
+    {"path":"server/src/com/openrsc/server/model/entity/player/Prayers.java","sha256":"54492468ce4d2180fa021caea738a7c86016ccb10c448362afcdda58fe771f4e"},
+    {"path":"server/src/com/openrsc/server/event/rsc/impl/PrayerDrainEvent.java","sha256":"022472531a73d09b0e4635c034888245c298cf1ab5651b8c675298b2a86cbe0b"},
+    {"path":"server/src/com/openrsc/server/event/rsc/impl/projectile/RangeUtils.java","sha256":"22e51f578a24d526f6b9a63397656a65e875609e83f64b26adf568ea4b492f59"},
+    {"path":"Client_Base/src/orsc/mudclient.java","sha256":"bddd7630f4988b4402f88b0552ffbc3ea2a9db7496145bf90de50df5a46093ca"},
     {
       "path": "server/src/com/openrsc/server/event/rsc/impl/combat/CombatFormula.java",
       "sha256": "e1f141611300a17e2a1eaeb491f2cc14c19fe6ee6509e9fbc3d5881303fe512e"
@@ -46,11 +51,15 @@
   "melee": "classic-accuracy-vs-defense-roll-then-nextInt(maxRoll)-plus320-div640-independent-Attack-Defense-Strength-style-prayer",
   "ranged": "classic-bow-aim-ammunition-power-separate-no-owner-offense-mitigation-or-procs",
   "magic": "public-modern-spell-power-floor-uniform-cast-failure-uses-level-and-equipment-godspell-charge-and-cape",
+  "prayers": "14-public-definitions-max-level-eligibility-positive-current-points-exclusive-defense-strength-attack-tiers-classic-drain-no-owner-reservation-or-devotion-growth",
+  "timing": "retain-classic-melee-round-and-ranged-base-delays-no-owner-equipment-potion-elemental-speed-multipliers",
+  "effects": "single-target-standard-impact-no-owner-AoE-lifesteal-elemental-debuffs-or-damage-procs-public-godspell-drains-and-chaos-gauntlet-bolt-plus1",
   "rings": {
     "recoil": {
       "id": 1314,
       "damage": "incoming/10+(incoming>0?1:0)",
       "budget": 40,
+      "budgetConfiguration": "RING_OF_RECOIL_LIMIT-public-default40",
       "cacheKey": "ringofrecoil",
       "exhaustion": "clamp-to-remaining-and-shatter-remove-cache"
     },

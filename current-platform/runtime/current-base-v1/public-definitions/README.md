@@ -33,14 +33,23 @@ and XP/timer effects, and three god-cape stone rewards/ownership/progression.
 The pure unselected-composition control retains the generic spell and axe
 dispatch; it is not a full Advanced launch test.
 
-This slice does not establish public combat parity. Current equipment offense,
-elemental jewelry and armor-power penalty dispatch still contain owner-specific
-behavior, including the changed interpretation of public item 1430. A bounded
-effective combat-stat audit/correction is required before a public candidate.
-Genuine imported map gameplay, ladder removal and client void-boundary checks
-also remain separate verification work. The packaged effective policy states
-these limits explicitly; content availability is not a gameplay approval.
-Generic and Advanced content sources remain independent.
+The original definition-only slice did not establish combat parity. The separate
+hash-bound `combat-policy.json` now selects classic equipment-field sums,
+Attack/Defense/Strength hit rolls and prayers, bow aim versus ammunition power,
+public spell powers/failure, and single-target impacts without owner armor
+mitigation, elemental damage procs or lifesteal. Recoil uses its public
+40-point default budget; life activates only while living at most 10% Hits,
+within the public wilderness limit, and always shatters. The matching prayer
+controls use the 14 public definitions, required levels and current points,
+not owner reservation costs. Generic and Advanced dispatch remains independent.
+
+Packaged headless probes exercise actual equipment reads, formula dispatch,
+projectile and melee impacts, prayer packets/drain, and state-changing rings.
+These are bounded contract proofs, not a claim of every plugin, poison tick,
+NPC attack profile, death/inventory interaction, or complete gameplay parity.
+The original `effective-policy.json` records the older definition-only scope;
+the separately bound skill/combat policies and tests define these later slices.
+Genuine imported-map acceptance has its own independent verification document.
 
 The separately hash-bound `skill-policy.json` records the public 18-skill
 numeric identity and XP/style oracle from exact historical source blobs. Bound

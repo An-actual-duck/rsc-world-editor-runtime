@@ -893,6 +893,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 	}
 
 	public void godSpellObject(Player player, Mob affectedMob, Spells spellEnum) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) applyPublicGodSpellDrain(player, affectedMob, spellEnum);
 		final boolean useLegacySceneryEffect = !player.isUsingCustomClient() || spellEnum == Spells.CHARGE;
 		switch (spellEnum) {
 			case CLAWS_OF_GUTHIX:
@@ -927,6 +928,20 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 				}
 				break;
 		}
+	}
+
+	private void applyPublicGodSpellDrain(Player player, Mob target, Spells spell) {
+		int skill;
+		switch (spell) {
+			case CLAWS_OF_GUTHIX: skill = Skill.DEFENSE.id(); break;
+			case SARADOMIN_STRIKE: skill = Skill.PRAYER.id(); break;
+			case FLAMES_OF_ZAMORAK: skill = Skill.MAGIC.id(); break;
+			default: return;
+		}
+		int current = target.getSkills().getLevel(skill);
+		if (spell != Spells.SARADOMIN_STRIKE && current < target.getSkills().getMaxStat(skill)) return;
+		int reduction = spell == Spells.SARADOMIN_STRIKE ? 1 : 1 + (int) (current * 0.05);
+		target.getSkills().setLevel(skill, current - reduction);
 	}
 
 	private void handleGroundCast(Player player, SpellDef spell, Spells spellEnum) {
@@ -1936,6 +1951,16 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 						}
 
 						double max = getPlayer().getWorld().getServer().getConstants().getSpellDamages().getSpellDamage(spellEnum, entityType, SpellDamages.MagicType.MODERNMAGIC);
+						if (com.openrsc.server.CurrentBaseCombatContract.selected()) {
+							boolean gauntlets = getPlayer().getCarriedItems().getEquipment().hasEquipped(ItemId.GAUNTLETS_OF_CHAOS.id())
+								&& getPlayer().getCache().getInt("famcrest_gauntlets") == Gauntlets.CHAOS.id();
+							if (gauntlets && spell.getName().contains("bolt")) max += 1;
+							int publicDamage = CombatFormula.calculateMagicDamage(getPlayer(), affectedMob, max);
+							getPlayer().getWorld().getServer().getGameEventHandler().add(new ProjectileEvent(getPlayer().getWorld(), getPlayer(), affectedMob, publicDamage, 1, setChasing));
+							getPlayer().setKillType(KillType.MAGIC);
+							finalizeSpell(getPlayer(), spell, DEFAULT);
+							break;
+						}
 						max = applyElementalRingDamageBonus(getPlayer(), spellEnum, max);
 
 						// Chaos gauntlets let mind-rune spells hit at the chaos-rune spell cap.
@@ -2066,6 +2091,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 	}
 
 	private void applyGodSpellAreaEffects(final Player caster, final Mob primaryTarget, final Spells spellEnum, final int primaryDamage) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return;
 		final boolean advancedSpell = SpellClassification.isAdvancedGodSpell(spellEnum);
 		if (Summoning.isPlayerAreaEffectSuppressed(caster)) {
 			applyGodSpellSpecialEffect(caster, primaryTarget, spellEnum, primaryDamage, true);
@@ -2091,6 +2117,7 @@ public class SpellHandler implements PayloadProcessor<SpellStruct, OpcodeIn> {
 	}
 
 	private void applyIbanBlastAreaEffects(final Player caster, final Mob primaryTarget) {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) return;
 		if (Summoning.isPlayerAreaEffectSuppressed(caster)) {
 			return;
 		}

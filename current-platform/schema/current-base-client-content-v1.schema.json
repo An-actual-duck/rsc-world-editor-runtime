@@ -23,7 +23,7 @@
       "items": false
     },
     "sourceFiles": {
-      "type": "array", "minItems": 22, "maxItems": 22,
+      "type": "array", "minItems": 23, "maxItems": 23,
       "items": {"$ref": "#/$defs/file"}
     },
     "forbiddenPathFragments": {

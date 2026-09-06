@@ -30,6 +30,23 @@ public final class CurrentBaseCombatContract {
         }
     }
 
+    /** Consume the stock ring's persistent budget; caller owns damage/death delivery. */
+    public static int consumeRecoil(com.openrsc.server.model.entity.player.Player wearer, int incomingDamage) {
+        if (!selected()) throw new IllegalStateException("public recoil requires bound Current Base");
+        if (incomingDamage <= 0 || !wearer.getCarriedItems().getEquipment().hasEquipped(1314)) return 0;
+        int used = wearer.getCache().hasKey("ringofrecoil") ? Math.max(0, wearer.getCache().getInt("ringofrecoil")) : 0;
+        int remaining = Math.max(0, wearer.getConfig().RING_OF_RECOIL_LIMIT - used);
+        int reflected = Math.min(remaining, incomingDamage / 10 + 1);
+        if (reflected >= remaining) {
+            wearer.getCache().remove("ringofrecoil");
+            wearer.getCarriedItems().shatter(new com.openrsc.server.model.container.Item(1314));
+        } else {
+            if (used == 0) wearer.message("You start a new ring of recoil");
+            wearer.getCache().set("ringofrecoil", used + reflected);
+        }
+        return reflected;
+    }
+
     public static int rangedAim(int id) {
         switch (id) {
             case 189: return 10;
