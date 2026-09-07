@@ -15,12 +15,30 @@ def strip_comments(source: str) -> str:
     return re.sub(r"//.*", "", source)
 
 
+# Only this exact composition-guarded public branch may fail a cast. The
+# remaining handler and every other Java call site retain the owner no-fail rule.
+PUBLIC_FAILURE = re.compile(
+    r'if\s*\(com\.openrsc\.server\.CurrentBaseCombatContract\.selected\(\)\s*'
+    r'&&\s*!Formulae\.castSpell\(spell, player\.getSkills\(\)\.getLevel\(getMagicId\(player, spell\)\), player\.getMagicPoints\(\)\)\)\s*\{\s*'
+    r'player\.message\("The spell fails! You may try again in 20 seconds"\);\s*'
+    r'player\.playSound\("spellfail"\);\s*player\.setSpellFail\(\);\s*'
+    r'player\.resetPath\(\);\s*return false;\s*\}'
+)
+
+
+def non_base_source(path: Path) -> str:
+    source = strip_comments(path.read_text(encoding="utf-8", errors="ignore"))
+    return PUBLIC_FAILURE.sub("", source) if path == SPELL_HANDLER else source
+
+
 def main() -> int:
     failures: list[str] = []
     searched = [SPELL_HANDLER, MAGIC_COMBAT_EVENT]
+    if len(PUBLIC_FAILURE.findall(strip_comments(SPELL_HANDLER.read_text(encoding="utf-8")))) != 1:
+        failures.append("The single reviewed Current Base cast-failure guard changed or is missing")
 
     for path in searched:
-        source = strip_comments(path.read_text(encoding="utf-8"))
+        source = non_base_source(path)
         if "Formulae.castSpell(" in source:
             failures.append(f"{path.relative_to(ROOT)} calls Formulae.castSpell, reintroducing random spell failure")
         if re.search(r"\bspellfail\b|spellfail\.wav|You fail to cast", source, re.I):
@@ -32,7 +50,7 @@ def main() -> int:
     for path in ROOT.rglob("*.java"):
         if path == FORMULAE:
             continue
-        source = strip_comments(path.read_text(encoding="utf-8", errors="ignore"))
+        source = non_base_source(path)
         call_sites += len(re.findall(r"\bFormulae\.castSpell\s*\(", source))
 
     print(f"Formulae.castSpell declarations: {declarations}")
@@ -50,7 +68,7 @@ def main() -> int:
             print(failure)
         return 1
 
-    print("\nPASS: live magic casting paths do not use random spell failure")
+    print("\nPASS: random spell failure is confined to the exact Current Base branch; non-Base casting remains no-fail")
     return 0
 
 
