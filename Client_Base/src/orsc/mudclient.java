@@ -437,8 +437,11 @@ public final class mudclient implements Runnable {
 	public final int[] bankItemOnTab = new int[500];
 	public final int[] equipIconXLocations = new int[]{98, 98, 98, 153, 43, 43, 98, 98, 43, 153, 153, 43};
 	public final int[] equipIconYLocations = new int[]{5, 85, 125, 85, 85, 165, 165, 45, 45, 45, 165, 125};
-	public final String[] equipmentStatNames = new String[]{"Rng. Def", "Mag. Def", "Mel. Def", "Mel. Pow",
-		"Prayer", "Rng. Pow", "Mag. Pow", "Holy Pow"};
+	private static String[] createEquipmentStatNames() {
+		return CurrentBaseSkillContract.selected() ? new String[]{"Armour", "Aim", "Power", "Magic", "Prayer", "", "", ""}
+			: new String[]{"Rng. Def", "Mag. Def", "Mel. Def", "Mel. Pow", "Prayer", "Rng. Pow", "Mag. Pow", "Holy Pow"};
+	}
+	public final String[] equipmentStatNames = createEquipmentStatNames();
 	public final int[] playerStatEquipment = new int[equipmentStatNames.length];
 	private final int[] mouseClickX = new int[8192];
 	private final int[] mouseClickY = new int[8192];
@@ -12851,7 +12854,8 @@ public final class mudclient implements Runnable {
 						this.drawEquipmentStatusValue(currSkill, xOffset + 42,
 							yOffset + 243 + currSkill * 13, 0xFFFFFF);
 					}
-					this.drawEquipmentStatusValue(currSkill == 0 ? 3 : currSkill + 4, 244 / 2 + xOffset + 35,
+					if (!CurrentBaseSkillContract.selected() || currSkill < 2)
+					this.drawEquipmentStatusValue(CurrentBaseSkillContract.selected() ? 3 + currSkill : currSkill == 0 ? 3 : currSkill + 4, 244 / 2 + xOffset + 35,
 						yOffset + 243 + currSkill * 13, 0xFFFFFF);
 				}
 
@@ -13561,7 +13565,8 @@ public final class mudclient implements Runnable {
 				if (this.magicOrPrayerList == 1) {
 					int prayerAllocatedPoints = this.getAllocatedPrayerPoints();
 					int prayerMaxPoints = this.getPrayerAllocationPoints();
-					int prayerAvailablePoints = Math.max(0, prayerMaxPoints - prayerAllocatedPoints);
+					int prayerAvailablePoints = CurrentBaseSkillContract.selected() ? this.playerStatCurrent[5]
+						: Math.max(0, prayerMaxPoints - prayerAllocatedPoints);
 					int prayerTooltipY = magicPanelYStart + 122;
 					int hoveredPrayer = -1;
 					if (SpellbookLayoutSettings.usesTextLayout()) {
@@ -13628,7 +13633,8 @@ public final class mudclient implements Runnable {
 								prayerDef.getName(),
 								0xFFFF00, 0, 1, prayerTooltipY + 13);
 						this.getSurface().drawColoredStringCentered(magicPanelX + magicPanelWidth / 2,
-							"Reserved points: " + this.getPrayerPointCost(hoveredPrayer),
+							CurrentBaseSkillContract.selected() ? "Level: " + prayerDef.getReqLevel()
+								: "Reserved points: " + this.getPrayerPointCost(hoveredPrayer),
 							0xFFFFFF, 0, 1, prayerTooltipY + 24);
 						this.getSurface().drawWrappedCenteredString(prayerDef.getDescription(),
 							magicPanelX + magicPanelWidth / 2, prayerTooltipY + 36, magicPanelWidth - 16,
@@ -13895,7 +13901,8 @@ public final class mudclient implements Runnable {
 			this.panelMagic.setListEntry(
 				this.controlMagicPanel,
 				prayerIndex,
-				color + prayerDef.getName() + " [" + this.getPrayerPointCost(prayerIndex) + "]",
+				color + prayerDef.getName() + " [" + (CurrentBaseSkillContract.selected()
+					? "Level " + prayerDef.getReqLevel() : this.getPrayerPointCost(prayerIndex)) + "]",
 				0,
 				null,
 				null);
@@ -13963,7 +13970,10 @@ public final class mudclient implements Runnable {
 		if (!this.prayerOn[prayerIndex]) {
 			if (!this.canActivatePrayer(prayerIndex)) {
 				this.showMessage(false, null,
-					"You need " + this.getPrayerPointCost(prayerIndex) + " free prayer points to activate this prayer",
+					CurrentBaseSkillContract.selected()
+						? (this.playerStatCurrent[5] <= 0 ? "You have run out of prayer points. Return to a church to recharge"
+							: "Your prayer ability is not high enough to use this prayer")
+						: "You need " + this.getPrayerPointCost(prayerIndex) + " free prayer points to activate this prayer",
 					MessageType.GAME, 0, null);
 				return;
 			}
@@ -16889,7 +16899,8 @@ public final class mudclient implements Runnable {
 					if (currSkill < 3) {
 						this.drawEquipmentStatusValue(currSkill, 5 + x, yOffset, textColour);
 					}
-					this.drawEquipmentStatusValue(currSkill == 0 ? 3 : currSkill + 4, x + width / 2 - 5, yOffset, textColour);
+					if (!CurrentBaseSkillContract.selected() || currSkill < 2)
+					this.drawEquipmentStatusValue(CurrentBaseSkillContract.selected() ? 3 + currSkill : currSkill == 0 ? 3 : currSkill + 4, x + width / 2 - 5, yOffset, textColour);
 					yOffset += 13;
 				}
 				yOffset -= 2;
@@ -26247,6 +26258,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private int getAllocatedPrayerPoints() {
+		if (CurrentBaseSkillContract.selected()) return 0;
 		int allocatedPoints = 0;
 		for (int i = 0; i < this.prayerOn.length && i < EntityHandler.prayerCount(); i++) {
 			if (this.prayerOn[i]) {
@@ -26257,6 +26269,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private int getPrayerAllocationPoints() {
+		if (CurrentBaseSkillContract.selected()) return this.playerStatBase[5];
 		int prayerLevel = this.playerStatCurrent.length > 5 ? this.playerStatCurrent[5] : 0;
 		int equipmentPrayer = this.playerStatEquipment.length > 4 ? this.playerStatEquipment[4] : 1;
 		return prayerLevel + Math.max(equipmentPrayer - 1, 0);
@@ -26268,6 +26281,10 @@ public final class mudclient implements Runnable {
 		}
 		if (this.prayerOn[prayerIndex]) {
 			return true;
+		}
+		if (CurrentBaseSkillContract.selected()) {
+			return this.playerStatCurrent[5] > 0
+				&& this.playerStatBase[5] >= EntityHandler.getPrayerDef(prayerIndex).getReqLevel();
 		}
 		return this.getAllocatedPrayerPoints() + this.getPrayerPointCost(prayerIndex)
 			<= this.getPrayerAllocationPoints();

@@ -32,9 +32,10 @@ class PublicRuntimeTest(unittest.TestCase):
                 (root / 'plugins.jar').write_bytes(plugins.read_bytes())
                 jars.append(plugins)
             classpath = os.pathsep.join(map(str, jars))
-            subprocess.run(['javac', '-cp', classpath, '-d', str(root),
+            compiled = subprocess.run(['javac', '-cp', classpath, '-d', str(root),
                 str(ROOT / ('tests/myworld/fixtures/current-base-public/' + probe + '.java'))],
-                cwd=root, check=True, capture_output=True, text=True, timeout=30)
+                cwd=root, capture_output=True, text=True, timeout=30)
+            self.assertEqual(0, compiled.returncode, compiled.stdout + compiled.stderr)
             command = ['java', '-Djava.awt.headless=true',
                 '-Dopenrsc.currentCompositionIdentityFile=' + str(OUTPUT / 'composition-identity.json'),
                 '-cp', str(root) + os.pathsep + classpath, probe, role,
@@ -47,6 +48,7 @@ class PublicRuntimeTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout[-6000:] + result.stderr[-12000:])
             self.assertIn('PUBLIC_GENERIC_CONTROL_VERIFIED' if probe == 'PublicGenericDispatchProbe' else
                           'PUBLIC_CLIENT_SKILLS_VERIFIED' if probe == 'PublicClientSkillProbe' else
+                          'PUBLIC_COMBAT_VERIFIED' if probe == 'PublicCombatProbe' else
                           'PUBLIC_MODELS_VERIFIED' if probe == 'PublicModelsProbe' else
                           'PUBLIC_MAGIC_VERIFIED' if probe == 'PublicMagicProbe' else
                           'PUBLIC_GATHERING_VERIFIED' if probe == 'PublicGatheringProbe'
@@ -63,6 +65,9 @@ class PublicRuntimeTest(unittest.TestCase):
 
     def test_actual_public_client_skill_registry_packets_and_controls(self):
         self.probe('client', 'PublicClientSkillProbe')
+
+    def test_actual_public_combat_equipment_and_formula_contract(self):
+        self.probe('server', 'PublicCombatProbe')
 
     def test_client_non_base_selection_preserves_existing_registry(self):
         self.probe('client', 'PublicClientSkillProbe', selection_control=True)

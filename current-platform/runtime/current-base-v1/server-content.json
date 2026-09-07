@@ -13,6 +13,7 @@
     "sceneryMaxId": 1295
   },
   "sourceFiles": [
+    {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/combat-policy.json","bundlePath":"conf/server/current-base-public-provenance/combat-policy.json","transform":"copy"},
     {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/skill-policy.json","bundlePath":"conf/server/current-base-public-provenance/skill-policy.json","transform":"copy"},
     {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/provenance.json","bundlePath":"conf/server/current-base-public-provenance/provenance.json","transform":"copy"},
     {"sourcePath":"current-platform/runtime/current-base-v1/public-definitions/gameplay-provenance.json","bundlePath":"conf/server/current-base-public-provenance/gameplay-provenance.json","transform":"copy"},

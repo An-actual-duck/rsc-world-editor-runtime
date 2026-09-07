@@ -31,6 +31,7 @@ public final class PublicClientSkillProbe {
     call(client,"loadSkills",new Class<?>[]{});
     List<?> names=(List<?>)field(mudclient.class,"skillNameLongArray").get(null);
     if(control) {
+      check(((String[])call(client,"createEquipmentStatNames",new Class<?>[]{}))[0].equals("Rng. Def"),"owner equipment labels unchanged");
       check(names.size()==20 && names.get(0).equals("Melee") && names.get(5).equals("Worship") && names.get(11).equals("Retired"),"non-Base registry unchanged");
       for(int id:new int[]{1,2,9,11})check((Boolean)call(client,"isSkillHiddenFromStatsMenu",new Class<?>[]{int.class},id),"owner hidden skills unchanged");
       check(!(Boolean)call(client,"shouldDrawPublicCombatStyleMenu",new Class<?>[]{}),"no public style menu outside Base");
@@ -72,6 +73,32 @@ public final class PublicClientSkillProbe {
       check(output.dataBuffer[at]==0 && output.dataBuffer[at+1]==2 && output.dataBuffer[at+2]==29 && output.dataBuffer[at+3]==style,"actual menu packet29"+style);
       check(client.getCombatStyle()==style,"selected classic control state");
     }
+    Config.F_CACHE_DIR=java.nio.file.Paths.get("Cache").toAbsolutePath().toString();
+    com.openrsc.client.entityhandling.EntityHandler.load(true);
+    check(com.openrsc.client.entityhandling.EntityHandler.prayerCount()==14,"actual public prayers");
+    set(client,"prayerOn",new boolean[14]);
+    client.setPlayerStatBase(5,99);client.setPlayerStatCurrent(5,1);
+    for(int prayer=0;prayer<14;prayer++) {
+      check((Boolean)call(client,"canActivatePrayer",new Class<?>[]{int.class},prayer),"level eligibility, no reservation "+prayer);
+      call(client,"togglePrayerMenuPrayer",new Class<?>[]{int.class},prayer);
+      int at=16+prayer*4;
+      check(output.dataBuffer[at+2]==60 && output.dataBuffer[at+3]==prayer,"actual prayer activation packet "+prayer);
+    }
+    client.setPlayerStatBase(5,1);client.setPlayerStatCurrent(5,99);
+    check(!(Boolean)call(client,"canActivatePrayer",new Class<?>[]{int.class},13),"boosted current cannot bypass required max");
+    client.setPlayerStatBase(5,99);client.setPlayerStatCurrent(5,0);
+    check(!(Boolean)call(client,"canActivatePrayer",new Class<?>[]{int.class},0),"zero prayer refusal");
+    ((boolean[])field(mudclient.class,"prayerOn").get(client))[0]=true;
+    call(client,"togglePrayerMenuPrayer",new Class<?>[]{int.class},0);
+    check((output.dataBuffer[74]&255)==254 && output.dataBuffer[75]==0,"actual prayer deactivation packet");
+    check((Integer)call(client,"getAllocatedPrayerPoints",new Class<?>[]{})==0,"no owner reservation");
+    check((Integer)call(client,"getPrayerAllocationPoints",new Class<?>[]{})==99,"public prayer display max");
+    String[] equipmentNames=(String[])call(client,"createEquipmentStatNames",new Class<?>[]{});
+    check(Arrays.asList(equipmentNames).subList(0,5).equals(Arrays.asList("Armour","Aim","Power","Magic","Prayer")),"classic equipment labels");
+    set(client,"playerStatEquipment",new int[8]);input.packetEnd=0;
+    int[] equipment={83,7,7,7,1,0,0,0};for(int i=0;i<5;i++)input.putByte(equipment[i]);for(int value:equipment)input.putInt(value);
+    input.packetEnd=0;call(handler,"updateEquipmentStats",new Class<?>[]{int.class},37);
+    check(Arrays.equals((int[])field(mudclient.class,"playerStatEquipment").get(client),equipment),"actual classic equipment numeric packet decoder");
     System.out.println("PUBLIC_CLIENT_SKILLS_VERIFIED registry=18 stats=18 singleStats=4 styles=4 noWindow=true");
   }
 }

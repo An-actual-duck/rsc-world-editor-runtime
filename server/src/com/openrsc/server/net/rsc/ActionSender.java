@@ -497,8 +497,11 @@ public class ActionSender {
 	}
 
 	public static void sendEquipmentStats(Player player, int slot) {
-		player.syncHitsEquipmentBonuses();
-		player.syncGiantMightEquipmentBonuses();
+		final boolean publicCombat = com.openrsc.server.CurrentBaseCombatContract.selected();
+		if (!publicCombat) {
+			player.syncHitsEquipmentBonuses();
+			player.syncGiantMightEquipmentBonuses();
+		}
 		EquipmentStatsStruct struct = new EquipmentStatsStruct();
 		struct.armourPoints = player.getRangedDefense();
 		struct.weaponAimPoints = player.getMagicDefense();
@@ -509,6 +512,16 @@ public class ActionSender {
 		struct.rangedPoints = player.getCarriedItems().getEquipment().getDisplayedRangedOffense();
 		struct.magicPowerPoints = player.getCarriedItems().getEquipment().getDisplayedMagicOffense();
 		struct.holyPowerPoints = player.getCarriedItems().getEquipment().getHolyPower();
+		if (publicCombat) {
+			struct.armourPoints = player.getArmourPoints();
+			struct.weaponAimPoints = player.getWeaponAimPoints();
+			struct.weaponPowerPoints = player.getWeaponPowerPoints();
+			struct.magicPoints = player.getMagicPoints();
+			struct.hidingPoints = 0;
+			struct.rangedPoints = 0;
+			struct.magicPowerPoints = 0;
+			struct.holyPowerPoints = 0;
+		}
 		tryFinalizeAndSendPacket(OpcodeOut.SEND_EQUIPMENT_STATS, struct, player);
 		if (player.getConfig().WANT_MYWORLD) {
 			player.getPrayers().deactivateOverflowingPrayers();

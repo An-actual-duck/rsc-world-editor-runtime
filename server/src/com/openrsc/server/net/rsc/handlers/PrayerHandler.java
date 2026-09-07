@@ -10,6 +10,7 @@ import com.openrsc.server.net.rsc.struct.incoming.PrayerStruct;
 public class PrayerHandler implements PayloadProcessor<PrayerStruct, OpcodeIn> {
 
 	public void process(final PrayerStruct payload, final Player player) throws Exception {
+		if (com.openrsc.server.CurrentBaseCombatContract.selected()) { processPublicPrayer(payload, player); return; }
 		final int prayerID = payload.prayerID;
 
 		if (prayerID < 0 || prayerID >= PrayerCatalog.PRAYERS_PER_BOOK) {
@@ -48,5 +49,25 @@ public class PrayerHandler implements PayloadProcessor<PrayerStruct, OpcodeIn> {
 				prayers.setPrayer(prayerID, false);
 			}
 		}
+	}
+
+	private void processPublicPrayer(final PrayerStruct payload, final Player player) {
+		int id = payload.prayerID;
+		if (id < 0 || id > Prayers.PROTECT_FROM_MISSILES) {
+			player.setSuspiciousPlayer(true, "public prayer ID outside 0..13"); return;
+		}
+		if (player.getConfig().LACKS_PRAYERS || (player.getDuel().isDuelActive() && player.getDuel().getDuelSetting(2))) return;
+		if (id == Prayers.PROTECT_ITEMS && player.isIronMan(com.openrsc.server.constants.IronmanMode.Ultimate.id())) return;
+		Prayers prayers = player.getPrayers();
+		if (payload.getOpcode() == OpcodeIn.PRAYER_DEACTIVATED) { prayers.setPrayer(id, false); return; }
+		if (payload.getOpcode() != OpcodeIn.PRAYER_ACTIVATED || prayers.isPrayerActivated(id)) return;
+		if (!prayers.canActivate(id)) { player.message(prayers.getActivationBlockMessage(id)); return; }
+		for (int[] family : new int[][]{{0,3,9},{1,4,10},{2,5,11}}) {
+			for (int member : family) if (member == id) {
+				for (int other : family) if (other != id) prayers.setPrayer(other, false, false);
+				break;
+			}
+		}
+		prayers.setPrayer(id, true);
 	}
 }

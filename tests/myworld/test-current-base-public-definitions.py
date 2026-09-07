@@ -28,6 +28,35 @@ def records(name):
 
 
 class PublicDefinitionSnapshotTest(unittest.TestCase):
+    def test_closed_public_combat_policy_and_selection(self):
+        spec = importlib.util.spec_from_file_location('public_combat_verify', ROOT / 'scripts/verify-current-base.py')
+        verify = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(verify)
+        profile = verify.validate_profile(SNAPSHOT.parent / 'profile.json')
+        binding = profile['combatPolicy']
+        raw = (ROOT / binding['sourcePath']).read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), binding['sha256'])
+        policy = json.loads(raw)
+        self.assertEqual(policy['rings']['recoil']['budget'], 40)
+        self.assertEqual([len(policy['projectileTables'][name]) for name in
+                          ('rangedAim', 'rangedPower', 'rangedPowerRetro')], [53, 57, 4])
+        with tempfile.TemporaryDirectory(prefix='public-combat-policy-') as temporary:
+            forged = Path(temporary) / 'profile.json'
+            for key, value in [('sourceCommit', '0' * 40), ('sha256', '0' * 64),
+                               ('serverBundlePath', 'other.json'), ('unknown', True)]:
+                altered = json.loads(json.dumps(profile))
+                altered['combatPolicy'][key] = value
+                forged.write_text(json.dumps(altered))
+                with self.assertRaisesRegex(verify.VerificationError, 'combat policy'):
+                    verify.validate_profile(forged)
+        for role in ('server', 'client'):
+            manifest = json.loads((SNAPSHOT.parent / (role + '-content.json')).read_bytes())
+            selected = next(row for row in manifest['sourceFiles'] if row['sourcePath'] == binding['sourcePath'])
+            for changed in ([], [selected, selected], [dict(selected, transform='prefix-xml')]):
+                altered = dict(manifest, sourceFiles=[row for row in manifest['sourceFiles'] if row != selected] + changed)
+                with self.assertRaisesRegex(verify.VerificationError, 'combat provenance selection'):
+                    verify.validate_public_provenance_selection(altered, role)
+
     def test_closed_public_skill_policy_and_selection(self):
         spec = importlib.util.spec_from_file_location('public_skill_verify', ROOT / 'scripts/verify-current-base.py')
         verify = importlib.util.module_from_spec(spec)
