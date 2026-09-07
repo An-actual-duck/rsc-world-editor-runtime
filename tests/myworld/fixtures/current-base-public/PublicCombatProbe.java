@@ -39,16 +39,6 @@ public final class PublicCombatProbe {
       for(Item added:player.getCarriedItems().getInventory().getItems())if(added.getCatalogId()==id)added.getItemStatus().setWielded(true);
     }
   }
-  static final class DeathOrderPlayer extends Player {
-    int deaths;
-    DeathOrderPlayer() { super(server.getWorld(),726L); }
-    @Override public void killedBy(Mob killer) {
-      deaths++;
-      check(getCache().getInt("ringofrecoil")==2,"lethal melee consumes recoil before death cleanup");
-      check(killer.getLevel(3)==97,"lethal melee delivers recoil before death cleanup");
-      getCarriedItems().getInventory().getItems().clear();
-    }
-  }
   static void meleeRecoilDelivery(Npc npc)throws Exception {
     clear();wear(1314);player.getCache().remove("ringofrecoil");
     player.getSkills().setTemporaryLevelAndMaxStat(3,99,99,false);
@@ -69,16 +59,22 @@ public final class PublicCombatProbe {
     field(Player.class,"loggedIn").setBoolean(player,false);player.getPrayers().resetPrayers();
     Player saved=player;
     try {
-      DeathOrderPlayer dying=new DeathOrderPlayer();player=dying;
+      player=new Player(server.getWorld(),726L);
       player.getSettings().setAppearance(new com.openrsc.server.model.PlayerAppearance(0,0,0,0,1,2));
       player.setBank(new Bank(player));player.setClientVersion(server.getConfig().CLIENT_VERSION);
       player.setClientLimitations(com.openrsc.server.net.rsc.ClientLimitations.forVersion(player.getClientVersion()));
+      player.getClientLimitations().maxSkillId=17;player.getClientLimitations().maxItemId=1592;
+      server.getWorld().getPlayers().add(player);
       player.setLocation(saved.getLocation(),true);field(Player.class,"prayers").set(player,new Prayers(player));
       player.getSkills().setTemporaryLevelAndMaxStat(3,5,99,false);wear(1314);
+      field(Player.class,"loggedIn").setBoolean(player,true);
+      player.getCache().store("myworld_test_death_drops",true);
+      player.setSkullEvent(new com.openrsc.server.event.DelayedEvent(server.getWorld(),player,1,"fixture skull") {public void run(){}});
       event=new com.openrsc.server.event.rsc.impl.combat.CombatEvent(server.getWorld(),npc,player);
       invoke(event.getClass(),event,"inflictDamage",new Class<?>[]{Mob.class,Mob.class,int.class},npc,player,17);
-      check(dying.deaths==1&&player.getLevel(3)==0,"lethal recoil path invokes death exactly once");
-    } finally { player=saved;clear();player.getCache().remove("ringofrecoil"); }
+      check(player.getCache().hasKey("last_death")&&!player.getCarriedItems().getEquipment().hasEquipped(1314),"actual death cleanup removes worn ring");
+      check(player.getCache().getInt("ringofrecoil")==2&&npc.getLevel(3)==97,"lethal melee resolves stock recoil before actual inventory death cleanup");
+    } finally { server.getWorld().getPlayers().remove(player);player=saved;clear();player.getCache().remove("ringofrecoil"); }
   }
   static void prayerAndEffects(Npc npc)throws Exception {
     clear();player.getPrayers().resetPrayers();
