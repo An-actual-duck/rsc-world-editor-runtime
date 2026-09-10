@@ -401,6 +401,114 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         client = (ROOT / "Client_Base/src/orsc/CurrentInstalledLaunch.java").read_text().split("\n", 1)[1]
         self.assertEqual(server, client)
 
+    def test_normal_server_creates_private_bans_and_preserves_existing_bans(self):
+        bans = self.side["server"] / "ipbans.txt"
+        server, ready = self.start("server")
+        self.stop(server, ready)
+        self.assertEqual(b"", bans.read_bytes())
+        self.assertEqual(0o600, bans.stat().st_mode & 0o777)
+        bans.write_bytes(b"192.0.2.17\n")
+        bans.chmod(0o664)  # A genuine predecessor may have created this mode.
+        server, ready = self.start("server")
+        self.stop(server, ready)
+        self.assertEqual(b"192.0.2.17\n", bans.read_bytes())
+        self.assertEqual(0o664, bans.stat().st_mode & 0o777)
+
+    def test_compiled_ban_load_save_and_link_refusals(self):
+        # Exercise the actual compiled filter and installed side-state helpers.
+        # This isolated helper probe activates only the real private constructor;
+        # descriptor admission/startup is covered by normal-server tests above.
+        source = self.root / "BanSideStateProbe.java"
+        source.write_text(r'''
+import com.openrsc.server.CurrentInstalledLaunch;
+import com.openrsc.server.net.RSCPacketFilter;
+import org.json.JSONObject;
+import java.lang.reflect.*;
+import java.nio.channels.*;
+import java.nio.file.*;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Arrays;
+
+public final class BanSideStateProbe {
+    static void check(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
+    }
+    static void privateFile(Path path) throws Exception {
+        check(Files.getPosixFilePermissions(path).equals(PosixFilePermissions.fromString("rw-------")),
+            "New ban file must be 0600: " + path);
+    }
+    public static void main(String[] args) throws Exception {
+        Path descriptor = Paths.get(args[0]);
+        JSONObject document = new JSONObject(new String(Files.readAllBytes(descriptor), "UTF-8"));
+        Constructor<CurrentInstalledLaunch> constructor = CurrentInstalledLaunch.class.getDeclaredConstructor(
+            JSONObject.class, Path.class, String.class, FileChannel.class, FileLock.class);
+        constructor.setAccessible(true);
+        Field current = CurrentInstalledLaunch.class.getDeclaredField("current");
+        current.setAccessible(true);
+        current.set(null, constructor.newInstance(document, descriptor, "server", null, null));
+        Path root = Paths.get(document.getString("sideStateRoot"));
+        Path bans = root.resolve("ipbans.txt"), temp = root.resolve("ipbans.temp");
+        RSCPacketFilter filter = new RSCPacketFilter(null);
+        filter.loadIpBans();
+        privateFile(bans);
+        Files.write(bans, "192.0.2.17\n".getBytes("UTF-8"));
+        Files.setPosixFilePermissions(bans, PosixFilePermissions.fromString("rw-rw-r--"));
+        byte[] original = Files.readAllBytes(bans);
+        filter.reloadIpBans();
+        check(Arrays.equals(original, Files.readAllBytes(bans)), "Loading must not truncate bans");
+        check(Files.getPosixFilePermissions(bans).equals(PosixFilePermissions.fromString("rw-rw-r--")),
+            "Loading must preserve historical permissions");
+        check(filter.isHostIpBanned("192.0.2.17"), "Existing ban must load");
+        filter.ipBanHost("192.0.2.18", -1, "invented regression fixture");
+        privateFile(bans);
+        check(Files.readAllLines(bans).equals(Arrays.asList("192.0.2.17", "192.0.2.18")), "Ban append must retain existing ban");
+        check(!Files.exists(temp), "Successful atomic ban write must consume temporary file");
+        filter.ipBanHost("192.0.2.18", 0, "invented regression fixture");
+        privateFile(bans);
+        check(Arrays.equals(original, Files.readAllBytes(bans)), "Unban must retain other ban bytes");
+        check(!Files.exists(temp), "Successful atomic unban must consume temporary file");
+        filter.reloadIpBans();
+        check(filter.isHostIpBanned("192.0.2.17") && !filter.isHostIpBanned("192.0.2.18"), "Saved bans must reload");
+        Path outside = descriptor.getParent().resolve("outside-ban-data");
+        Files.write(outside, original);
+        for (String name : Arrays.asList("ipbans.txt", "ipbans.temp")) {
+            Path path = root.resolve(name);
+            Files.deleteIfExists(path);
+            for (String kind : Arrays.asList("symlink", "hardlink", "directory")) {
+                if (kind.equals("symlink")) Files.createSymbolicLink(path, outside);
+                else if (kind.equals("hardlink")) Files.createLink(path, outside);
+                else Files.createDirectory(path);
+                boolean refused = false;
+                try {
+                    if (name.equals("ipbans.txt")) filter.loadIpBans();
+                    else filter.ipBanHost("192.0.2.19", -1, "invented hostile fixture");
+                } catch (IllegalStateException expected) { refused = true; }
+                check(refused, "Unsafe " + name + " " + kind + " must refuse");
+                check(Arrays.equals(original, Files.readAllBytes(outside)), "Refusal must not mutate linked bytes");
+                Files.delete(path);
+            }
+            Files.write(bans, original);
+        }
+        current.set(null, null);
+        Path legacy = Paths.get("ipbans.txt");
+        Files.write(legacy, original);
+        Files.setPosixFilePermissions(legacy, PosixFilePermissions.fromString("rw-rw-r--"));
+        new RSCPacketFilter(null).loadIpBans();
+        check(Arrays.equals(original, Files.readAllBytes(legacy)), "Historical load must retain bytes");
+        check(Files.getPosixFilePermissions(legacy).equals(PosixFilePermissions.fromString("rw-rw-r--")),
+            "Historical load must retain mode");
+        System.out.println("BAN_SIDE_STATE_OK");
+    }
+}
+''')
+        core = self.code["server"] / "core.jar"
+        subprocess.run(["javac", "-cp", str(core), str(source)], check=True, capture_output=True)
+        result = subprocess.run(["java", "-cp", os.pathsep.join((str(self.root), str(core))),
+            "BanSideStateProbe", str(self.root / "server-launch.json")], cwd=self.working["server"],
+            capture_output=True, text=True, timeout=30, env=launch_environment())
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("BAN_SIDE_STATE_OK", result.stdout)
+
     def test_pending_cutover_refuses_both_roles_without_writable_effects(self):
         guard = self.anchor / "pending-cutover.json"
         before = {role: tree_hash(self.state[role]) for role in ("server", "client")}

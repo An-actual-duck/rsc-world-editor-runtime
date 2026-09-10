@@ -88,16 +88,17 @@ public class RSCPacketFilter {
 			File ipBansFile = com.openrsc.server.CurrentInstalledLaunch.sideState(BAN_FILE_PATH).toFile();
 			try {
 				// creates new file only if ipbans.txt file doesn't already exist.
-				boolean newFile = ipBansFile.createNewFile();
+				boolean newFile = com.openrsc.server.CurrentInstalledLaunch.createSideStateIfAbsent(BAN_FILE_PATH);
 				if (newFile) {
 					LOGGER.info("Created new IP bans file at " + ipBansFile.getAbsolutePath());
 					return;
 				}
-				BufferedReader reader = new BufferedReader(new FileReader(ipBansFile));
-				String line;
-				while ((line = reader.readLine()) != null) {
-					counter++;
-					ipBans.put(line.trim(), -1L);
+				try (BufferedReader reader = new BufferedReader(new FileReader(ipBansFile))) {
+					String line;
+					while ((line = reader.readLine()) != null) {
+						counter++;
+						ipBans.put(line.trim(), -1L);
+					}
 				}
 				LOGGER.info("Loaded " + counter + " banned IPs.");
 			} catch (IOException ex) {
@@ -168,7 +169,13 @@ public class RSCPacketFilter {
 			if (until == -1 && (!ipBans.containsKey(hostAddress) || ipBans.get(hostAddress) == 0)) { // Perm ban
 				try {
 					//Copy the contents of the original file to the temp file
-					Files.copy(filePath, tempFilePath, StandardCopyOption.REPLACE_EXISTING);
+					if (com.openrsc.server.CurrentInstalledLaunch.current() == null) {
+						Files.copy(filePath, tempFilePath, StandardCopyOption.REPLACE_EXISTING);
+					} else {
+						try (OutputStream output = com.openrsc.server.CurrentInstalledLaunch.openSideStateOutput(BAN_TEMPFILE_PATH)) {
+							Files.copy(filePath, output);
+						}
+					}
 
 					//Append the new hostAddress to the temp file
 					try (BufferedWriter writer = Files.newBufferedWriter(tempFilePath, StandardCharsets.UTF_8, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
@@ -185,7 +192,10 @@ public class RSCPacketFilter {
 				try {
 					//Read from original file and write to temp file
 					try (BufferedReader reader = Files.newBufferedReader(filePath);
-						 BufferedWriter writer = Files.newBufferedWriter(tempFilePath)) {
+						 BufferedWriter writer = com.openrsc.server.CurrentInstalledLaunch.current() == null
+							 ? Files.newBufferedWriter(tempFilePath)
+							 : new BufferedWriter(new OutputStreamWriter(
+								 com.openrsc.server.CurrentInstalledLaunch.openSideStateOutput(BAN_TEMPFILE_PATH), StandardCharsets.UTF_8))) {
 						String currentLine;
 						while ((currentLine = reader.readLine()) != null) {
 							if (!currentLine.trim().equals(hostAddress)) {
