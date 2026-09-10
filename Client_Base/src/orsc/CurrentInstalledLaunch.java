@@ -333,6 +333,18 @@ public final class CurrentInstalledLaunch {
         return java.nio.channels.Channels.newOutputStream(Files.newByteChannel(path, options,
             PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))));
     }
+    public static boolean createSideStateIfAbsent(String name) throws IOException {
+        Path path = sideState(name);
+        if (current == null) return path.toFile().createNewFile();
+        try {
+            Files.createFile(path, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+            return true;
+        } catch (FileAlreadyExistsException existing) {
+            // Revalidate an existing file without truncating or changing its permissions.
+            sideState(name);
+            return false;
+        }
+    }
     public void requirePublicKey(BigInteger exponent, BigInteger modulus) {
         if (!publicKey.getPublicExponent().equals(exponent) || !publicKey.getModulus().equals(modulus))
             throw new IllegalStateException("Server public key differs from installed trust binding");
