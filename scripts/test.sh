@@ -12,6 +12,7 @@ case "${1:-}" in
 		python3 tests/myworld/test-widescreen-world-input-viewport.py
 		python3 tests/myworld/test-legacy-software-scaling-settings.py
 		python3 tests/myworld/test-world-builder-preservation-ui.py
+		python3 tests/myworld/test-software-editor-overlays.py
 		;;
 	--help|-h)
 		printf 'UI iteration: ./scripts/test.sh --group presentation\nFull gate: ./scripts/test.sh --full\nPresentation checks are headless; actual visual/input acceptance is separate.\n'

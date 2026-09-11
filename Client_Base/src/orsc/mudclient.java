@@ -8901,13 +8901,13 @@ public final class mudclient implements Runnable {
 								meshFrame == null ? 0 : meshFrame.getFlatColorTriangleCount(),
 								meshFrame == null ? 0 : meshFrame.getTransparentTriangleCount(),
 								meshFrame == null ? 0 : meshFrame.getSkippedTriangleCount());
-						this.drawWorldEditorBuildGridLegacy(renderer3DFrame);
 						} else {
 							// Software rendering has no captured GPU frame. Its completed
 							// scene pixels must also release same-scope teleport retention.
 							this.completeLayeredSceneActivationFreshFrame(null, true);
 						}
 						this.getSurface().setRenderer2DPhase(Renderer2DFrame.Phase.WORLD_OVERLAY);
+						this.drawWorldEditorBuildGridLegacy(renderer3DFrame);
 						this.drawWorldEditorTerrainToolPreview(renderer3DFrame);
 						this.drawWorldEditorSceneryMovePreview(renderer3DFrame);
 						this.drawWorldEditorLockdownPreview(renderer3DFrame);
@@ -13429,26 +13429,28 @@ public final class mudclient implements Runnable {
 			short magicPanelWidth = 196;
 			int inactiveTabColor = GenUtil.buildColor(160, 160, 160);
 			int activeTabColor = GenUtil.buildColor(220, 220, 220);
-			int firstTabWidth = magicPanelWidth / 3;
-			int secondTabWidth = magicPanelWidth / 3;
+			boolean classicMenu = WorldBuilderUiProfile.isEnabled();
+			if (classicMenu && this.magicOrPrayerList > 1) this.magicOrPrayerList = 0;
+			int firstTabWidth = magicPanelWidth / (classicMenu ? 2 : 3);
+			int secondTabWidth = firstTabWidth;
 			int thirdTabWidth = magicPanelWidth - firstTabWidth - secondTabWidth;
 			this.getSurface().drawBoxAlpha(magicPanelX, magicPanelYStart, firstTabWidth, 24,
 				this.magicOrPrayerList == 0 ? activeTabColor : inactiveTabColor, 128);
 			this.getSurface().drawBoxAlpha(magicPanelX + firstTabWidth, magicPanelYStart, secondTabWidth, 24,
 				this.magicOrPrayerList == 1 ? activeTabColor : inactiveTabColor, 128);
-			this.getSurface().drawBoxAlpha(magicPanelX + firstTabWidth + secondTabWidth, magicPanelYStart, thirdTabWidth, 24,
+			if (!classicMenu) this.getSurface().drawBoxAlpha(magicPanelX + firstTabWidth + secondTabWidth, magicPanelYStart, thirdTabWidth, 24,
 				this.magicOrPrayerList == 2 ? activeTabColor : inactiveTabColor, 128);
 			this.getSurface().drawBoxAlpha(magicPanelX, magicPanelYStart + 24, magicPanelWidth, 90, GenUtil.buildColor(220, 220, 220), 128);
 			this.getSurface().drawBoxAlpha(magicPanelX, 114 + magicPanelYStart, magicPanelWidth, 68, GenUtil.buildColor(160, 160, 160),
 				128);
 			this.getSurface().drawLineHoriz(magicPanelX, 24 + magicPanelYStart, magicPanelWidth, 0);
 			this.getSurface().drawLineVert(magicPanelX + firstTabWidth, 0 + magicPanelYStart, 0, 24);
-			this.getSurface().drawLineVert(magicPanelX + firstTabWidth + secondTabWidth, 0 + magicPanelYStart, 0, 24);
+			if (!classicMenu) this.getSurface().drawLineVert(magicPanelX + firstTabWidth + secondTabWidth, 0 + magicPanelYStart, 0, 24);
 			this.getSurface().drawLineHoriz(magicPanelX, magicPanelYStart + 113, magicPanelWidth, 0);
 			if (var2 == -74) {
 				this.getSurface().drawColoredStringCentered(magicPanelX + firstTabWidth / 2, "Magic", 0, var2 + 74, 4, 16 + magicPanelYStart);
 				this.getSurface().drawColoredStringCentered(magicPanelX + firstTabWidth + secondTabWidth / 2, "Prayer", 0, 0, 4, 16 + magicPanelYStart);
-				this.getSurface().drawColoredStringCentered(magicPanelX + firstTabWidth + secondTabWidth + thirdTabWidth / 2, "Summon", 0, 0, 4, 16 + magicPanelYStart);
+				if (!classicMenu) this.getSurface().drawColoredStringCentered(magicPanelX + firstTabWidth + secondTabWidth + thirdTabWidth / 2, "Summon", 0, 0, 4, 16 + magicPanelYStart);
 				int spellIndex;
 				int magicLevel;
 				String var11;
@@ -14735,7 +14737,7 @@ public final class mudclient implements Runnable {
 			y += HEALTH_HUD_HEIGHT + HEALTH_HUD_COORDINATE_GAP;
 		} else {
 			x = this.getGameWidth() - 185;
-			y = 34;
+			y = 48;
 		}
 		if (this.showCoordinatesOverlay) {
 			int compatibilityX = this.playerLocalX + this.midRegionBaseX;
@@ -24018,7 +24020,20 @@ public final class mudclient implements Runnable {
 	}
 
 	private void drawWorldEditorBuildGridLegacy(Renderer3DFrame frame){
-		if(!WorldEditorBuildSettings.isEnabled()||ScaledWindow.isOpenGLPrimaryWindowEnabled()||frame==null)return;
+		if(!WorldEditorBuildSettings.isEnabled()||ScaledWindow.isOpenGLPrimaryWindowEnabled())return;
+		if(frame==null){
+			if(!WorldBuilderUiProfile.isEnabled()||world==null)return;
+			int[] first=new int[2],second=new int[2];
+			for(int x=0;x<World.LOCAL_TILE_COUNT-1;x++)for(int z=0;z<World.LOCAL_TILE_COUNT-1;z++){
+				int worldX=x*tileSize,worldZ=z*tileSize;
+				if(!projectWorldEditorGridPoint(null,worldX,-world.getElevation(worldX,worldZ)-2,worldZ,first))continue;
+				if(projectWorldEditorGridPoint(null,worldX+tileSize,-world.getElevation(worldX+tileSize,worldZ)-2,worldZ,second))
+					drawWorldEditorGridLine(first[0],first[1],second[0],second[1],0x4f747c);
+				if(projectWorldEditorGridPoint(null,worldX,-world.getElevation(worldX,worldZ+tileSize)-2,worldZ+tileSize,second))
+					drawWorldEditorGridLine(first[0],first[1],second[0],second[1],0x4f747c);
+			}
+			return;
+		}
 		int[] segments=worldEditorTerrainGrid.segments(frame.getWorldChunkFrame(),frame.getActivePlane());
 		if(segments.length==0)return;
 		int[] first=new int[2],second=new int[2];
@@ -24030,7 +24045,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private void drawWorldEditorTerrainToolPreview(Renderer3DFrame frame){
-		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.terrainToolPreviewTiles();int[] anchor=worldEditorInterface.terrainLineAnchorTile();if(tiles.length==0&&anchor==null)return;
+		if(worldEditorInterface==null||world==null)return;int[][] tiles=worldEditorInterface.terrainToolPreviewTiles();int[] anchor=worldEditorInterface.terrainLineAnchorTile();if(tiles.length==0&&anchor==null)return;
 		Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;
 			if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;
 			toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);
@@ -24040,7 +24055,7 @@ public final class mudclient implements Runnable {
 		if(anchor!=null)drawWorldEditorTerrainAnchorMarker(frame,anchor[0]-midRegionBaseX,anchor[1]-midRegionBaseZ);
 	}
 	private void drawWorldEditorSceneryMovePreview(Renderer3DFrame frame){
-		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.sceneryMovePreviewTiles();int[] source=worldEditorInterface.sceneryMoveSourceTile(),destination=worldEditorInterface.sceneryMoveDestinationTile();if(source==null)return;
+		if(worldEditorInterface==null||world==null)return;int[][] tiles=worldEditorInterface.sceneryMovePreviewTiles();int[] source=worldEditorInterface.sceneryMoveSourceTile(),destination=worldEditorInterface.sceneryMoveDestinationTile();if(source==null)return;
 		if(destination!=null&&tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}
 			int ghostColor=0x45f3ff;for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorSceneryGhostEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,ghostColor);}}
 		drawWorldEditorTerrainAnchorMarker(frame,source[0]-midRegionBaseX,source[1]-midRegionBaseZ);if(destination!=null)drawWorldEditorSceneryDestinationMarker(frame,destination[0]-midRegionBaseX,destination[1]-midRegionBaseZ);
@@ -24056,7 +24071,7 @@ public final class mudclient implements Runnable {
 		for(int dy=-8;dy<=8;dy++){int width=8-Math.abs(dy);this.getSurface().drawLineHoriz(point[0]-width-1,point[1]+dy,width*2+3,0);if(width>0)this.getSurface().drawLineHoriz(point[0]-width,point[1]+dy,width*2+1,color);}this.getSurface().drawString("MOVE",point[0]-18,point[1]-12,0xffffff,1);
 	}
 	private void drawWorldEditorRegionSelectionPreview(Renderer3DFrame frame){
-		if(worldEditorInterface==null||frame==null||world==null||!worldEditorInterface.isRegionSelecting())return;int[][] markers=worldEditorInterface.regionMarkerTiles();int[][] tiles=worldEditorInterface.regionSelectionPreviewTiles();int[] hover=worldEditorInterface.regionSelectionHoverTile();
+		if(worldEditorInterface==null||world==null||!worldEditorInterface.isRegionSelecting())return;int[][] markers=worldEditorInterface.regionMarkerTiles();int[][] tiles=worldEditorInterface.regionSelectionPreviewTiles();int[] hover=worldEditorInterface.regionSelectionHoverTile();
 		if(tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,0x55e6a5);}}
 		for(int index=1;index<markers.length;index++)drawWorldEditorRegionSegment(frame,markers[index-1],markers[index],0x55e6a5);
 		if(worldEditorInterface.isRegionClosed()&&markers.length>=3)drawWorldEditorRegionSegment(frame,markers[markers.length-1],markers[0],0x55e6a5);
@@ -24065,12 +24080,12 @@ public final class mudclient implements Runnable {
 		if(hover!=null&&markers.length<256)drawWorldEditorRegionMarker(frame,hover[0]-midRegionBaseX,hover[1]-midRegionBaseZ,String.valueOf(markers.length+1),0xffc04d);
 	}
 	private void drawWorldEditorLockdownPreview(Renderer3DFrame frame){
-		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.lockdownProtectedTiles(),markers=worldEditorInterface.lockdownMarkerTiles();int[] hover=worldEditorInterface.lockdownHoverTile();
+		if(worldEditorInterface==null||world==null)return;int[][] tiles=worldEditorInterface.lockdownProtectedTiles(),markers=worldEditorInterface.lockdownMarkerTiles();int[] hover=worldEditorInterface.lockdownHoverTile();
 		if(tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}int color=worldEditorInterface.isLockdownEnabled()?0xff4058:0x888888;for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,color);}}
 		for(int i=0;i<markers.length;i++)drawWorldEditorRegionMarker(frame,markers[i][0]-midRegionBaseX,markers[i][1]-midRegionBaseZ,"L",worldEditorInterface.isLockdownEnabled()?0xff4058:0x888888);if(hover!=null)drawWorldEditorRegionMarker(frame,hover[0]-midRegionBaseX,hover[1]-midRegionBaseZ,"+",0xffc04d);
 	}
 	private void drawWorldEditorRegionPastePreview(Renderer3DFrame frame){
-		if(worldEditorInterface==null||frame==null||world==null)return;int[][] tiles=worldEditorInterface.regionPastePreviewTiles(),collisions=worldEditorInterface.regionPasteCollisionTiles();int[] anchor=worldEditorInterface.regionPasteAnchorTile();if(tiles.length==0&&anchor==null)return;
+		if(worldEditorInterface==null||world==null)return;int[][] tiles=worldEditorInterface.regionPastePreviewTiles(),collisions=worldEditorInterface.regionPasteCollisionTiles();int[] anchor=worldEditorInterface.regionPasteAnchorTile();if(tiles.length==0&&anchor==null)return;
 		if(tiles.length>0){Set<Long> boundary=new LinkedHashSet<Long>();for(int[] tile:tiles){int x=tile[0]-midRegionBaseX,z=tile[1]-midRegionBaseZ;if(x<0||z<0||x>=World.LOCAL_TILE_COUNT||z>=World.LOCAL_TILE_COUNT)continue;toggleWorldEditorPreviewEdge(boundary,0,x,z);toggleWorldEditorPreviewEdge(boundary,0,x,z+1);toggleWorldEditorPreviewEdge(boundary,1,x,z);toggleWorldEditorPreviewEdge(boundary,1,x+1,z);}for(long edge:boundary){int orientation=(int)(edge>>>40),x=(int)((edge>>>20)&0xfffffL),z=(int)(edge&0xfffffL),x2=orientation==0?x+1:x,z2=orientation==0?z:z+1;drawWorldEditorTerrainPreviewEdge(frame,x*tileSize,z*tileSize,x2*tileSize,z2*tileSize,collisions.length>0?0xff981f:0x45f3ff);}}
 		if(anchor!=null)drawWorldEditorRegionMarker(frame,anchor[0]-midRegionBaseX,anchor[1]-midRegionBaseZ,"1",0xff4dff);for(int[] collision:collisions)drawWorldEditorRegionMarker(frame,collision[0]-midRegionBaseX,collision[1]-midRegionBaseZ,"!",0xff3030);
 	}
@@ -24104,7 +24119,9 @@ public final class mudclient implements Runnable {
 		if(projectWorldEditorGridPoint(frame,x1,y1,z1,first)&&projectWorldEditorGridPoint(frame,x2,y2,z2,second))drawWorldEditorGridLine(first[0],first[1],second[0],second[1],color);
 	}
 
-	private static boolean projectWorldEditorGridPoint(Renderer3DFrame frame,int x,int y,int z,int[] destination){
+	private boolean projectWorldEditorGridPoint(Renderer3DFrame frame,int x,int y,int z,int[] destination){
+		if (frame == null) return WorldBuilderUiProfile.isEnabled() && scene != null
+			&& scene.projectWorldEditorPoint(x, y, z, destination);
 		int cameraX=x-frame.getCameraOffsetX(),cameraY=y-frame.getCameraOffsetY(),cameraZ=z-frame.getCameraOffsetZ(),temporary,rotation=frame.getCameraRotationZ();
 		if(rotation!=0){int sin=FastMath.trigTable1024[rotation],cos=FastMath.trigTable1024[rotation+1024];temporary=cameraY*sin+cos*cameraX>>15;cameraY=cameraY*cos-cameraX*sin>>15;cameraX=temporary;}
 		rotation=frame.getCameraRotationY();if(rotation!=0){int sin=FastMath.trigTable1024[rotation],cos=FastMath.trigTable1024[rotation+1024];temporary=cos*cameraX+cameraZ*sin>>15;cameraZ=cos*cameraZ-cameraX*sin>>15;cameraX=temporary;}
@@ -24118,10 +24135,10 @@ public final class mudclient implements Runnable {
 		while(true){
 			if((code0|code1)==0)break;if((code0&code1)!=0)return;
 			int code=code0!=0?code0:code1,x=0,y=0;
-			if((code&8)!=0){if(y1==y0)return;x=x0+(x1-x0)*(height-1-y0)/(y1-y0);y=height-1;}
-			else if((code&4)!=0){if(y1==y0)return;x=x0+(x1-x0)*(0-y0)/(y1-y0);y=0;}
-			else if((code&2)!=0){if(x1==x0)return;y=y0+(y1-y0)*(width-1-x0)/(x1-x0);x=width-1;}
-			else{if(x1==x0)return;y=y0+(y1-y0)*(0-x0)/(x1-x0);x=0;}
+			if((code&8)!=0){if(y1==y0)return;x=x0+(int)(((long)x1-x0)*(height-1L-y0)/((long)y1-y0));y=height-1;}
+			else if((code&4)!=0){if(y1==y0)return;x=x0+(int)(((long)x1-x0)*(-((long)y0))/((long)y1-y0));y=0;}
+			else if((code&2)!=0){if(x1==x0)return;y=y0+(int)(((long)y1-y0)*(width-1L-x0)/((long)x1-x0));x=width-1;}
+			else{if(x1==x0)return;y=y0+(int)(((long)y1-y0)*(-((long)x0))/((long)x1-x0));x=0;}
 			if(code==code0){x0=x;y0=y;code0=worldEditorGridClipCode(x0,y0,width,height);}else{x1=x;y1=y;code1=worldEditorGridClipCode(x1,y1,width,height);}
 		}
 		int dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,error=dx+dy;
@@ -27002,6 +27019,8 @@ public final class mudclient implements Runnable {
 	}
 
 	public void setPrayerBook(int prayerBook) {
+		// Base XML uses classic server prayer IDs, not Advanced book slots.
+		if (WorldBuilderUiProfile.isEnabled() && CurrentBaseSkillContract.selected()) return;
 		if (prayerBook == 1) {
 			EntityHandler.setPrayerBook("ZAMORAK");
 		} else if (prayerBook == 2) {

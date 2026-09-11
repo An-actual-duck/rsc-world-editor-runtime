@@ -86,7 +86,7 @@ or migration suites for a UI-only diff.
 
 World Builder launches may opt into `openrsc.worldBuilderPreservationUi=true`
 alongside `openrsc.worldBuilderMode=true`. This presentation-only profile uses
-Preservation-style Social/General tabs, classic sprites/icon spellbooks, and
+Preservation-style Social/General tabs, classic sprites/text spellbooks, and
 the existing software integer x1/x2 scaling. The logical minimum is 640x480,
 not Preservation's 512x346, because the existing map-editor dock is 396 pixels
 tall. The window remains resizable; no fullscreen/aspect-fit scale is implied.
@@ -98,6 +98,14 @@ zoom remain; installed-player defaults and persisted map/server data do not chan
 The consuming Editor must select software presentation and keep camera pitch
 and extended zoom enabled in its authoring launch command. Existing immutable
 project runtime capsules are not rewritten by selecting this profile.
+
+Authoring Magic/Prayer uses two classic text-list tabs; Summoning is hidden.
+Definitions and spell/prayer IDs still come from the selected composition;
+Base's canonical prayers cannot be replaced by an Advanced prayer-book packet.
+Coordinates sit one text line below their previous top-right position. Editor
+selection/paste/line/move/lockdown markers and the build grid project directly
+through the software scene camera when no captured GPU frame exists. This
+does not create a geometry frame or change navigation's fresh-frame latch.
 
 Preserve exact tested/published handoffs. Reuse verified immutable build outputs
 only when source, dependencies, options and toolchain match; keep mutable test
