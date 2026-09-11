@@ -852,6 +852,36 @@ class LayeredTransitionMinimapAcceptanceTest(unittest.TestCase):
                         "hard bound eventually releases");
                     require(!latch.wasLastReleaseStable(),
                         "bounded fallback is distinguishable");
+
+                    latch.begin(true);
+                    require(!latch.completeFreshSoftwareFrame(true),
+                        "software cannot bypass authoritative activation");
+                    require(latch.shouldRetainLastPresentedFrame(),
+                        "software keeps old frame while activation is pending");
+                    latch.updatePending(false);
+                    require(!latch.completeFreshSoftwareFrame(false),
+                        "software cannot bypass pending terrain products");
+                    require(latch.getFreshFrameSamples() == 0,
+                        "incomplete software frame consumes no sample");
+                    require(latch.shouldRetainLastPresentedFrame(),
+                        "incomplete software frame keeps retention");
+                    require(latch.completeFreshSoftwareFrame(true),
+                        "complete software scene releases without GPU capture");
+                    require(!latch.shouldRetainLastPresentedFrame(),
+                        "teleport destination pixels can be presented");
+                    require(latch.wasLastReleaseStable(),
+                        "software completion is not an exhausted GPU fallback");
+                    require(!latch.completeFreshSoftwareFrame(true),
+                        "software release is single-use");
+                    latch.begin(false);
+                    latch.updatePending(false);
+                    require(!latch.completeFreshSoftwareFrame(true),
+                        "new scope does not manufacture software retention");
+                    latch.begin(true);
+                    latch.updatePending(false);
+                    latch.reset();
+                    require(!latch.completeFreshSoftwareFrame(true),
+                        "reset cancels software release");
                 }
 
                 private static void require(
@@ -906,6 +936,16 @@ class LayeredTransitionMinimapAcceptanceTest(unittest.TestCase):
             "completeLayeredSceneActivationFreshFrame(",
             self.client,
         )
+        self.assertIn(
+            "this.drawWorldEditorBuildGridLegacy(renderer3DFrame);\n"
+            "\t\t\t\t\t\t} else {",
+            self.client,
+        )
+        self.assertIn(
+            "this.completeLayeredSceneActivationFreshFrame(null, true);",
+            self.client,
+        )
+        self.assertIn("presentedWorldChunkFrame, false);", self.client)
         self.assertIn(
             '"renderer.atomic-presentation-release"',
             self.client,

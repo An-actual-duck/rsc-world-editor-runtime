@@ -8876,7 +8876,7 @@ public final class mudclient implements Runnable {
 						renderer3DFrame.setWorldChunkFrame(
 							presentedWorldChunkFrame);
 						this.completeLayeredSceneActivationFreshFrame(
-							presentedWorldChunkFrame);
+							presentedWorldChunkFrame, false);
 						Renderer3DDepthFrame depthFrame = renderer3DFrame.getDepthFrame();
 						Renderer3DMeshFrame meshFrame = renderer3DFrame.getMeshFrame();
 						RenderTelemetry.recordWorldGeometryFrame(
@@ -8902,6 +8902,10 @@ public final class mudclient implements Runnable {
 								meshFrame == null ? 0 : meshFrame.getTransparentTriangleCount(),
 								meshFrame == null ? 0 : meshFrame.getSkippedTriangleCount());
 						this.drawWorldEditorBuildGridLegacy(renderer3DFrame);
+						} else {
+							// Software rendering has no captured GPU frame. Its completed
+							// scene pixels must also release same-scope teleport retention.
+							this.completeLayeredSceneActivationFreshFrame(null, true);
 						}
 						this.getSurface().setRenderer2DPhase(Renderer2DFrame.Phase.WORLD_OVERLAY);
 						this.drawWorldEditorTerrainToolPreview(renderer3DFrame);
@@ -26117,7 +26121,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private void completeLayeredSceneActivationFreshFrame(
-		Renderer3DWorldChunkFrame worldChunkFrame) {
+		Renderer3DWorldChunkFrame worldChunkFrame, boolean softwareFrame) {
 		long staticWorldSignature =
 			worldChunkFrame == null
 				? 0L
@@ -26156,7 +26160,10 @@ public final class mudclient implements Runnable {
 			}
 		}
 		boolean released =
-			this.layeredScenePresentationLatch.completeFreshFrame(
+			softwareFrame
+				? this.layeredScenePresentationLatch.completeFreshSoftwareFrame(
+					presentationProductsReady)
+				: this.layeredScenePresentationLatch.completeFreshFrame(
 				staticWorldSignature,
 				staticChunkCount,
 				presentationProductsReady);
