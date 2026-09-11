@@ -212,7 +212,7 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         output = next(output for child, output in self.processes if child is process)
         return os.pread(output.fileno(), 1024 * 1024, 0).decode("utf-8", errors="replace")
 
-    def manual_login(self, server, client):
+    def manual_login(self, server, client, username="launchtest", password="launchpass", verify_world=True):
         self.assertIsNotNone(shutil.which("xdotool"), "Manual UI integration requires xdotool")
         self.assertIsNotNone(shutil.which("xwd"), "Window-isolated frame verification requires xwd")
         def xdo(*args):
@@ -255,22 +255,24 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         xdo("click", "1")
         time.sleep(0.3)
         self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
-        xdo("type", "--delay", "70", "launchtest")
+        xdo("type", "--delay", "70", username)
         xdo("key", "Return")
         time.sleep(0.3)  # Allow the normal game tick to move focus to password.
         if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
             capture().save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "input.png")
         self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
-        xdo("type", "--delay", "70", "launchpass")
+        xdo("type", "--delay", "70", password)
         time.sleep(0.3)
         xdo("key", "Return")
         time.sleep(2)
         if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
             capture().save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "submitted.png")
         deadline = time.monotonic() + 25
-        while "Player Loaded: launchtest" not in self.log(server) and time.monotonic() < deadline:
+        while "Player Loaded: " + username not in self.log(server) and time.monotonic() < deadline:
             time.sleep(0.1)
-        self.assertTrue("Player Loaded: launchtest" in self.log(server), self.log(client)[-2500:])
+        self.assertTrue("Player Loaded: " + username in self.log(server), self.log(client)[-2500:])
+        if not verify_world:
+            return  # A newly registered account legitimately opens character creation.
         time.sleep(3)
         # Dismiss the normal welcome modal using the real owned-window input path.
         xdo("mousemove", "--window", window, width // 8, height // 2)
@@ -296,6 +298,73 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         self.assertGreater(avatar_pixels, 100, "The normally authenticated player must be visibly rasterized over the terrain")
         self.assertNotIn("CURRENT_BASE_RUNTIME_EXECUTION", self.log(client), "Normal client must not use credential evidence mode")
         self.assertFalse((self.side["client"] / "credentials.txt").exists())
+
+    def test_registration_handshake_creates_account_and_allows_normal_login(self):
+        server, server_ready = self.start("server")
+        client, client_ready = self.start("client")
+        def xdo(*args):
+            return subprocess.run(["xdotool", *map(str, args)], capture_output=True,
+                text=True, check=True, timeout=10).stdout
+        deadline = time.monotonic() + 30
+        while "Got server configs!" not in self.log(client) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertIn("Got server configs!", self.log(client))
+        time.sleep(2)
+        windows = xdo("search", "--onlyvisible", "--pid", client.pid).split()
+        self.assertEqual(1, len(windows))
+        window = windows[0]
+        xdo("windowactivate", "--sync", window)
+        xdo("windowfocus", "--sync", window)
+        raw = subprocess.run(["xwd", "-silent", "-nobdrs", "-id", window],
+            check=True, capture_output=True).stdout
+        header = struct.unpack(">25I", raw[:100])
+        self.assertEqual(32, header[11])
+        frame = Image.frombytes("RGB", (header[4], header[5]),
+            raw[header[0] + header[19] * 12:], "raw",
+            "BGRX" if header[7] == 0 else "XRGB", header[12])
+        width, height = frame.size
+        if os.environ.get("CURRENT_BASE_UI_DEBUG_DIR"):
+            frame.save(Path(os.environ["CURRENT_BASE_UI_DEBUG_DIR"]) / "registration.png")
+        pixels = frame.load()
+        blue = [(x, y) for y in range(height // 3, height * 9 // 10)
+            for x in range(width // 2)
+            if 40 < pixels[x, y][0] < 150 and pixels[x, y][0] <= pixels[x, y][1]
+            and pixels[x, y][2] > pixels[x, y][1] + 10]
+        self.assertGreater(len(blue), 1000, "Expected normal New User button")
+        xdo("mousemove", "--window", window,
+            sum(x for x, _ in blue) // len(blue), sum(y for _, y in blue) // len(blue))
+        self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
+        xdo("click", "1")
+        time.sleep(0.3)
+        for value in ("registertest", "registerpass", "registerpass"):
+            self.assertEqual(str(client.pid), xdo("getwindowfocus", "getwindowpid").strip())
+            xdo("type", "--delay", "50", value)
+            xdo("key", "Return")
+            time.sleep(0.3)
+        xdo("key", "Return")
+        deadline = time.monotonic() + 20
+        while "Registration response:0" not in self.log(client) and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertIn("Registration response:0", self.log(client)[-4000:])
+        self.assertNotIn("refused login before handshake", self.log(server))
+        with sqlite3.connect(self.state["server"] / "current_base.db") as database:
+            self.assertEqual(1, database.execute(
+                "SELECT count(*) FROM players WHERE username='registertest'").fetchone()[0])
+        self.stop(client, client_ready)
+        client, client_ready = self.start("client")
+        self.manual_login(server, client, "registertest", "registerpass", verify_world=False)
+        self.stop(client, client_ready)
+        self.stop(server, server_ready)
+
+    def test_every_prelogin_socket_handshakes_before_sending_account_packets(self):
+        source = (ROOT / "Client_Base/src/orsc/mudclient.java").read_text()
+        needle = "this.packetHandler.openSocket(port, ip)"
+        self.assertEqual(10, source.count(needle), "Review any new prelogin connection path")
+        offset = 0
+        for _ in range(source.count(needle)):
+            offset = source.index(needle, offset) + len(needle)
+            before_packet = source[offset:].split("this.packetHandler.getClientStream().newPacket(", 1)[0]
+            self.assertIn("requireCurrentCompositionHandshake();", before_packet)
 
     def test_normal_pair_uses_persistent_leases_and_restarts_stable_descriptors(self):
         self.assertTrue(os.environ.get("DISPLAY"), "Actual normal client requires a GUI test lane")

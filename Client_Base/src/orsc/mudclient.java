@@ -18899,6 +18899,7 @@ public final class mudclient implements Runnable {
 								this.packetHandler.getClientStream().m_d = MiscFunctions.maxReadTries;
 							}
 
+							requireCurrentCompositionHandshake();
 							this.packetHandler.getClientStream().newPacket(4);
 							this.packetHandler.getClientStream().bufferBits.putString(getUsername());
 							this.packetHandler.getClientStream().finishPacketAndFlush();
@@ -18992,6 +18993,7 @@ public final class mudclient implements Runnable {
 								this.packetHandler.getClientStream().m_d = MiscFunctions.maxReadTries;
 							}
 
+							requireCurrentCompositionHandshake();
 							String pPass = DataOperations.addCharacters(this.panelRecovery.getControlText(this.controlPreviousPassword), 20);
 							String nPass = DataOperations.addCharacters(this.panelRecovery.getControlText(this.controlNewPassword), 20);
 							this.packetHandler.getClientStream().newPacket(8);
@@ -19117,6 +19119,7 @@ public final class mudclient implements Runnable {
 				this.packetHandler.setClientStream(new Network_Socket(this.packetHandler.openSocket(port, ip), this.packetHandler));
 				this.packetHandler.getClientStream().m_d = MiscFunctions.maxReadTries;
 			}
+			requireCurrentCompositionHandshake();
 			this.packetHandler.getClientStream().newPacket(2);
 			this.packetHandler.getClientStream().bufferBits.putString(user);
 			this.packetHandler.getClientStream().bufferBits.putString(pass);
