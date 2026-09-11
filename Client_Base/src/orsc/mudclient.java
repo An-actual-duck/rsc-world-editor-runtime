@@ -14739,7 +14739,7 @@ public final class mudclient implements Runnable {
 			x = this.getGameWidth() - 185;
 			y = 48;
 		}
-		if (this.showCoordinatesOverlay) {
+		if (this.showCoordinatesOverlay && (!WorldBuilderUiProfile.isEnabled() || this.showUiTab == 0)) {
 			int compatibilityX = this.playerLocalX + this.midRegionBaseX;
 			int compatibilityY = this.playerLocalZ + this.midRegionBaseZ;
 			int logicalX = this.packetHandler.getLogicalPlayerX(compatibilityX);

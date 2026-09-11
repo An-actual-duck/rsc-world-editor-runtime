@@ -57,6 +57,7 @@ def main():
     assert "if (classicMenu && this.magicOrPrayerList > 1)" in client
     assert "if (WorldBuilderUiProfile.isEnabled() && CurrentBaseSkillContract.selected()) return;" in client
     assert "y = 48;" in client
+    assert "this.showCoordinatesOverlay && (!WorldBuilderUiProfile.isEnabled() || this.showUiTab == 0)" in client
     clip_methods = client.split("private void drawWorldEditorGridLine", 1)[1].split("public void setWorldEditorBuildMode", 1)[0]
     clip_fixture = '''public class EditorOverlayClipFixture {
         static class Surface { int width2=640,height2=480; int[] pixelData=new int[640*480]; }
