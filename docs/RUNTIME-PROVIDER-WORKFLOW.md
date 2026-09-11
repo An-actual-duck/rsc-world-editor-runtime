@@ -74,8 +74,8 @@ candidate targets 5–10 minutes including packaging. These are targets, not
 guarantees. Explain newly discovered risk and obtain owner agreement before
 expanding a small UI task to broad verification; never silently omit safety tests.
 
-The presentation profile runs existing viewport, widescreen-input and software
-scale regressions headlessly. Compile affected code and check actual visuals and
+The presentation profile runs existing viewport, widescreen-input, software
+scale and authoring-only Preservation UI regressions headlessly. Compile affected code and check actual visuals and
 pointer alignment separately; fullscreen/readiness logs do not prove appearance.
 Add dependency/archive checks when those inputs change. State/data/protocol or
 transaction changes require their affected integration and refusal/recovery tests.
@@ -83,6 +83,21 @@ Broad integration uses `./scripts/test.sh --full`. Production acceptance keeps
 all full-suite, exact-artifact and release requirements. A restricted owner-test
 candidate is not production acceptance and need not repeat unchanged gameplay
 or migration suites for a UI-only diff.
+
+World Builder launches may opt into `openrsc.worldBuilderPreservationUi=true`
+alongside `openrsc.worldBuilderMode=true`. This presentation-only profile uses
+Preservation-style Social/General tabs, classic sprites/icon spellbooks, and
+the existing software integer x1/x2 scaling. The logical minimum is 640x480,
+not Preservation's 512x346, because the existing map-editor dock is 396 pixels
+tall. The window remains resizable; no fullscreen/aspect-fit scale is implied.
+General retains scaling, middle-mouse tilt/classic mode, coordinates, and
+available roof/flicker controls. Spoiled Milk renderer controls, custom HUDs,
+spellbook/minimap layout controls, focus menus and related developer hotkeys
+are absent in this profile. Editor tools, camera rotation/pitch and extended
+zoom remain; installed-player defaults and persisted map/server data do not change.
+The consuming Editor must select software presentation and keep camera pitch
+and extended zoom enabled in its authoring launch command. Existing immutable
+project runtime capsules are not rewritten by selecting this profile.
 
 Preserve exact tested/published handoffs. Reuse verified immutable build outputs
 only when source, dependencies, options and toolchain match; keep mutable test

@@ -157,6 +157,7 @@ python3 ./tests/myworld/test-client-auxiliary-types.py
 python3 ./tests/myworld/test-renderer-settings-panel-extraction.py
 python3 ./tests/myworld/test-renderer-profile-applier.py
 python3 ./tests/myworld/test-legacy-software-scaling-settings.py
+python3 ./tests/myworld/test-world-builder-preservation-ui.py
 python3 ./tests/myworld/test-client-external-asset-loader.py
 python3 ./tests/myworld/test-client-scene-instance-store.py
 python3 ./tests/myworld/test-client-static-presentation-stability.py

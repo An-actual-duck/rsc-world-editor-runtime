@@ -20,15 +20,16 @@ final class RenderSurfaceSettings {
 	}
 
 	static int getWidth() {
-		return mode.width;
+		// Preservation scaling, with room for the existing 396px editor dock.
+		return WorldBuilderUiProfile.isEnabled() ? 640 : mode.width;
 	}
 
 	static int getHeight() {
-		return mode.height;
+		return WorldBuilderUiProfile.isEnabled() ? 480 : mode.height;
 	}
 
 	static Dimension getDimensions() {
-		return new Dimension(mode.width, mode.height);
+		return new Dimension(getWidth(), getHeight());
 	}
 
 	static String getAspectLabel() {

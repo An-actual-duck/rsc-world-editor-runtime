@@ -16,7 +16,7 @@ public final class RemasteredSpriteSettings {
 	}
 
 	public static boolean isEnabled() {
-		return enabled;
+		return !orsc.WorldBuilderUiProfile.isEnabled() && enabled;
 	}
 
 	public static boolean hasRuntimeOverride() {

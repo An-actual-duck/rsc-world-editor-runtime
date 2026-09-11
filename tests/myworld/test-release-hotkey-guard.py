@@ -88,7 +88,8 @@ def main() -> None:
         classes = tmp / "classes"
         classes.mkdir()
         compiled = run(
-            ["javac", "-source", "1.8", "-target", "1.8", "-d", str(classes), str(SOURCE), str(fixture)],
+            ["javac", "-source", "1.8", "-target", "1.8", "-d", str(classes), str(SOURCE),
+             str(ROOT / "Client_Base/src/orsc/WorldBuilderUiProfile.java"), str(fixture)],
             ROOT,
         )
         if compiled.returncode != 0:
