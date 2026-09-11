@@ -44,9 +44,16 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         if cls.output.exists():
             raise AssertionError("clean checkout unexpectedly contains ignored candidate output")
         subprocess.run(
-            ["python3", str(cls.build)], cwd=cls.repo, check=True,
+            ["python3", str(cls.repo / "scripts/current-base-lwjgl.py"),
+             "--stage-from", str(ROOT / "PC_Client/lib/lwjgl")],
+            cwd=cls.repo, check=True, capture_output=True, text=True,
+        )
+        built = subprocess.run(
+            ["python3", str(cls.build)], cwd=cls.repo, check=False,
             capture_output=True, text=True,
         )
+        if built.returncode:
+            raise AssertionError(f"Clean Base build failed:\n{built.stdout}\n{built.stderr}")
         cls.identity = json.loads(cls.identity_path.read_text(encoding="utf-8"))
         cls.profile = json.loads(
             (cls.repo / "current-platform/runtime/current-base-v1/profile.json").read_text()
@@ -57,6 +64,11 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         cls.checkout.cleanup()
 
     def test_candidate_is_installable_but_not_claimed_released(self) -> None:
+        subprocess.run(
+            ["python3", str(self.repo / "scripts/current-base-lwjgl.py"),
+             "--archive", str(self.output / "client/Open_RSC_Client.jar")],
+            cwd=self.repo, check=True, capture_output=True, text=True,
+        )
         with zipfile.ZipFile(self.output / "server/core.jar") as archive:
             self.assertIn("Multi-Release: true",
                           archive.read("META-INF/MANIFEST.MF").decode().splitlines())
@@ -81,6 +93,24 @@ class CurrentBaseCandidateTest(unittest.TestCase):
             "base-gameplay-state-runtime-execution-v1",
             bundle["requiredExecutableScenarios"],
         )
+
+    def test_missing_presenter_input_refuses_before_replacing_candidate(self) -> None:
+        dependency = self.repo / "PC_Client/lib/lwjgl/lwjgl-3.3.4.jar"
+        retained = self.repo.parent / "retained-lwjgl-3.3.4.jar"
+        before = {path: sha256(path) for path in self.output.rglob("*") if path.is_file()}
+        dependency.rename(retained)
+        try:
+            result = subprocess.run(
+                ["python3", str(self.build)], cwd=self.repo,
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("Missing/unsafe pinned LWJGL input", result.stderr)
+            self.assertEqual(before, {
+                path: sha256(path) for path in self.output.rglob("*") if path.is_file()
+            })
+        finally:
+            retained.rename(dependency)
 
     def test_candidate_verifier_binds_exact_six_field_artifact_pairing(self) -> None:
         result = subprocess.run(

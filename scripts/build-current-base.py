@@ -276,6 +276,10 @@ def build(output: Path, allow_dirty: bool) -> Path:
             "official Current Base candidate build requires a clean provider source tree"
         )
 
+    # Refuse before deleting/rebuilding output. Reflection-based presentation
+    # otherwise compiles successfully even when its runtime jars are absent.
+    run([sys.executable, "scripts/current-base-lwjgl.py"])
+
     if output.exists():
         shutil.rmtree(output)
     server_output = output / "server"
