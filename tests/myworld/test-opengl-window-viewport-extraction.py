@@ -202,6 +202,21 @@ def verify_viewport_behavior() -> None:
                 require(primary.textSmoothingAlpha() > 0.0f,
                     "fractional HiDPI scale should smooth text");
 
+                OpenGLViewportPresenter builder =
+                    new OpenGLViewportPresenter(true, 960, 540);
+                builder.update(3840, 2160, 1920, 1080, 960, 540);
+                viewport(builder.framebufferViewport(), 0, 0, 3840, 2160,
+                    "Base builder logical UI scales to the full 4K framebuffer");
+                require(builder.mapMouseX(960.0) == 480
+                        && builder.mapMouseY(540.0) == 270,
+                    "Base builder HiDPI center maps to logical UI coordinates");
+                builder.update(2560, 1440, 2560, 1440, 960, 540);
+                viewport(builder.drawViewport(), 0, 0, 2560, 1440,
+                    "Base builder uses the full 1440p window");
+                require(builder.mapMouseX(1280.0) == 480
+                        && builder.mapMouseY(720.0) == 270,
+                    "Base builder 1440p cursor remains aligned with scaled controls");
+
                 OpenGLViewportPresenter mirror =
                     new OpenGLViewportPresenter(false, 800, 600);
                 mirror.update(1600, 1200, 1600, 1200, 800, 600);

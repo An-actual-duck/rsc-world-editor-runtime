@@ -48,10 +48,12 @@ class CurrentBaseCandidateTest(unittest.TestCase):
              "--stage-from", str(ROOT / "PC_Client/lib/lwjgl")],
             cwd=cls.repo, check=True, capture_output=True, text=True,
         )
-        subprocess.run(
-            ["python3", str(cls.build)], cwd=cls.repo, check=True,
+        built = subprocess.run(
+            ["python3", str(cls.build)], cwd=cls.repo, check=False,
             capture_output=True, text=True,
         )
+        if built.returncode:
+            raise AssertionError(f"Clean Base build failed:\n{built.stdout}\n{built.stderr}")
         cls.identity = json.loads(cls.identity_path.read_text(encoding="utf-8"))
         cls.profile = json.loads(
             (cls.repo / "current-platform/runtime/current-base-v1/profile.json").read_text()
