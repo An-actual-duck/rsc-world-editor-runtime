@@ -44,6 +44,11 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         if cls.output.exists():
             raise AssertionError("clean checkout unexpectedly contains ignored candidate output")
         subprocess.run(
+            ["python3", str(cls.repo / "scripts/current-base-lwjgl.py"),
+             "--stage-from", str(ROOT / "PC_Client/lib/lwjgl")],
+            cwd=cls.repo, check=True, capture_output=True, text=True,
+        )
+        subprocess.run(
             ["python3", str(cls.build)], cwd=cls.repo, check=True,
             capture_output=True, text=True,
         )
@@ -57,6 +62,11 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         cls.checkout.cleanup()
 
     def test_candidate_is_installable_but_not_claimed_released(self) -> None:
+        subprocess.run(
+            ["python3", str(self.repo / "scripts/current-base-lwjgl.py"),
+             "--archive", str(self.output / "client/Open_RSC_Client.jar")],
+            cwd=self.repo, check=True, capture_output=True, text=True,
+        )
         with zipfile.ZipFile(self.output / "server/core.jar") as archive:
             self.assertIn("Multi-Release: true",
                           archive.read("META-INF/MANIFEST.MF").decode().splitlines())

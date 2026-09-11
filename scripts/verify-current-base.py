@@ -691,6 +691,11 @@ def verify(identity_path: Path, payload_root: Path) -> dict:
     server_names = archive_names(server)
     plugin_names = archive_names(plugins)
     client_names = archive_names(client)
+    presenter_spec = importlib.util.spec_from_file_location(
+        "current_base_lwjgl", ROOT / "scripts/current-base-lwjgl.py")
+    presenter = importlib.util.module_from_spec(presenter_spec)
+    presenter_spec.loader.exec_module(presenter)
+    presenter.verify_archive(client, payload_root / "PC_Client/lib/lwjgl")
     profile = validate_profile(profile_path)
     validate_server_content(
         content_manifest_path, content_path,
