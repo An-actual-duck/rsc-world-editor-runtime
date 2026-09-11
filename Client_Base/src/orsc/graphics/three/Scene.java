@@ -2482,6 +2482,14 @@ public final class Scene {
 		return renderer3DFrame;
 	}
 
+	/** Project overlays using the software scene camera without capturing geometry. */
+	public boolean projectWorldEditorPoint(int x, int y, int z, int[] destination) {
+		return WorldEditorProjection.project(x, y, z,
+			rot1024_off_x, rot1024_off_y, rot1024_off_z,
+			cameraProjX, cameraProjY, cameraProjZ, m_Zb, m_Nb,
+			rot1024_vp_src, rot1024_zTop, destination);
+	}
+
 	public final RSModel[] b(byte var1) {
 		try {
 			if (var1 < 95) {

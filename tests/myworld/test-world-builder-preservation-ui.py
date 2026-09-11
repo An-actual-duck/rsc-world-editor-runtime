@@ -25,7 +25,10 @@ public class WorldBuilderPreservationUiFixture {
         check(WorldBuilderUiProfile.isEnabled(), "authoring profile missing");
         check(RenderSurfaceSettings.getWidth() == 640 && RenderSurfaceSettings.getHeight() == 480,
               "existing editor dock must fit in resizable logical surface");
-        check(!SpellbookLayoutSettings.usesTextLayout(), "non-Preservation spellbook exposed");
+        check(SpellbookLayoutSettings.usesTextLayout(), "Preservation text spellbook missing");
+        SpellbookLayoutSettings.setMode(SpellbookLayoutSettings.Mode.ICONS);
+        check(SpellbookLayoutSettings.usesTextLayout(), "saved icon choice overrides authoring list");
+        SpellbookLayoutSettings.setMode(SpellbookLayoutSettings.Mode.TEXT);
         check(!orsc.remastered.RemasteredSpriteSettings.isEnabled(), "remastered sprites exposed");
         check(WorldBuilderUiProfile.settingsTab(0) == 0 && WorldBuilderUiProfile.settingsTab(97) == 0
             && WorldBuilderUiProfile.settingsTab(98) == 1 && WorldBuilderUiProfile.settingsTab(195) == 1,

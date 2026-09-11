@@ -936,10 +936,10 @@ class LayeredTransitionMinimapAcceptanceTest(unittest.TestCase):
             "completeLayeredSceneActivationFreshFrame(",
             self.client,
         )
-        self.assertIn(
-            "this.drawWorldEditorBuildGridLegacy(renderer3DFrame);\n"
-            "\t\t\t\t\t\t} else {",
-            self.client,
+        rendered = self.client.split("this.scene.endScene(-113);", 1)[1]
+        self.assertLess(
+            rendered.index("this.completeLayeredSceneActivationFreshFrame(null, true);"),
+            rendered.index("this.drawWorldEditorBuildGridLegacy(renderer3DFrame);"),
         )
         self.assertIn(
             "this.completeLayeredSceneActivationFreshFrame(null, true);",
