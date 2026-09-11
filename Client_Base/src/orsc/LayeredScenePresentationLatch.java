@@ -50,6 +50,18 @@ final class LayeredScenePresentationLatch {
 		return pending && retainPresentedFrame || awaitingFreshFrame;
 	}
 
+	/** A software frame already contains the synchronously rebuilt scene pixels. */
+	boolean completeFreshSoftwareFrame(boolean presentationProductsReady) {
+		if (pending || !awaitingFreshFrame || !presentationProductsReady) {
+			return false;
+		}
+		freshFrameSamples++;
+		awaitingFreshFrame = false;
+		retainPresentedFrame = false;
+		lastReleaseStable = true;
+		return true;
+	}
+
 	boolean completeFreshFrame(
 		long staticWorldSignature,
 		int staticChunkCount,
