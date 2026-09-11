@@ -14,6 +14,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 LIB = ROOT / "PC_Client/lib/lwjgl"
+PAYLOAD_PREFIXES = ("org/lwjgl/", "linux/x64/org/lwjgl/", "windows/x64/org/lwjgl/")
 PINS = {
     "lwjgl-3.3.4.jar": "6844ff591a4fa4175136416eb1d93ede336224fe3e2026ff29993a93a000b169",
     "lwjgl-3.3.4-natives-linux.jar": "8bb4acce4516fe66a70603258651eba56841e65f2cabd07ca8eb8fb5e30ee7f9",
@@ -51,7 +52,7 @@ def payload(lib=LIB):
         with zipfile.ZipFile(lib / name) as archive:
             for entry in archive.namelist():
                 # Metadata and module-info are intentionally shared in fat jars.
-                if entry.endswith("/") or not entry.startswith(("org/lwjgl/", "linux/", "windows/")):
+                if entry.endswith("/") or not entry.startswith(PAYLOAD_PREFIXES):
                     continue
                 data = archive.read(entry)
                 if entry in result and result[entry] != data:
@@ -64,7 +65,7 @@ def verify_archive(path, lib=LIB):
     expected = payload(lib)
     with zipfile.ZipFile(path) as archive:
         actual = {entry for entry in archive.namelist()
-                  if not entry.endswith("/") and entry.startswith(("org/lwjgl/", "linux/", "windows/"))}
+                  if not entry.endswith("/") and entry.startswith(PAYLOAD_PREFIXES)}
         if actual != set(expected):
             raise ValueError("Base client LWJGL class/native inventory differs from pinned presenter inputs")
         for entry, data in expected.items():
