@@ -484,8 +484,10 @@ public class ScaledWindow extends JFrame implements WindowListener, FocusListene
 
 	/** Determines the minimum window size for the applet based on the scalar */
 	public Dimension getMinimumViewportSizeForScalar() {
-		int renderWidth = viewportWidth > 0 ? viewportWidth : RenderSurfaceSettings.getWidth();
-		int renderHeight = viewportHeight > 0 ? viewportHeight : RenderSurfaceSettings.getHeight();
+		int renderWidth = !WorldBuilderUiProfile.isEnabled() && viewportWidth > 0
+			? viewportWidth : RenderSurfaceSettings.getWidth();
+		int renderHeight = !WorldBuilderUiProfile.isEnabled() && viewportHeight > 0
+			? viewportHeight : RenderSurfaceSettings.getHeight();
 		return new Dimension(
 			LegacySoftwareScalingSettings.scaleDimension(renderWidth),
 			LegacySoftwareScalingSettings.scaleDimension(renderHeight));

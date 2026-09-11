@@ -63,7 +63,8 @@ def run_settings_fixture() -> None:
         fixture_path = temp / "SpellbookLayoutSettingsFixture.java"
         fixture_path.write_text(fixture, encoding="utf-8")
         subprocess.run(
-            ["javac", "-d", str(temp), str(SETTINGS), str(fixture_path)],
+            ["javac", "-d", str(temp), str(SETTINGS),
+             str(ROOT / "Client_Base/src/orsc/WorldBuilderUiProfile.java"), str(fixture_path)],
             check=True,
             cwd=ROOT,
         )

@@ -1371,6 +1371,10 @@ public final class mudclient implements Runnable {
 		}
 
 		initConfig();
+		if (WorldBuilderUiProfile.isEnabled()) {
+			C_CUSTOM_UI = false;
+			this.authenticSettings = false;
+		}
 		Properties clientSettings = loadClientSettings();
 		SpellbookLayoutSettings.loadFromClientSettings(clientSettings);
 		RemasteredSpriteSettings.loadFromClientSettings(clientSettings);
@@ -1449,6 +1453,11 @@ public final class mudclient implements Runnable {
 		this.minimapPinned = Boolean.parseBoolean(props.getProperty("minimap_pinned", "false"));
 		this.drawMinimap = this.minimapPinned;
 		this.showCoordinatesOverlay = Boolean.parseBoolean(props.getProperty("show_coordinates", "true"));
+		if (WorldBuilderUiProfile.isEnabled()) {
+			this.minimapPosition = MINIMAP_POSITION_TOP_RIGHT;
+			this.minimapPinned = false;
+			this.drawMinimap = false;
+		}
 	}
 
 	private void saveMinimapSettings() {
@@ -9054,8 +9063,12 @@ public final class mudclient implements Runnable {
 					int i2 = 75;
 					int index;
 					int var12;
-					this.drawActivePotionEffectsHud();
-					if (S_SIDE_MENU_TOGGLE && C_SIDE_MENU_OVERLAY) {
+					if (WorldBuilderUiProfile.isEnabled()) {
+						this.drawPlayerStatusHud();
+					} else {
+						this.drawActivePotionEffectsHud();
+					}
+					if (!WorldBuilderUiProfile.isEnabled() && S_SIDE_MENU_TOGGLE && C_SIDE_MENU_OVERLAY) {
 						this.drawPlayerStatusHud();
 						int i = 130;
 						//this.getSurface().drawString("FPS: @gre@(@whi@" + FPS + "@gre@)", 7, i, 0xffffff, 1);
@@ -10941,7 +10954,8 @@ public final class mudclient implements Runnable {
 			}
 
 			if (!hideSummonDuringArrival && (isCombatDirection(npc.direction) || npc.combatTimeout != 0 || npc.suppressAttackOption)) {
-				boolean showSummonHealthBar = C_SUMMON_HEALTH_BARS || !npc.suppressAttackOption;
+				boolean showSummonHealthBar = (!WorldBuilderUiProfile.isEnabled() && C_SUMMON_HEALTH_BARS)
+					|| !npc.suppressAttackOption;
 				if (showSummonHealthBar && (npc.combatTimeout > 0 || npc.suppressAttackOption) && npc.healthMax > 0) {
 					var15 = x + getCombatScreenOffset(npc.direction, overlayMovement, 20);
 
@@ -14711,9 +14725,14 @@ public final class mudclient implements Runnable {
 		int x = this.getSurface().width2 - TOP_MENU_BAR_WIDTH - HEALTH_HUD_WIDTH - HEALTH_HUD_RIGHT_OF_MENU_GAP;
 		int y = HEALTH_HUD_TOP_MARGIN;
 		x = Math.max(7 + AUTO_ATTACK_HUD_SIZE + AUTO_ATTACK_HUD_GAP, x);
-		this.drawAutoAttackHudButton(x - AUTO_ATTACK_HUD_SIZE - AUTO_ATTACK_HUD_GAP, y - 1);
-		this.drawPlayerHealthBar(x, y);
-		y += HEALTH_HUD_HEIGHT + HEALTH_HUD_COORDINATE_GAP;
+		if (!WorldBuilderUiProfile.isEnabled()) {
+			this.drawAutoAttackHudButton(x - AUTO_ATTACK_HUD_SIZE - AUTO_ATTACK_HUD_GAP, y - 1);
+			this.drawPlayerHealthBar(x, y);
+			y += HEALTH_HUD_HEIGHT + HEALTH_HUD_COORDINATE_GAP;
+		} else {
+			x = this.getGameWidth() - 185;
+			y = 34;
+		}
 		if (this.showCoordinatesOverlay) {
 			int compatibilityX = this.playerLocalX + this.midRegionBaseX;
 			int compatibilityY = this.playerLocalZ + this.midRegionBaseZ;
@@ -14968,6 +14987,9 @@ public final class mudclient implements Runnable {
 
 	// wrench settings menu
 	private void drawUiTabOptions(int var1, boolean mustTrackMouse) {
+		if (WorldBuilderUiProfile.isEnabled() && this.settingTab == 2) {
+			this.settingTab = 1;
+		}
 
 		int maxY = getUITabsY();
 
@@ -15058,7 +15080,9 @@ public final class mudclient implements Runnable {
 							}
 						} else if (!isAndroid()) {
 							if (var13 <= 24 && this.mouseButtonClick == 1) {
-								if (var3 < 66 && (this.settingTab == 1 || this.settingTab == 2)) {
+								if (WorldBuilderUiProfile.isEnabled()) {
+									this.settingTab = WorldBuilderUiProfile.settingsTab(var3);
+								} else if (var3 < 66 && (this.settingTab == 1 || this.settingTab == 2)) {
 									this.settingTab = 0; // Social Settings Tab
 								} else if (var3 >= 66 && var3 <= 131
 									&& (this.settingTab == 0 || this.settingTab == 2)) {
@@ -15142,6 +15166,20 @@ public final class mudclient implements Runnable {
 
 	// custom settings menu
 	private void drawCustomSettingsBox(int var3, int var4, short var5, int chosenColor, int unchosenColor) {
+		if (WorldBuilderUiProfile.isEnabled()) {
+			int half = var5 / 2;
+			this.getSurface().drawBoxAlpha(var3, var4 - 25, half, 24,
+				this.settingTab == 0 ? chosenColor : unchosenColor, 128);
+			this.getSurface().drawBoxAlpha(var3 + half, var4 - 25, half, 24,
+				this.settingTab == 1 ? chosenColor : unchosenColor, 128);
+			this.getSurface().drawLineHoriz(var3, var4 - 1, var5, 0);
+			this.getSurface().drawLineVert(var3 + half, var4 - 25, 0, 24);
+			this.getSurface().drawColoredStringCentered(var3 + half / 2, "Social", 0, 0, 4, var4 - 9);
+			this.getSurface().drawColoredStringCentered(var3 + half + half / 2, "General", 0, 0, 4, var4 - 9);
+			this.getSurface().drawBoxAlpha(var3, var4, var5, 200, GenUtil.buildColor(181, 181, 181), 160);
+			this.getSurface().drawBoxAlpha(var3, var4 + 200, var5, 40, GenUtil.buildColor(201, 201, 201), 160);
+			return;
+		}
 		int firstDivider = var5 / 3;
 		int secondDivider = 2 * (var5 / 3) + 1;
 		this.getSurface().drawBoxAlpha(var3, var4 - 25, firstDivider, 24,
@@ -15367,16 +15405,24 @@ public final class mudclient implements Runnable {
 			index = addSettingsRow(index, "@whi@Mouse buttons - @gre@Two", 1);
 		}
 
-		index = addSettingsRow(index, "@whi@Minimap position - @gre@" + this.getMinimapPositionLabel(), 50);
+		if (WorldBuilderUiProfile.isEnabled()) {
+			index = addSettingsRow(index, "@whi@Scaling - @gre@"
+				+ (int) LegacySoftwareScalingSettings.getRenderingScalar() + "x (click to change)", 170);
+			index = addSettingsRow(index, "@whi@Middle mouse - " + DesktopMiddleMouseSettings.getMode().label, 171);
+		} else {
+			index = addSettingsRow(index, "@whi@Minimap position - @gre@" + this.getMinimapPositionLabel(), 50);
+		}
 
 		index = addSettingsRow(index,
 			"@whi@Coordinates - " + (this.showCoordinatesOverlay ? "@gre@On" : "@red@Off"), 51);
 
-		index = addSettingsRow(index,
-			"@whi@Spellbook layout - " + SpellbookLayoutSettings.getMode().label, 65);
+		if (!WorldBuilderUiProfile.isEnabled()) {
+			index = addSettingsRow(index,
+				"@whi@Spellbook layout - " + SpellbookLayoutSettings.getMode().label, 65);
+		}
 
 		// custom UI
-		if (S_WANT_CUSTOM_UI) {
+		if (S_WANT_CUSTOM_UI && !WorldBuilderUiProfile.isEnabled()) {
 			if (!C_CUSTOM_UI) {
 				this.panelSettings.setListEntry(this.controlSettingPanel, index++,
 					"@whi@Custom UI - @red@Off", 39, null, null);
@@ -15397,14 +15443,16 @@ public final class mudclient implements Runnable {
 			}
 		}
 
-		this.panelSettings.setListEntry(this.controlSettingPanel, index++,
-			"@whi@Tool Focus Menu - " + getGatheringFocusMenuLabel(), 52, null, null);
+		if (!WorldBuilderUiProfile.isEnabled()) {
+			this.panelSettings.setListEntry(this.controlSettingPanel, index++,
+				"@whi@Tool Focus Menu - " + getGatheringFocusMenuLabel(), 52, null, null);
 
-		this.panelSettings.setListEntry(this.controlSettingPanel, index++,
-			"@whi@Hits XP Focus Menu - " + getHitsXpFocusMenuLabel(), 53, null, null);
+			this.panelSettings.setListEntry(this.controlSettingPanel, index++,
+				"@whi@Hits XP Focus Menu - " + getHitsXpFocusMenuLabel(), 53, null, null);
 
-		this.panelSettings.setListEntry(this.controlSettingPanel, index++,
-			"@whi@Summon Health Bars - " + (C_SUMMON_HEALTH_BARS ? "@gre@On" : "@red@Off"), 54, null, null);
+			this.panelSettings.setListEntry(this.controlSettingPanel, index++,
+				"@whi@Summon Health Bars - " + (C_SUMMON_HEALTH_BARS ? "@gre@On" : "@red@Off"), 54, null, null);
+		}
 
 		// experience drops
 		if (S_EXPERIENCE_DROPS_TOGGLE) {
@@ -15435,7 +15483,7 @@ public final class mudclient implements Runnable {
 			}
 		}
 		// show roof
-		if (isAndroid() && S_SHOW_ROOF_TOGGLE) {
+		if ((isAndroid() || WorldBuilderUiProfile.isEnabled()) && S_SHOW_ROOF_TOGGLE) {
 			if (!C_HIDE_ROOFS) {
 				this.panelSettings.setListEntry(this.controlSettingPanel, index++,
 					"@whi@Hide Roofs - @red@Off", 26, null, null);
@@ -15446,7 +15494,7 @@ public final class mudclient implements Runnable {
 		}
 
 		// underground lighting flicker toggle
-		if (isAndroid() && S_SHOW_UNDERGROUND_FLICKER_TOGGLE) {
+		if ((isAndroid() || WorldBuilderUiProfile.isEnabled()) && S_SHOW_UNDERGROUND_FLICKER_TOGGLE) {
 			if (!C_HIDE_UNDERGROUND_FLICKER) {
 				this.panelSettings.setListEntry(this.controlSettingPanel, index++,
 					"@whi@Hide Underground Flicker - @red@Off", 42, null, null);
@@ -15484,7 +15532,7 @@ public final class mudclient implements Runnable {
 		}
 
 		// side menu
-		if (S_SIDE_MENU_TOGGLE) {
+		if (S_SIDE_MENU_TOGGLE && !WorldBuilderUiProfile.isEnabled()) {
 			if (!C_SIDE_MENU_OVERLAY) {
 				this.panelSettings.setListEntry(this.controlSettingPanel, index++,
 					"@whi@Side Menu - @red@Off", 10, null, null);
@@ -15574,8 +15622,10 @@ public final class mudclient implements Runnable {
 						"@whi@Nat Rune Alch Protection - @gre@On", 47, null, null);
 				}
 
-				this.panelSettings.setListEntry(this.controlSettingPanel, index++,
-					"@whi@Auto Retaliate - " + (C_AUTO_RETALIATE ? "@gre@On" : "@red@Off"), 48, null, null);
+				if (!WorldBuilderUiProfile.isEnabled()) {
+					this.panelSettings.setListEntry(this.controlSettingPanel, index++,
+						"@whi@Auto Retaliate - " + (C_AUTO_RETALIATE ? "@gre@On" : "@red@Off"), 48, null, null);
+				}
 			}
 
 			// report abuse - keep at bottom of list since it's not a toggle
@@ -15888,6 +15938,20 @@ public final class mudclient implements Runnable {
 		//System.out.println("Setting index is: " + settingIndex); // DO NOT REMOVE THIS, IT IS VERY HELPFUL
 		if (settingIndex == RendererSettingsPanel.SECTION_ROW) {
 			return;
+		}
+		if (WorldBuilderUiProfile.isEnabled() && this.mouseButtonClick == 1) {
+			if (settingIndex == 170) {
+				if (LegacySoftwareScalingSettings.getRenderingScalar() > 1.0f) {
+					LegacySoftwareScalingSettings.scaleDown(LEGACY_SCALING_SETTINGS_STORE);
+				} else {
+					LegacySoftwareScalingSettings.scaleUp(LEGACY_SCALING_SETTINGS_STORE);
+				}
+				return;
+			}
+			if (settingIndex == 171) {
+				this.cycleDesktopMiddleMouseMode();
+				return;
+			}
 		}
 
 		// camera mode - byte index 0
@@ -26790,7 +26854,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private boolean shouldDrawGatheringFocusMenu() {
-		if (CurrentBaseSkillContract.selected()) return false;
+		if (WorldBuilderUiProfile.isEnabled() || CurrentBaseSkillContract.selected()) return false;
 		if (C_GATHERING_FOCUS_MENU == 0) {
 			return false;
 		}
@@ -26816,7 +26880,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private boolean shouldDrawHitsXpFocusMenu() {
-		if (CurrentBaseSkillContract.selected()) return false;
+		if (WorldBuilderUiProfile.isEnabled() || CurrentBaseSkillContract.selected()) return false;
 		if (C_HITS_XP_FOCUS_MENU == 0) {
 			return false;
 		}
@@ -29452,7 +29516,7 @@ public final class mudclient implements Runnable {
 	}
 
 	public void setCustomUI(boolean b) {
-		C_CUSTOM_UI = b;
+		C_CUSTOM_UI = !WorldBuilderUiProfile.isEnabled() && b;
 	}
 
 	public void setHideLoginBox(boolean b) {

@@ -104,6 +104,9 @@ final class LegacySoftwareScalingSettings {
 		if (hasText(configuredAlgorithm)) {
 			scalingAlgorithm = parseAlgorithm(configuredAlgorithm);
 		}
+		if (WorldBuilderUiProfile.isEnabled()) {
+			scalingAlgorithm = ScaledWindow.ScalingAlgorithm.INTEGER_SCALING;
+		}
 
 		String configuredScalar = properties.getProperty(UI_SCALE_KEY);
 		if (!hasText(configuredScalar)) {

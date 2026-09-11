@@ -19,6 +19,12 @@ final class ClientHotkeySettings {
 	}
 
 	static boolean shouldSuppressFunctionKey(int keyCode) {
+		if (WorldBuilderUiProfile.isEnabled() && (keyCode == KeyEvent.VK_F2
+			|| keyCode == KeyEvent.VK_F4 || keyCode == KeyEvent.VK_F6
+			|| keyCode == KeyEvent.VK_F7 || keyCode == KeyEvent.VK_F8
+			|| keyCode == KeyEvent.VK_F10)) {
+			return true;
+		}
 		return RELEASE_BUILD
 			&& keyCode >= KeyEvent.VK_F1
 			&& keyCode <= KeyEvent.VK_F12
@@ -26,7 +32,7 @@ final class ClientHotkeySettings {
 	}
 
 	static boolean showDeveloperFunctionKeyHints() {
-		return !RELEASE_BUILD;
+		return !RELEASE_BUILD && !WorldBuilderUiProfile.isEnabled();
 	}
 
 	private static boolean hasReleaseMarker() {

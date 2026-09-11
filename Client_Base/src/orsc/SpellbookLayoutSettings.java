@@ -14,7 +14,7 @@ final class SpellbookLayoutSettings {
 	}
 
 	static boolean usesTextLayout() {
-		return mode == Mode.TEXT;
+		return !WorldBuilderUiProfile.isEnabled() && mode == Mode.TEXT;
 	}
 
 	static Mode cycleMode() {
