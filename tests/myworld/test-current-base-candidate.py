@@ -96,7 +96,7 @@ class CurrentBaseCandidateTest(unittest.TestCase):
 
     def test_missing_presenter_input_refuses_before_replacing_candidate(self) -> None:
         dependency = self.repo / "PC_Client/lib/lwjgl/lwjgl-3.3.4.jar"
-        retained = dependency.with_suffix(".retained")
+        retained = self.repo.parent / "retained-lwjgl-3.3.4.jar"
         before = {path: sha256(path) for path in self.output.rglob("*") if path.is_file()}
         dependency.rename(retained)
         try:
