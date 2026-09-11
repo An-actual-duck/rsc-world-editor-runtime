@@ -98,6 +98,8 @@
             <zipgroupfileset dir="${lib}" includes="*.jar"/>
             <manifest>
                 <attribute name="Main-Class" value="com.openrsc.server.Server"/>
+                <!-- Keep dependency Java 9+ implementations active in the fat JAR. -->
+                <attribute name="Multi-Release" value="true"/>
             </manifest>
         </jar>
         <delete dir="${build}"/>

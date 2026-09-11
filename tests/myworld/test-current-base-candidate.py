@@ -57,6 +57,11 @@ class CurrentBaseCandidateTest(unittest.TestCase):
         cls.checkout.cleanup()
 
     def test_candidate_is_installable_but_not_claimed_released(self) -> None:
+        with zipfile.ZipFile(self.output / "server/core.jar") as archive:
+            self.assertIn("Multi-Release: true",
+                          archive.read("META-INF/MANIFEST.MF").decode().splitlines())
+            self.assertIn("META-INF/versions/9/org/apache/logging/log4j/util/StackLocator.class",
+                          archive.namelist())
         base = json.loads(
             (self.repo / "current-platform/variants/current-base-v1.json").read_text()
         )

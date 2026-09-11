@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import hashlib
+import os
 import subprocess
 import stat
 import sys
@@ -174,6 +175,10 @@ public final class ServerFatJarServiceProbe {
     }
 
     public static void main(String[] args) throws Exception {
+        if (!"ServerFatJarServiceProbe".equals(
+                org.apache.logging.log4j.LogManager.getLogger().getName())) {
+            throw new IllegalStateException("Automatic logger caller lookup failed");
+        }
         requireProvider("java.sql.Driver", "com.mysql.cj.jdbc.Driver");
         requireProvider("java.sql.Driver", "org.sqlite.JDBC");
     }
@@ -192,7 +197,8 @@ public final class ServerFatJarServiceProbe {
         if compiled.returncode != 0:
             fail(f"ServiceLoader probe compilation failed:\n{compiled.stdout}{compiled.stderr}")
         executed = subprocess.run(
-            ["java", "-cp", f"{CORE_JAR}:{temp}", "ServerFatJarServiceProbe"],
+            [os.environ.get("SERVER_FAT_JAR_TEST_JAVA", "java"), "-cp",
+             f"{CORE_JAR}:{temp}", "ServerFatJarServiceProbe"],
             cwd=temp,
             capture_output=True,
             text=True,
@@ -249,6 +255,10 @@ def main() -> int:
         manifest = core.read("META-INF/MANIFEST.MF").decode("utf-8", errors="replace")
         if "Main-Class: com.openrsc.server.Server" not in manifest:
             fail("core.jar lost its server entry point")
+        if "Multi-Release: true" not in manifest.splitlines():
+            fail("core.jar must activate its Java 9+ dependency implementations")
+        if "META-INF/versions/9/org/apache/logging/log4j/util/StackLocator.class" not in names:
+            fail("core.jar lost Java 9+ automatic logger caller lookup")
 
         wrong_precedence = []
         for name, sources in duplicate_classes.items():
