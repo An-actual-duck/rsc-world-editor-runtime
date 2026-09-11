@@ -94,6 +94,24 @@ class CurrentBaseCandidateTest(unittest.TestCase):
             bundle["requiredExecutableScenarios"],
         )
 
+    def test_missing_presenter_input_refuses_before_replacing_candidate(self) -> None:
+        dependency = self.repo / "PC_Client/lib/lwjgl/lwjgl-3.3.4.jar"
+        retained = dependency.with_suffix(".retained")
+        before = {path: sha256(path) for path in self.output.rglob("*") if path.is_file()}
+        dependency.rename(retained)
+        try:
+            result = subprocess.run(
+                ["python3", str(self.build)], cwd=self.repo,
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("Missing/unsafe pinned LWJGL input", result.stderr)
+            self.assertEqual(before, {
+                path: sha256(path) for path in self.output.rglob("*") if path.is_file()
+            })
+        finally:
+            retained.rename(dependency)
+
     def test_candidate_verifier_binds_exact_six_field_artifact_pairing(self) -> None:
         result = subprocess.run(
             [
