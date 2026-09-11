@@ -106,8 +106,14 @@ requested by the owner.
 4. Inspect and test the exact READY tip before merging. Direct manager changes
    receive equivalent review and risk-appropriate verification without a
    synthetic worker handoff.
-5. Run focused tests for narrow low-risk changes and the full runtime suite for
-   behavioral/runtime integration intended for Editor adoption.
+5. Declare test scope and expected duration first. UI-only changes use
+   `./scripts/test.sh --group presentation`, affected compilation and actual
+   visual/input acceptance, not the full runtime suite. Editor adoption alone
+   does not require full testing: review the actual diff. Data, protocol,
+   authentication, persistence and transaction changes require affected safety
+   suites; broad integration and production releases require full suites.
+   Get owner agreement before expanding a small UI task to broad verification.
+   Testing-policy/tooling changes receive focused workflow checks.
 6. Push tested runtime `main`, recycle only after publication, and make the
    exact published commit available to the product manager. In-scope Editor
    adoption may proceed immediately.

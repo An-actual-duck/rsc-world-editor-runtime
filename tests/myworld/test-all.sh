@@ -6,6 +6,7 @@ ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$ROOT_DIR"
 
 ./scripts/check.sh
+python3 ./tests/myworld/test-verification-selection.py
 ./tests/myworld/test-smoke.sh
 python3 ./tests/myworld/test-server-build-source-of-truth.py
 python3 ./tests/myworld/test-server-fat-jar-archive.py
