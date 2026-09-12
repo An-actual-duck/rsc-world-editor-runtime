@@ -113,11 +113,12 @@ def main() -> None:
     ):
         forbid(general, visual_owner, "desktop visual setting in General")
 
-    # Android keeps the visual rows it already exposed through General.
+    # Android retains its rows; accepted Preservation editor UI also exposes
+    # roof/flicker controls in General instead of the retired Graphics tab.
     require(general, "if (isAndroid() && !ScaledWindow.isOpenGLPrimaryWindowEnabled())",
             "Android sprite compatibility guard")
-    require(general, "if (isAndroid() && S_SHOW_ROOF_TOGGLE)", "Android roof compatibility guard")
-    require(general, "if (isAndroid() && S_SHOW_UNDERGROUND_FLICKER_TOGGLE)",
+    require(general, "if ((isAndroid() || WorldBuilderUiProfile.isEnabled()) && S_SHOW_ROOF_TOGGLE)", "Android/Preservation roof compatibility guard")
+    require(general, "if ((isAndroid() || WorldBuilderUiProfile.isEnabled()) && S_SHOW_UNDERGROUND_FLICKER_TOGGLE)",
             "Android underground-flicker compatibility guard")
 
     for label in (
