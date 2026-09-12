@@ -20,6 +20,15 @@ SEALED = {
     "source/migration/input/derivation.json": "2935ce8dece731b0c77c7738f03cfa6978e30c5be13b3059cf7b20829bb55000",
     "source/migration/decoder/evidence.json": "e9fb4383d7b14efe5a4919abc9b54740625393a3f23d68cfa4cc5cbf5e5a3845",
 }
+# Reviewed v0.8.0 Editor conversion probe. Decoder bytes and historical source
+# remain identical; current derivation/package metadata has a new exact seal.
+# These are fixed reviewed identities, never caller-supplied trust overrides.
+SEALED_V080 = {
+    "conversion/package/manifest.json": "f869ae2ed0f2791e9f16a1c1645e88dcebd8e07c3cd8587d902a1c4219b6b52c",
+    "conversion/discovery-reconciliation.json": "0370a3b1ad4f466feab18c46540959cb5fcdc04004d68d603f4c08bbaed566a9",
+    "source/migration/input/derivation.json": "5b19c315c95921732c6df5f55fcc2e4e7917e0e1aee5c25df19523114392386e",
+    "source/migration/decoder/evidence.json": "e9fb4383d7b14efe5a4919abc9b54740625393a3f23d68cfa4cc5cbf5e5a3845",
+}
 
 
 def digest(data):
@@ -58,7 +67,12 @@ def inspect(requested):
     root = Path(requested)
     if not root.is_absolute() or root.resolve() != root or not root.is_dir():
         raise ValueError("fixture requires literal canonical existing project-stage")
-    documents = {name: json.loads(checked_file(root, name, sha)) for name, sha in SEALED.items()}
+    manifest_hash = digest(checked_file(root, "conversion/package/manifest.json"))
+    seal = next((candidate for candidate in (SEALED, SEALED_V080)
+                 if candidate["conversion/package/manifest.json"] == manifest_hash), None)
+    if seal is None:
+        raise ValueError("unreviewed conversion fixture identity")
+    documents = {name: json.loads(checked_file(root, name, sha)) for name, sha in seal.items()}
     manifest = documents["conversion/package/manifest.json"]
     derivation = documents["source/migration/input/derivation.json"]
     decoded = documents["source/migration/decoder/evidence.json"]
