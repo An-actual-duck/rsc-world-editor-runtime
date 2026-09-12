@@ -109,7 +109,8 @@ class GenuineMapSemanticsTest(unittest.TestCase):
             profile.parent.mkdir()
             profile.write_text(json.dumps(dict(schemaVersion=1,manifestType="world-builder-installed-client-profile",
                 active=True,packageId=self.manifest["packageId"],packageVersion=self.manifest["packageVersion"],
-                packageFingerprintSha256=fingerprint,manifestSha256=fixture.SEALED["conversion/package/manifest.json"],
+                packageFingerprintSha256=fingerprint,
+                manifestSha256=fixture.digest((root/relative/"manifest.json").read_bytes()),
                 packageRelativePath=relative)))
             jar=OUTPUT/"client/Open_RSC_Client.jar"
             artifact_classpath=os.pathsep.join(map(str,(jar,OUTPUT/"server/core.jar")))
