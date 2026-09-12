@@ -38,7 +38,9 @@ class VerificationSelectionTest(unittest.TestCase):
             self.assertEqual([
                 "tests/myworld/test-opengl-window-viewport-extraction.py",
                 "tests/myworld/test-widescreen-world-input-viewport.py",
-                "tests/myworld/test-legacy-software-scaling-settings.py"], calls)
+                "tests/myworld/test-legacy-software-scaling-settings.py",
+                "tests/myworld/test-world-builder-preservation-ui.py",
+                "tests/myworld/test-software-editor-overlays.py"], calls)
             for args in ((), ("--full",)):
                 self.assertEqual((0, ["full"]), run(*args))
             for args in (("--group", "unknown"), ("--full", "extra"), ("--unknown",)):
