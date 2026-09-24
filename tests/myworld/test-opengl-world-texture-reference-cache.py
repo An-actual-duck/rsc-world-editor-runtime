@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Exercise precomputed renderer texture references and cache invalidation."""
+"""Exercise material identity, texture references, and cache invalidation."""
 
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 import tempfile
 import textwrap
 from pathlib import Path
@@ -84,8 +86,8 @@ public final class OpenGLWorldTextureReferenceFixture {
 			202L);
 		assertReferences(
 			first,
-			new int[] {0, 1, 2, LEGACY_TRANSPARENT_TEXTURE},
-			"chunk references");
+			new int[] {0, 1, LEGACY_TRANSPARENT_TEXTURE},
+			"chunk references exclude RGB fallback");
 
 		Renderer3DWorldChunkFrame world = Renderer3DWorldChunkFrame.fromChunks(
 			Arrays.asList(first, second));
@@ -121,10 +123,142 @@ public final class OpenGLWorldTextureReferenceFixture {
 			cacheSignature(cache, frame, changedWorld),
 			"world update invalidates cache signature");
 
+		long window = 0;
+		if (Boolean.getBoolean("material.render")) {
+			if (!org.lwjgl.glfw.GLFW.glfwInit()) throw new AssertionError("GLFW init failed");
+			org.lwjgl.glfw.GLFW.glfwWindowHint(org.lwjgl.glfw.GLFW.GLFW_VISIBLE, org.lwjgl.glfw.GLFW.GLFW_FALSE);
+			window = org.lwjgl.glfw.GLFW.glfwCreateWindow(64, 64, "Material acceptance fixture", 0, 0);
+			if (window == 0) throw new AssertionError("hidden OpenGL context failed");
+			org.lwjgl.glfw.GLFW.glfwMakeContextCurrent(window);
+			org.lwjgl.opengl.GL.createCapabilities();
+		}
+		try { materialIdentity(frame); } finally {
+			if (window != 0) { org.lwjgl.glfw.GLFW.glfwDestroyWindow(window); org.lwjgl.glfw.GLFW.glfwTerminate(); }
+		}
 		frame.release();
 		sameCatalog.release();
 		changedUnreferencedTexture.release();
 		System.out.println("PASS: OpenGL world texture-reference cache");
+	}
+
+	private static void materialIdentity(Renderer3DFrame frame) throws Exception {
+		Class<?> builderType = Class.forName("orsc.graphics.three.World$WorldGpuChunkMeshBuilder");
+		Constructor<?> ctor = builderType.getDeclaredConstructors()[0];
+		ctor.setAccessible(true);
+		Method add = builderType.getDeclaredMethod("addFace", Renderer3DModelKind.class,
+			int.class, int.class, int[].class, int[].class);
+		add.setAccessible(true);
+		Method build = builderType.getDeclaredMethod("build");
+		build.setAccessible(true);
+		OpenGLWorldChunkRenderer renderer = new OpenGLWorldChunkRenderer(null, null, null,
+			true, true, true, true, true, true, true);
+		Method color = OpenGLWorldChunkRenderer.class.getDeclaredMethod("materialColorForTriangle",
+			Renderer3DFrame.class, Renderer3DWorldChunkFrame.ChunkMesh.class, int.class);
+		color.setAccessible(true);
+		Method raw = OpenGLWorldChunkRenderer.class.getDeclaredMethod("rawMaterialColorForTriangle",
+			Renderer3DFrame.class, Renderer3DWorldChunkFrame.ChunkMesh.class, int.class);
+		raw.setAccessible(true);
+		for (Renderer3DModelKind kind : new Renderer3DModelKind[] {
+			Renderer3DModelKind.TERRAIN, Renderer3DModelKind.WALL, Renderer3DModelKind.ROOF}) {
+			for (int resource : new int[] {-1, -2, -32, -32768, 0, 1, LEGACY_TRANSPARENT_TEXTURE}) {
+				for (boolean back : new boolean[] {false, true}) {
+					Object builder = ctor.newInstance(0, 50, 50, 0, 0, false);
+					add.invoke(builder, kind, back ? LEGACY_TRANSPARENT_TEXTURE : resource,
+						back ? resource : LEGACY_TRANSPARENT_TEXTURE,
+						new int[] {0,0,0, 128,0,0, 0,0,128}, new int[] {0,0,0});
+					Object mesh = build.invoke(builder);
+					Method export = mesh.getClass().getDeclaredMethod("toRenderer3DWorldChunkMesh");
+					export.setAccessible(true);
+					Renderer3DWorldChunkFrame.ChunkMesh chunk =
+						(Renderer3DWorldChunkFrame.ChunkMesh) export.invoke(mesh);
+					int expectedTexture = resource < 0 ? LEGACY_TRANSPARENT_TEXTURE : resource;
+					int encoded = -(resource + 1);
+					int rgb = ((encoded & 0x7c00) << 9) | ((encoded & 0x3e0) << 6) | ((encoded & 31) << 3);
+					assertEquals(expectedTexture, chunk.getTriangleTexture(0), kind + " material identity");
+					assertEquals(resource < 0 ? rgb : LEGACY_TRANSPARENT_TEXTURE,
+						chunk.getTriangleFallbackColor(0), kind + " decoded color");
+					if (resource != LEGACY_TRANSPARENT_TEXTURE) {
+						int expectedColor = resource < 0 ? rgb : frame.getTexture(resource).getAverageOpaqueRgb();
+						assertEquals(expectedColor, ((Integer) color.invoke(renderer, frame, chunk, 0)).intValue(), kind + " classic color");
+						assertEquals(expectedColor, ((Integer) raw.invoke(renderer, frame, chunk, 0)).intValue(), kind + " remaster color");
+						if (Boolean.getBoolean("material.render")) renderChunk(renderer, frame, chunk);
+					}
+					if (resource >= 0 && resource != LEGACY_TRANSPARENT_TEXTURE) {
+						if (chunk.getVertexTextureU(1) == 0.0f && chunk.getVertexTextureV(1) == 0.0f)
+							throw new AssertionError("genuine texture lost UV coordinates");
+					}
+				}
+			}
+		}
+		// RGB can be any 24-bit value, including every occupied texture slot.
+		for (int rgb : new int[] {0, 1, 2, 3, 8, 248}) {
+			Renderer3DWorldChunkFrame.ChunkMesh chunk = chunk(new int[] {LEGACY_TRANSPARENT_TEXTURE}, new int[] {rgb}, 900L + rgb);
+			assertEquals(rgb, ((Integer) color.invoke(renderer, frame, chunk, 0)).intValue(), "RGB never aliases texture");
+			assertEquals(rgb, ((Integer) raw.invoke(renderer, frame, chunk, 0)).intValue(), "raw RGB never aliases texture");
+			assertReferences(chunk, new int[] {LEGACY_TRANSPARENT_TEXTURE}, "solid has no texture dependency");
+		}
+	}
+
+	private static void renderChunk(OpenGLWorldChunkRenderer renderer, Renderer3DFrame frame,
+		Renderer3DWorldChunkFrame.ChunkMesh chunk) throws Exception {
+		OpenGLWorldTextureCache textureCache = new OpenGLWorldTextureCache(LwjglBindings.load());
+		textureCache.uploadReferencedTextures(frame, Renderer3DWorldChunkFrame.fromChunks(java.util.Arrays.asList(chunk)));
+		renderer = new OpenGLWorldChunkRenderer(LwjglBindings.load(), textureCache, null,
+			true, true, true, true, true, true, true);
+		Method ensure = OpenGLWorldChunkRenderer.class.getDeclaredMethod("ensureUploadBuffers", int.class, int.class);
+		ensure.setAccessible(true);
+		ensure.invoke(renderer, 3, 3);
+		Method copy = OpenGLWorldChunkRenderer.class.getDeclaredMethod("copyChunkVertices",
+			Renderer3DWorldChunkFrame.ChunkMesh.class, Renderer3DFrame.class, int.class, boolean.class, java.util.List.class);
+		copy.setAccessible(true);
+		copy.invoke(renderer, chunk, frame, 3, true, java.util.Collections.emptyList());
+		java.lang.reflect.Field bufferField = OpenGLWorldChunkRenderer.class.getDeclaredField("vertexUploadBuffer");
+		bufferField.setAccessible(true);
+		java.nio.FloatBuffer vertices = (java.nio.FloatBuffer) bufferField.get(renderer);
+		java.lang.reflect.Field strideField = OpenGLWorldChunkRenderer.class.getDeclaredField("STRIDE_BYTES");
+		strideField.setAccessible(true);
+		int stride = strideField.getInt(null);
+		int vbo = org.lwjgl.opengl.GL15.glGenBuffers();
+		org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, vbo);
+		org.lwjgl.opengl.GL15.glBufferData(org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER, vertices, org.lwjgl.opengl.GL15.GL_STATIC_DRAW);
+		org.lwjgl.opengl.GL11.glViewport(0, 0, 64, 64);
+		org.lwjgl.opengl.GL11.glClearColor(1, 0, 1, 1);
+		org.lwjgl.opengl.GL11.glClear(org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT);
+		org.lwjgl.opengl.GL11.glMatrixMode(org.lwjgl.opengl.GL11.GL_PROJECTION);
+		org.lwjgl.opengl.GL11.glLoadIdentity();
+		org.lwjgl.opengl.GL11.glOrtho(0, 128, 0, 128, -1, 1);
+		org.lwjgl.opengl.GL11.glMatrixMode(org.lwjgl.opengl.GL11.GL_MODELVIEW);
+		org.lwjgl.opengl.GL11.glLoadIdentity();
+		org.lwjgl.opengl.GL11.glRotatef(-90, 1, 0, 0);
+		org.lwjgl.opengl.GL11.glEnableClientState(org.lwjgl.opengl.GL11.GL_VERTEX_ARRAY);
+		org.lwjgl.opengl.GL11.glEnableClientState(org.lwjgl.opengl.GL11.GL_COLOR_ARRAY);
+		org.lwjgl.opengl.GL11.glVertexPointer(3, org.lwjgl.opengl.GL11.GL_FLOAT, stride, 0L);
+		org.lwjgl.opengl.GL11.glColorPointer(4, org.lwjgl.opengl.GL11.GL_FLOAT, stride, 12L);
+		WorldChunkMaterialBatch batch = new WorldChunkMaterialBatch(chunk.getTriangleModelKind(0),
+			chunk.getTriangleTexture(0), chunk.getTriangleFallbackColor(0), 0, 3, 0, 0, 0, 128, 0, 0, 0, 128);
+		Method stateMethod = OpenGLWorldChunkRenderer.class.getDeclaredMethod("chunkBatchDrawState",
+			Renderer3DFrame.class, WorldChunkMaterialBatch.class, boolean.class);
+		stateMethod.setAccessible(true);
+		WorldChunkBatchDrawState state = (WorldChunkBatchDrawState) stateMethod.invoke(renderer, frame, batch, true);
+		boolean textured = chunk.getTriangleTexture(0) != LEGACY_TRANSPARENT_TEXTURE;
+		if (state.bindResult != (textured ? WorldChunkBatchBindResult.TEXTURED : WorldChunkBatchBindResult.FLAT_FALLBACK))
+			throw new AssertionError("wrong texture-enabled draw state " + state.bindResult);
+		Method bind = OpenGLWorldChunkRenderer.class.getDeclaredMethod("bindChunkBatchDrawState",
+			WorldChunkBatchDrawState.class, WorldChunkDrawAccumulator.class, boolean.class);
+		bind.setAccessible(true);
+		bind.invoke(renderer, state, new WorldChunkDrawAccumulator(), false);
+		org.lwjgl.opengl.GL11.glDrawArrays(org.lwjgl.opengl.GL11.GL_TRIANGLES, 0, 3);
+		java.nio.ByteBuffer pixel = java.nio.ByteBuffer.allocateDirect(4);
+		org.lwjgl.opengl.GL11.glReadPixels(16, 16, 1, 1, org.lwjgl.opengl.GL11.GL_RGBA, org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, pixel);
+		for (int channel = 0; channel < 3; channel++) {
+			int expected = textured
+				? Math.round(((frame.getTexture(chunk.getTriangleTexture(0)).getAverageOpaqueRgb() >> (16 - channel * 8)) & 255) * vertices.get(9 + channel))
+				: Math.round(vertices.get(3 + channel) * 255);
+			int actual = pixel.get(channel) & 255;
+			if (Math.abs(expected - actual) > 1) throw new AssertionError("GPU pixel mismatch " + expected + " != " + actual);
+		}
+		org.lwjgl.opengl.GL15.glDeleteBuffers(vbo);
+		textureCache.close();
 	}
 
 	private static Renderer3DTextureData texture(int textureId, int color)
@@ -352,8 +486,9 @@ def main() -> None:
         run_result = subprocess.run(
             [
                 "java",
+                "-Dmaterial.render=" + str("--render" in sys.argv).lower(),
                 "-cp",
-                f"{temp}:{CLIENT_JAR}",
+                os.pathsep.join((str(temp), str(CLIENT_JAR))),
                 "orsc.OpenGLWorldTextureReferenceFixture",
             ],
             cwd=ROOT,
@@ -367,6 +502,8 @@ def main() -> None:
                 + run_result.stderr
             )
         print(run_result.stdout.strip())
+        if "--render" in sys.argv:
+            print("PASS: hidden OpenGL framebuffer acceptance, production textured/solid batch binding and vertex upload")
 
 
 if __name__ == "__main__":

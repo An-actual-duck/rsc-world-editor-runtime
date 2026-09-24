@@ -359,9 +359,9 @@ def main() -> None:
             "Terrain GPU mesh vertices should use active-window-local X")
     require(world, "drawOriginZ + va.z",
             "Terrain GPU mesh vertices should use active-window-local Z")
-    require(world, "triangleTextures.add(Integer.valueOf(texture));",
+    require(world, "triangleTextures.add(Integer.valueOf(material < 0 ? Scene.TRANSPARENT : material));",
             "GPU-ready chunk meshes should preserve per-triangle material ids")
-    require(world, "triangleFallbackColors.add(Integer.valueOf(resolveFallbackColor(texture, fallbackColor)));",
+    require(world, "triangleFallbackColors.add(Integer.valueOf(material < 0 ? resourceToRgb(material) : Scene.TRANSPARENT));",
             "GPU-ready chunk meshes should preserve resolved per-triangle fallback colors")
     require(world, "private int resourceToRgb(int resource)",
             "GPU-ready chunk meshes should resolve synthetic resource colors for flat fallback batches")

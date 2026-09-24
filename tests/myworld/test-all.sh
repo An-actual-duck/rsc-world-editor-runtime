@@ -8,6 +8,7 @@ cd "$ROOT_DIR"
 ./scripts/check.sh
 python3 ./tests/myworld/test-verification-selection.py
 python3 ./tests/myworld/test-software-editor-overlays.py
+python3 ./tests/myworld/test-opengl-world-texture-reference-cache.py
 ./tests/myworld/test-smoke.sh
 python3 ./tests/myworld/test-server-build-source-of-truth.py
 python3 ./tests/myworld/test-server-fat-jar-archive.py

@@ -1126,10 +1126,6 @@ public final class Renderer3DWorldChunkFrame {
 			for (int triangle = 0; triangle < triangleTextures.length; triangle++) {
 				int textureId = triangleTextures[triangle];
 				references.add(textureId);
-				if (textureId == LEGACY_TRANSPARENT_TEXTURE
-					&& triangle < triangleFallbackColors.length) {
-					references.add(triangleFallbackColors[triangle]);
-				}
 			}
 			return references.toSortedArray();
 		}
@@ -1690,10 +1686,12 @@ public final class Renderer3DWorldChunkFrame {
 			return indices[indexOffset];
 		}
 
+		/** Genuine texture ID, or the transparent sentinel for an RGB-only material. */
 		public int getTriangleTexture(int triangleIndex) {
 			return triangleTextures[triangleIndex];
 		}
 
+		/** Decoded RGB, or the transparent sentinel when no solid material exists. Never a texture ID. */
 		public int getTriangleFallbackColor(int triangleIndex) {
 			return triangleFallbackColors[triangleIndex];
 		}
