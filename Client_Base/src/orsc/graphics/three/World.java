@@ -6784,8 +6784,11 @@ public final class World {
 			indices.add(Integer.valueOf(baseVertex));
 			indices.add(Integer.valueOf(baseVertex + 1));
 			indices.add(Integer.valueOf(baseVertex + 2));
-			triangleTextures.add(Integer.valueOf(texture));
-			triangleFallbackColors.add(Integer.valueOf(resolveFallbackColor(texture, fallbackColor)));
+			// Resolve the legacy front/back resources before decoding RGB. The
+			// fallback channel contains colors only, never texture references.
+			int material = texture == Scene.TRANSPARENT ? fallbackColor : texture;
+			triangleTextures.add(Integer.valueOf(material < 0 ? Scene.TRANSPARENT : material));
+			triangleFallbackColors.add(Integer.valueOf(material < 0 ? resourceToRgb(material) : Scene.TRANSPARENT));
 			triangleModelKinds.add(kind);
 			triangleMaterialFamilies.add(family == null
 				? Renderer3DMaterialClassifier.fallbackFor(kind)
@@ -6798,13 +6801,6 @@ public final class World {
 			} else if (kind == Renderer3DModelKind.ROOF) {
 				roofTriangles++;
 			}
-		}
-
-		private int resolveFallbackColor(int texture, int fallbackColor) {
-			if (texture == Scene.TRANSPARENT && fallbackColor != Scene.TRANSPARENT) {
-				return resourceToRgb(fallbackColor);
-			}
-			return fallbackColor;
 		}
 
 		private void addWallShadowCaster(Renderer3DModelKind kind, int[] faceVertexCoords) {

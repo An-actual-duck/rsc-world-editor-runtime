@@ -2577,7 +2577,7 @@ final class OpenGLWorldChunkRenderer implements AutoCloseable {
 		if (textureCache == null || batch == null) {
 			return null;
 		}
-		int textureId = effectiveChunkTextureId(frame, batch.textureId, batch.fallbackColor);
+		int textureId = batch.textureId;
 		return textureId == LEGACY_TRANSPARENT_TEXTURE ? null : textureCache.getRegion(frame, textureId);
 	}
 
@@ -2656,26 +2656,15 @@ final class OpenGLWorldChunkRenderer implements AutoCloseable {
 	}
 
 	private int fallbackColorForBatch(Renderer3DFrame frame, WorldChunkMaterialBatch batch) {
-		int textureId = effectiveChunkTextureId(frame, batch.textureId, batch.fallbackColor);
+		int textureId = batch.textureId;
 		int textureAverageColor = averageTextureColor(frame, textureId);
 		if (textureAverageColor != NO_FALLBACK_COLOR) {
 			return textureAverageColor;
 		}
-		int fallbackTextureAverageColor = averageTextureColor(frame, batch.fallbackColor);
-		if (fallbackTextureAverageColor != NO_FALLBACK_COLOR) {
-			return fallbackTextureAverageColor;
-		}
 		if (batch.textureId == LEGACY_TRANSPARENT_TEXTURE && batch.fallbackColor != LEGACY_TRANSPARENT_TEXTURE) {
-			if (isFrameTextureReference(frame, batch.fallbackColor)) {
-				return NO_FALLBACK_COLOR;
-			}
 			return batch.fallbackColor & 0xFFFFFF;
 		}
 		return NO_FALLBACK_COLOR;
-	}
-
-	private boolean isFrameTextureReference(Renderer3DFrame frame, int textureId) {
-		return frame != null && textureId >= 0 && textureId < frame.getTextureCount();
 	}
 
 	private int averageTextureColor(Renderer3DFrame frame, int textureId) {
@@ -3169,10 +3158,7 @@ final class OpenGLWorldChunkRenderer implements AutoCloseable {
 			int triangle = vertex / 3;
 			OpenGLTextureRegion textureRegion =
 				atlasTextureCoordinates ? textureRegionForVertex(frame, chunk, vertex) : null;
-			int effectiveTextureId = effectiveChunkTextureId(
-				frame,
-				chunk.getTriangleTexture(triangle),
-				chunk.getTriangleFallbackColor(triangle));
+			int effectiveTextureId = chunk.getTriangleTexture(triangle);
 			int rawMaterialColor = rawMaterialColorForTriangle(frame, chunk, triangle);
 			vertexUploadBuffer.put((float) chunk.getVertexCoord(coord));
 			vertexUploadBuffer.put((float) chunk.getVertexCoord(coord + 1));
@@ -3342,18 +3328,13 @@ final class OpenGLWorldChunkRenderer implements AutoCloseable {
 			return modelKindDiagnosticColor(Renderer3DModelKind.UNCLASSIFIED);
 		}
 		int fallbackColor = chunk.getTriangleFallbackColor(triangle);
-		int textureId = effectiveChunkTextureId(frame, chunk.getTriangleTexture(triangle), fallbackColor);
+		int textureId = chunk.getTriangleTexture(triangle);
 		int textureAverageColor = averageTextureColor(frame, textureId);
 		if (textureAverageColor != NO_FALLBACK_COLOR) {
 			return textureAverageColor;
 		}
-		int fallbackTextureAverageColor = averageTextureColor(frame, fallbackColor);
-		if (fallbackTextureAverageColor != NO_FALLBACK_COLOR) {
-			return fallbackTextureAverageColor;
-		}
 		if (chunk.getTriangleTexture(triangle) == LEGACY_TRANSPARENT_TEXTURE
-			&& fallbackColor != LEGACY_TRANSPARENT_TEXTURE
-			&& !isFrameTextureReference(frame, fallbackColor)) {
+			&& fallbackColor != LEGACY_TRANSPARENT_TEXTURE) {
 			return fallbackColor & 0xFFFFFF;
 		}
 		return modelKindDiagnosticColor(chunk.getTriangleModelKind(triangle));
@@ -3369,13 +3350,8 @@ final class OpenGLWorldChunkRenderer implements AutoCloseable {
 		int fallbackColor = chunk.getTriangleFallbackColor(triangle);
 		int textureId = chunk.getTriangleTexture(triangle);
 		if (textureId == LEGACY_TRANSPARENT_TEXTURE
-			&& fallbackColor != LEGACY_TRANSPARENT_TEXTURE
-			&& !isFrameTextureReference(frame, fallbackColor)) {
+			&& fallbackColor != LEGACY_TRANSPARENT_TEXTURE) {
 			return fallbackColor & 0xFFFFFF;
-		}
-		int fallbackTextureAverageColor = averageTextureColor(frame, fallbackColor);
-		if (fallbackTextureAverageColor != NO_FALLBACK_COLOR) {
-			return fallbackTextureAverageColor;
 		}
 		return materialColorForTriangle(frame, chunk, triangle);
 	}
@@ -3391,20 +3367,8 @@ final class OpenGLWorldChunkRenderer implements AutoCloseable {
 		if (triangle < 0 || triangle >= chunk.getTriangleCount()) {
 			return null;
 		}
-		int textureId = effectiveChunkTextureId(
-			frame,
-			chunk.getTriangleTexture(triangle),
-			chunk.getTriangleFallbackColor(triangle));
+		int textureId = chunk.getTriangleTexture(triangle);
 		return textureId == LEGACY_TRANSPARENT_TEXTURE ? null : textureCache.getRegion(frame, textureId);
-	}
-
-	private int effectiveChunkTextureId(Renderer3DFrame frame, int textureId, int fallbackColor) {
-		if (textureId != LEGACY_TRANSPARENT_TEXTURE) {
-			return textureId;
-		}
-		return isFrameTextureReference(frame, fallbackColor)
-			? fallbackColor
-			: textureId;
 	}
 
 	private float chunkTextureU(OpenGLTextureRegion region, float sourceU) {
