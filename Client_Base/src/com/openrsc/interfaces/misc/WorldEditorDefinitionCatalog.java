@@ -307,13 +307,16 @@ public final class WorldEditorDefinitionCatalog {
 			try {
 				definition = EntityHandler.getDoorDef(id);
 			} catch (RuntimeException failure) {
+				reportUnavailableDefinition("boundary", id, failure.getMessage());
 				continue;
 			}
 			if (definition == null || definition.id != id) {
+				reportUnavailableDefinition("boundary", id, "missing or mismatched definition ID");
 				continue;
 			}
 			String canonical = normalized(definition.getName());
 			if (canonical.isEmpty()) {
+				reportUnavailableDefinition("boundary", id, "missing name");
 				continue;
 			}
 			String display = boundaryLabel(id, canonical);
@@ -332,16 +335,20 @@ public final class WorldEditorDefinitionCatalog {
 		List<Entry> entries = new ArrayList<Entry>();
 		entries.add(new Entry("floor", 0, "base floor color", "Base Floor Color",
 			"editor", "No overlay", "base floor color none no overlay clear"));
+		TileDef bridge = null;
 		for (int id = 0; id < EntityHandler.tileCount(); id++) {
 			TileDef definition;
 			try {
 				definition = EntityHandler.getTileDef(id);
 			} catch (RuntimeException failure) {
+				reportUnavailableDefinition("tile", id, failure.getMessage());
 				continue;
 			}
 			if (definition == null) {
+				reportUnavailableDefinition("tile", id, "missing definition");
 				continue;
 			}
+			if (id == 1) bridge = definition;
 			int overlay = id + 1;
 			if (overlay == 250
 				|| WorldBuilderTerrainOverlay.isBlockingBaseColor(overlay)) {
@@ -356,8 +363,7 @@ public final class WorldEditorDefinitionCatalog {
 			entries.add(new Entry("floor", overlay, display, display,
 				"runtime", tags, search));
 		}
-		if (EntityHandler.tileCount() > 1) {
-			TileDef bridge = EntityHandler.getTileDef(1);
+		if (bridge != null) {
 			String tags = bridge.getObjectType() == 0 ? "Walkable" : "Not Walkable";
 			entries.add(new Entry("floor", 250, "bridge transition", "Bridge Transition",
 				"editor", tags, "bridge transition floor texture overlay alias " + tags));
@@ -367,6 +373,11 @@ public final class WorldEditorDefinitionCatalog {
 			"editor", "Not Walkable",
 			"blocking non-walkable base floor colour color blended terrain overlay"));
 		return Collections.unmodifiableList(entries);
+	}
+
+	private static void reportUnavailableDefinition(String family, int id, String reason) {
+		System.err.println("[world-editor catalog] Skipping " + family + " #" + id
+			+ ": " + reason + ". Check the selected content provider and client log.");
 	}
 
 	private static String commandTerms(String[] commands) {

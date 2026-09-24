@@ -819,7 +819,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private boolean definitionAllowed(String family,int id){return WorldBuilderClientProfile.current().isDefinitionAllowed(family,id);}
 	private int[] projectDefinitionIds(String family){return WorldBuilderClientProfile.current().hasAuthoringDefinitionBinding()?WorldBuilderClientProfile.current().definitionIds(family):null;}
 	private int[] projectFloorOverlayIds(){
-		int[] ids=projectDefinitionIds("floor");if(ids==null)return null;
+		int[] ids=projectDefinitionIds("tile");if(ids==null)return null;
 		java.util.TreeSet<Integer> overlays=new java.util.TreeSet<Integer>();overlays.add(Integer.valueOf(0));overlays.add(Integer.valueOf(WorldBuilderTerrainOverlay.BLOCKING_BASE_COLOR));
 		for(int id:ids){if(id>=0&&id<255&&id+1!=250)overlays.add(Integer.valueOf(id+1));if(id==1)overlays.add(Integer.valueOf(250));}
 		int[] result=new int[overlays.size()];int index=0;for(Integer overlay:overlays)result[index++]=overlay.intValue();return result;
