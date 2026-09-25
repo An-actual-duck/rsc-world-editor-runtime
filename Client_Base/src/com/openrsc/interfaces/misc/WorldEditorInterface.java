@@ -813,7 +813,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		public com.openrsc.client.entityhandling.defs.TileDef get(int id){return EntityHandler.getTileDef(id);}
 		public boolean allowed(int id){return definitionAllowed("tile",id);}
 	},terrainFloorTexture,floorWalkable,mc.getEditorPlayerWorldLevel());}
-	private boolean validateFloorSelection(){if(paintFloorColor&&resolvedFloorOverlay()<0){showError("This floor and walkability combination is unavailable on this level. Refresh the project's standard floor content.");return false;}return true;}
+	private boolean validateFloorSelection(){if(paintFloorColor&&resolvedFloorOverlay()<0){showError("This floor and walkability combination is unavailable on this level. This project lacks the required floor definitions.");return false;}return true;}
 	private void toggleFloorWalkable(){boolean previous=floorWalkable;floorWalkable=!floorWalkable;if(resolvedFloorOverlay()<0){floorWalkable=previous;showError("This content provider has no matching floor with that walkability.");}}
 
 	private void setTerrainRoof(int value){terrainRoof=Math.max(0,Math.min(value,EntityHandler.elevationCount()));terrainRoofText=String.valueOf(terrainRoof);}
@@ -871,7 +871,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private boolean inspectedFloorWalkable(int raw){if(raw==0)return true;if(raw==255)return false;int id=(raw==250?2:raw)-1;if(id<0||id>=EntityHandler.tileCount())return false;com.openrsc.client.entityhandling.defs.TileDef tile=EntityHandler.getTileDef(id);return tile!=null&&tile.getObjectType()==0;}
 	private boolean canToggleFloorWalkable(){floorWalkable=!floorWalkable;boolean enabled=resolvedFloorOverlay()>=0;floorWalkable=!floorWalkable;return enabled;}
 	private void floorWalkabilityCheckbox(int x,int y){if(canToggleFloorWalkable())checkbox(x,y,floorWalkable,"Walkable");else{graphics().drawBoxAlpha(x,y,18,18,0x333333,150);graphics().drawString(floorWalkable?"X":"",x+5,y+14,0x777777,2);graphics().drawString("Walkable",x+26,y+14,0x777777,2);}}
-	private void seedTerrain(int[] fields){setTerrainElevation(fields[0]);setTerrainFloorColor(fields[1]);setTerrainFloorTexture(fields[2]);floorWalkable=inspectedFloorWalkable(fields[2]);setTerrainRoof(fields[3]);setTerrainEastWall(fields[4]);setTerrainNorthWall(fields[5]);int diagonal=fields[6];terrainDiagonalOrientation=diagonal>12000?1:0;setTerrainDiagonalWall(diagonal>12000?diagonal-12000:diagonal);}
+	private void seedTerrain(int[] fields){setTerrainElevation(fields[0]);setTerrainFloorColor(fields[1]);setTerrainFloorTexture(fields[2]);floorWalkable=inspectedFloorWalkable(fields[2]);if((fields[2]==0||fields[2]==255)&&(lastClickedLevel==1||lastClickedLevel==2)){terrainFloorTexture=-1;terrainFloorTextureText="Invisible";}setTerrainRoof(fields[3]);setTerrainEastWall(fields[4]);setTerrainNorthWall(fields[5]);int diagonal=fields[6];terrainDiagonalOrientation=diagonal>12000?1:0;setTerrainDiagonalWall(diagonal>12000?diagonal-12000:diagonal);}
 	private int encodedDiagonalWall(){return terrainDiagonalWall==0?0:(terrainDiagonalOrientation==0?terrainDiagonalWall:12000+terrainDiagonalWall);}
 	private static int rawByte(int value){return Math.max(0,Math.min(value,255));}
 	private static int unsignedShort(int value){return Math.max(0,Math.min(value,65535));}
@@ -1447,7 +1447,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		toolButton(x+8,y+180,164,paintFloorColor?"Paint: ON":"Paint: OFF",paintFloorColor);
 		graphics().drawString(terrainFloorTexture==0?"Color + walkability":"Texture overrides color",x+8,y+224,0xbdbdbd,1);
 		if(resolvedFloorOverlay()==2||resolvedFloorOverlay()==11)graphics().drawString("Legacy: blocks projectiles",x+8,y+244,0xff981f,1);
-		if(resolvedFloorOverlay()<0){graphics().drawString("Unavailable on this level",x+8,y+244,0xff981f,1);graphics().drawString("Refresh standard floor content",x+8,y+260,0xff981f,1);}
+		if(resolvedFloorOverlay()<0){graphics().drawString("Unavailable on this level",x+8,y+244,0xff981f,1);graphics().drawString("Project lacks floor definitions",x+8,y+260,0xff981f,1);}
 	}
 	private void handleFloorMouse(int x,int y){
 		if(floorColorPalette){if(x>=8&&x<168&&y>=58&&y<218){setTerrainFloorColor((y-58)/10*16+(x-8)/10);floorColorPalette=false;}else if(y>=230&&y<254)floorColorPalette=false;return;}
@@ -1584,7 +1584,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private void structureField(int x,int y,String label,boolean enabled,String value,boolean focused,String description){checkbox(x+10,y,enabled,label);button(x+118,y,24,"-");textField(x+148,y,54,value,focused);button(x+208,y,24,"+");graphics().drawString(compactLine(description,12),x+240,y+17,0xbdbdbd,1);}
 	private String roofDescription(){return terrainRoof==0?"none":"#"+(terrainRoof-1)+" profile";}
 	private String wallDescription(int raw){try{return raw==0?"none":WorldEditorDefinitionCatalog.boundaryLabel(raw-1);}catch(Exception e){return "undefined";}}
-	private String floorTextureVisualName(){return terrainFloorTexture==0?"None (uses selected color)":WorldEditorDefinitionCatalog.floorTextureLabel(terrainFloorTexture);}
+	private String floorTextureVisualName(){return terrainFloorTexture==-1?"Invisible floor":terrainFloorTexture==0?"None (uses selected color)":WorldEditorDefinitionCatalog.floorTextureLabel(terrainFloorTexture);}
 	private String floorTextureTraversal(){return floorWalkable?"Walkable":"Not Walkable";}
 	private int floorTextureTraversalColor(){String traversal=floorTextureTraversal();return "Walkable".equals(traversal)?0x80c080:"Not Walkable".equals(traversal)?0xff981f:0xff3333;}
 	private void renderScenery(int x,int y){

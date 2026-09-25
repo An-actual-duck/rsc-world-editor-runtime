@@ -3277,7 +3277,7 @@ public final class World {
 	private static boolean explicitInvisible(int rawOverlay) {
 		if (rawOverlay <= 0 || rawOverlay >= 250) return false;
 		com.openrsc.client.entityhandling.defs.TileDef definition = EntityHandler.getTileDef(rawOverlay - 1);
-		return definition != null && definition.getWorldBuilderSourceOverlay() > 0 && definition.getColour() == Scene.TRANSPARENT;
+		return definition != null && definition.getWorldBuilderSourceOverlay() > 0 && definition.getColour() == Scene.TRANSPARENT && definition.getTileValue() != 4;
 	}
 
 	private static int appearanceOverlay(int rawOverlay) {

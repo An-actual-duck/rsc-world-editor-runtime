@@ -47,16 +47,21 @@ public class FriendlyFloorProbe {
   int[] palette=new int[256];for(int i=0;i<256;i++){int rgb=WorldEditorFloorSelection.paletteRgb(i);palette[i]=GenUtil.colorToResource(rgb>>16,(rgb>>8)&255,rgb&255);}set(world,"colorToResource",palette);
   Field sectorCount=World.class.getDeclaredField("ACTIVE_SECTION_COUNT");sectorCount.setAccessible(true);Sector[] sectors=new Sector[sectorCount.getInt(null)];for(int i=0;i<sectors.length;i++)sectors[i]=new Sector();
   Class<?> input=Class.forName("orsc.graphics.three.World$TerrainModelInputSource");Constructor<?> ctor=input.getDeclaredConstructor(Sector[].class);ctor.setAccessible(true);Object source=ctor.newInstance((Object)sectors);
+  Method overlays=World.class.getDeclaredMethod("collectTerrainOverlayFaceInputs",int.class,input);overlays.setAccessible(true);
   Method collect=World.class.getDeclaredMethod("collectTerrainTileFaceInputs",int.class,input);collect.setAccessible(true);
   for(int level:new int[]{-2,0,1,2,5})for(int raw:new int[]{0,8,11,12,WorldEditorFloorSelection.resolve(defs,0,true,level),WorldEditorFloorSelection.resolve(defs,0,false,level),WorldEditorFloorSelection.resolve(defs,8,true,level),WorldEditorFloorSelection.resolve(defs,11,true,level),WorldEditorFloorSelection.resolve(defs,12,true,level)}){
    for(Sector sector:sectors)for(int i=0;i<2304;i++){sector.getTile(i).groundTexture=17;sector.getTile(i).groundOverlay=(byte)raw;}
-   Object[] faces=(Object[])collect.invoke(world,level,source);Object face=faces[0];int resource=(Integer)field(face,"colorResource");
+   Object[] faces=(Object[])collect.invoke(world,level,source);Object face=null;for(Object candidate:faces)if((Integer)field(candidate,"x")==10&&(Integer)field(candidate,"z")==10){face=candidate;break;}check(face!=null,"missing interior tile");int resource=(Integer)field(face,"colorResource");
    if(raw==0)check(resource==(level==1||level==2?12345678:palette[17]),"legacy color changed");
    else if(defs.get(raw-1).usesExplicitBaseColor()){check(resource==palette[17],"explicit color invisible upstairs");check((Boolean)field(face,"collisionFullBlock")== (defs.get(raw-1).getObjectType()!=0),"render collision mismatch");}
    else if(defs.get(raw-1).getWorldBuilderSourceOverlay()==8){check(resource==12345678,"invisible not transparent");check((Boolean)field(face,"pickableInvisibleOverlay"),"invisible cannot be picked");}
-   else if(defs.get(raw-1).getWorldBuilderSourceOverlay()==12)check(resource==31,"alternate water visual lost");
+   else if(defs.get(raw-1).getWorldBuilderSourceOverlay()==12){check(resource==31,"alternate water visual lost");Object[] bridges=(Object[])overlays.invoke(world,level,source);check(bridges.length>0&&(Integer)field(bridges[0],"texture")==3,"bridge surface material lost");}
    else if(defs.get(raw-1).getWorldBuilderSourceOverlay()==11)check((Boolean)field(face,"lavaGlowEmitter"),"lava glow lost");
   }
+  Field tilesField=EntityHandler.class.getDeclaredField("tiles");tilesField.setAccessible(true);java.util.List<TileDef> loaded=(java.util.List<TileDef>)tilesField.get(null);int customOriginal=loaded.size()+1;loaded.add(new TileDef(12345678,4,0));loaded.add(new TileDef(12345678,4,1,"",customOriginal));TileDef.validateWorldBuilderDefinitions(loaded);
+  for(Sector sector:sectors)for(int i=0;i<2304;i++)sector.getTile(i).groundOverlay=(byte)loaded.size();
+  Object[] customFaces=(Object[])collect.invoke(world,0,source);Object customFace=null;for(Object candidate:customFaces)if((Integer)field(candidate,"x")==10&&(Integer)field(candidate,"z")==10)customFace=candidate;
+  check((Integer)field(customFace,"colorResource")==1,"transparent bridge surface erased underlying water");check(!(Boolean)field(customFace,"pickableInvisibleOverlay"),"water bridge mislabeled invisible");
   System.out.println("PASS: all palette colors, levels, traversal variants, legacy fallback, renderer inputs and save/reopen bytes");
  }
 }

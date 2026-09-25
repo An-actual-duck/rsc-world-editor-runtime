@@ -7,6 +7,20 @@ final class WorldEditorFloorSelection {
 	interface Definitions { int size(); TileDef get(int id); boolean allowed(int id); }
 	static int resolve(Definitions definitions, int appearance, boolean walkable, int level) {
 		int blocking = walkable ? 0 : 1;
+		if (appearance == -1) {
+			for (int id = 0; id < definitions.size() && id < 249; id++) {
+				TileDef value = definitions.get(id);
+				if (value != null && definitions.allowed(id) && value.getColour() == 12345678 && value.getTileValue() != 4
+					&& value.getWorldBuilderSourceOverlay() > 0 && value.getObjectType() == blocking) return id + 1;
+			}
+			if (level == 1 || level == 2) return walkable ? 0 : 255;
+			for (int id = 0; id < definitions.size() && id < 249; id++) {
+				TileDef value = definitions.get(id);
+				if (value != null && definitions.allowed(id) && value.getColour() == 12345678 && value.getTileValue() != 4
+					&& value.getObjectType() == blocking) return id + 1;
+			}
+			return -1;
+		}
 		if (appearance == 0) {
 			for (int id = 0; id < definitions.size() && id < 249; id++) {
 				TileDef value = definitions.get(id);
