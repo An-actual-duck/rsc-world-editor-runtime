@@ -4211,7 +4211,9 @@ public class RegionManager {
 			nativeLayeredNeighbor(owner, location, 0, 1),
 			this::nativeTerrainOverlayBlocks,
 			this::nativeTerrainWallBlocks,
-			WorldLoader::projectileClipAllowed)
+			WorldLoader::projectileClipAllowed,
+			raw -> (raw == 2 || raw == 11) && getWorld().getServer().getEntityHandler()
+				.getTileDef(raw - 1).blocksLegacyProjectiles(raw))
 			.applyTo(tile);
 		return nativeLayeredGameObjects.applyCollision(location, tile);
 	}

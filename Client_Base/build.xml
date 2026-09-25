@@ -73,6 +73,7 @@
             <zipfileset src="${jsonlib}"/>
             <manifest>
                 <attribute name="World-Builder-Floor-Semantics" value="standard-floors-v1"/>
+                <attribute name="World-Builder-Installed-Floors" value="installed-floors-v1"/>
                 <attribute name="Main-Class" value="orsc.OpenRSC"/>
             </manifest>
         </jar>

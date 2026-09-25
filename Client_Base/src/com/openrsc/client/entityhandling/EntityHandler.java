@@ -9765,6 +9765,7 @@ public class EntityHandler {
 		} else {
 			loadCurrentBasePublicDefinitions();
 		}
+		if (!WorldBuilderClientProfile.current().isEnabled()) loadInstalledFloorDefinitions();
 		loadElevationDefinitions();
 		loadProjectiles();
 		loadGUIParts();
@@ -10025,6 +10026,10 @@ public class EntityHandler {
 	}
 
 	private static Document projectXml(Path path, String root) throws Exception {
+		return projectXml(java.nio.file.Files.readAllBytes(path), root);
+	}
+
+	private static Document projectXml(byte[] bytes, String root) throws Exception {
 		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 		factory.setFeature("http" + "://apache.org/xml/features/disallow-doctype-decl", true);
 		factory.setFeature("http" + "://xml.org/sax/features/external-general-entities", false);
@@ -10032,15 +10037,28 @@ public class EntityHandler {
 		factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
 		factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
 		factory.setXIncludeAware(false); factory.setExpandEntityReferences(false);
-		Document document = factory.newDocumentBuilder().parse(path.toFile());
+		Document document = factory.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(bytes));
 		if (!root.equals(document.getDocumentElement().getTagName())) {
 			throw new IllegalArgumentException("Unexpected definition XML root");
 		}
 		return document;
 	}
 
+	private static void loadInstalledFloorDefinitions() {
+		try {
+			byte[] definitions = orsc.WorldBuilderInstalledFloorDefinitions.loadConfigured();
+			if (definitions != null) loadProjectTiles(projectXml(definitions, "TileDef-array"));
+		} catch (Exception failure) {
+			throw new IllegalStateException("Installed World Builder floor definitions are invalid", failure);
+		}
+	}
+
 	private static void loadProjectTiles(Path path) throws Exception {
-		NodeList rows = projectXml(path, "TileDef-array").getElementsByTagName("TileDef");
+		loadProjectTiles(projectXml(path, "TileDef-array"));
+	}
+
+	private static void loadProjectTiles(Document document) throws Exception {
+		NodeList rows = document.getElementsByTagName("TileDef");
 		tiles.clear();
 		for (int id = 0; id < rows.getLength(); id++) {
 			Element row = (Element) rows.item(id);
