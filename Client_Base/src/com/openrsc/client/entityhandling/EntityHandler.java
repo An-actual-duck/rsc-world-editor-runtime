@@ -10044,9 +10044,16 @@ public class EntityHandler {
 		tiles.clear();
 		for (int id = 0; id < rows.getLength(); id++) {
 			Element row = (Element) rows.item(id);
+			if (row.getElementsByTagName("worldBuilderMaterial").getLength() > 0
+				&& xmlText(row, "worldBuilderMaterial", "").isEmpty()
+				|| row.getElementsByTagName("worldBuilderSourceOverlay").getLength() > 0
+				&& xmlInt(row, "worldBuilderSourceOverlay", 0) <= 0)
+				throw new IllegalArgumentException("Empty or invalid explicit floor metadata");
 			tiles.add(new TileDef(xmlInt(row, "colour", 0), xmlInt(row, "unknown", 0),
-				xmlInt(row, "objectType", 0)));
+				xmlInt(row, "objectType", 0), xmlText(row, "worldBuilderMaterial", ""),
+				xmlInt(row, "worldBuilderSourceOverlay", 0)));
 		}
+		TileDef.validateWorldBuilderDefinitions(tiles);
 	}
 
 	private static void loadProjectDoors(Path path) throws Exception {

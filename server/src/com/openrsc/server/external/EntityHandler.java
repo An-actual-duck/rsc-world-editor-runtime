@@ -326,6 +326,7 @@ public final class EntityHandler {
 		tiles = projectContent.isPresent()
 			? loadProjectTiles(projectContent.path("definition.tile"))
 			: (TileDef[]) getPersistenceManager().load("defs/TileDef.xml");
+		TileDef.validateWorldBuilderDefinitions(java.util.Arrays.asList(tiles));
 
 		herbSeconds = (ItemHerbSecond[]) getPersistenceManager().load(getPath("defs/extras/ItemHerbSecond.xml"));
 		dartTips = (HashMap<Integer, ItemDartTipDef>) getPersistenceManager().load(getPath("defs/extras/ItemDartTipDef.xml"));
@@ -497,8 +498,15 @@ public final class EntityHandler {
 		TileDef[] result = new TileDef[rows.getLength()];
 		for (int index = 0; index < rows.getLength(); index++) {
 			Element row = (Element) rows.item(index); TileDef value = new TileDef();
+			if (row.getElementsByTagName("worldBuilderMaterial").getLength() > 0
+				&& xmlText(row, "worldBuilderMaterial", "").isEmpty()
+				|| row.getElementsByTagName("worldBuilderSourceOverlay").getLength() > 0
+				&& xmlInt(row, "worldBuilderSourceOverlay", 0) <= 0)
+				throw new IllegalArgumentException("Empty or invalid explicit floor metadata");
 			value.colour = xmlInt(row, "colour", 0); value.unknown = xmlInt(row, "unknown", 0);
-			value.objectType = xmlInt(row, "objectType", 0); result[index] = value;
+			value.objectType = xmlInt(row, "objectType", 0);
+			value.worldBuilderMaterial = xmlText(row, "worldBuilderMaterial", "");
+			value.worldBuilderSourceOverlay = xmlInt(row, "worldBuilderSourceOverlay", 0); result[index] = value;
 		}
 		return result;
 	}

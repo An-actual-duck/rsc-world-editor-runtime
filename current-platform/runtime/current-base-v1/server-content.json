@@ -67,7 +67,7 @@
     {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/GameObjectDef.xml", "bundlePath": "conf/server/defs/GameObjectDef.xml", "transform": "copy"},
     {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/PrayerDef.xml", "bundlePath": "conf/server/defs/PrayerDef.xml", "transform": "copy"},
     {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/SpellDef.xml", "bundlePath": "conf/server/defs/SpellDef.xml", "transform": "copy"},
-    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/TileDef.xml", "bundlePath": "conf/server/defs/TileDef.xml", "transform": "copy"},
+    {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/TileDef.xml", "bundlePath": "conf/server/defs/TileDef.xml", "transform": "standard-floors-v1"},
     {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/extras/FiremakingDef.xml", "bundlePath": "conf/server/defs/extras/FiremakingDef.xml", "transform": "copy"},
     {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/extras/ItemAffectedTypes.xml", "bundlePath": "conf/server/defs/extras/ItemAffectedTypes.xml", "transform": "copy"},
     {"sourcePath": "current-platform/runtime/current-base-v1/public-definitions/extras/ItemArrowHeadDef.xml", "bundlePath": "conf/server/defs/extras/ItemArrowHeadDef.xml", "transform": "copy"},

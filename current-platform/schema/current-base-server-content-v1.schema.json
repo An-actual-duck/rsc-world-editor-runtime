@@ -32,7 +32,7 @@
       "required": ["sourcePath", "bundlePath", "transform"],
       "properties": {
         "sourcePath": {"$ref": "#/$defs/path"}, "bundlePath": {"$ref": "#/$defs/path"},
-        "transform": {"const": "copy"}
+        "transform": {"enum": ["copy", "standard-floors-v1"]}
       }
     },
     "generated": {

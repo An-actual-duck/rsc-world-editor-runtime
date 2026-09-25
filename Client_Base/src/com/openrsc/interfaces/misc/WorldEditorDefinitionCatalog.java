@@ -164,6 +164,13 @@ public final class WorldEditorDefinitionCatalog {
 	 * alter rendering, collision, archives, or protocol values.
 	 */
 	public static String floorTextureLabel(int overlay) {
+		if (overlay > 0 && overlay < 250 && overlay <= EntityHandler.tileCount()) {
+			TileDef definition = EntityHandler.getTileDef(overlay - 1);
+			if (definition != null) {
+				if (definition.usesExplicitBaseColor()) return "Selected floor color";
+				if (definition.getWorldBuilderSourceOverlay() != 0) overlay = definition.getWorldBuilderSourceOverlay();
+			}
+		}
 		if (WorldBuilderTerrainOverlay.isBlockingBaseColor(overlay)) {
 			return "Non-Walkable Base Floor Color";
 		}
@@ -333,8 +340,8 @@ public final class WorldEditorDefinitionCatalog {
 
 	private static List<Entry> runtimeFloors() {
 		List<Entry> entries = new ArrayList<Entry>();
-		entries.add(new Entry("floor", 0, "base floor color", "Base Floor Color",
-			"editor", "No overlay", "base floor color none no overlay clear"));
+		entries.add(new Entry("floor", 0, "none", "None (use color)",
+			"editor", "Selected color", "base floor color none no overlay clear"));
 		TileDef bridge = null;
 		for (int id = 0; id < EntityHandler.tileCount(); id++) {
 			TileDef definition;
@@ -348,6 +355,7 @@ public final class WorldEditorDefinitionCatalog {
 				reportUnavailableDefinition("tile", id, "missing definition");
 				continue;
 			}
+			if (definition.usesExplicitBaseColor() || definition.getWorldBuilderSourceOverlay() != 0) continue;
 			if (id == 1) bridge = definition;
 			int overlay = id + 1;
 			if (overlay == 250
@@ -356,7 +364,7 @@ public final class WorldEditorDefinitionCatalog {
 			}
 			String display = overlay < FLOOR_TEXTURE_LABELS.length
 				? FLOOR_TEXTURE_LABELS[overlay] : "Floor Texture " + overlay;
-			String tags = definition.getObjectType() == 0 ? "Walkable" : "Not Walkable";
+			String tags = "Appearance";
 			String search = normalized(display + " floor texture overlay tile " + tags
 				+ " colour color " + definition.getColour()
 				+ " tile-value " + definition.getTileValue());
@@ -368,10 +376,6 @@ public final class WorldEditorDefinitionCatalog {
 			entries.add(new Entry("floor", 250, "bridge transition", "Bridge Transition",
 				"editor", tags, "bridge transition floor texture overlay alias " + tags));
 		}
-		entries.add(new Entry("floor", WorldBuilderTerrainOverlay.BLOCKING_BASE_COLOR,
-			"non-walkable base floor color", "Non-Walkable Base Floor Color",
-			"editor", "Not Walkable",
-			"blocking non-walkable base floor colour color blended terrain overlay"));
 		return Collections.unmodifiableList(entries);
 	}
 

@@ -3239,8 +3239,8 @@ public final class World {
 				if (tileX < 0 || tileZ < 0 || tileX >= LOCAL_FACE_TILE_COUNT || tileZ >= LOCAL_FACE_TILE_COUNT) {
 					continue;
 				}
-				if (!WorldBuilderTerrainOverlay.usesBaseColor(
-					source.tileDecorationID(tileX, tileZ))) {
+				if (!WorldBuilderTerrainOverlay.usesBaseColor(source.tileDecorationID(tileX, tileZ))
+					&& !explicitBaseColor(source.tileDecorationID(tileX, tileZ))) {
 					continue;
 				}
 				int color = terrainRgbForTile(source, tileX, tileZ);
@@ -3267,6 +3267,23 @@ public final class World {
 
 	private int terrainRgbForTile(TerrainModelInputSource source, int tileX, int tileZ) {
 		return resourceToRgb(this.colorToResource[source.terrainColour(tileX, tileZ)]) & 0xffffff;
+	}
+
+	private static boolean explicitBaseColor(int rawOverlay) {
+		if (rawOverlay <= 0 || WorldBuilderTerrainOverlay.isBlockingBaseColor(rawOverlay)) return false;
+		return Objects.requireNonNull(EntityHandler.getTileDef(rawOverlay - 1)).usesExplicitBaseColor();
+	}
+
+	private static boolean explicitInvisible(int rawOverlay) {
+		if (rawOverlay <= 0 || rawOverlay >= 250) return false;
+		com.openrsc.client.entityhandling.defs.TileDef definition = EntityHandler.getTileDef(rawOverlay - 1);
+		return definition != null && definition.getWorldBuilderSourceOverlay() > 0 && definition.getColour() == Scene.TRANSPARENT;
+	}
+
+	private static int appearanceOverlay(int rawOverlay) {
+		if (rawOverlay <= 0 || WorldBuilderTerrainOverlay.isBlockingBaseColor(rawOverlay)) return rawOverlay;
+		int source = Objects.requireNonNull(EntityHandler.getTileDef(rawOverlay - 1)).getWorldBuilderSourceOverlay();
+		return source == 0 ? rawOverlay : source;
 	}
 
 	private static int tileDecorationType(int rawOverlay) {
@@ -3313,8 +3330,12 @@ public final class World {
 				int decorID = source.tileDecorationID(x, z);
 				boolean terrainVariationEligible = plane == 0
 					&& WorldBuilderTerrainOverlay.usesBaseColor(decorID);
-				boolean lavaGlowEmitter = decorID == LAVA_GLOW_OVERLAY_ID;
-				if (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {
+				boolean lavaGlowEmitter = appearanceOverlay(decorID) == LAVA_GLOW_OVERLAY_ID;
+				if (explicitBaseColor(decorID) || explicitInvisible(decorID)) {
+					colorResource = res01 = explicitInvisible(decorID) ? Scene.TRANSPARENT : this.colorToResource[source.terrainColour(x, z)];
+					collisionFullBlock = EntityHandler.getTileDef(decorID - 1).getObjectType() != 0;
+					terrainVariationEligible = plane == 0 && explicitBaseColor(decorID);
+				} else if (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {
 					collisionFullBlock = true;
 				} else if (decorID > 0) {
 					int decorType = Objects.requireNonNull(EntityHandler.getTileDef(decorID - 1)).getTileValue();
@@ -3324,7 +3345,7 @@ public final class World {
 					if (decorType == 4) {
 						colorResource = 1;
 						res01 = 1;
-						if (decorID == 12) {
+						if (appearanceOverlay(decorID) == 12) {
 							colorResource = 31;
 							res01 = 31;
 						}
@@ -3475,7 +3496,7 @@ public final class World {
 			x,
 			z,
 			texture,
-			Renderer3DMaterialClassifier.classifyTerrain(true, decorationId == LAVA_GLOW_OVERLAY_ID),
+			Renderer3DMaterialClassifier.classifyTerrain(true, appearanceOverlay(decorationId) == LAVA_GLOW_OVERLAY_ID),
 			vertexCoords));
 	}
 
@@ -4399,7 +4420,7 @@ public final class World {
 			if (id == 0) {
 				return defaultVal;
 			}
-			if (WorldBuilderTerrainOverlay.isBlockingBaseColor(id)) {
+			if (WorldBuilderTerrainOverlay.isBlockingBaseColor(id) || explicitBaseColor(id)) {
 				return this.colorToResource[this.getTerrainColour(xTile, zTile)];
 			}
 			return Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getColour();
@@ -4410,7 +4431,8 @@ public final class World {
 	}
 
 	private boolean isPickableInvisibleOverlay(int xTile, int zTile, int plane) {
-		return this.getTileDecorationID(xTile, zTile, plane) == 26;
+		int raw = this.getTileDecorationID(xTile, zTile, plane);
+		return appearanceOverlay(raw) == 26 || explicitInvisible(raw);
 	}
 
 	private int getTileDecorationID(int xTile, int zTile, int plane) {
@@ -5608,7 +5630,11 @@ public final class World {
 				}
 				byte bridge00_11 = 0;
 				int decorID = this.getTileDecorationID((int) x, z, plane);
-				if (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {
+				if (explicitBaseColor(decorID) || explicitInvisible(decorID)) {
+					colorResource = res01 = explicitInvisible(decorID) ? Scene.TRANSPARENT : this.colorToResource[this.getTerrainColour(x, z)];
+					if (EntityHandler.getTileDef(decorID - 1).getObjectType() != 0)
+						this.collisionFlags[x][z] = FastMath.bitwiseOr(this.collisionFlags[x][z], CollisionFlag.FULL_BLOCK_C);
+				} else if (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {
 					this.collisionFlags[x][z] = FastMath.bitwiseOr(
 						this.collisionFlags[x][z], CollisionFlag.FULL_BLOCK_C);
 				} else if (decorID > 0) {
@@ -5618,7 +5644,7 @@ public final class World {
 					if (decorType == 4) {
 						colorResource = 1;
 						res01 = 1;
-						if (decorID == 12) {
+						if (appearanceOverlay(decorID) == 12) {
 							colorResource = 31;
 							res01 = 31;
 						}
@@ -7258,7 +7284,7 @@ public final class World {
 			if (id == 0) {
 				return defaultVal;
 			}
-			if (WorldBuilderTerrainOverlay.isBlockingBaseColor(id)) {
+			if (WorldBuilderTerrainOverlay.isBlockingBaseColor(id) || explicitBaseColor(id)) {
 				return colorToResource[terrainColour(tileX, tileZ)];
 			}
 			return Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getColour();
@@ -7280,7 +7306,8 @@ public final class World {
 		}
 
 		private boolean pickableInvisibleOverlay(int tileX, int tileZ) {
-			return tileDecorationID(tileX, tileZ) == 26;
+			int raw = tileDecorationID(tileX, tileZ);
+			return appearanceOverlay(raw) == 26 || explicitInvisible(raw);
 		}
 
 		private int wallDiagonal(int tileX, int tileZ) {

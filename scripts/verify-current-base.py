@@ -55,6 +55,15 @@ def load_composition_tool():
     return module
 
 
+def standard_floor_payload(record, payload):
+    if record["sourcePath"] != "current-platform/runtime/current-base-v1/public-definitions/TileDef.xml" or record["bundlePath"] not in ("conf/server/defs/TileDef.xml", "Cache/current-base-definitions/TileDef.xml"):
+        raise VerificationError("standard floors transform is bound to Base tile definitions")
+    spec = importlib.util.spec_from_file_location("standard_floors_verify", ROOT / "scripts/standard-floors.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.transform(payload)
+
+
 def archive_names(path: Path) -> set[str]:
     names: set[str] = set()
     folded: set[str] = set()
@@ -414,12 +423,15 @@ def validate_server_content(manifest_path: Path, archive_path: Path,
             raise VerificationError(f"Advanced-only server content path is present: {name}")
     with zipfile.ZipFile(archive_path) as archive:
         for record in manifest["sourceFiles"]:
-            if record["transform"] != "copy":
+            if record["transform"] not in ("copy", "standard-floors-v1"):
                 raise VerificationError("public Base content must not filter stock definition IDs")
             source = ROOT / record["sourcePath"]
             if not source.is_file() or source.is_symlink():
                 raise VerificationError("server content source is missing or unsafe")
-            if archive.read(record["bundlePath"]) != source.read_bytes():
+            payload = source.read_bytes()
+            if record["transform"] == "standard-floors-v1":
+                payload = standard_floor_payload(record, payload)
+            if archive.read(record["bundlePath"]) != payload:
                 raise VerificationError("server content payload differs from selected source: " + record["bundlePath"])
         for name, payload in generated.items():
             if archive.read(name) != payload:
@@ -615,13 +627,15 @@ def validate_client_content(manifest_path: Path, archive_path: Path) -> None:
     for record in manifest["sourceFiles"]:
         require_exact_keys(record, {"sourcePath", "bundlePath", "transform"},
                            "client content source file")
-        if record["transform"] not in ("copy", "base64", "public-models-empty-211-v1"):
+        if record["transform"] not in ("copy", "base64", "public-models-empty-211-v1", "standard-floors-v1"):
             raise VerificationError("unsupported client content transform")
         source = ROOT / record["sourcePath"]
         if not source.is_file() or source.is_symlink():
             raise VerificationError("client content source file is missing or unsafe")
         payload = source.read_bytes()
-        if record["transform"] == "base64":
+        if record["transform"] == "standard-floors-v1":
+            payload = standard_floor_payload(record, payload)
+        elif record["transform"] == "base64":
             try:
                 payload = base64.b64decode(b"".join(payload.split()), validate=True)
             except binascii.Error as error:
