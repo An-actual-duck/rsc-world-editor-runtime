@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import zipfile
+import importlib.util
 ROOT=Path(__file__).resolve().parents[2]
 original='<TileDef><colour>3</colour><unknown>2</unknown><objectType>0</objectType></TileDef>'
 base='<TileDef><colour>0</colour><unknown>0</unknown><objectType>0</objectType><worldBuilderMaterial>base-color-v1</worldBuilderMaterial></TileDef>'
@@ -20,3 +21,14 @@ with tempfile.TemporaryDirectory(prefix='floor-metadata-') as tmp:
         with zipfile.ZipFile(ROOT/jar) as archive:
             assert 'World-Builder-Floor-Semantics: standard-floors-v1' in archive.read('META-INF/MANIFEST.MF').decode().splitlines()
         subprocess.run(['java','-cp',tmp+':'+str(ROOT/jar),'FloorMetadataProbe',handler]+files,check=True,cwd=ROOT)
+
+spec=importlib.util.spec_from_file_location('base_verifier',ROOT/'scripts/verify-current-base.py')
+verify=importlib.util.module_from_spec(spec);spec.loader.exec_module(verify)
+with tempfile.TemporaryDirectory(prefix='floor-capability-') as tmp:
+    for i,attributes in enumerate(['', 'World-Builder-Floor-Semantics: legacy\n', 'World-Builder-Floor-Semantics: standard-floors-v1\nWorld-Builder-Floor-Semantics: legacy\n']):
+        path=Path(tmp)/f'{i}.jar'
+        with zipfile.ZipFile(path,'w') as archive: archive.writestr('META-INF/MANIFEST.MF','Manifest-Version: 1.0\n'+attributes+'\n')
+        try: verify.read_pairing(path,'fixture')
+        except verify.VerificationError as error: assert 'standard-floors-v1' in str(error)
+        else: raise AssertionError('Unsupported floor capability accepted')
+print('PASS absent, outdated and duplicate runtime floor capabilities refused')

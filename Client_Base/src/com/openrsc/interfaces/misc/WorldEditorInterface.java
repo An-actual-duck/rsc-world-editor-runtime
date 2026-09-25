@@ -1620,7 +1620,8 @@ public final class WorldEditorInterface extends NCustomComponent {
 	private int selectedDefinitionBrowserId(){switch(definitionBrowser.family()){
 		case NPC:return npcId;case ITEM:return groundItemId;case SCENERY:return sceneryId;case FLOOR:return terrainFloorTexture;case BOUNDARY:int raw=terrainWallValue(definitionBrowserTerrainField);return raw==0?-1:raw-1;default:return -1;}}
 	private String definitionBrowserEntryDetail(WorldEditorDefinitionCatalog.Entry entry){
-		if(definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.NPC||definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.ITEM||definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.FLOOR)return "#"+entry.id()+" | "+entry.tags();
+		if(definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.FLOOR)return entry.tags();
+		if(definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.NPC||definitionBrowser.family()==WorldEditorDefinitionBrowser.Family.ITEM)return "#"+entry.id()+" | "+entry.tags();
 		return "#"+entry.id()+" | "+entry.canonicalName();
 	}
 	private void renderNpc(int x,int y){

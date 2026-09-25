@@ -9860,7 +9860,7 @@ public class EntityHandler {
 				prayers.add(new PrayerDef(xmlInt(row, "reqLevel", 0), xmlInt(row, "drainRate", 0),
 					xmlText(row, "name", ""), xmlText(row, "description", "")));
 			}
-			if (items.size() != 1593 || objects.size() != 1296 || doors.size() != 214 || tiles.size() != 25) {
+			if (items.size() != 1593 || objects.size() != 1296 || doors.size() != 214 || tiles.size() != 77) {
 				throw new IllegalArgumentException("incomplete public Base definitions");
 			}
 		} catch (Exception failure) {
