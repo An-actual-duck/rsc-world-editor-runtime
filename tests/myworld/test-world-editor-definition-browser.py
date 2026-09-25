@@ -29,7 +29,8 @@ class WorldEditorDefinitionBrowserTest(unittest.TestCase):
         self.assertEqual(2, editor.count('"Browse NPCs..."'))
         self.assertEqual(2, editor.count('"Browse items..."'))
         self.assertIn('"Browse floor textures..."', editor)
-        self.assertIn('"Browse textures..."', editor)
+        self.assertIn('"Select texture"', editor)
+        self.assertIn('"Select color"', editor)
         self.assertIn('"Browse walls..."', editor)
         self.assertIn('"Browse walls"', editor)
         self.assertIn("renderDefinitionBrowser", editor)
@@ -98,17 +99,20 @@ public final class WorldEditorDefinitionBrowserFixture {
 			"project-bound boundary results were not exact");
 
 		browser.open(WorldEditorDefinitionBrowser.Family.FLOOR, 11);
-		browser.setQuery("lava walkable");
+		browser.setQuery("lava appearance");
 		require(visibleContains(browser, 11), "floor texture metadata was not searchable");
 		browser.setQuery("#250");
 		require(browser.resultCount() == 1 && visibleContains(browser, 250),
 			"special bridge overlay search changed");
-		browser.setQuery("non-walkable base color");
-		require(browser.resultCount() == 1 && visibleContains(browser, 255),
-			"blocking base-color overlay search changed");
+		browser.setQuery("none color");
+		require(browser.resultCount() == 1 && visibleContains(browser, 0),
+			"color-only appearance search changed");
+		browser.setQuery("#255");
+		require(browser.resultCount() == 0,
+			"walkability encoding leaked into appearance choices");
 		browser.open(WorldEditorDefinitionBrowser.Family.FLOOR, 11, new int[]{0, 11, 250, 255});
-		require(browser.resultCount() == 4 && visibleContains(browser, 11)
-			&& visibleContains(browser, 255),
+		require(browser.resultCount() == 3 && visibleContains(browser, 11)
+			&& visibleContains(browser, 0),
 			"project-bound floor overlays were not exact");
 
 		browser.open(WorldEditorDefinitionBrowser.Family.NPC, 0);
