@@ -41,6 +41,7 @@ package com.openrsc.client.entityhandling;
 import com.openrsc.client.entityhandling.defs.EntityDef;
 import com.openrsc.client.entityhandling.defs.ItemDef;
 import com.openrsc.client.entityhandling.defs.SpriteDef;
+import com.openrsc.client.entityhandling.defs.TileDef;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -251,9 +252,19 @@ public final class ClientDefinitionRegistryFixture {
 		}
 
 		append(digest, type.getName());
+		if (value instanceof TileDef) {
+			TileDef tile = (TileDef) value;
+			if (!tile.getWorldBuilderMaterial().isEmpty() || tile.getWorldBuilderSourceOverlay() != 0) {
+				throw new AssertionError("Legacy tile unexpectedly acquired World Builder semantics");
+			}
+		}
 		List<Field> fields = new ArrayList<Field>();
 		for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
 			for (Field field : current.getDeclaredFields()) {
+				// Keep the published legacy-data digest stable across optional schema fields.
+				// Their required legacy defaults are checked above, never ignored silently.
+				if (current == TileDef.class && (field.getName().equals("worldBuilderMaterial")
+					|| field.getName().equals("worldBuilderSourceOverlay"))) continue;
 				if (!Modifier.isStatic(field.getModifiers())) {
 					fields.add(field);
 				}
