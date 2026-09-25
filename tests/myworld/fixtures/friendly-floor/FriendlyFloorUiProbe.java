@@ -34,6 +34,13 @@ public class FriendlyFloorUiProbe {
   check((buffer.dataBuffer[17]&255)==6,"wire field mask");check((buffer.dataBuffer[19]&255)==17,"wire color");check((buffer.dataBuffer[20]&255)==resolved,"wire resolved overlay");
   f(editor.getClass(),"lastClickedLevel").set(editor,1);call(editor,"seedTerrain",new Class[]{int[].class},new int[]{0,17,0,0,0,0,0});check(f(editor.getClass(),"terrainFloorTexture").getInt(editor)==-1,"copy upper invisible lost");
   int invisible=(Integer)call(editor,"resolvedFloorOverlay",new Class[]{});check(EntityHandler.getTileDef(invisible-1).getColour()==12345678,"copy invisible became color");
+  for(int level:new int[]{1,2})for(int raw:new int[]{0,255}){
+   int collision=raw==255?64:0;
+   editor.showTerrain(0,10,level*944+11,level,0,0,10,11,0,17,raw,0,0,0,0,collision,true,false,"");
+   String details=java.util.Arrays.toString((String[])f(editor.getClass(),"inspectionDetails").get(editor));
+   check(details.contains("Floor: Invisible (legacy upper floor)"),"upper raw "+raw+" mislabels appearance");
+   check(details.contains("Collision: 0x"+Integer.toHexString(collision)),"invisible inspection lost collision");
+  }
   call(editor,"seedTerrain",new Class[]{int[].class},new int[]{0,17,200,0,0,0,0});
   call(editor,"setTerrainFloorTexture",new Class[]{int.class},3);call(editor,"setTerrainFloorTexture",new Class[]{int.class},0);check(f(editor.getClass(),"terrainFloorColor").getInt(editor)==17,"texture cleared remembered color");
   load.invoke(null,Paths.get(args[3]));call(editor,"setTerrainFloorTexture",new Class[]{int.class},3);f(editor.getClass(),"floorWalkable").set(editor,true);

@@ -520,7 +520,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		int displayLevel=isLayeredReview()?plane:logicalLevelForLegacyPlane(plane);
 		java.util.List<String> lines=new java.util.ArrayList<String>();java.util.Collections.addAll(lines,
 			"Coordinates: "+x+", "+displayY+", L"+displayLevel,"Level: "+displayLevel+" ("+planeName(displayLevel)+")","Elevation: "+elev,
-			"Floor: "+(overlay==0&&(displayLevel==1||displayLevel==2)?"Invisible (legacy upper floor)":WorldEditorDefinitionCatalog.floorTextureLabel(overlay)),"Floor data: color "+texture+", overlay "+overlay,
+			"Floor: "+((overlay==0||overlay==255)&&(displayLevel==1||displayLevel==2)?"Invisible (legacy upper floor)":WorldEditorDefinitionCatalog.floorTextureLabel(overlay)),"Floor data: color "+texture+", overlay "+overlay,
 			"Walls: North "+wall(northId,northName)+" | East "+wall(eastId,eastName),
 			"Diagonal "+wall(diagonalId,diagonalName)+" ("+diagonalRotation(diag)+")",
 			"Collision: 0x"+Integer.toHexString(collision)+" | Projectiles: "+(projectile?"allowed":"blocked"),
@@ -1231,7 +1231,6 @@ public final class WorldEditorInterface extends NCustomComponent {
 				if(!terrainStructureTab){
 					if(floorColorPalette){handleFloorMouse(rx-130,ry-25);return true;}
 					if(ry>=82&&ry<106){if(rx>=10&&rx<30)paintElevation=!paintElevation;else if(rx>=150&&rx<178)setTerrainElevation(terrainElevation-1);else if(rx>=185&&rx<265)focusNumber(6);else if(rx>=272&&rx<300)setTerrainElevation(terrainElevation+1);else if(rx>=307&&isLayeredTerrainDraft())terrainElevationOperation=(terrainElevationOperation+1)%3;return true;}
-					if(floorColorPalette){handleFloorMouse(rx-130,ry-25);return true;}
 					if(ry>=122&&ry<146){if(rx<140)toggleTerrainField(7);else toggleFloorWalkable();return true;}
 					if(ry>=162&&ry<186){if(rx<140)floorColorPalette=true;else if(rx<307)openFloorBrowser();else setTerrainFloorTexture(0);return true;}
 					if(ry>=194&&ry<218){if(terrainTool==TerrainTool.RECTANGLE){if(rx>=65&&rx<137)rectangleOptions.setFill(false);else if(rx>=141&&rx<196)rectangleOptions.setFill(true);else if(rx>=204&&rx<285)rectangleOptions.toggleSmartWalls();else if(rx>=290&&rx<375)requestWorldEditSave();clearTerrainLine();}else if(rx>=65&&rx<110)terrainBrushSize=1;else if(rx>=114&&rx<159)terrainBrushSize=3;else if(rx>=163&&rx<208)terrainBrushSize=5;else if(rx>=212&&rx<257)terrainBrushSize=7;else if(rx>=270&&rx<375)requestWorldEditSave();return true;}
