@@ -78,6 +78,9 @@ python3 ./tests/myworld/test-world-editor-definition-browser.py
 python3 ./tests/myworld/test-project-terrain-browser.py
 python3 ./tests/myworld/test-friendly-floor-authoring.py
 python3 ./tests/myworld/test-friendly-floor-metadata.py
+python3 ./tests/myworld/test-imported-standard-floors.py
+python3 ./tests/myworld/test-imported-floor-selection.py
+python3 ./tests/myworld/test-installed-floor-definitions.py
 python3 ./tests/myworld/test-friendly-floor-ui.py
 LAYERED_TEST_WORKSPACE="$(
   mktemp -d "${TMPDIR:-/tmp}/spoiled-milk-layered-tests.XXXXXX"
