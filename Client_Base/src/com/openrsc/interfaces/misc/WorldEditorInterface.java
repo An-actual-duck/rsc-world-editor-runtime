@@ -1445,7 +1445,7 @@ public final class WorldEditorInterface extends NCustomComponent {
 		graphics().drawString(compactLine(terrainFloorTexture==0?"None (uses color)":floorTextureVisualName(),27),x+8,y+161,0xffffff,1);
 		toolButton(x+8,y+180,164,paintFloorColor?"Paint: ON":"Paint: OFF",paintFloorColor);
 		graphics().drawString(terrainFloorTexture==0?"Color + walkability":"Texture overrides color",x+8,y+224,0xbdbdbd,1);
-		if(resolvedFloorOverlay()==2||resolvedFloorOverlay()==11)graphics().drawString("Legacy: blocks projectiles",x+8,y+244,0xff981f,1);
+		if(resolvedFloorOverlay()>0&&resolvedFloorOverlay()<250&&EntityHandler.getTileDef(resolvedFloorOverlay()-1).blocksLegacyProjectiles(resolvedFloorOverlay()))graphics().drawString("Legacy: blocks projectiles",x+8,y+244,0xff981f,1);
 		if(resolvedFloorOverlay()<0){graphics().drawString("Unavailable on this level",x+8,y+244,0xff981f,1);graphics().drawString("Project lacks floor definitions",x+8,y+260,0xff981f,1);}
 	}
 	private void handleFloorMouse(int x,int y){

@@ -98,6 +98,7 @@
             <zipgroupfileset dir="${lib}" includes="*.jar"/>
             <manifest>
                 <attribute name="World-Builder-Floor-Semantics" value="standard-floors-v1"/>
+                <attribute name="World-Builder-Installed-Floors" value="installed-floors-v1"/>
                 <attribute name="Main-Class" value="com.openrsc.server.Server"/>
                 <!-- Keep dependency Java 9+ implementations active in the fat JAR. -->
                 <attribute name="Multi-Release" value="true"/>

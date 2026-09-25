@@ -154,7 +154,9 @@ public class WorldLoader {
 					}
 				}
 
-				tile.setTerrainOverlayProjectileBlocked(tile.overlay == 2 || tile.overlay == 11);
+				tile.setTerrainOverlayProjectileBlocked((tile.overlay == 2 || tile.overlay == 11)
+					&& getWorld().getServer().getEntityHandler().getTileDef(tile.overlay - 1)
+						.blocksLegacyProjectiles(tile.overlay));
 			}
 		}
 		return true;

@@ -19,6 +19,11 @@ public class TileDef {
 		worldBuilderSourceOverlay = sourceOverlay;
 	}
 
+	public boolean blocksLegacyProjectiles(int rawOverlay) {
+		return (rawOverlay == 2 || rawOverlay == 11) && getWorldBuilderMaterial().isEmpty()
+			&& worldBuilderSourceOverlay == 0;
+	}
+
 	public boolean usesExplicitBaseColor() { return "base-color-v1".equals(worldBuilderMaterial); }
 	public int getWorldBuilderSourceOverlay() { return worldBuilderSourceOverlay; }
 	public String getWorldBuilderMaterial() { return worldBuilderMaterial == null ? "" : worldBuilderMaterial; }

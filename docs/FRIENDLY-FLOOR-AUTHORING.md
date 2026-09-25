@@ -12,8 +12,8 @@ semantic standard definitions when available, never assumes fixed extension IDs,
 and disables unavailable walkability combinations. Legacy unextended catalogs
 retain their supported selections. In particular, color-only legacy overlays
 cannot supply visible base color on levels 1 and 2. Existing raw overlays 0 and
-255 retain their original level-dependent interpretation. Existing maps and
-immutable projects are not rewritten or automatically extended.
+255 retain their original level-dependent interpretation. Existing map bytes are not rewritten; the Editor prepares a new immutable
+content revision when extending an imported project.
 
 ## Current standard
 
@@ -23,10 +23,9 @@ bytes and appends two definitions per original appearance (objectType 0 and 1),
 then two explicit base-color definitions. Base's 25 originals become 77 total.
 The same deterministic transform runs for both archives. It fails before output
 when any source is already marked, has noncanonical blocking, or would exceed
-249 total definitions. Raw 250 and 255 remain reserved. Advanced/custom existing
-catalogs do not silently gain new definitions; they can use only combinations
-supported by their selected immutable content until an explicit compatible
-content update supplies the standard.
+249 total definitions. Raw 250 and 255 remain reserved. Imported/custom catalogs use the separate append-only extension described below.
+The frozen Base producer remains unchanged so its established generated IDs stay
+stable.
 
 Optional XML fields are:
 
@@ -58,9 +57,10 @@ transparent beside diagonal walls and remain selectable. Unmarked originals
 retain historical blending and picking. Type-4 transparent bridge surfaces are
 not mistaken for wholly invisible floors: their underlying water remains.
 
-The standard selects generated definitions for both traversal states. It does
+Base selects generated definitions for both traversal states. Imported catalogs
+can reuse safe originals with identical traversal state. Floor authoring does
 not add tile damage, swimming, fishing, or agility rules. Original raw overlays
-2 and 11 block projectiles in the legacy and native loaders; newly generated
+2 and 11 block projectiles in the legacy and native loaders when unmarked; newly generated
 appearance variants do not inherit those ID-triggered gameplay rules. The UI
 identifies that projectile behavior when an unextended legacy catalog must use
 an original selection. Existing agility lava damage is tied to explicit obstacle
@@ -83,3 +83,56 @@ throwaway screenshots; `FRIENDLY_FLOOR_SCREENSHOTS` selects a retained temporary
 artifact directory. Manager visually accepted the compact/expanded controls and
 palette. This is isolated fixture acceptance, not a claim of running an owner's
 installed editor or migrating existing project content.
+
+## Imported catalog extension
+
+`scripts/standard-floors.py:extend` is the provider reference for imported
+catalogs. It validates all rows before returning output and preserves every
+existing byte and raw ID. In original raw-ID order, then blocking-state order
+(0, 1), it appends only missing partners. A matching marked partner must reference
+that exact original ID; equal color/unknown alone never establishes visual
+identity. A matching unmarked original can be reused except raw 2/11 (historical
+projectile effects) and transparent non-water rows (which require semantic
+markers for reliable picking). Missing explicit base-color states follow last.
+Existing generated rows and duplicate partners remain untouched. Missing legacy
+numeric fields retain the loaders' zero defaults; empty/duplicate/invalid markers,
+chained sources and noncanonical blocking fail. Over 249 final rows fails before
+output; no truncation, renumbering or partial extension occurs. Completed input
+returns exactly the original bytes. Base's 25 originals extend minimally to 55
+rows, while its previously shipped 77-row standard remains unchanged.
+
+Generated rows assigned small IDs 2/11 do not inherit legacy projectile effects.
+Both legacy and native server paths consult the semantic marker. Unmarked raw
+2/11 and raw250 retain prior collision policy. Client legacy warnings use the
+same distinction.
+
+## Installed normal-player floor catalog
+
+Normal client initialization reads `world-builder-configs/installed-floors.json`
+relative to the client launch directory when present. Its exact schema is:
+
+```json
+{
+  "schemaVersion": 1,
+  "manifestType": "world-builder-installed-floor-definitions",
+  "tileDefinitionsRelativePath": "world-builder-configs/TileDef.xml",
+  "tileDefinitionsSha256": "<64 lowercase hexadecimal characters>"
+}
+```
+
+The descriptor and XML must be regular, non-symlink files under the client root.
+The fixed path, exact fields, types and SHA-256 are verified; the exact verified
+XML bytes are passed to the existing strict floor loader. Absent descriptor/XML pairs
+leave normal vanilla/custom loading unchanged; orphan XML and malformed present installations
+fail initialization. Isolated Builder mode keeps its bound project catalog.
+Editor target upgrades own transactional deployment/recovery of this pair and
+the matching server definitions. Both JARs advertise
+`World-Builder-Installed-Floors: installed-floors-v1`; the client contains
+`orsc.WorldBuilderInstalledFloorDefinitions`. No normal client launch or real
+server was performed during provider verification.
+
+Additional focused probes cover deterministic minimal extension, partial and
+already-complete inputs, preservation of custom values, capacity refusal,
+actual client selection on minimal/full catalogs, verified normal-client
+bootstrap and absent/hash/path/schema/XML/symlink cases, and old versus marked
+projectile policy in the native collision plan.

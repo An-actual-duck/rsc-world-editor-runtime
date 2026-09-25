@@ -26,6 +26,18 @@ public final class NativeLayeredTerrainCollisionPlan {
 		final IntPredicate blockingOverlay,
 		final IntPredicate blockingWall,
 		final IntPredicate projectileBlockingWall) {
+		return derive(current, positiveX, positiveY, blockingOverlay, blockingWall,
+			projectileBlockingWall, raw -> raw == 2 || raw == 11);
+	}
+
+	public static Result derive(
+		final NativeLayeredTerrainTile current,
+		final NativeLayeredTerrainTile positiveX,
+		final NativeLayeredTerrainTile positiveY,
+		final IntPredicate blockingOverlay,
+		final IntPredicate blockingWall,
+		final IntPredicate projectileBlockingWall,
+		final IntPredicate projectileBlockingOverlay) {
 		NativeLayeredTerrainTile checkedCurrent =
 			Objects.requireNonNull(current, "current");
 		IntPredicate checkedOverlay =
@@ -88,7 +100,7 @@ public final class NativeLayeredTerrainCollisionPlan {
 			WorldBuilderTerrainOverlay.isBlockingBaseColor(rawOverlay)
 				|| collisionOverlay > 0 && checkedOverlay.test(collisionOverlay);
 		boolean overlayProjectileBlocked =
-			rawOverlay == 2 || rawOverlay == 11;
+			Objects.requireNonNull(projectileBlockingOverlay, "projectileBlockingOverlay").test(rawOverlay);
 		return new Result(
 			mask,
 			terrainBlocked,
