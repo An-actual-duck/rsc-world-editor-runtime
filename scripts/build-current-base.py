@@ -130,6 +130,13 @@ def filtered_xml(payload: bytes, transform: str, limits: dict[str, int]) -> byte
     return ET.tostring(root, encoding="utf-8", short_empty_elements=True) + b"\n"
 
 
+def standard_floors(payload: bytes) -> bytes:
+    spec = importlib.util.spec_from_file_location("standard_floors", ROOT / "scripts/standard-floors.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.transform(payload)
+
+
 def write_server_content_archive(path: Path) -> None:
     manifest = json.loads(CONTENT_MANIFEST.read_text(encoding="utf-8"))
     limits = manifest["definitionLimits"]
@@ -145,7 +152,9 @@ def write_server_content_archive(path: Path) -> None:
         source = ROOT / record["sourcePath"]
         payload = source.read_bytes()
         transform = record["transform"]
-        if transform != "copy":
+        if transform == "standard-floors-v1":
+            payload = standard_floors(payload)
+        elif transform != "copy":
             payload = filtered_xml(payload, transform, limits)
         if record["bundlePath"] in records:
             raise RuntimeError("duplicate Current Base server content path")
@@ -208,6 +217,8 @@ def write_client_content_archive(path: Path) -> None:
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             payload = module.transform(payload)
+        elif record["transform"] == "standard-floors-v1":
+            payload = standard_floors(payload)
         elif record["transform"] != "copy":
             raise RuntimeError("unknown Current Base client content transform")
         records[bundle_path] = payload

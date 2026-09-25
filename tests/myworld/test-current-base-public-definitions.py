@@ -182,7 +182,7 @@ class PublicDefinitionSnapshotTest(unittest.TestCase):
             self.assertEqual(len(original), row['sourceSize'])
             self.assertEqual(len(ET.fromstring(payload)), row['recordCount'])
             selected = sources['conf/server/defs/' + row['path']]
-            self.assertEqual(selected['transform'], 'copy')
+            self.assertEqual(selected['transform'], 'standard-floors-v1' if row['path'] == 'TileDef.xml' else 'copy')
             self.assertEqual(selected['sourcePath'], 'current-platform/runtime/current-base-v1/public-definitions/' + row['path'])
         generated = {row['bundlePath']: row['content'] for row in manifest['generatedFiles']}
         for filename in document['disabledHookMaps']:

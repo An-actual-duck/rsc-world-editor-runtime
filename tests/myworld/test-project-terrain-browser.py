@@ -70,7 +70,7 @@ public class ProjectTerrainBrowserFixture {
             field(editor.getClass(),"definitionBrowser").get(editor);
         invoke(editor,"openFloorBrowser",new Class<?>[]{});
         require(browser.isOpen(),"floor did not open");
-        require(browser.resultCount()==(malformed?3:5),"floor inventory/aliases wrong");
+        require(browser.resultCount()==(malformed?2:4),"floor inventory/aliases wrong");
         browser.setQuery("#"+(tile+1));
         require(browser.resultCount()==1,"floor custom/stock ID absent");
         invoke(editor,"handleDefinitionBrowserKey",new Class<?>[]{char.class,int.class},'\n',13);

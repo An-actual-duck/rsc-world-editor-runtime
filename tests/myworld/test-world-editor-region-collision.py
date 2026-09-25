@@ -106,10 +106,8 @@ if re.search(r"getTile\([^;\n]+\)\.(?:add|remove|set|initialize)", WORLD):
     raise AssertionError("world entity collision mutation bypasses region copy-on-write")
 if re.search(r"getTile\([^;\n]+\)\.traversalMask\s*[|&^]?=", WORLD):
     raise AssertionError("world collision mask is mutated outside authoritative ownership")
-if 'terrainField(x,y+122,"Floor Color"' not in UI or "paintFloorColor?2:0" not in UI:
-    raise AssertionError("Floor Color no longer maps only to raw groundTexture")
-if 'terrainField(x,y+162,"Floor Texture"' not in UI or "paintFloorTexture?4:0" not in UI:
-    raise AssertionError("Floor Texture no longer maps to collision-bearing raw groundOverlay")
+if "paintFloorColor?6:0" not in UI or "terrainStrokeTexture=paintFloorColor?resolvedFloorOverlay():0" not in UI:
+    raise AssertionError("unified Floor no longer applies color and resolved collision overlay atomically")
 
 tile_defs = ET.parse(ROOT / "server/conf/server/defs/TileDef.xml").getroot().findall("TileDef")
 if int(tile_defs[0].findtext("objectType")) != 0:

@@ -291,7 +291,19 @@ public final class PublicDefinitionProbe {
     int index = Arrays.asList(files).indexOf(file);
     int actualCount = client ? ((Number) handlerClass.getMethod(countMethods[index]).invoke(null)).intValue()
       : Array.getLength(field(handler, fields[index]));
-    if (id != actualCount) throw new AssertionError("unexpected trailing/missing " + file + " definitions");
+    if (file.equals("TileDef.xml")) {
+      if (actualCount != id * 3 + 2) throw new AssertionError("missing standard floor extensions");
+      for (int original = 0; original < id; original++) for (int blocking = 0; blocking <= 1; blocking++) {
+        Object partner = handlerClass.getMethod("getTileDef", int.class).invoke(client ? null : handler, id + original * 2 + blocking);
+        if (((Number)field(partner, "worldBuilderSourceOverlay")).intValue() != original + 1
+          || ((Number)field(partner, "objectType")).intValue() != blocking) throw new AssertionError("invalid floor partner");
+      }
+      for (int blocking = 0; blocking <= 1; blocking++) {
+        Object base = handlerClass.getMethod("getTileDef", int.class).invoke(client ? null : handler, id * 3 + blocking);
+        if (!"base-color-v1".equals(field(base, "worldBuilderMaterial"))
+          || ((Number)field(base, "objectType")).intValue() != blocking) throw new AssertionError("missing base floor variant");
+      }
+    } else if (id != actualCount) throw new AssertionError("unexpected trailing/missing " + file + " definitions");
   }
 
   public static void main(String[] args) throws Exception {

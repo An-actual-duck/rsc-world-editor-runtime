@@ -132,8 +132,8 @@ class WorldEditorDefinitionCatalogTest(unittest.TestCase):
         self.assertIn('"Invisible Path"', catalog_source)
         self.assertIn("floorTextureVisualName()", editor)
         self.assertIn("floorTextureTraversal()", editor)
-        self.assertIn('return "Walkable"', editor)
-        self.assertIn('?"Not Walkable":"Walkable"', editor)
+        self.assertIn('floorWalkable?"Walkable":"Not Walkable"', editor)
+        self.assertIn('"Select texture"', editor)
         self.assertNotIn('"Floor Texture "+terrainFloorTexture', editor)
         self.assertNotIn('raw==0?"none":"#"', editor)
         self.assertNotIn('id<0?"none":"#"', editor)
@@ -173,7 +173,7 @@ public final class WorldEditorDefinitionCatalogFixture {
 			throw new AssertionError("runtime wall inventory is incomplete");
 		}
 		int expectedFloors = EntityHandler.tileCount()
-			+ (EntityHandler.tileCount() > 254 ? 1 : EntityHandler.tileCount() > 249 ? 2 : 3);
+			+ (EntityHandler.tileCount() > 254 ? 0 : EntityHandler.tileCount() > 249 ? 1 : 2);
 		if (WorldEditorDefinitionCatalog.floorEntries().size() != expectedFloors) {
 			throw new AssertionError("runtime floor inventory is incomplete");
 		}

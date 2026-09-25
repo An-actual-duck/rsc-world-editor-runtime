@@ -65,7 +65,7 @@
     {
       "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/TileDef.xml",
       "bundlePath": "Cache/current-base-definitions/TileDef.xml",
-      "transform": "copy"
+      "transform": "standard-floors-v1"
     },
     {
       "sourcePath": "current-platform/runtime/current-base-v1/public-definitions/ItemDefs.json",

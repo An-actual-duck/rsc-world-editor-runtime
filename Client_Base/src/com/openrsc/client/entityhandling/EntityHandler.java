@@ -9860,7 +9860,7 @@ public class EntityHandler {
 				prayers.add(new PrayerDef(xmlInt(row, "reqLevel", 0), xmlInt(row, "drainRate", 0),
 					xmlText(row, "name", ""), xmlText(row, "description", "")));
 			}
-			if (items.size() != 1593 || objects.size() != 1296 || doors.size() != 214 || tiles.size() != 25) {
+			if (items.size() != 1593 || objects.size() != 1296 || doors.size() != 214 || tiles.size() != 77) {
 				throw new IllegalArgumentException("incomplete public Base definitions");
 			}
 		} catch (Exception failure) {
@@ -10044,9 +10044,18 @@ public class EntityHandler {
 		tiles.clear();
 		for (int id = 0; id < rows.getLength(); id++) {
 			Element row = (Element) rows.item(id);
+			if (row.getElementsByTagName("worldBuilderMaterial").getLength() > 1
+				|| row.getElementsByTagName("worldBuilderSourceOverlay").getLength() > 1
+				|| row.getElementsByTagName("worldBuilderMaterial").getLength() > 0
+				&& xmlText(row, "worldBuilderMaterial", "").isEmpty()
+				|| row.getElementsByTagName("worldBuilderSourceOverlay").getLength() > 0
+				&& xmlInt(row, "worldBuilderSourceOverlay", 0) <= 0)
+				throw new IllegalArgumentException("Empty or invalid explicit floor metadata");
 			tiles.add(new TileDef(xmlInt(row, "colour", 0), xmlInt(row, "unknown", 0),
-				xmlInt(row, "objectType", 0)));
+				xmlInt(row, "objectType", 0), xmlText(row, "worldBuilderMaterial", ""),
+				xmlInt(row, "worldBuilderSourceOverlay", 0)));
 		}
+		TileDef.validateWorldBuilderDefinitions(tiles);
 	}
 
 	private static void loadProjectDoors(Path path) throws Exception {
