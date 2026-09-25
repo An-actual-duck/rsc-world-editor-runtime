@@ -70,6 +70,7 @@ class CurrentBaseCandidateTest(unittest.TestCase):
             cwd=self.repo, check=True, capture_output=True, text=True,
         )
         with zipfile.ZipFile(self.output / "server/core.jar") as archive:
+            self.assertIn("World-Builder-Floor-Semantics: standard-floors-v1", archive.read("META-INF/MANIFEST.MF").decode().splitlines())
             self.assertIn("Multi-Release: true",
                           archive.read("META-INF/MANIFEST.MF").decode().splitlines())
             self.assertIn("META-INF/versions/9/org/apache/logging/log4j/util/StackLocator.class",

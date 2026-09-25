@@ -113,6 +113,12 @@ def parse_pairing(payload: bytes, label: str) -> dict[str, str]:
 def read_pairing(path: Path, label: str) -> dict[str, str]:
     with zipfile.ZipFile(path) as archive:
         try:
+            manifest = archive.read("META-INF/MANIFEST.MF").decode("utf-8").replace("\r\n ", "").splitlines()
+        except (KeyError, UnicodeError) as error:
+            raise VerificationError(f"{label} lacks a valid floor semantics manifest") from error
+        if manifest.count("World-Builder-Floor-Semantics: standard-floors-v1") != 1:
+            raise VerificationError(f"{label} does not support standard-floors-v1")
+        try:
             return parse_pairing(archive.read(PAIRING_ENTRY), label)
         except KeyError as error:
             raise VerificationError(f"{label} lacks {PAIRING_ENTRY}") from error

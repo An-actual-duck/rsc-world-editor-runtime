@@ -3,6 +3,7 @@
 from pathlib import Path
 import subprocess
 import tempfile
+import zipfile
 ROOT=Path(__file__).resolve().parents[2]
 original='<TileDef><colour>3</colour><unknown>2</unknown><objectType>0</objectType></TileDef>'
 base='<TileDef><colour>0</colour><unknown>0</unknown><objectType>0</objectType><worldBuilderMaterial>base-color-v1</worldBuilderMaterial></TileDef>'
@@ -16,4 +17,6 @@ with tempfile.TemporaryDirectory(prefix='floor-metadata-') as tmp:
     for i,rows in enumerate([original+base+partner]+[original+x for x in bad]+[original+partner+partner.replace('>1</worldBuilderSourceOverlay>','>2</worldBuilderSourceOverlay>'),original*249+base]):
         p=out/f'{i}.xml';p.write_text('<TileDef-array>'+rows+'</TileDef-array>');files.append(str(p))
     for jar,handler in [('Client_Base/Open_RSC_Client.jar','com.openrsc.client.entityhandling.EntityHandler'),('server/core.jar','com.openrsc.server.external.EntityHandler')]:
+        with zipfile.ZipFile(ROOT/jar) as archive:
+            assert 'World-Builder-Floor-Semantics: standard-floors-v1' in archive.read('META-INF/MANIFEST.MF').decode().splitlines()
         subprocess.run(['java','-cp',tmp+':'+str(ROOT/jar),'FloorMetadataProbe',handler]+files,check=True,cwd=ROOT)

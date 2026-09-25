@@ -45,7 +45,10 @@ project definitions. Existing gzip legacy definitions retain their old loader.
 No terrain encoding, packet layout, map ID, or original definition is changed.
 The changed content transform and schema hashes bind the new Current Base
 composition; marked content requires this runtime generation and must not be
-sent to an older renderer that ignores its material semantics.
+sent to an older renderer that ignores its material semantics. Both client and
+server JARs advertise `World-Builder-Floor-Semantics: standard-floors-v1`;
+Current Base verification and Editor marked-content guards require this
+capability before launch/export to prevent silent old-runtime interpretation.
 
 ## Rendering and gameplay
 

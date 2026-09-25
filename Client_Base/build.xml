@@ -72,6 +72,7 @@
             <zipgroupfileset dir="${lib}" includes="**/*.jar"/>
             <zipfileset src="${jsonlib}"/>
             <manifest>
+                <attribute name="World-Builder-Floor-Semantics" value="standard-floors-v1"/>
                 <attribute name="Main-Class" value="orsc.OpenRSC"/>
             </manifest>
         </jar>
