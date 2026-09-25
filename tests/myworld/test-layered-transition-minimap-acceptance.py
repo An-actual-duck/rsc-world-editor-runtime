@@ -212,10 +212,14 @@ class LayeredTransitionMinimapAcceptanceTest(unittest.TestCase):
             )
 
     def test_blocking_base_color_shares_walkable_color_blending(self):
-        self.assertIn(
-            "WorldBuilderTerrainOverlay.usesBaseColor(\n"
-            "\t\t\t\t\tsource.tileDecorationID(tileX, tileZ))",
+        # Both legacy color overlays and explicit all-level color definitions
+        # contribute to the same vertex-color blend; ignore line wrapping.
+        self.assertRegex(
             self.world,
+            r"if\s*\(\s*!WorldBuilderTerrainOverlay\.usesBaseColor\("
+            r"\s*source\.tileDecorationID\(tileX, tileZ\)\)\s*"
+            r"&&\s*!explicitBaseColor\(source\.tileDecorationID\(tileX, tileZ\)\)\)"
+            r"\s*\{\s*continue;",
         )
         self.assertIn(
             "WorldBuilderTerrainOverlay.usesBaseColor(decorID)",
