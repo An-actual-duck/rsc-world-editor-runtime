@@ -76,7 +76,44 @@ public final class NpcAnimationV1Harness {
       ||a.getCharColour()!=1193046||a.getBlueMask()!=6636321
       ||a.getGenderModel()!=2||a.hasA()||a.hasF()||a.getNumber()!=100)
       throw new AssertionError("NPC animation registry semantics absent");
+    assertInstalled(b);
     System.out.println("npc-animation-v1 id=2000 name=foreign frames=15");
+  }
+  static void assertInstalled(ProjectContentBundle b)throws Exception{
+    java.lang.reflect.Field uf=sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+    uf.setAccessible(true);
+    orsc.mudclient client=(orsc.mudclient)((sun.misc.Unsafe)uf.get(null)).allocateInstance(orsc.mudclient.class);
+    orsc.Config.S_WANT_CUSTOM_SPRITES=true;
+    orsc.graphics.two.MudClientGraphics surface=new orsc.graphics.two.MudClientGraphics(64,64,5000);
+    surface.sprites=new com.openrsc.client.model.Sprite[5000];
+    client.setSurface(surface);
+    java.lang.reflect.Method install=orsc.mudclient.class.getDeclaredMethod("installProjectItemVisuals",ProjectContentBundle.class);
+    install.setAccessible(true);
+    for(int iteration=0;iteration<2;iteration++){
+      install.invoke(client,b);
+      for(ProjectContentBundle.ItemVisual visual:b.itemVisuals().values()){
+        com.openrsc.client.entityhandling.defs.ItemDef item=new com.openrsc.client.entityhandling.defs.ItemDef(
+          "fixture","","",0,visual.authenticSpriteId()==null?0:visual.authenticSpriteId(),
+          visual.spriteLocation(),false,false,0,visual.pictureMask(),visual.blueMask(),false,false,false,visual.itemId());
+        com.openrsc.client.model.Sprite actual=surface.spriteSelect(item),expected=b.itemSprite(visual.itemId());
+        if(actual.getWidth()!=expected.getWidth()||actual.getHeight()!=expected.getHeight()
+          ||!java.util.Arrays.equals(actual.getPixels(),expected.getPixels()))
+          throw new AssertionError("Installed item pixels differ: v"+b.schemaVersion()+" item="+visual.itemId());
+      }
+    }
+    System.out.println("surface-item-visuals-v"+b.schemaVersion()+" count="+b.itemVisuals().size());
+
+  }
+}
+"""
+
+V2_SURFACE_HARNESS = r"""
+import java.nio.file.Paths;
+import orsc.ProjectContentBundle;
+public final class ItemVisualV2SurfaceHarness {
+  public static void main(String[] args)throws Exception{
+    NpcAnimationV1Harness.assertInstalled(ProjectContentBundle.load(Paths.get(args[0]),args[1],
+      "project-local-custom-content-v2",args[2],args[3],args[4],args[5]));
   }
 }
 """
@@ -119,11 +156,12 @@ class ProjectNpcAnimationRegistryV1Test(unittest.TestCase):
         cls.classes = tempfile.TemporaryDirectory(prefix="npc-animation-v1-classes-")
         for filename, source_text, jar in (
             ("NpcAnimationV1Harness.java", HARNESS, CLIENT),
+            ("ItemVisualV2SurfaceHarness.java", V2_SURFACE_HARNESS, CLIENT),
             ("NpcAnimationV1ServerHarness.java", SERVER_HARNESS, SERVER),
         ):
             source = Path(cls.classes.name) / filename
             source.write_text(source_text)
-            subprocess.run(["javac", "-cp", str(jar), "-d", cls.classes.name,
+            subprocess.run(["javac", "-cp", f"{cls.classes.name}:{jar}", "-d", cls.classes.name,
                             str(source)], check=True)
 
     @classmethod
@@ -201,7 +239,23 @@ class ProjectNpcAnimationRegistryV1Test(unittest.TestCase):
         workspace, bundle, manifest, _ = self.bundle()
         outputs = self.run_consumers(workspace, bundle, manifest)
         self.assertIn("npc-animation-v1 id=2000", outputs[0])
+        self.assertIn("surface-item-visuals-v3 count=3", outputs[0])
         self.assertIn("server-npc-animation-v1 schema=3", outputs[1])
+
+    def test_v2_item_visuals_still_install_on_actual_surface(self):
+        with tempfile.TemporaryDirectory(prefix="v2-surface-") as temporary:
+            workspace = Path(temporary)
+            bundle = workspace / "working/content-bundle"
+            shutil.copytree(FIXTURE, bundle)
+            manifest = json.loads((bundle / "manifest.json").read_text())
+            args = [str(workspace), str(bundle), manifest["bundleFingerprintSha256"],
+                    manifest["definitionFingerprintSha256"], manifest["assetFingerprintSha256"],
+                    manifest["itemVisualFingerprintSha256"]]
+            result = subprocess.run(["java", "-cp", f"{self.classes.name}:{CLIENT}",
+                                     "ItemVisualV2SurfaceHarness", *args], text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            self.assertEqual(0, result.returncode, result.stdout)
+            self.assertIn("surface-item-visuals-v2 count=3", result.stdout)
 
     def test_malformed_semantics_and_asset_drift_fail_closed(self):
         for mutation in ("duplicate-id", "frame-shape", "custom-entry", "authentic-hash"):

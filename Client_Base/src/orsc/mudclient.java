@@ -20883,7 +20883,7 @@ public final class mudclient implements Runnable {
 	}
 
 	private void installProjectItemVisuals(ProjectContentBundle content) {
-		if (content == null || content.schemaVersion() != 2) return;
+		if (content == null || content.schemaVersion() < 2) return;
 		try {
 			for (String role : new String[] {"asset.sprite.custom", "asset.spritepack"}) {
 				boolean required = false;
