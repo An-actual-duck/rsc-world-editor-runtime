@@ -9890,7 +9890,7 @@ public class EntityHandler {
 	}
 
 	private static final java.util.IdentityHashMap<AnimationDef, orsc.ProjectNpcAnimationRegistry.EntryDef> PROJECT_NPC_ANIMATIONS = new java.util.IdentityHashMap<>();
-		public static orsc.ProjectNpcAnimationRegistry.EntryDef getProjectNpcAnimation(AnimationDef animation) {
+	public static orsc.ProjectNpcAnimationRegistry.EntryDef getProjectNpcAnimation(AnimationDef animation) {
 		return PROJECT_NPC_ANIMATIONS.get(animation);
 	}
 	private static void loadProjectNpcAnimations(ProjectContentBundle bundle) {

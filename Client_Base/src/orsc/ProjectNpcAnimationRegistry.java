@@ -95,15 +95,15 @@ public final class ProjectNpcAnimationRegistry {
 			if (rgb && id < 1080) throw new IOException("NPC RGB animation must append beyond the packaged animation table");
 			String name = name(row, "name"), category = name(row, "category");
 			if (!rgb) {
-			String subspace = name(row, "customSpriteSubspace");
-			String entry = name(row, "customSpriteEntry");
-			if (!category.equals(subspace) || !name.equals(entry)) {
-				throw new IOException("NPC animation custom lookup differs from category/name");
-			}
-			String entryHash = string(row, "customEntrySha256");
-			if (!SHA.matcher(entryHash).matches()) {
-				throw new IOException("NPC animation custom entry hash is invalid");
-			}
+				String subspace = name(row, "customSpriteSubspace");
+				String entry = name(row, "customSpriteEntry");
+				if (!category.equals(subspace) || !name.equals(entry)) {
+					throw new IOException("NPC animation custom lookup differs from category/name");
+				}
+				String entryHash = string(row, "customEntrySha256");
+				if (!SHA.matcher(entryHash).matches()) {
+					throw new IOException("NPC animation custom entry hash is invalid");
+				}
 			}
 			boolean combat = bool(row, "hasCombatFrames");
 			boolean special = bool(row, "hasSpecialCombatFrames");
@@ -190,6 +190,7 @@ public final class ProjectNpcAnimationRegistry {
 			}
 		}
 		byte[] bytes = output.toByteArray();
+		if (bytes.length != entry.getSize()) throw new IOException("NPC RGB frame size differs from archive metadata");
 		if (bytes.length < 25) throw new IOException("NPC RGB frame is truncated");
 		java.nio.ByteBuffer data = java.nio.ByteBuffer.wrap(bytes);
 		int width = data.getInt(), height = data.getInt(), shift = data.get() & 255;

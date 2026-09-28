@@ -33,3 +33,12 @@ and ordinary packaged animation loading retain their prior behavior.
 Run `python3 tests/myworld/test-project-npc-rgb-frames.py` for actual client
 initialization and software drawing across both modes, eight directions, and
 three walk beats, plus malformed payload refusal by both runtime roles.
+
+Acceptance on 2026-09-28 used a disposable Editor-captured project containing
+NPC 866 and the owner's tracked Naga direction sheet. Both runtime roles
+accepted the unchanged captured bundle. The client resolved its appended
+animation 1080 and drew the complete body in all 48 walk poses (two modes,
+eight directions, three beats). A retained contact sheet was visually checked
+for full body, blades, mirrored directions, and corresponding animation beats.
+This was real software rendering through `drawNPC`; a networked gameplay
+session and native OpenGL presentation were not exercised by this probe.

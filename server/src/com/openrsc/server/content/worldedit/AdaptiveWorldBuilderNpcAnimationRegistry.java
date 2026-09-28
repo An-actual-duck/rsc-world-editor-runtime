@@ -75,13 +75,13 @@ final class AdaptiveWorldBuilderNpcAnimationRegistry {
 			if (rgb && id < 1080) throw new IOException("NPC RGB animation must append beyond the packaged animation table");
 			String name = name(row, "name"), category = name(row, "category");
 			if (!rgb) {
-			if (!category.equals(name(row, "customSpriteSubspace"))
-				|| !name.equals(name(row, "customSpriteEntry"))) {
-				throw new IOException("NPC animation custom lookup differs from category/name");
-			}
-			if (!SHA.matcher(text(row, "customEntrySha256")).matches()) {
-				throw new IOException("NPC animation custom entry hash is invalid");
-			}
+				if (!category.equals(name(row, "customSpriteSubspace"))
+					|| !name.equals(name(row, "customSpriteEntry"))) {
+					throw new IOException("NPC animation custom lookup differs from category/name");
+				}
+				if (!SHA.matcher(text(row, "customEntrySha256")).matches()) {
+					throw new IOException("NPC animation custom entry hash is invalid");
+				}
 			}
 			integer(row, "charColour"); integer(row, "blueMask"); integer(row, "genderModel");
 			boolean combat = bool(row, "hasCombatFrames");
@@ -182,6 +182,7 @@ final class AdaptiveWorldBuilderNpcAnimationRegistry {
 			}
 		}
 		byte[] bytes = output.toByteArray();
+		if (bytes.length != entry.getSize()) throw new IOException("NPC RGB frame size differs from archive metadata");
 		if (bytes.length < 25) throw new IOException("NPC RGB frame is truncated");
 		java.nio.ByteBuffer data = java.nio.ByteBuffer.wrap(bytes);
 		int width = data.getInt(), height = data.getInt(), shift = data.get() & 255;
