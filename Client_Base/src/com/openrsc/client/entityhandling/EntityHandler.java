@@ -6644,6 +6644,7 @@ public class EntityHandler {
 	}
 
 	private static void loadAnimationDefinitions() {
+		PROJECT_NPC_ANIMATIONS.clear();
 		animations.add(new AnimationDef("head1", "player", 1, 13, true, false, 0));//0
 		animations.add(new AnimationDef("body1", "player", 2, 6, true, false, 0));//1
 		animations.add(new AnimationDef("legs1", "player", 3, 15, true, false, 0));//2
@@ -9888,14 +9889,21 @@ public class EntityHandler {
 		}
 	}
 
+	private static final java.util.IdentityHashMap<AnimationDef, orsc.ProjectNpcAnimationRegistry.EntryDef> PROJECT_NPC_ANIMATIONS = new java.util.IdentityHashMap<>();
+	public static orsc.ProjectNpcAnimationRegistry.EntryDef getProjectNpcAnimation(AnimationDef animation) {
+		return PROJECT_NPC_ANIMATIONS.get(animation);
+	}
 	private static void loadProjectNpcAnimations(ProjectContentBundle bundle) {
+		PROJECT_NPC_ANIMATIONS.clear();
 		for (orsc.ProjectNpcAnimationRegistry.EntryDef definition
 			: bundle.npcAnimations().values()) {
 			while (animations.size() <= definition.id()) {
 				animations.add(new AnimationDef("missing", "npc", 0, 0, 0,
 					false, false, 0));
 			}
-			animations.set(definition.id(), definition.animationDef());
+			AnimationDef animation = definition.animationDef();
+			animations.set(definition.id(), animation);
+			PROJECT_NPC_ANIMATIONS.put(animation, definition);
 			System.out.println("PROJECT_NPC_ANIMATION_INSTALLED animationId="
 				+ definition.id());
 		}

@@ -20939,7 +20939,10 @@ public final class mudclient implements Runnable {
 		int animationNumber = 0;
 		label0:
 		for (int animationIndex = 0; animationIndex < EntityHandler.animationCount(); animationIndex++) {
-			String s = EntityHandler.getAnimationDef(animationIndex).getName();
+			AnimationDef animation = EntityHandler.getAnimationDef(animationIndex);
+			ProjectNpcAnimationRegistry.EntryDef project = EntityHandler.getProjectNpcAnimation(animation);
+			if (project != null && project.hasRgbFrames()) continue;
+			String s = animation.getName();
 			for (int nextAnimationIndex = 0; nextAnimationIndex < animationIndex; nextAnimationIndex++) {
 				if (!EntityHandler.getAnimationDef(nextAnimationIndex).getName().equalsIgnoreCase(s)) {
 					continue;
