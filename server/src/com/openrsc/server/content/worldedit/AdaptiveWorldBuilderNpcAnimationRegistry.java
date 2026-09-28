@@ -56,15 +56,25 @@ final class AdaptiveWorldBuilderNpcAnimationRegistry {
 		if (rows == null || rows.length() < 1 || rows.length() > 65536) {
 			throw new IOException("NPC animation registry is empty or too large");
 		}
+		long[] rgbBudget = {256L * 1024 * 1024};
 		int previous = -1;
 		for (int index = 0; index < rows.length(); index++) {
 			JSONObject row = rows.optJSONObject(index);
 			if (row == null) throw new IOException("NPC animation row is not an object");
-			requireKeys(row, RECORD_KEYS);
+			boolean rgb = row.has("frameSource");
+			Set<String> keys = new HashSet<String>(RECORD_KEYS);
+			if (rgb) {
+				if (!"authentic-rgb".equals(row.opt("frameSource"))) throw new IOException("Unknown NPC frame source");
+				keys.remove("customSpriteSubspace"); keys.remove("customSpriteEntry"); keys.remove("customEntrySha256");
+				keys.add("frameSource");
+			}
+			requireKeys(row, keys);
 			int id = bounded(row, "animationId", 0, 65535);
 			if (id <= previous) throw new IOException("NPC animation IDs are not sorted and unique");
 			previous = id;
+			if (rgb && id < 1080) throw new IOException("NPC RGB animation must append beyond the packaged animation table");
 			String name = name(row, "name"), category = name(row, "category");
+			if (!rgb) {
 			if (!category.equals(name(row, "customSpriteSubspace"))
 				|| !name.equals(name(row, "customSpriteEntry"))) {
 				throw new IOException("NPC animation custom lookup differs from category/name");
@@ -72,13 +82,14 @@ final class AdaptiveWorldBuilderNpcAnimationRegistry {
 			if (!SHA.matcher(text(row, "customEntrySha256")).matches()) {
 				throw new IOException("NPC animation custom entry hash is invalid");
 			}
+			}
 			integer(row, "charColour"); integer(row, "blueMask"); integer(row, "genderModel");
 			boolean combat = bool(row, "hasCombatFrames");
 			boolean special = bool(row, "hasSpecialCombatFrames");
 			if (special && !combat) throw new IOException("NPC special frames require combat frames");
 			int count = bounded(row, "requiredFrameCount", 1, 27);
 			int expected = 15 + (combat ? 3 : 0) + (special ? 9 : 0);
-			if (count != expected || !Integer.valueOf(count).equals(frames.get(category + "\0" + name))) {
+			if (count != expected || (!rgb && !Integer.valueOf(count).equals(frames.get(category + "\0" + name)))) {
 				throw new IOException("NPC animation frames disagree with renderer semantics");
 			}
 			int base = bounded(row, "authenticBaseSpriteId", 0, 65535);
@@ -87,6 +98,7 @@ final class AdaptiveWorldBuilderNpcAnimationRegistry {
 				throw new IOException("NPC authentic animation inventory is incomplete");
 			}
 			validateAuthentic(authenticArchive, base, hashes);
+			if (rgb) validateRgbFrames(authenticArchive, base, count, rgbBudget);
 		}
 	}
 
@@ -152,6 +164,40 @@ final class AdaptiveWorldBuilderNpcAnimationRegistry {
 					if (!expected.equals(sha256(input))) throw new IOException("NPC authentic frame hash mismatch");
 				}
 			}
+		}
+	}
+
+	private static byte[] rgbPayload(ZipFile zip, int id, long[] budget) throws IOException {
+		ZipEntry entry = zip.getEntry("sprites/" + id + ".dat");
+		if (entry == null || entry.isDirectory() || entry.getSize() < 25 || entry.getSize() > 16L * 1024 * 1024)
+			throw new IOException("NPC RGB frame is missing or outside its bound");
+		if (entry.getSize() > budget[0]) throw new IOException("NPC RGB frame inventory exceeds its decoded bound");
+		budget[0] -= entry.getSize();
+		java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+		try (InputStream input = zip.getInputStream(entry)) {
+			byte[] block = new byte[8192]; int n;
+			while ((n = input.read(block)) != -1) {
+				if (output.size() + n > 16 * 1024 * 1024) throw new IOException("NPC RGB frame is too large");
+				output.write(block, 0, n);
+			}
+		}
+		byte[] bytes = output.toByteArray();
+		if (bytes.length < 25) throw new IOException("NPC RGB frame is truncated");
+		java.nio.ByteBuffer data = java.nio.ByteBuffer.wrap(bytes);
+		int width = data.getInt(), height = data.getInt(), shift = data.get() & 255;
+		int x = data.getInt(), y = data.getInt(), boundWidth = data.getInt(), boundHeight = data.getInt();
+		long pixels = (long) width * height;
+		if (width < 1 || height < 1 || width > 4096 || height > 4096 || shift > 1
+			|| boundWidth < 1 || boundHeight < 1 || boundWidth > 4096 || boundHeight > 4096
+			|| x < -4096 || x > 4096 || y < -4096 || y > 4096
+			|| 25L + pixels * 4 != bytes.length) throw new IOException("NPC RGB frame dimensions are unsafe");
+		while (data.hasRemaining()) if ((data.getInt() & 0xff000000) != 0)
+			throw new IOException("NPC RGB pixel is not normalized RGB");
+		return bytes;
+	}
+	private static void validateRgbFrames(Path path, int base, int count, long[] budget) throws IOException {
+		try (ZipFile zip = new ZipFile(path.toFile())) {
+			for (int index = 0; index < count; index++) rgbPayload(zip, base + index, budget);
 		}
 	}
 

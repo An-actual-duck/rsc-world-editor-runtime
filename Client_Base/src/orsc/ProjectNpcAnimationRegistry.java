@@ -71,6 +71,7 @@ public final class ProjectNpcAnimationRegistry {
 			throw new IOException("NPC animation registry is empty or too large");
 		}
 		Map<Integer,EntryDef> result = new LinkedHashMap<Integer,EntryDef>();
+		long[] rgbBudget = {256L * 1024 * 1024};
 		int previous = -1;
 		for (int index = 0; index < rows.length(); index++) {
 			Object raw = rows.opt(index);
@@ -78,13 +79,22 @@ public final class ProjectNpcAnimationRegistry {
 				throw new IOException("NPC animation registry row is not an object");
 			}
 			JSONObject row = (JSONObject)raw;
-			requireKeys(row, RECORD_KEYS, "NPC animation registry row");
+			boolean rgb = row.has("frameSource");
+			Set<String> keys = new HashSet<String>(RECORD_KEYS);
+			if (rgb) {
+				if (!"authentic-rgb".equals(row.opt("frameSource"))) throw new IOException("Unknown NPC frame source");
+				keys.remove("customSpriteSubspace"); keys.remove("customSpriteEntry"); keys.remove("customEntrySha256");
+				keys.add("frameSource");
+			}
+			requireKeys(row, keys, "NPC animation registry row");
 			int id = boundedInt(row, "animationId", 0, 65535);
 			if (id <= previous) {
 				throw new IOException("NPC animation IDs are not sorted and unique");
 			}
 			previous = id;
+			if (rgb && id < 1080) throw new IOException("NPC RGB animation must append beyond the packaged animation table");
 			String name = name(row, "name"), category = name(row, "category");
+			if (!rgb) {
 			String subspace = name(row, "customSpriteSubspace");
 			String entry = name(row, "customSpriteEntry");
 			if (!category.equals(subspace) || !name.equals(entry)) {
@@ -94,6 +104,7 @@ public final class ProjectNpcAnimationRegistry {
 			if (!SHA.matcher(entryHash).matches()) {
 				throw new IOException("NPC animation custom entry hash is invalid");
 			}
+			}
 			boolean combat = bool(row, "hasCombatFrames");
 			boolean special = bool(row, "hasSpecialCombatFrames");
 			if (special && !combat) {
@@ -102,7 +113,7 @@ public final class ProjectNpcAnimationRegistry {
 			int required = boundedInt(row, "requiredFrameCount", 1, 27);
 			int expected = 15 + (combat ? 3 : 0) + (special ? 9 : 0);
 			if (required != expected
-				|| !Integer.valueOf(required).equals(customFrames.get(category + "\0" + name))) {
+				|| (!rgb && !Integer.valueOf(required).equals(customFrames.get(category + "\0" + name)))) {
 				throw new IOException("NPC animation custom frames disagree with renderer semantics");
 			}
 			int authenticBase = boundedInt(row, "authenticBaseSpriteId", 0, 65535);
@@ -111,9 +122,10 @@ public final class ProjectNpcAnimationRegistry {
 				throw new IOException("NPC animation authentic frame inventory is incomplete");
 			}
 			validateAuthenticFrames(authenticArchive, authenticBase, hashes);
+			com.openrsc.client.model.Sprite[] rgbFrames = rgb ? decodeRgbFrames(authenticArchive, authenticBase, required, rgbBudget) : null;
 			EntryDef value = new EntryDef(id, name, category,
 				exactInt(row, "charColour"), exactInt(row, "blueMask"),
-				exactInt(row, "genderModel"), combat, special, authenticBase);
+				exactInt(row, "genderModel"), combat, special, authenticBase, rgbFrames);
 			result.put(Integer.valueOf(id), value);
 		}
 		return Collections.unmodifiableMap(result);
@@ -161,6 +173,43 @@ public final class ProjectNpcAnimationRegistry {
 				}
 			}
 		}
+	}
+
+	private static byte[] rgbPayload(ZipFile zip, int id, long[] budget) throws IOException {
+		ZipEntry entry = zip.getEntry("sprites/" + id + ".dat");
+		if (entry == null || entry.isDirectory() || entry.getSize() < 25 || entry.getSize() > 16L * 1024 * 1024)
+			throw new IOException("NPC RGB frame is missing or outside its bound");
+		if (entry.getSize() > budget[0]) throw new IOException("NPC RGB frame inventory exceeds its decoded bound");
+		budget[0] -= entry.getSize();
+		java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+		try (InputStream input = zip.getInputStream(entry)) {
+			byte[] block = new byte[8192]; int n;
+			while ((n = input.read(block)) != -1) {
+				if (output.size() + n > 16 * 1024 * 1024) throw new IOException("NPC RGB frame is too large");
+				output.write(block, 0, n);
+			}
+		}
+		byte[] bytes = output.toByteArray();
+		if (bytes.length < 25) throw new IOException("NPC RGB frame is truncated");
+		java.nio.ByteBuffer data = java.nio.ByteBuffer.wrap(bytes);
+		int width = data.getInt(), height = data.getInt(), shift = data.get() & 255;
+		int x = data.getInt(), y = data.getInt(), boundWidth = data.getInt(), boundHeight = data.getInt();
+		long pixels = (long) width * height;
+		if (width < 1 || height < 1 || width > 4096 || height > 4096 || shift > 1
+			|| boundWidth < 1 || boundHeight < 1 || boundWidth > 4096 || boundHeight > 4096
+			|| x < -4096 || x > 4096 || y < -4096 || y > 4096
+			|| 25L + pixels * 4 != bytes.length) throw new IOException("NPC RGB frame dimensions are unsafe");
+		while (data.hasRemaining()) if ((data.getInt() & 0xff000000) != 0)
+			throw new IOException("NPC RGB pixel is not normalized RGB");
+		return bytes;
+	}
+	private static com.openrsc.client.model.Sprite[] decodeRgbFrames(Path path, int base, int count, long[] budget) throws IOException {
+		com.openrsc.client.model.Sprite[] frames = new com.openrsc.client.model.Sprite[count];
+		try (ZipFile zip = new ZipFile(path.toFile())) {
+			for (int index = 0; index < count; index++) frames[index] = com.openrsc.client.model.Sprite.unpack(
+				java.nio.ByteBuffer.wrap(rgbPayload(zip, base + index, budget)));
+		}
+		return frames;
 	}
 
 	private static String sha256(InputStream input) throws IOException {
@@ -237,14 +286,21 @@ public final class ProjectNpcAnimationRegistry {
 		final boolean combat;
 		final boolean special;
 		final int authenticBase;
+		final com.openrsc.client.model.Sprite[] rgbFrames;
 		EntryDef(int id, String name, String category, int charColour, int blueMask,
-			int genderModel, boolean combat, boolean special, int authenticBase) {
+			int genderModel, boolean combat, boolean special, int authenticBase, com.openrsc.client.model.Sprite[] rgbFrames) {
 			this.id = id; this.name = name; this.category = category;
 			this.charColour = charColour; this.blueMask = blueMask;
 			this.genderModel = genderModel; this.combat = combat;
-			this.special = special; this.authenticBase = authenticBase;
+			this.special = special; this.authenticBase = authenticBase; this.rgbFrames = rgbFrames;
 		}
 		public int id() { return id; }
+		public boolean hasRgbFrames() { return rgbFrames != null; }
+		public com.openrsc.client.model.Sprite rgbFrame(int offset) {
+			if (rgbFrames == null) return null;
+			if (offset < 0 || offset >= rgbFrames.length) throw new IllegalArgumentException("NPC RGB frame offset is outside its bound");
+			return rgbFrames[offset];
+		}
 		public AnimationDef animationDef() {
 			return new AnimationDef(name, category, charColour, blueMask,
 				genderModel, combat, special, authenticBase);

@@ -1503,6 +1503,8 @@ public class GraphicsController {
 	}
 
 	public Sprite spriteSelect(AnimationDef animation, int offset) {
+		orsc.ProjectNpcAnimationRegistry.EntryDef project = EntityHandler.getProjectNpcAnimation(animation);
+		if (project != null && project.hasRgbFrames()) return project.rgbFrame(offset);
 		Sprite canonical;
 		if (!Config.S_WANT_CUSTOM_SPRITES) {
 			if (animation == null) {
