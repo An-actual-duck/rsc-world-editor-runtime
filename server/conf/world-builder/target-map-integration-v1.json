@@ -1,0 +1,471 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "world-builder-target-map-integration",
+  "integrationId": "target-owned-layered-map-v1",
+  "loaderId": "generic-signed-layered-loader-v7-blocking-base-color",
+  "protocolId": "world-builder-native-layered-protocol-v2-u16-elevation",
+  "encodingVersions": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "adapters": [
+    {
+      "adapterId": "native-layered-v4-source-v1",
+      "sources": [
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/io/NativeLayeredWorldPackage.java",
+          "payloadRelativePath": "server/conf/world-builder/target-map-source/server/src/com/openrsc/server/io/NativeLayeredWorldPackage.java",
+          "sha256": "114fd745ff34834a2bfb78a460d70e85e858119ede33476d8364b09a62213178",
+          "policy": "replace-reviewed-map-source",
+          "acceptedBeforeSha256": [
+            "02050133545aa3ca725b92529dbaaf2aad0c5b52e1389dbcbc4f15c2a30c3362"
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/io/NativeLayeredPlacementSet.java",
+          "payloadRelativePath": "server/conf/world-builder/target-map-source/server/src/com/openrsc/server/io/NativeLayeredPlacementSet.java",
+          "sha256": "0bd7f8d45ea88a3360a325f5c9df40f204e8c56b24ecdcc1a0b27fb3c1595480",
+          "policy": "replace-reviewed-map-source",
+          "acceptedBeforeSha256": [
+            "58b73ad1fb30191bda589cb28720c887950a374ffde5b8b2012009f26a406172"
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/io/WorldBuilderInstalledServerProfile.java",
+          "payloadRelativePath": "server/conf/world-builder/target-map-source/server/src/com/openrsc/server/io/WorldBuilderInstalledServerProfile.java",
+          "sha256": "4457f7d069453ab6dad55bb9fef9ec6c730e5706114cc345092dbb749110197b",
+          "policy": "add-or-exact",
+          "acceptedBeforeSha256": []
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/io/TargetOwnedMapPackageProfile.java",
+          "payloadRelativePath": "server/conf/world-builder/target-map-source/server/src/com/openrsc/server/io/TargetOwnedMapPackageProfile.java",
+          "sha256": "d4257054004c2c9c9fefd1e6abb9ecfb23ed36a119c7a1c333c717fbe337187e",
+          "policy": "add-or-exact",
+          "acceptedBeforeSha256": []
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/external/TileDef.java",
+          "payloadRelativePath": "server/conf/world-builder/target-map-source/server/src/com/openrsc/server/external/TileDef.java",
+          "sha256": "cfb64bbb3d563600a230216d4bdf74576fbeb266506828db54a6b94ece980ca2",
+          "policy": "replace-reviewed-map-source",
+          "acceptedBeforeSha256": [
+            "59e3ae5ac42da35911acd449855bfbfe007383c0ac276ea34e743774f3427fde"
+          ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/orsc/WorldBuilderInstalledClientProfile.java",
+          "payloadRelativePath": "server/conf/world-builder/target-map-source/client/src/orsc/WorldBuilderInstalledClientProfile.java",
+          "sha256": "408efba8597edfd679fd866c694649a467ef57a599fad379049e4dc0b68df147",
+          "policy": "replace-reviewed-map-source",
+          "acceptedBeforeSha256": [
+            "1a3780fe15081d155278cc2162bac076fd91ed6805f108720029bfc622cc12e2"
+          ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/orsc/WorldBuilderInstalledFloorDefinitions.java",
+          "payloadRelativePath": "server/conf/world-builder/target-map-source/client/src/orsc/WorldBuilderInstalledFloorDefinitions.java",
+          "sha256": "f22b01bea09a64fc54c17677c4eaf0b696bb63693c959440b4ac888dda9ddc02",
+          "policy": "add-or-exact",
+          "acceptedBeforeSha256": []
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/com/openrsc/client/entityhandling/defs/TileDef.java",
+          "payloadRelativePath": "server/conf/world-builder/target-map-source/client/src/com/openrsc/client/entityhandling/defs/TileDef.java",
+          "sha256": "ab1eeb86b965b7a989f07ca3da30283cfc38de15350ec014de4c12d1c4558754",
+          "policy": "replace-reviewed-map-source",
+          "acceptedBeforeSha256": [
+            "35ef77b3167ae693af48ff0d77b4b1e0aa4245dc832e7d35fa32972124bd67de"
+          ]
+        }
+      ],
+      "transforms": [
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/io/NativeLayeredWorldRuntimeProfile.java",
+          "transformId": "map-nativelayeredworldruntimeprofile-v1",
+          "edits": [
+            {
+              "before": "\tSPOILED_MILK_EDITOR_INSTALLED(\n\t\t\"spoiled-milk-editor-installed\", true);",
+              "after": "\tSPOILED_MILK_EDITOR_INSTALLED(\n\t\t\"spoiled-milk-editor-installed\", true),\n\tWORLD_BUILDER_INSTALLED(\"world-builder-installed\", true);",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\t|| this == SPOILED_MILK_EDITOR_INSTALLED;",
+              "after": "\t\t\t|| this == SPOILED_MILK_EDITOR_INSTALLED\n\t\t\t|| this == WORLD_BUILDER_INSTALLED;",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\tcase SPOILED_MILK_EDITOR_INSTALLED:\n",
+              "after": "\t\t\tcase WORLD_BUILDER_INSTALLED:\n\t\t\t\tTargetOwnedMapPackageProfile.validate(catalog, getId());\n\t\t\t\treturn;\n\t\t\tcase SPOILED_MILK_EDITOR_INSTALLED:\n",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/ServerConfiguration.java",
+          "transformId": "map-serverconfiguration-v1",
+          "edits": [
+            {
+              "before": "\tpublic String LAYERED_NATIVE_TERRAIN_MANIFEST_SHA256;\n",
+              "after": "\tpublic String LAYERED_NATIVE_TERRAIN_MANIFEST_SHA256;\n\tpublic String LAYERED_NATIVE_TERRAIN_INVENTORY_SHA256 = \"\";\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\tapplyInstalledWorldBuilderMap();\n",
+              "after": "\t\tapplyInstalledWorldBuilderMap();\n\t\tcom.openrsc.server.io.WorldBuilderInstalledServerProfile.apply(this);\n",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/io/NativeLayeredTerrainChunk.java",
+          "transformId": "map-nativelayeredterrainchunk-v1",
+          "edits": [
+            {
+              "before": "return NativeLayeredWorldPackage.RAW_ENCODING_V2.equals(encoding);",
+              "after": "return NativeLayeredWorldPackage.isWideTerrainEncoding(encoding);",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/GameStateUpdater.java",
+          "transformId": "map-gamestateupdater-v1",
+          "edits": [
+            {
+              "before": "\t\t\t\t\t\t\t\t: chunk.getSourceEncoding();",
+              "after": "\t\t\t\t\t\t\t\t: wide ? NativeLayeredWorldPackage.RAW_ENCODING_V2\n\t\t\t\t\t\t\t\t\t: NativeLayeredWorldPackage.RAW_ENCODING;",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/model/world/region/TileValue.java",
+          "transformId": "map-tilevalue-v1",
+          "edits": [
+            {
+              "before": "\tpublic byte elevation = 0;",
+              "after": "\tpublic int elevation = 0;",
+              "occurrences": 1
+            },
+            {
+              "before": "final byte elevation,",
+              "after": "final int elevation,",
+              "occurrences": 1
+            },
+            {
+              "before": "\tpublic TileValue() {\n\t}\n",
+              "after": "\tpublic TileValue() {\n\t}\n\n\t/** Missing native terrain is solid void, with target collision policies retained. */\n\tpublic static TileValue blockedVoid() {\n\t\tTileValue tile = new TileValue();\n\t\ttile.initializeTerrainCollision();\n\t\ttile.addTerrainCollision(CollisionFlag.FULL_BLOCK);\n\t\ttile.setTerrainBlocked(true);\n\t\treturn tile;\n\t}\n\n",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/model/world/region/LayeredTileState.java",
+          "transformId": "map-layeredtilestate-v1",
+          "edits": [
+            {
+              "before": "private final byte elevation;",
+              "after": "private final int elevation;",
+              "occurrences": 1
+            },
+            {
+              "before": "final byte elevation,",
+              "after": "final int elevation,",
+              "occurrences": 1
+            },
+            {
+              "before": "public byte getElevation()",
+              "after": "public int getElevation()",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/model/world/region/LayeredPackedRegionTerrainInitializationPlan.java",
+          "transformId": "map-layeredpackedregionterraininitializationplan-v1",
+          "edits": [
+            {
+              "before": "private final byte elevation;",
+              "after": "private final int elevation;",
+              "occurrences": 1
+            },
+            {
+              "before": "final byte elevation,",
+              "after": "final int elevation,",
+              "occurrences": 1
+            },
+            {
+              "before": "public byte getElevation()",
+              "after": "public int getElevation()",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/model/world/region/RegionManager.java",
+          "transformId": "map-regionmanager-v1",
+          "edits": [
+            {
+              "before": "\t\ttile.elevation = (byte) source.getElevation();",
+              "after": "\t\ttile.elevation = source.getElevation();",
+              "occurrences": 1
+            },
+            {
+              "before": "\tpublic TileValue getTile(final WorldLocation location) {\n\t\tif (hasNativeLayeredTerrain(location)) {\n\t\t\treturn nativeLayeredTile(location);\n\t\t}",
+              "after": "\tpublic TileValue getTile(final WorldLocation location) {\n\t\tif (hasNativeLayeredTerrain(location)) {\n\t\t\treturn nativeLayeredTile(location);\n\t\t}\n\t\tif (nativeLayeredWorldPackageCatalog != null\n\t\t\t&& nativeLayeredWorldRuntimeProfile == NativeLayeredWorldRuntimeProfile.WORLD_BUILDER_INSTALLED) {\n\t\t\treturn TileValue.blockedVoid();\n\t\t}",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/model/entity/Mob.java",
+          "transformId": "map-mob-v1",
+          "edits": [
+            {
+              "before": "\t\t\tif (getWorld().getRegionManager().hasNativeLayeredTerrain(owner)\n\t\t\t\t&& !getWorld().getRegionManager()\n\t\t\t\t\t.hasNativeLayeredTerrain(candidate)) {\n\t\t\t\treturn null;\n\t\t\t}",
+              "after": "\t\t\tif (getWorld().getRegionManager().hasNativeLayeredTerrain(owner)\n\t\t\t\t&& !getWorld().getRegionManager()\n\t\t\t\t\t.hasNativeLayeredTerrain(candidate)) {\n\t\t\t\treturn TileValue.blockedVoid();\n\t\t\t}",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/orsc/graphics/three/World.java",
+          "transformId": "map-world-v1",
+          "edits": [
+            {
+              "before": "\t\t\t\tif (tileX < 0 || tileZ < 0 || tileX >= LOCAL_FACE_TILE_COUNT || tileZ >= LOCAL_FACE_TILE_COUNT) {\n\t\t\t\t\tcontinue;\n\t\t\t\t}\n\t\t\t\tif (!WorldBuilderTerrainOverlay.usesBaseColor(\n\t\t\t\t\tsource.tileDecorationID(tileX, tileZ))) {\n\t\t\t\t\tcontinue;\n\t\t\t\t}\n\t\t\t\tint color = terrainRgbForTile(source, tileX, tileZ);\n",
+              "after": "\t\t\t\tif (tileX < 0 || tileZ < 0 || tileX >= LOCAL_FACE_TILE_COUNT || tileZ >= LOCAL_FACE_TILE_COUNT) {\n\t\t\t\t\tcontinue;\n\t\t\t\t}\n\t\t\t\tif (!WorldBuilderTerrainOverlay.usesBaseColor(source.tileDecorationID(tileX, tileZ))\n\t\t\t\t\t&& !explicitBaseColor(source.tileDecorationID(tileX, tileZ))) {\n\t\t\t\t\tcontinue;\n\t\t\t\t}\n\t\t\t\tint color = terrainRgbForTile(source, tileX, tileZ);\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\n\tprivate int terrainRgbForTile(TerrainModelInputSource source, int tileX, int tileZ) {\n\t\treturn resourceToRgb(this.colorToResource[source.terrainColour(tileX, tileZ)]) & 0xffffff;\n\t}\n\n\tprivate static int tileDecorationType(int rawOverlay) {\n",
+              "after": "\n\tprivate int terrainRgbForTile(TerrainModelInputSource source, int tileX, int tileZ) {\n\t\treturn resourceToRgb(this.colorToResource[source.terrainColour(tileX, tileZ)]) & 0xffffff;\n\t}\n\n\tprivate static boolean explicitBaseColor(int rawOverlay) {\n\t\tif (rawOverlay <= 0 || WorldBuilderTerrainOverlay.isBlockingBaseColor(rawOverlay)) return false;\n\t\treturn Objects.requireNonNull(EntityHandler.getTileDef(rawOverlay - 1)).usesExplicitBaseColor();\n\t}\n\n\tprivate static boolean explicitInvisible(int rawOverlay) {\n\t\tif (rawOverlay <= 0 || rawOverlay >= 250) return false;\n\t\tcom.openrsc.client.entityhandling.defs.TileDef definition = EntityHandler.getTileDef(rawOverlay - 1);\n\t\treturn definition != null && definition.getWorldBuilderSourceOverlay() > 0 && definition.getColour() == Scene.TRANSPARENT && definition.getTileValue() != 4;\n\t}\n\n\tprivate static int appearanceOverlay(int rawOverlay) {\n\t\tif (rawOverlay <= 0 || WorldBuilderTerrainOverlay.isBlockingBaseColor(rawOverlay)) return rawOverlay;\n\t\tint source = Objects.requireNonNull(EntityHandler.getTileDef(rawOverlay - 1)).getWorldBuilderSourceOverlay();\n\t\treturn source == 0 ? rawOverlay : source;\n\t}\n\n\tprivate static int tileDecorationType(int rawOverlay) {\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\t\tint decorID = source.tileDecorationID(x, z);\n\t\t\t\tboolean terrainVariationEligible = plane == 0\n\t\t\t\t\t&& WorldBuilderTerrainOverlay.usesBaseColor(decorID);\n\t\t\t\tboolean lavaGlowEmitter = decorID == LAVA_GLOW_OVERLAY_ID;\n\t\t\t\tif (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {\n\t\t\t\t\tcollisionFullBlock = true;\n\t\t\t\t} else if (decorID > 0) {\n\t\t\t\t\tint decorType = Objects.requireNonNull(EntityHandler.getTileDef(decorID - 1)).getTileValue();\n",
+              "after": "\t\t\t\tint decorID = source.tileDecorationID(x, z);\n\t\t\t\tboolean terrainVariationEligible = plane == 0\n\t\t\t\t\t&& WorldBuilderTerrainOverlay.usesBaseColor(decorID);\n\t\t\t\tboolean lavaGlowEmitter = appearanceOverlay(decorID) == LAVA_GLOW_OVERLAY_ID;\n\t\t\t\tif (explicitBaseColor(decorID) || explicitInvisible(decorID)) {\n\t\t\t\t\tcolorResource = res01 = explicitInvisible(decorID) ? Scene.TRANSPARENT : this.colorToResource[source.terrainColour(x, z)];\n\t\t\t\t\tcollisionFullBlock = EntityHandler.getTileDef(decorID - 1).getObjectType() != 0;\n\t\t\t\t\tterrainVariationEligible = plane == 0 && explicitBaseColor(decorID);\n\t\t\t\t} else if (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {\n\t\t\t\t\tcollisionFullBlock = true;\n\t\t\t\t} else if (decorID > 0) {\n\t\t\t\t\tint decorType = Objects.requireNonNull(EntityHandler.getTileDef(decorID - 1)).getTileValue();\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\t\t\tif (decorType == 4) {\n\t\t\t\t\t\tcolorResource = 1;\n\t\t\t\t\t\tres01 = 1;\n\t\t\t\t\t\tif (decorID == 12) {\n\t\t\t\t\t\t\tcolorResource = 31;\n\t\t\t\t\t\t\tres01 = 31;\n\t\t\t\t\t\t}\n",
+              "after": "\t\t\t\t\tif (decorType == 4) {\n\t\t\t\t\t\tcolorResource = 1;\n\t\t\t\t\t\tres01 = 1;\n\t\t\t\t\t\tif (appearanceOverlay(decorID) == 12) {\n\t\t\t\t\t\t\tcolorResource = 31;\n\t\t\t\t\t\t\tres01 = 31;\n\t\t\t\t\t\t}\n",
+              "occurrences": 2
+            },
+            {
+              "before": "\t\t\tx,\n\t\t\tz,\n\t\t\ttexture,\n\t\t\tRenderer3DMaterialClassifier.classifyTerrain(true, decorationId == LAVA_GLOW_OVERLAY_ID),\n\t\t\tvertexCoords));\n\t}\n\n",
+              "after": "\t\t\tx,\n\t\t\tz,\n\t\t\ttexture,\n\t\t\tRenderer3DMaterialClassifier.classifyTerrain(true, appearanceOverlay(decorationId) == LAVA_GLOW_OVERLAY_ID),\n\t\t\tvertexCoords));\n\t}\n\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\tif (id == 0) {\n\t\t\t\treturn defaultVal;\n\t\t\t}\n\t\t\tif (WorldBuilderTerrainOverlay.isBlockingBaseColor(id)) {\n\t\t\t\treturn this.colorToResource[this.getTerrainColour(xTile, zTile)];\n\t\t\t}\n\t\t\treturn Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getColour();\n",
+              "after": "\t\t\tif (id == 0) {\n\t\t\t\treturn defaultVal;\n\t\t\t}\n\t\t\tif (WorldBuilderTerrainOverlay.isBlockingBaseColor(id) || explicitBaseColor(id)) {\n\t\t\t\treturn this.colorToResource[this.getTerrainColour(xTile, zTile)];\n\t\t\t}\n\t\t\treturn Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getColour();\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t}\n\n\tprivate boolean isPickableInvisibleOverlay(int xTile, int zTile, int plane) {\n\t\treturn this.getTileDecorationID(xTile, zTile, plane) == 26;\n\t}\n\n\tprivate int getTileDecorationID(int xTile, int zTile, int plane) {\n",
+              "after": "\t}\n\n\tprivate boolean isPickableInvisibleOverlay(int xTile, int zTile, int plane) {\n\t\tint raw = this.getTileDecorationID(xTile, zTile, plane);\n\t\treturn appearanceOverlay(raw) == 26 || explicitInvisible(raw);\n\t}\n\n\tprivate int getTileDecorationID(int xTile, int zTile, int plane) {\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\t\t}\n\t\t\t\tbyte bridge00_11 = 0;\n\t\t\t\tint decorID = this.getTileDecorationID((int) x, z, plane);\n\t\t\t\tif (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {\n\t\t\t\t\tthis.collisionFlags[x][z] = FastMath.bitwiseOr(\n\t\t\t\t\t\tthis.collisionFlags[x][z], CollisionFlag.FULL_BLOCK_C);\n\t\t\t\t} else if (decorID > 0) {\n",
+              "after": "\t\t\t\t}\n\t\t\t\tbyte bridge00_11 = 0;\n\t\t\t\tint decorID = this.getTileDecorationID((int) x, z, plane);\n\t\t\t\tif (explicitBaseColor(decorID) || explicitInvisible(decorID)) {\n\t\t\t\t\tcolorResource = res01 = explicitInvisible(decorID) ? Scene.TRANSPARENT : this.colorToResource[this.getTerrainColour(x, z)];\n\t\t\t\t\tif (EntityHandler.getTileDef(decorID - 1).getObjectType() != 0)\n\t\t\t\t\t\tthis.collisionFlags[x][z] = FastMath.bitwiseOr(this.collisionFlags[x][z], CollisionFlag.FULL_BLOCK_C);\n\t\t\t\t} else if (WorldBuilderTerrainOverlay.isBlockingBaseColor(decorID)) {\n\t\t\t\t\tthis.collisionFlags[x][z] = FastMath.bitwiseOr(\n\t\t\t\t\t\tthis.collisionFlags[x][z], CollisionFlag.FULL_BLOCK_C);\n\t\t\t\t} else if (decorID > 0) {\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\tindices.add(Integer.valueOf(baseVertex));\n\t\t\tindices.add(Integer.valueOf(baseVertex + 1));\n\t\t\tindices.add(Integer.valueOf(baseVertex + 2));\n\t\t\ttriangleTextures.add(Integer.valueOf(texture));\n\t\t\ttriangleFallbackColors.add(Integer.valueOf(resolveFallbackColor(texture, fallbackColor)));\n\t\t\ttriangleModelKinds.add(kind);\n\t\t\ttriangleMaterialFamilies.add(family == null\n\t\t\t\t? Renderer3DMaterialClassifier.fallbackFor(kind)\n",
+              "after": "\t\t\tindices.add(Integer.valueOf(baseVertex));\n\t\t\tindices.add(Integer.valueOf(baseVertex + 1));\n\t\t\tindices.add(Integer.valueOf(baseVertex + 2));\n\t\t\t// Resolve the legacy front/back resources before decoding RGB. The\n\t\t\t// fallback channel contains colors only, never texture references.\n\t\t\tint material = texture == Scene.TRANSPARENT ? fallbackColor : texture;\n\t\t\ttriangleTextures.add(Integer.valueOf(material < 0 ? Scene.TRANSPARENT : material));\n\t\t\ttriangleFallbackColors.add(Integer.valueOf(material < 0 ? resourceToRgb(material) : Scene.TRANSPARENT));\n\t\t\ttriangleModelKinds.add(kind);\n\t\t\ttriangleMaterialFamilies.add(family == null\n\t\t\t\t? Renderer3DMaterialClassifier.fallbackFor(kind)\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\t} else if (kind == Renderer3DModelKind.ROOF) {\n\t\t\t\troofTriangles++;\n\t\t\t}\n\t\t}\n\n\t\tprivate int resolveFallbackColor(int texture, int fallbackColor) {\n\t\t\tif (texture == Scene.TRANSPARENT && fallbackColor != Scene.TRANSPARENT) {\n\t\t\t\treturn resourceToRgb(fallbackColor);\n\t\t\t}\n\t\t\treturn fallbackColor;\n\t\t}\n\n\t\tprivate void addWallShadowCaster(Renderer3DModelKind kind, int[] faceVertexCoords) {\n",
+              "after": "\t\t\t} else if (kind == Renderer3DModelKind.ROOF) {\n\t\t\t\troofTriangles++;\n\t\t\t}\n\t\t}\n\n\t\tprivate void addWallShadowCaster(Renderer3DModelKind kind, int[] faceVertexCoords) {\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t\tif (id == 0) {\n\t\t\t\treturn defaultVal;\n\t\t\t}\n\t\t\tif (WorldBuilderTerrainOverlay.isBlockingBaseColor(id)) {\n\t\t\t\treturn colorToResource[terrainColour(tileX, tileZ)];\n\t\t\t}\n\t\t\treturn Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getColour();\n",
+              "after": "\t\t\tif (id == 0) {\n\t\t\t\treturn defaultVal;\n\t\t\t}\n\t\t\tif (WorldBuilderTerrainOverlay.isBlockingBaseColor(id) || explicitBaseColor(id)) {\n\t\t\t\treturn colorToResource[terrainColour(tileX, tileZ)];\n\t\t\t}\n\t\t\treturn Objects.requireNonNull(EntityHandler.getTileDef(id - 1)).getColour();\n",
+              "occurrences": 1
+            },
+            {
+              "before": "\t\t}\n\n\t\tprivate boolean pickableInvisibleOverlay(int tileX, int tileZ) {\n\t\t\treturn tileDecorationID(tileX, tileZ) == 26;\n\t\t}\n\n\t\tprivate int wallDiagonal(int tileX, int tileZ) {\n",
+              "after": "\t\t}\n\n\t\tprivate boolean pickableInvisibleOverlay(int tileX, int tileZ) {\n\t\t\tint raw = tileDecorationID(tileX, tileZ);\n\t\t\treturn appearanceOverlay(raw) == 26 || explicitInvisible(raw);\n\t\t}\n\n\t\tprivate int wallDiagonal(int tileX, int tileZ) {\n",
+              "occurrences": 1
+            }
+          ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/com/openrsc/client/entityhandling/EntityHandler.java",
+          "transformId": "map-entityhandler-v1",
+          "edits": [
+            {
+              "before": "\t\tloadTileDefinitions();",
+              "after": "\t\tloadTileDefinitions();\n\t\ttry { orsc.WorldBuilderInstalledFloorDefinitions.appendTo(tiles); }\n\t\tcatch (java.io.IOException failure) { throw new IllegalStateException(\"Installed map floors conflict with target content\", failure); }",
+              "occurrences": 1
+            }
+          ]
+        }
+      ],
+      "requirements": [
+        {
+          "scope": "client",
+          "targetRelativePath": "src/orsc/WorldBuilderTerrainBootstrap.java",
+          "requiredFragments": [
+            "WorldBuilderInstalledClientProfile.current().isEnabled()"
+          ],
+          "acceptedSourceSha256": [
+            "da847d86d9d65c37288ee1ab3a96aed053cc8ed7aad5dafd1a9d43d37cbd219c"
+          ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/orsc/mudclient.java",
+          "requiredFragments": [
+            "WorldBuilderTerrainBootstrap.isNativeOnly()"
+          ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/orsc/NativeLayeredTerrainPacketDecoder.java",
+          "requiredFragments": [
+            "VISUAL_ENCODING_V2",
+            "STRUCTURAL_ENCODING_V2"
+          ],
+          "acceptedSourceSha256": [
+            "3f22bb2caa55a8ac2f165f29f4a9c703d7f56082189530b90f29a496b967ea26"
+          ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/orsc/NativeLayeredTerrainChunk.java",
+          "requiredFragments": [
+            "WIDE_TILE_WIRE_BYTES"
+          ],
+          "acceptedSourceSha256": [
+            "44c54180b49748087d37fba46a56c2ebf657029cd7cf175e6cbbcd3d29566dfc"
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/io/NativeLayeredTerrainSector.java",
+          "requiredFragments": [
+            "NativeLayeredTerrainChunk.isWideEncoding(sourceEncoding)",
+            "NativeLayeredTerrainChunk.writeWireTile("
+          ],
+          "acceptedSourceSha256": [
+            "910661ecf57cbc23d13857a0922d8063a468fb88abbe3dcaa4255995f87f89e5"
+          ]
+        },
+        {
+          "scope": "server",
+          "targetRelativePath": "src/com/openrsc/server/io/NativeLayeredWorldRuntimeProfile.java",
+          "requiredFragments": [
+            "return replacesLegacyBasePopulation;"
+          ]
+        }
+      ],
+      "requiredEntryProbes": [
+        {
+          "scope": "server",
+          "entry": "com/openrsc/server/io/NativeLayeredWorldPackage.class",
+          "markers": [
+            "layered-world-placements-v4"
+          ]
+        },
+        {
+          "scope": "client",
+          "entry": "orsc/NativeLayeredTerrainPacketDecoder.class",
+          "markers": [
+            "visual-layered-sector-v2-u16",
+            "structural-layered-sector-v2-u16"
+          ]
+        }
+      ],
+      "compilation": [
+        {
+          "scope": "server",
+          "archiveRelativePath": "core.jar",
+          "sourceRoots": [
+            "src"
+          ],
+          "dependencyDirectories": [
+            "server/lib"
+          ],
+          "sourceLevel": "8",
+          "targetLevel": "8",
+          "manifestAttributes": {
+            "World-Builder-Floor-Semantics": "standard-floors-v1",
+            "World-Builder-Installed-Floors": "installed-floors-v1"
+          },
+          "compileAllSources": true,
+          "abiChangedClasses": [
+            "com/openrsc/server/model/world/region/TileValue",
+            "com/openrsc/server/model/world/region/LayeredTileState",
+            "com/openrsc/server/model/world/region/LayeredPackedRegionTerrainInitializationPlan$TerrainTileInput"
+          ],
+          "runtimeLevel": 17
+        },
+        {
+          "scope": "server",
+          "archiveRelativePath": "plugins.jar",
+          "sourceRoots": [
+            "plugins"
+          ],
+          "dependencyDirectories": [
+            "server/lib"
+          ],
+          "dependencyArchives": [
+            "server/core.jar"
+          ],
+          "sourceLevel": "8",
+          "targetLevel": "8",
+          "runtimeLevel": 17,
+          "compileAllSources": true,
+          "manifestAttributes": {}
+        },
+        {
+          "scope": "client",
+          "archiveRelativePath": "Open_RSC_Client.jar",
+          "sourceRoots": [
+            "src"
+          ],
+          "dependencyDirectories": [
+            "PC_Client/lib",
+            "server/lib"
+          ],
+          "sourceLevel": "8",
+          "targetLevel": "8",
+          "manifestAttributes": {
+            "World-Builder-Floor-Semantics": "standard-floors-v1",
+            "World-Builder-Installed-Floors": "installed-floors-v1"
+          },
+          "compileAllSources": false,
+          "runtimeLevel": 17
+        }
+      ]
+    }
+  ]
+}
