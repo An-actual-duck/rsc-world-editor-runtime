@@ -84,6 +84,24 @@ class TargetMapIntegrationTest(unittest.TestCase):
     self.assertNotIn('AnimationRegistry',row['targetRelativePath'])
    staged={str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}
    self.assertEqual({row['payloadRelativePath'] for row in rows}|{str(stage.CONTRACT)},staged)
+ def test_floor_registry_is_verified_without_replacing_custom_fallback_behavior(self):
+  adapter=self.contract['adapters'][0];relative='src/com/openrsc/client/entityhandling/ClientDefinitionRegistry.java'
+  self.assertFalse(any(source['targetRelativePath']==relative for source in adapter['sources']))
+  registry=next(row for row in adapter['requirements'] if row['targetRelativePath']==relative)
+  original=(ROOT/'Client_Base'/relative).read_bytes()
+  self.assertIn(hashlib.sha256(original).hexdigest(),registry['acceptedSourceSha256'])
+  self.assertEqual(2,len(registry['acceptedSourceSha256']))
+  self.assertIn('private final ArrayList<TileDef> tiles = new ArrayList<>();',registry['requiredFragments'])
+  self.assertIn('ArrayList<TileDef> mutableTiles() {\n\t\treturn tiles;\n\t}',registry['requiredFragments'])
+  client=next(row for row in adapter['compilation'] if row['scope']=='client')
+  self.assertIn(relative,client['verificationSources'])
+  for row in adapter['requirements']:
+   key=(row['scope'],row['targetRelativePath'])
+   edited=any((source['scope'],source['targetRelativePath'])==key for source in adapter['sources']+adapter['transforms'])
+   compiled=any(compilation['scope']==row['scope'] and row['targetRelativePath'] in compilation.get('verificationSources',[]) for compilation in adapter['compilation'])
+   self.assertTrue(edited or compiled, 'Unverified active map capability owner: '+str(key))
+  changed=original.replace(b'ArrayList<TileDef> tiles = new ArrayList<>();',b'ArrayList<TileDef> tiles = new ArrayList<>(java.util.Arrays.asList(new TileDef(1,1,1)));',1)
+  self.assertNotIn(hashlib.sha256(changed).hexdigest(),registry['acceptedSourceSha256'])
  def test_compiled_loader_keeps_arbitrary_ids_and_v4_v5_semantics(self):
   with tempfile.TemporaryDirectory(prefix='target-map-packages-') as tmp:
    for version in (4,5):

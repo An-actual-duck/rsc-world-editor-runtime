@@ -171,6 +171,11 @@ class TargetMapAdapterCompilationTest(unittest.TestCase):
    for relative in changed:
     if relative.parts[0]=='Client_Base':
      target=selected/Path(*relative.parts[2:]);target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes((host/relative).read_bytes())
+   for compilation in adapter['compilation']:
+    if compilation['scope']=='client':
+     for relative in compilation.get('verificationSources',[]):
+      source=host/'Client_Base'/relative;target=selected/Path(*Path(relative).parts[1:])
+      target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(source.read_bytes())
    compile_sources(selected,after/'client',[clientlib,library])
    behavior('after',after)
    self.assertEqual((before/'server/synthetic/TargetContent.class').read_bytes(),(after/'server/synthetic/TargetContent.class').read_bytes())

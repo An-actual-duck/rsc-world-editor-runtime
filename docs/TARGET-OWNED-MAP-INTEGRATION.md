@@ -22,7 +22,11 @@ byte-identical. `replace-reviewed-map-source` additionally accepts only the
 listed beforeimage hashes. Mixed classes use exact, counted code edits; all
 other source bytes remain target-owned. Required source hashes and entry probes
 establish the pre-existing paired protocol integration. Probe strings alone
-are not proof of arbitrary implementations.
+are not proof of arbitrary implementations. Unmodified prerequisite classes
+(including client bootstrap, terrain wire decoders, the terrain-sector API, and
+the client definition registry) are explicit verification sources: the consumer
+checks their active bytecode against baseline source and preserves their original
+class bytes.
 
 The adapter preserves the target's old runtime profile and its original pinned
 map identities, adding a generic installed profile. It does not replace custom
@@ -62,7 +66,16 @@ Uniform and run-length encoded wide elevation use the same unsigned 16-bit wire
 representation as raw terrain. Content IDs are opaque placement identities,
 never instructions to import editor NPC appearances into the target.
 
-Installed floor loading verifies the complete existing prefix before appending
+Before upgrade mutation, the Editor extracts the closed literal
+`loadTileDefinitions` initializer and compares its ordered tuples to the planned
+installed floor prefix. Dynamic or conflicting initialization is unsupported by
+this first adapter and must be reported before mutation. The adapter binds the
+client registry to reviewed empty-list initialization and checks source/active
+bytecode coherence. Its original class and unrelated NPC/item/object fallback
+policies are retained; the registry is a verification input, never a replacement
+payload.
+
+Installed floor loading also verifies the complete existing prefix before appending
 anything. Existing `TileDef` object identities and fields remain intact; hash,
 XML, schema, size, ancestry, or prefix conflicts fail before list mutation.
 Rendering changes concern explicit base color, transparent floor partners, and
