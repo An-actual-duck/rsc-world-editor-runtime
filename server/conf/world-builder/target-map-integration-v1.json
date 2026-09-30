@@ -385,6 +385,26 @@
           "requiredFragments": [
             "return replacesLegacyBasePopulation;"
           ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/com/openrsc/client/entityhandling/ClientDefinitionRegistry.java",
+          "requiredFragments": [
+            "private final ArrayList<TileDef> tiles = new ArrayList<>();",
+            "ArrayList<TileDef> mutableTiles() {\n\t\treturn tiles;\n\t}"
+          ],
+          "acceptedSourceSha256": [
+            "93b73209907e0fccdfbc2d247ce144c9077314c71eb0396210e3732cfba21cb9",
+            "d2bf12788e1fdb2ef02cd7f1239c6fddfbe006999aaa76553f24510bea3cef20"
+          ]
+        },
+        {
+          "scope": "client",
+          "targetRelativePath": "src/com/openrsc/client/entityhandling/EntityHandler.java",
+          "requiredFragments": [
+            "private static final ClientDefinitionRegistry REGISTRY = new ClientDefinitionRegistry();",
+            "private static final ArrayList<TileDef> tiles = REGISTRY.mutableTiles();"
+          ]
         }
       ],
       "requiredEntryProbes": [
@@ -426,7 +446,10 @@
             "com/openrsc/server/model/world/region/LayeredTileState",
             "com/openrsc/server/model/world/region/LayeredPackedRegionTerrainInitializationPlan$TerrainTileInput"
           ],
-          "runtimeLevel": 17
+          "runtimeLevel": 17,
+          "verificationSources": [
+            "src/com/openrsc/server/io/NativeLayeredTerrainSector.java"
+          ]
         },
         {
           "scope": "server",
@@ -468,7 +491,14 @@
             "World-Builder-Installed-Floors": "installed-floors-v1"
           },
           "compileAllSources": false,
-          "runtimeLevel": 17
+          "runtimeLevel": 17,
+          "verificationSources": [
+            "src/com/openrsc/client/entityhandling/ClientDefinitionRegistry.java",
+            "src/orsc/WorldBuilderTerrainBootstrap.java",
+            "src/orsc/NativeLayeredTerrainPacketDecoder.java",
+            "src/orsc/NativeLayeredTerrainChunk.java",
+            "src/orsc/mudclient.java"
+          ]
         }
       ]
     }
