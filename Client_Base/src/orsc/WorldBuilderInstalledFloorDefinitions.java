@@ -20,6 +20,67 @@ public final class WorldBuilderInstalledFloorDefinitions {
         return load(Paths.get(".").toAbsolutePath().normalize());
     }
 
+    /** Adds verified map materials while retaining every existing target definition object. */
+    public static void appendTo(java.util.List<com.openrsc.client.entityhandling.defs.TileDef> existing)
+            throws IOException {
+        byte[] bytes = loadConfigured();
+        if (bytes == null) return;
+        try {
+            javax.xml.parsers.DocumentBuilderFactory factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            factory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            org.w3c.dom.Element root = factory.newDocumentBuilder()
+                .parse(new java.io.ByteArrayInputStream(bytes)).getDocumentElement();
+            if (!"TileDef-array".equals(root.getTagName()) || root.hasAttributes())
+                throw new IOException("Invalid installed floor root");
+            java.util.List<com.openrsc.client.entityhandling.defs.TileDef> supplied = new java.util.ArrayList<>();
+            for (org.w3c.dom.Node node = root.getFirstChild(); node != null; node = node.getNextSibling()) {
+                if (!(node instanceof org.w3c.dom.Element)) continue;
+                org.w3c.dom.Element row = (org.w3c.dom.Element) node;
+                if (!"TileDef".equals(row.getTagName()) || row.hasAttributes() || supplied.size() >= 249)
+                    throw new IOException("Invalid installed floor inventory");
+                java.util.Map<String, String> fields = new java.util.HashMap<>();
+                for (org.w3c.dom.Node child = row.getFirstChild(); child != null; child = child.getNextSibling()) {
+                    if (!(child instanceof org.w3c.dom.Element)) continue;
+                    String key = child.getNodeName();
+                    org.w3c.dom.Element field = (org.w3c.dom.Element) child;
+                    if (field.hasAttributes() || field.getElementsByTagName("*").getLength() != 0
+                            || !Arrays.asList("colour", "unknown", "objectType", "worldBuilderMaterial",
+                            "worldBuilderSourceOverlay").contains(key) || fields.put(key, child.getTextContent().trim()) != null)
+                        throw new IOException("Invalid installed floor field");
+                }
+                if (fields.containsKey("worldBuilderMaterial") && fields.get("worldBuilderMaterial").isEmpty()
+                        || fields.containsKey("worldBuilderSourceOverlay")
+                            && Integer.parseInt(fields.get("worldBuilderSourceOverlay")) <= 0)
+                    throw new IOException("Invalid installed floor metadata");
+                supplied.add(new com.openrsc.client.entityhandling.defs.TileDef(
+                    Integer.parseInt(fields.get("colour")), Integer.parseInt(fields.get("unknown")),
+                    Integer.parseInt(fields.get("objectType")), fields.getOrDefault("worldBuilderMaterial", ""),
+                    Integer.parseInt(fields.getOrDefault("worldBuilderSourceOverlay", "0"))));
+            }
+            com.openrsc.client.entityhandling.defs.TileDef.validateWorldBuilderDefinitions(supplied);
+            if (supplied.size() < existing.size()) throw new IOException("Installed floors remove target definitions");
+            for (int index = 0; index < existing.size(); index++) {
+                com.openrsc.client.entityhandling.defs.TileDef before = existing.get(index), after = supplied.get(index);
+                if (before == null || before.getColour() != after.getColour()
+                        || before.getTileValue() != after.getTileValue() || before.getObjectType() != after.getObjectType()
+                        || !before.getWorldBuilderMaterial().equals(after.getWorldBuilderMaterial())
+                        || before.getWorldBuilderSourceOverlay() != after.getWorldBuilderSourceOverlay())
+                    throw new IOException("Installed floors conflict with target definition " + (index + 1));
+            }
+            existing.addAll(supplied.subList(existing.size(), supplied.size()));
+        } catch (IOException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new IOException("Invalid installed floor definitions", failure);
+        }
+    }
+
     public static byte[] load(Path clientRoot) throws IOException {
         Path root = clientRoot.toAbsolutePath().normalize();
         Path descriptor = root.resolve(DESCRIPTOR);
