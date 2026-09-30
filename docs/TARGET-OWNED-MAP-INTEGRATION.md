@@ -75,3 +75,19 @@ hook applicability without compiling or executing that reference. These checks
 are not a full target-game acceptance claim: Editor integration must additionally
 exercise source/binary preservation, custom dialogue, custom appearance,
 item/object callbacks, plugin behavior, repeated import, and recovery.
+
+The separate `test-target-map-adapter-compilation.py` reconstructs older map
+source shapes from provider-owned source, compiles the complete server before
+and after every shipped edit, and compiles changed client owners. A synthetic
+plugin reads the changed elevation field across JAR ownership boundaries. The
+before loader rejects v5; after integration the actual loader accepts the same
+v5 package with elevation 65535 and retains the placed custom NPC ID. Synthetic
+visual/dialogue/item/object callbacks and a custom method in the edited tile
+class execute before and after; unrelated callback bytecode remains identical.
+The plugin bytecode necessarily changes to use the integer field descriptor.
+
+This fixture does not add its reconstructed source hashes to the production
+adapter's accepted hashes. It proves the shipped edit syntax, map decoder,
+linked map APIs, and callback preservation against coherent provider-owned
+sources. It does not claim that the reference game was compiled or run, that a
+native Windows compiler was tested, or that every custom server layout matches.

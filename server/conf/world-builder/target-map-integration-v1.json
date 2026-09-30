@@ -444,7 +444,12 @@
           "targetLevel": "8",
           "runtimeLevel": 17,
           "compileAllSources": true,
-          "manifestAttributes": {}
+          "manifestAttributes": {},
+          "abiChangedClasses": [
+            "com/openrsc/server/model/world/region/TileValue",
+            "com/openrsc/server/model/world/region/LayeredTileState",
+            "com/openrsc/server/model/world/region/LayeredPackedRegionTerrainInitializationPlan$TerrainTileInput"
+          ]
         },
         {
           "scope": "client",

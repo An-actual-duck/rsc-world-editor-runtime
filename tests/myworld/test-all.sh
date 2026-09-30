@@ -111,6 +111,7 @@ python3 ./tests/myworld/test-adaptive-id-list-validation.py
 python3 ./tests/myworld/test-project-bound-placement-definitions.py
 python3 ./tests/myworld/test-host-runtime-capability.py
 python3 ./tests/myworld/test-target-map-integration.py
+python3 ./tests/myworld/test-target-map-adapter-compilation.py
 python3 ./tests/myworld/test-current-platform-composition.py
 python3 ./tests/myworld/test-current-base-presenter-dependencies.py
 python3 ./tests/myworld/test-current-base-candidate.py
