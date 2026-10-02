@@ -10537,22 +10537,9 @@ public final class mudclient implements Runnable {
 					if (something1 != 0 && something2 != 0) {
 						int xOffset = (spriteOffsetX * width1) / something1;
 						int yOffset = (spriteOffsetY * height) / something2;
-						int colorVariant = animationDef.getCharColour();// CacheValues.animationCharacterColour[animID];
-						int baseColor = 0;
-						if (colorVariant == 1) {
-							baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-							colorVariant = def.getHairColour();// CacheValues.npcColourHair[npc.npcId];
-						} else if (animID >= 230 && Config.S_WANT_CUSTOM_SPRITES) {
-							baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-						} else if (colorVariant != 2) {
-							if (colorVariant == 3) {
-								baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-								colorVariant = def.getBottomColour();// CacheValues.npcColourBottom[npc.npcId];
-							}
-						} else {
-							colorVariant = def.getTopColour();// CacheValues.npcColourTop[npc.npcId];
-							baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-						}
+						long npcMasks = resolveNpcAnimationMasks(animationDef, animID, def);
+						int colorVariant = (int) (npcMasks >>> 32);
+						int baseColor = (int) npcMasks;
 						this.getSurface().drawSpriteClipping(sprite, xOffset + x, yOffset + y, width1, height,
 							colorVariant, baseColor, 0, false, 0, 1);
 					}
@@ -10751,6 +10738,14 @@ public final class mudclient implements Runnable {
 		return cachedBounds[mirrorIndex];
 	}
 
+	private long resolveNpcAnimationMasks(AnimationDef animation, int animationId, NPCDef def) {
+		ProjectNpcAnimationRegistry.EntryDef project = EntityHandler.getProjectNpcAnimation(animation);
+		String policy = project == null ? null : project.npcMaskPolicy();
+		if (policy == null) policy = NpcAnimationMaskPolicy.derive(animationId, Config.S_WANT_CUSTOM_SPRITES, animation.getCharColour());
+		return NpcAnimationMaskPolicy.resolve(policy, animation.getCharColour(), def.getHairColour(),
+			def.getTopColour(), def.getBottomColour(), def.getSkinColour());
+	}
+
 	public final void drawNPC(int npcIndex, int x, int y, int width1, int height, int topPixelSkew, int var3,
 							  int overlayMovement) {
 		try {
@@ -10821,22 +10816,9 @@ public final class mudclient implements Runnable {
 								int yOffset = (spriteOffsetY * height) / something2;
 								int spriteWidth = (something1 * width1) / something3;
 								xOffset -= (spriteWidth - width1) / 2;
-								int colorVariant = animationDef.getCharColour();// CacheValues.animationCharacterColour[animID];
-								int baseColor = 0;
-								if (colorVariant == 1) {
-									baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-									colorVariant = def.getHairColour();// CacheValues.npcColourHair[npc.npcId];
-								} else if (animID[var16] >= 230 && Config.S_WANT_CUSTOM_SPRITES) {
-									baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-								} else if (colorVariant != 2) {
-									if (colorVariant == 3) {
-										baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-										colorVariant = def.getBottomColour();// CacheValues.npcColourBottom[npc.npcId];
-									}
-								} else {
-									colorVariant = def.getTopColour();// CacheValues.npcColourTop[npc.npcId];
-									baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-								}
+								long npcMasks = resolveNpcAnimationMasks(animationDef, animID[var16], def);
+								int colorVariant = (int) (npcMasks >>> 32);
+								int baseColor = (int) npcMasks;
 
 								this.getSurface().drawSpriteClipping(sprite, xOffset + x, yOffset + y, spriteWidth, height,
 									colorVariant, baseColor, 0, var12, topPixelSkew, 1, npcColourTransform);
@@ -10864,22 +10846,9 @@ public final class mudclient implements Runnable {
 								int yOffset = (spriteOffsetY * height) / something2;
 								int spriteWidth = (something1 * width1) / something3;
 								xOffset -= (spriteWidth - width1) / 2;
-								int colorVariant = animationDef.getCharColour();// CacheValues.animationCharacterColour[animID];
-								int baseColor = 0;
-								if (colorVariant == 1) {
-									baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-									colorVariant = def.getHairColour();// CacheValues.npcColourHair[npc.npcId];
-								} else if (animID >= 230 && Config.S_WANT_CUSTOM_SPRITES) {
-									baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-								} else if (colorVariant != 2) {
-									if (colorVariant == 3) {
-										baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-										colorVariant = def.getBottomColour();// CacheValues.npcColourBottom[npc.npcId];
-									}
-								} else {
-									colorVariant = def.getTopColour();// CacheValues.npcColourTop[npc.npcId];
-									baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-								}
+								long npcMasks = resolveNpcAnimationMasks(animationDef, animID, def);
+								int colorVariant = (int) (npcMasks >>> 32);
+								int baseColor = (int) npcMasks;
 								this.getSurface().drawSpriteClipping(sprite, xOffset + x, yOffset + y, spriteWidth, height,
 									colorVariant, baseColor, 0, var12, topPixelSkew, 1, npcColourTransform);
 							}
@@ -10906,22 +10875,9 @@ public final class mudclient implements Runnable {
 							int yOffset = (spriteOffsetY * height) / something2;
 							int spriteWidth = (something1 * width1) / something3;
 							xOffset -= (spriteWidth - width1) / 2;
-							int colorVariant = animationDef.getCharColour();// CacheValues.animationCharacterColour[animID];
-							int baseColor = 0;
-							if (colorVariant == 1) {
-								baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-								colorVariant = def.getHairColour();// CacheValues.npcColourHair[npc.npcId];
-							} else if (animID >= 230 && Config.S_WANT_CUSTOM_SPRITES) {
-								baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-							} else if (colorVariant != 2) {
-								if (colorVariant == 3) {
-									baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-									colorVariant = def.getBottomColour();// CacheValues.npcColourBottom[npc.npcId];
-								}
-							} else {
-								colorVariant = def.getTopColour();// CacheValues.npcColourTop[npc.npcId];
-								baseColor = def.getSkinColour();// CacheValues.npcColourSkin[npc.npcId];
-							}
+							long npcMasks = resolveNpcAnimationMasks(animationDef, animID, def);
+							int colorVariant = (int) (npcMasks >>> 32);
+							int baseColor = (int) npcMasks;
 
 							this.getSurface().drawSpriteClipping(sprite, xOffset + x, yOffset + y, spriteWidth, height,
 								colorVariant, baseColor, 0, var12, topPixelSkew, 1, npcColourTransform);

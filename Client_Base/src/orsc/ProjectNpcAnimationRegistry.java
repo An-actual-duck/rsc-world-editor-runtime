@@ -86,7 +86,22 @@ public final class ProjectNpcAnimationRegistry {
 				keys.remove("customSpriteSubspace"); keys.remove("customSpriteEntry"); keys.remove("customEntrySha256");
 				keys.add("frameSource");
 			}
+			boolean policyPresent = row.has("npcMaskPolicy") || row.has("sourceAnimationId") || row.has("sourceCustomSprites");
+			if (policyPresent) {
+				if (!rgb) throw new IOException("NPC mask policy requires RGB frames");
+				keys.add("npcMaskPolicy"); keys.add("sourceAnimationId"); keys.add("sourceCustomSprites");
+			}
 			requireKeys(row, keys, "NPC animation registry row");
+			String maskPolicy = null;
+			if (policyPresent) {
+				int sourceId = boundedInt(row, "sourceAnimationId", 0, 65535), colour = exactInt(row, "charColour");
+				boolean custom = bool(row, "sourceCustomSprites");
+				String expectedPolicy = colour == 1 ? "hair-and-skin" : sourceId >= 230 && custom ? "literal-and-skin"
+					: colour == 2 ? "top-and-skin" : colour == 3 ? "bottom-and-skin" : "literal-only";
+				maskPolicy = string(row, "npcMaskPolicy");
+				if (!expectedPolicy.equals(maskPolicy)) throw new IOException("NPC mask policy disagrees with source semantics");
+			}
+
 			int id = boundedInt(row, "animationId", 0, 65535);
 			if (id <= previous) {
 				throw new IOException("NPC animation IDs are not sorted and unique");
@@ -125,7 +140,7 @@ public final class ProjectNpcAnimationRegistry {
 			com.openrsc.client.model.Sprite[] rgbFrames = rgb ? decodeRgbFrames(authenticArchive, authenticBase, required, rgbBudget) : null;
 			EntryDef value = new EntryDef(id, name, category,
 				exactInt(row, "charColour"), exactInt(row, "blueMask"),
-				exactInt(row, "genderModel"), combat, special, authenticBase, rgbFrames);
+				exactInt(row, "genderModel"), combat, special, authenticBase, rgbFrames, maskPolicy);
 			result.put(Integer.valueOf(id), value);
 		}
 		return Collections.unmodifiableMap(result);
@@ -288,13 +303,16 @@ public final class ProjectNpcAnimationRegistry {
 		final boolean special;
 		final int authenticBase;
 		final com.openrsc.client.model.Sprite[] rgbFrames;
+		final String npcMaskPolicy;
 		EntryDef(int id, String name, String category, int charColour, int blueMask,
-			int genderModel, boolean combat, boolean special, int authenticBase, com.openrsc.client.model.Sprite[] rgbFrames) {
+			int genderModel, boolean combat, boolean special, int authenticBase, com.openrsc.client.model.Sprite[] rgbFrames, String npcMaskPolicy) {
+			this.npcMaskPolicy = npcMaskPolicy;
 			this.id = id; this.name = name; this.category = category;
 			this.charColour = charColour; this.blueMask = blueMask;
 			this.genderModel = genderModel; this.combat = combat;
 			this.special = special; this.authenticBase = authenticBase; this.rgbFrames = rgbFrames;
 		}
+		public String npcMaskPolicy() { return npcMaskPolicy; }
 		public int id() { return id; }
 		public boolean hasRgbFrames() { return rgbFrames != null; }
 		public com.openrsc.client.model.Sprite rgbFrame(int offset) {

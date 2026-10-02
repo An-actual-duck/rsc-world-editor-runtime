@@ -107,6 +107,7 @@ python3 ./tests/myworld/test-project-content-bundle-v2-runtime.py
 python3 ./tests/myworld/test-project-scenery-model-fallback.py
 python3 ./tests/myworld/test-project-npc-animation-registry-v1.py
 python3 ./tests/myworld/test-project-npc-rgb-frames.py
+python3 ./tests/myworld/test-project-npc-mask-policy.py
 python3 ./tests/myworld/test-adaptive-id-list-validation.py
 python3 ./tests/myworld/test-project-bound-placement-definitions.py
 python3 ./tests/myworld/test-host-runtime-capability.py
