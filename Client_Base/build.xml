@@ -75,6 +75,7 @@
                 <attribute name="World-Builder-Floor-Semantics" value="standard-floors-v1"/>
                 <attribute name="World-Builder-Installed-Floors" value="installed-floors-v1"/>
                 <attribute name="World-Builder-Npc-Rgb" value="npc-rgb-frames-v1"/>
+                <attribute name="World-Builder-Npc-Mask-Policy" value="npc-mask-policy-v1"/>
                 <attribute name="World-Builder-Npc-Animation-Count" value="1080"/>
                 <attribute name="Main-Class" value="orsc.OpenRSC"/>
             </manifest>

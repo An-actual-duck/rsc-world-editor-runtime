@@ -68,7 +68,22 @@ final class AdaptiveWorldBuilderNpcAnimationRegistry {
 				keys.remove("customSpriteSubspace"); keys.remove("customSpriteEntry"); keys.remove("customEntrySha256");
 				keys.add("frameSource");
 			}
+			boolean policyPresent = row.has("npcMaskPolicy") || row.has("sourceAnimationId") || row.has("sourceCustomSprites");
+			if (policyPresent) {
+				if (!rgb) throw new IOException("NPC mask policy requires RGB frames");
+				keys.add("npcMaskPolicy"); keys.add("sourceAnimationId"); keys.add("sourceCustomSprites");
+			}
 			requireKeys(row, keys);
+			String maskPolicy = null;
+			if (policyPresent) {
+				int sourceId = bounded(row, "sourceAnimationId", 0, 65535), colour = integer(row, "charColour");
+				boolean custom = bool(row, "sourceCustomSprites");
+				String expectedPolicy = colour == 1 ? "hair-and-skin" : sourceId >= 230 && custom ? "literal-and-skin"
+					: colour == 2 ? "top-and-skin" : colour == 3 ? "bottom-and-skin" : "literal-only";
+				maskPolicy = text(row, "npcMaskPolicy");
+				if (!expectedPolicy.equals(maskPolicy)) throw new IOException("NPC mask policy disagrees with source semantics");
+			}
+
 			int id = bounded(row, "animationId", 0, 65535);
 			if (id <= previous) throw new IOException("NPC animation IDs are not sorted and unique");
 			previous = id;
