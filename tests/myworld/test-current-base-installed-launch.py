@@ -225,8 +225,9 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         windows = xdo("search", "--onlyvisible", "--pid", client.pid).split()
         self.assertEqual(1, len(windows), "Only this owned child window is admitted for test input")
         window = windows[0]
+        # Let the window manager select Java's focus proxy. Forcing X focus
+        # onto the top-level frame makes AWT lose keyboard focus on ScaledWindow.
         xdo("windowactivate", "--sync", window)
-        xdo("windowfocus", "--sync", window)
         def capture():
             # Capture only this child-owned window, never a desktop rectangle or another application.
             raw = subprocess.run(["xwd", "-silent", "-nobdrs", "-id", window],
@@ -313,8 +314,8 @@ class CurrentBaseInstalledLaunchTest(unittest.TestCase):
         windows = xdo("search", "--onlyvisible", "--pid", client.pid).split()
         self.assertEqual(1, len(windows))
         window = windows[0]
+        # Preserve the toolkit-managed focus proxy (see manual_login).
         xdo("windowactivate", "--sync", window)
-        xdo("windowfocus", "--sync", window)
         raw = subprocess.run(["xwd", "-silent", "-nobdrs", "-id", window],
             check=True, capture_output=True).stdout
         header = struct.unpack(">25I", raw[:100])
