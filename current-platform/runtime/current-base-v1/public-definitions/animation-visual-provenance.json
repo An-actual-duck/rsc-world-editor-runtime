@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "manifestType": "current-base-public-animation-visual-provenance",
+  "sourceCommit": "deb55301702dc80f49497ac722341895145363e1",
+  "sourcePath": "Client_Base/src/com/openrsc/client/entityhandling/EntityHandler.java",
+  "allocatorSourcePath": "Client_Base/src/orsc/mudclient.java",
+  "sourceSha256": "d02b5cea80eb499d3ec99e78de6edd9096f0f8b71c72597b43928e9d6cd5e9a4",
+  "allocatorSourceSha256": "f42d7768bf8795962915e873274bc5df83361976790337cbb76779f59ed5aa04",
+  "profileId": "current-base-authentic-npc-visuals-v1",
+  "flags": {
+    "Config.S_WANT_CUSTOM_SPRITES": false,
+    "Config.S_ALLOW_BEARDED_LADIES": false
+  },
+  "profileConfigurationPath": "current-platform/runtime/current-base-v1/server/current-base.conf",
+  "profileConfigurationSha256": "f3fe644e51cbe26ca924b160d75b03d19f089d11991fb9cc97b5e6a27154abe7",
+  "path": "animation-visuals.json",
+  "sha256": "5f7dd8fbdb1c121ba48200dc335cb24ce3c99e2540677fca889959c047134f3e",
+  "size": 49560,
+  "recordCount": 229,
+  "derivation": "reviewed-authentic-prefix-literal-registry-case-insensitive-name-allocation-27-slot-gap-v1",
+  "precedence": "explicit-project-animation-registry-overrides-this-implicit-profile",
+  "unsupported": "No implicit animation IDs above 228; no custom-sprite profile; no target gameplay or source authority."
+}

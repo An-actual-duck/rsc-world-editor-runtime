@@ -116,6 +116,7 @@ python3 ./tests/myworld/test-current-platform-composition.py
 python3 ./tests/myworld/test-current-base-presenter-dependencies.py
 python3 ./tests/myworld/test-current-base-candidate.py
 python3 ./tests/myworld/test-current-base-public-definitions.py
+python3 ./tests/myworld/test-current-base-animation-visuals.py
 python3 ./tests/myworld/test-current-base-public-runtime.py
 python3 ./tests/myworld/test-current-base-state-migration.py
 python3 ./tests/myworld/test-current-base-state-location.py
