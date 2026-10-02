@@ -72,3 +72,21 @@ not logged in, so its existing death-world side-effect guard remains active.
 These are not GUI, player death/inventory, complete combat balancing, hiscores,
 or full imported-map acceptance claims. Generic/unselected Firemaking hiding,
 20-skill packet shape and combined-melee behavior remain covered controls.
+
+`animation-visuals.json` is inert presentation lookup data for the pinned Base
+renderer profile `current-base-authentic-npc-visuals-v1`. Both custom sprites and
+bearded ladies are disabled by that profile. Its 229 implicit animation IDs
+(0–228) retain exact names, categories, masks, frame flags and authentic sprite
+allocations; repeated names share allocations case-insensitively. Allocation
+reserves 27 slots per new name and skips from 1998 to 3300. This is not `id * 27`.
+
+Regenerate with `python3 scripts/derive-current-base-public-animation-visuals.py`.
+The exporter accepts only its reviewed provider source and allocator hashes;
+`animation-visual-provenance.json` binds those inputs, profile and output.
+The focused animation test executes the maintained Java registry prefix and
+allocator against every exported row, and independently exercises the reserved
+gap and case-insensitive aliases. Explicit captured project animation metadata
+always takes precedence. IDs above 228 and other runtime profiles require their
+own verified metadata; this file grants no authority over target gameplay,
+custom content or source code. `genderModel` is preserved registry metadata,
+not an NPC pixel-rendering input.
