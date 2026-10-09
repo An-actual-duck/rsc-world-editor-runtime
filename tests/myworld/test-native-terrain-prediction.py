@@ -788,13 +788,13 @@ class NativeTerrainPredictionTest(unittest.TestCase):
         )[1].split(
             "private boolean canActivateNativeTerrainStage", 1
         )[0]
-        self.assertIn("stagedTerrain.commitResidency();", accept_method)
+        self.assertNotIn("commitResidency();", accept_method)
         send_method = updater.split(
             "private void maybeSendNativeTerrainStage", 1
         )[1].split(
             "private int[] predictNativeTerrainCenter", 1
         )[0]
-        self.assertNotIn("stagedTerrain.commitResidency();", send_method)
+        self.assertIn("stagedTerrain.commitResidency();", send_method)
         self.assertIn("SEND_LAYERED_TERRAIN_STAGE, 154", generator)
         self.assertIn("case 155:", parser)
         self.assertIn("OpcodeIn.LAYERED_TERRAIN_STAGE_READY", parser)

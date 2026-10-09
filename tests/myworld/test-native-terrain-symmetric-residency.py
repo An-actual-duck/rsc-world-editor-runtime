@@ -387,9 +387,13 @@ class NativeTerrainSymmetricResidencyTest(unittest.TestCase):
             match = coordinate.search(path.relative_to(PACKAGE_TERRAIN).as_posix())
             self.assertIsNotNone(match, path)
             raw = path.read_bytes()
-            self.assertEqual(len(raw), 48 * 48 * 10)
-            visual = b"".join(raw[offset : offset + 3]
-                              for offset in range(0, len(raw), 10))
+            # Both supported raw encodings retain the same seven structural
+            # bytes; v2 adds one elevation byte to the visual prefix.
+            stride = len(raw) // (48 * 48)
+            self.assertIn(stride, (10, 11))
+            self.assertEqual(len(raw), 48 * 48 * stride)
+            visual = b"".join(raw[offset : offset + stride - 7]
+                              for offset in range(0, len(raw), stride))
             sectors[
                 (
                     signed(match["level"]),
@@ -429,9 +433,12 @@ class NativeTerrainSymmetricResidencyTest(unittest.TestCase):
             match = coordinate.search(path.relative_to(PACKAGE_TERRAIN).as_posix())
             self.assertIsNotNone(match, path)
             raw = path.read_bytes()
+            stride = len(raw) // (48 * 48)
+            self.assertIn(stride, (10, 11))
+            self.assertEqual(len(raw), 48 * 48 * stride)
             structural = b"".join(
-                raw[offset + 3 : offset + 10]
-                for offset in range(0, len(raw), 10)
+                raw[offset + stride - 7 : offset + stride]
+                for offset in range(0, len(raw), stride)
             )
             sectors[
                 (

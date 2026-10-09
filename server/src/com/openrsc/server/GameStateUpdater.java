@@ -159,8 +159,6 @@ public final class GameStateUpdater {
 		"native_terrain_pending_stage";
 	private static final String NATIVE_TERRAIN_ACCEPTED_STAGE_ATTRIBUTE =
 		"native_terrain_accepted_stage";
-	private static final String NATIVE_TERRAIN_STAGE_TRANSACTION_ATTRIBUTE =
-		"native_terrain_stage_transaction";
 	private static final String NATIVE_TERRAIN_SYMMETRIC_VISUAL_CONTEXT_ATTRIBUTE =
 		"native_terrain_symmetric_visual_context";
 	private static final String NATIVE_TERRAIN_SYMMETRIC_STRUCTURE_CONTEXT_ATTRIBUTE =
@@ -508,15 +506,7 @@ public final class GameStateUpdater {
 		if (pending == null || !pending.matches(receipt)) {
 			return;
 		}
-		final NativeLayeredSceneTerrain stagedTerrain =
-			player.getAttribute(
-				NATIVE_TERRAIN_STAGE_TRANSACTION_ATTRIBUTE, null);
-		if (stagedTerrain == null) {
-			return;
-		}
-		stagedTerrain.commitResidency();
-		player.removeAttribute(
-			NATIVE_TERRAIN_STAGE_TRANSACTION_ATTRIBUTE);
+		// ACK proves prebuild readiness; wire residency committed at queue time.
 		player.setAttribute(
 			NATIVE_TERRAIN_ACCEPTED_STAGE_ATTRIBUTE, pending);
 		if (receipt.protocolVersion
@@ -637,14 +627,13 @@ public final class GameStateUpdater {
 				player)) {
 			return;
 		}
+		// Mirror the client decode in wire order, independently of readiness ACK.
+		stagedTerrain.commitResidency();
 		player.setAttribute(
 			NATIVE_TERRAIN_STAGE_SEQUENCE_ATTRIBUTE, sequence);
 		player.setAttribute(
 			NATIVE_TERRAIN_PENDING_STAGE_ATTRIBUTE,
 			NativeLayeredTerrainStageReadiness.from(stage));
-		player.setAttribute(
-			NATIVE_TERRAIN_STAGE_TRANSACTION_ATTRIBUTE,
-			stagedTerrain);
 		player.removeAttribute(NATIVE_TERRAIN_ACCEPTED_STAGE_ATTRIBUTE);
 	}
 
@@ -727,14 +716,13 @@ public final class GameStateUpdater {
 				player)) {
 			return;
 		}
+		// Mirror the client decode in wire order, independently of readiness ACK.
+		stagedTerrain.commitResidency();
 		player.setAttribute(
 			NATIVE_TERRAIN_STAGE_SEQUENCE_ATTRIBUTE, sequence);
 		player.setAttribute(
 			NATIVE_TERRAIN_PENDING_STAGE_ATTRIBUTE,
 			NativeLayeredTerrainStageReadiness.from(stage));
-		player.setAttribute(
-			NATIVE_TERRAIN_STAGE_TRANSACTION_ATTRIBUTE,
-			stagedTerrain);
 		player.removeAttribute(NATIVE_TERRAIN_ACCEPTED_STAGE_ATTRIBUTE);
 	}
 
@@ -798,14 +786,13 @@ public final class GameStateUpdater {
 				player)) {
 			return;
 		}
+		// Mirror the client decode in wire order, independently of readiness ACK.
+		haloTerrain.commitResidency();
 		player.setAttribute(
 			NATIVE_TERRAIN_STAGE_SEQUENCE_ATTRIBUTE, sequence);
 		player.setAttribute(
 			NATIVE_TERRAIN_PENDING_STAGE_ATTRIBUTE,
 			NativeLayeredTerrainStageReadiness.from(halo));
-		player.setAttribute(
-			NATIVE_TERRAIN_STAGE_TRANSACTION_ATTRIBUTE,
-			haloTerrain);
 		player.removeAttribute(NATIVE_TERRAIN_ACCEPTED_STAGE_ATTRIBUTE);
 	}
 
@@ -953,7 +940,6 @@ public final class GameStateUpdater {
 	private static void clearNativeTerrainStage(final Player player) {
 		player.removeAttribute(NATIVE_TERRAIN_PENDING_STAGE_ATTRIBUTE);
 		player.removeAttribute(NATIVE_TERRAIN_ACCEPTED_STAGE_ATTRIBUTE);
-		player.removeAttribute(NATIVE_TERRAIN_STAGE_TRANSACTION_ATTRIBUTE);
 		player.removeAttribute(
 			NATIVE_TERRAIN_SYMMETRIC_VISUAL_CONTEXT_ATTRIBUTE);
 		player.removeAttribute(
