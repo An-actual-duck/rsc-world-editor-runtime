@@ -30,6 +30,7 @@ public final class NativeTerrainStageContextReplay {
     private static final String VERSION = "1.0.0";
     private static final String SHA = repeat('a');
     private static final String SOURCE_SHA = repeat('b');
+    private static boolean wide;
     private final Object nativeTerrainWireCache = new Object();
     private final Player player = new Player();
     private final NativeLayeredTerrainClientResidency serverCache = new NativeLayeredTerrainClientResidency();
@@ -112,12 +113,14 @@ public final class NativeTerrainStageContextReplay {
             boolean outer = Math.max(Math.abs(dx), Math.abs(dy)) == 2;
             slot.available = !structural || outer;
             if (slot.available) {
-                slot.sourceEncoding = structural ? NativeLayeredTerrainChunk.STRUCTURAL_ENCODING
-                    : outer ? NativeLayeredTerrainChunk.VISUAL_ENCODING : "rsc-sector-v1";
+                slot.sourceEncoding = structural
+                    ? (wide ? NativeLayeredTerrainChunk.STRUCTURAL_ENCODING_V2 : NativeLayeredTerrainChunk.STRUCTURAL_ENCODING)
+                    : outer ? (wide ? NativeLayeredTerrainChunk.VISUAL_ENCODING_V2 : NativeLayeredTerrainChunk.VISUAL_ENCODING)
+                    : (wide ? NativeLayeredTerrainChunk.RAW_ENCODING_V2 : NativeLayeredTerrainChunk.RAW_ENCODING);
                 slot.sourcePayloadSha256 = SOURCE_SHA;
                 slot.payloadPresent = transaction.requiresPayload(identity(slot));
                 if (slot.payloadPresent) {
-                    int width = structural ? 7 : outer ? 3 : 10;
+                    int width = structural ? 7 : outer ? (wide ? 4 : 3) : (wide ? 11 : 10);
                     slot.tileBytes = compress(new byte[48 * 48 * width]);
                 }
             }
@@ -195,6 +198,7 @@ public final class NativeTerrainStageContextReplay {
     }
 
     public static void main(String[] args) {
+        wide = args.length > 0 && "wide".equals(args[0]);
         NativeTerrainStageContextReplay replay = new NativeTerrainStageContextReplay();
         replay.context(3, 13);
         replay.haloThenStructure(3, 13);
@@ -249,10 +253,11 @@ public final class NativeTerrainStageContextReplay {
         require(before.equals(keys(replay.serverCache)), "failed queue changed mirror");
         require(replay.player.getAttribute(NATIVE_TERRAIN_PENDING_STAGE_ATTRIBUTE, null) == null, "failed queue published pending");
         replay.assertPaired("failed queue");
+        replay.queueSucceeds = true;
         replay.serverCache.clear(); replay.clientCache.clear(); clearNativeTerrainStage(replay.player);
         replay.context(3, 13); replay.haloThenStructure(3, 13);
         replay.ack(structural); replay.assertPaired("reconnect and ancient ACK");
-        System.out.println("PASS: production stage queue/ACK replay, full paired wire/decoder cache order, capacity, reversal, teleport, reconnect, failed queues");
+        System.out.println((wide ? "wide: " : "legacy: ") + "PASS: production stage queue/ACK replay, full paired wire/decoder cache order, capacity, reversal, teleport, reconnect, failed queues");
     }
     private static byte[] readPacket(Packet packet) {
         try { return packet.readBytes(packet.getBuffer().readableBytes()); }

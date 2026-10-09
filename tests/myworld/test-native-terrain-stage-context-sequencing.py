@@ -59,8 +59,12 @@ class StageContextSequencingTest(unittest.TestCase):
                             str(ROOT / "tests/myworld/fixtures/orsc/WorldBuilderClientProfile.java"),
                             *[str(ROOT / f"Client_Base/src/orsc/{name}.java") for name in client]],
                            check=True, cwd=ROOT)
-            subprocess.run([java, "-cp", os.pathsep.join([str(work), str(ROOT / "server/lib/*")]),
-                            "orsc.NativeTerrainStageContextReplay"], check=True, cwd=ROOT)
+            self.assertTrue((work / "com/openrsc/server/GameStateUpdater.class").is_file(),
+                            "The changed production updater must compile, not only the facade")
+            for encoding in ("legacy", "wide"):
+                with self.subTest(encoding=encoding):
+                    subprocess.run([java, "-cp", os.pathsep.join([str(work), str(ROOT / "server/lib/*")]),
+                                    "orsc.NativeTerrainStageContextReplay", encoding], check=True, cwd=ROOT)
 
 
 if __name__ == "__main__":
